@@ -46,7 +46,7 @@ Home: <https://github.com/indynull/icedtea>.
 
 1. Set `version` in `Cargo.toml` and add a `CHANGELOG.md` section.
 2. Push `master`. GitHub Actions runs `just check` on Linux, macOS, and
-   Windows.
+   Windows, and the test suite on Ubuntu `stable` and `beta`.
 3. Store `CARGO_REGISTRY_TOKEN` as a repository secret (crates.io API
    token).
 4. Tag `vX.Y.Z` (same numbers as `version`) and push the tag.
