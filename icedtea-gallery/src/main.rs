@@ -1234,14 +1234,9 @@ impl Gallery {
                 tok,
                 &self.catalog,
             ),
-            "about" => pattern::about_page(
-                "icedtea",
-                "0.1.0",
-                "MIT",
-                "Gallery",
-                tok,
-                &self.catalog,
-            ),
+            "about" => {
+                pattern::about_page("icedtea", "0.1.0", "MIT", "Gallery", tok, &self.catalog)
+            }
             "status-page" => pattern::status_page(
                 "Nothing here",
                 "Create an item to begin.",
