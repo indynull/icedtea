@@ -1,0 +1,218 @@
+//! Accessible name, role, value, and state for every public widget.
+
+use iced::widget::{container, Id};
+use iced::Element;
+
+/// Platform role.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// let a = A11y::button("Save");
+/// assert_eq!(a.role, Role::Button);
+/// assert!(!a.disabled);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Role {
+    Button,
+    Checkbox,
+    Radio,
+    Switch,
+    Slider,
+    Progress,
+    SpinButton,
+    TextBox,
+    ComboBox,
+    List,
+    ListItem,
+    Table,
+    Tree,
+    Tab,
+    Menu,
+    MenuItem,
+    Dialog,
+    Tooltip,
+    Image,
+    Link,
+    Header,
+    Status,
+    Separator,
+    Group,
+}
+
+impl Role {
+    /// Stable token used in [`A11y::node_id`].
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Button => "button",
+            Self::Checkbox => "checkbox",
+            Self::Radio => "radio",
+            Self::Switch => "switch",
+            Self::Slider => "slider",
+            Self::Progress => "progress",
+            Self::SpinButton => "spinbutton",
+            Self::TextBox => "textbox",
+            Self::ComboBox => "combobox",
+            Self::List => "list",
+            Self::ListItem => "listitem",
+            Self::Table => "table",
+            Self::Tree => "tree",
+            Self::Tab => "tab",
+            Self::Menu => "menu",
+            Self::MenuItem => "menuitem",
+            Self::Dialog => "dialog",
+            Self::Tooltip => "tooltip",
+            Self::Image => "image",
+            Self::Link => "link",
+            Self::Header => "header",
+            Self::Status => "status",
+            Self::Separator => "separator",
+            Self::Group => "group",
+        }
+    }
+}
+
+/// Accessible metadata attached to a widget.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct A11y {
+    pub name: String,
+    pub role: Role,
+    pub value: Option<String>,
+    pub disabled: bool,
+    pub checked: Option<bool>,
+}
+
+impl A11y {
+    pub fn new(name: impl Into<String>, role: Role) -> Self {
+        Self {
+            name: name.into(),
+            role,
+            value: None,
+            disabled: false,
+            checked: None,
+        }
+    }
+
+    pub fn button(name: impl Into<String>) -> Self {
+        Self::new(name, Role::Button)
+    }
+
+    pub fn with_value(mut self, value: impl Into<String>) -> Self {
+        self.value = Some(value.into());
+        self
+    }
+
+    pub fn with_disabled(mut self, disabled: bool) -> Self {
+        self.disabled = disabled;
+        self
+    }
+
+    pub fn with_checked(mut self, checked: bool) -> Self {
+        self.checked = Some(checked);
+        self
+    }
+
+    /// Encodes name, role, value, disabled, and checked for the iced widget id.
+    pub fn node_id(&self) -> String {
+        let checked = match self.checked {
+            Some(true) => "1",
+            Some(false) => "0",
+            None => "",
+        };
+        format!(
+            "{}|{}|{}|{}|{checked}",
+            self.role.as_str(),
+            self.name,
+            self.value.as_deref().unwrap_or(""),
+            u8::from(self.disabled),
+        )
+    }
+
+    /// Visible name: explicit [`Self::name`] or the constructor fallback.
+    pub fn apply_name(&self, fallback: impl Into<String>) -> String {
+        if self.name.is_empty() {
+            fallback.into()
+        } else {
+            self.name.clone()
+        }
+    }
+
+    /// Checked state: explicit [`Self::checked`] or the constructor fallback.
+    pub fn apply_checked(&self, fallback: bool) -> bool {
+        self.checked.unwrap_or(fallback)
+    }
+
+    /// Drop a press/toggle handler when disabled.
+    pub fn apply_message<M>(&self, msg: Option<M>) -> Option<M> {
+        if self.disabled {
+            None
+        } else {
+            msg
+        }
+    }
+}
+
+/// Attach name/role/value/disabled/checked to a child (iced 0.14 has no accesskit slot).
+pub fn attach<'a, M: 'a>(child: Element<'a, M>, a11y: &A11y) -> Element<'a, M> {
+    container(child).id(Id::from(a11y.node_id())).into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn builder_covers_roles() {
+        let a = A11y::button("Go")
+            .with_value("idle")
+            .with_disabled(true)
+            .with_checked(false);
+        assert_eq!(a.name, "Go");
+        assert_eq!(a.role, Role::Button);
+        assert_eq!(a.value.as_deref(), Some("idle"));
+        assert!(a.disabled);
+        assert_eq!(a.checked, Some(false));
+        for role in [
+            Role::Checkbox,
+            Role::Radio,
+            Role::Switch,
+            Role::Slider,
+            Role::Progress,
+            Role::SpinButton,
+            Role::TextBox,
+            Role::ComboBox,
+            Role::List,
+            Role::ListItem,
+            Role::Table,
+            Role::Tree,
+            Role::Tab,
+            Role::Menu,
+            Role::MenuItem,
+            Role::Dialog,
+            Role::Tooltip,
+            Role::Image,
+            Role::Link,
+            Role::Header,
+            Role::Status,
+            Role::Separator,
+            Role::Group,
+        ] {
+            let a = A11y::new("x", role).with_value("v");
+            assert!(a.node_id().starts_with(role.as_str()));
+            assert!(a.node_id().contains("|x|v|"));
+            let _: Element<'_, ()> = attach(iced::widget::text("x").into(), &a);
+        }
+        let disabled = A11y::button("Save").with_disabled(true).with_value("idle");
+        assert_eq!(disabled.node_id(), "button|Save|idle|1|");
+        assert!(disabled.apply_message(Some(1u8)).is_none());
+        assert_eq!(disabled.apply_name("other"), "Save");
+        assert_eq!(A11y::button("").apply_name("Save"), "Save");
+        assert!(A11y::new("c", Role::Checkbox)
+            .with_checked(true)
+            .apply_checked(false));
+        assert!(!A11y::new("c", Role::Checkbox).apply_checked(false));
+        assert_eq!(
+            A11y::button("Go").with_checked(false).node_id(),
+            "button|Go||0|0"
+        );
+    }
+}

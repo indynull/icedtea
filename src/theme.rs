@@ -1,0 +1,509 @@
+//! Semantic color tokens, mixing rules, and the named community catalog.
+
+use std::collections::BTreeMap;
+use std::sync::OnceLock;
+
+use iced::Color;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+/// Semantic colors used by every styled widget.
+///
+/// ```
+/// let dark = icedtea::theme::named("dark");
+/// assert_eq!(dark.name, "dark");
+/// assert!(dark.tokens.canvas.r < 0.2);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Tokens {
+    pub canvas: Color,
+    pub surface: Color,
+    pub panel: Color,
+    pub text: Color,
+    pub muted: Color,
+    pub primary: Color,
+    pub accent: Color,
+    pub success: Color,
+    pub warning: Color,
+    pub danger: Color,
+    pub border: Color,
+    pub selection: Color,
+    pub selection_text: Color,
+}
+
+/// A named theme: catalog key plus tokens.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct NamedTheme {
+    pub name: &'static str,
+    pub tokens: Tokens,
+    pub dark: bool,
+}
+
+/// Blend `fg` over `bg` by `amount` (0 = bg, 1 = fg). Result is opaque.
+///
+/// ```
+/// use iced::Color;
+/// let mixed = icedtea::theme::mix(Color::WHITE, Color::BLACK, 0.5);
+/// assert!((mixed.r - 0.5).abs() < 0.01);
+/// assert_eq!(mixed.a, 1.0);
+/// ```
+pub fn mix(fg: Color, bg: Color, amount: f32) -> Color {
+    let t = amount.clamp(0.0, 1.0);
+    Color::from_rgb(
+        fg.r * t + bg.r * (1.0 - t),
+        fg.g * t + bg.g * (1.0 - t),
+        fg.b * t + bg.b * (1.0 - t),
+    )
+}
+
+/// Hover wash over canvas.
+pub fn hover_fill(tok: Tokens) -> Color {
+    mix(tok.text, tok.canvas, 0.08)
+}
+
+/// Pressed wash over canvas.
+pub fn pressed_fill(tok: Tokens) -> Color {
+    mix(tok.text, tok.canvas, 0.14)
+}
+
+/// Chip / quiet fill.
+pub fn chip_fill(tok: Tokens) -> Color {
+    mix(tok.text, tok.canvas, 0.10)
+}
+
+/// Primary wash used for selected rows.
+pub fn selection_fill(tok: Tokens) -> Color {
+    mix(tok.primary, tok.canvas, 0.28)
+}
+
+fn rgb(r: u8, g: u8, b: u8) -> Color {
+    Color::from_rgb8(r, g, b)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn tokens(
+    canvas: Color,
+    surface: Color,
+    panel: Color,
+    text: Color,
+    muted: Color,
+    primary: Color,
+    accent: Color,
+    success: Color,
+    warning: Color,
+    danger: Color,
+    border: Color,
+) -> Tokens {
+    Tokens {
+        canvas,
+        surface,
+        panel,
+        text,
+        muted,
+        primary,
+        accent,
+        success,
+        warning,
+        danger,
+        border,
+        selection: mix(primary, canvas, 0.28),
+        selection_text: text,
+    }
+}
+
+const CATALOG_JSON: &str = include_str!("../assets/themes/catalog.json");
+
+fn intern(s: &str) -> &'static str {
+    Box::leak(s.to_string().into_boxed_str())
+}
+
+fn parse_hex(s: &str) -> Option<Color> {
+    let t = s.trim().trim_start_matches('#');
+    if t.len() < 6 || !t.as_bytes()[..6].iter().all(|c| c.is_ascii_hexdigit()) {
+        return None;
+    }
+    let r = u8::from_str_radix(&t[0..2], 16).ok()?;
+    let g = u8::from_str_radix(&t[2..4], 16).ok()?;
+    let b = u8::from_str_radix(&t[4..6], 16).ok()?;
+    Some(Color::from_rgb8(r, g, b))
+}
+
+fn hex_of(obj: &Value, key: &str, fallback: Color) -> Color {
+    obj.get(key)
+        .and_then(Value::as_str)
+        .and_then(parse_hex)
+        .unwrap_or(fallback)
+}
+
+fn high_contrast() -> NamedTheme {
+    NamedTheme {
+        name: "high-contrast",
+        dark: true,
+        tokens: Tokens {
+            canvas: rgb(0x00, 0x00, 0x00),
+            surface: rgb(0x00, 0x00, 0x00),
+            panel: rgb(0x1A, 0x1A, 0x1A),
+            text: rgb(0xFF, 0xFF, 0xFF),
+            muted: rgb(0xE0, 0xE0, 0xE0),
+            primary: rgb(0xFF, 0xFF, 0x00),
+            accent: rgb(0x00, 0xFF, 0xFF),
+            success: rgb(0x00, 0xFF, 0x00),
+            warning: rgb(0xFF, 0xC0, 0x00),
+            danger: rgb(0xFF, 0x40, 0x40),
+            border: rgb(0xFF, 0xFF, 0xFF),
+            selection: rgb(0x00, 0x00, 0xAA),
+            selection_text: rgb(0xFF, 0xFF, 0xFF),
+        },
+    }
+}
+
+fn alias(name: &str) -> &str {
+    match name {
+        "gruvbox-dark" => "gruvbox",
+        "one-dark" | "onedark" => "atom-one-dark",
+        "one-light" => "atom-one-light",
+        _ => name,
+    }
+}
+
+fn load_catalog() -> BTreeMap<&'static str, NamedTheme> {
+    let mut map = BTreeMap::new();
+    if let Ok(Value::Object(root)) = serde_json::from_str::<Value>(CATALOG_JSON) {
+        for (name, rec) in root {
+            let Some(obj) = rec.as_object() else {
+                continue;
+            };
+            let rec = Value::Object(obj.clone());
+            let canvas = hex_of(&rec, "canvas", rgb(0x1E, 0x1E, 0x1E));
+            let text = hex_of(&rec, "text", rgb(0xE0, 0xE0, 0xE0));
+            let primary = hex_of(&rec, "primary", rgb(0x01, 0x78, 0xD4));
+            let panel = hex_of(&rec, "panel", mix(text, canvas, 0.10));
+            let surface = hex_of(&rec, "surface", panel);
+            let key = intern(&name);
+            map.insert(
+                key,
+                NamedTheme {
+                    name: key,
+                    dark: rec.get("dark").and_then(Value::as_bool).unwrap_or(true),
+                    tokens: tokens(
+                        canvas,
+                        surface,
+                        panel,
+                        text,
+                        hex_of(&rec, "muted", mix(text, canvas, 0.55)),
+                        primary,
+                        hex_of(&rec, "accent", rgb(0xFE, 0xA6, 0x2B)),
+                        hex_of(&rec, "success", rgb(0x4E, 0xBF, 0x71)),
+                        hex_of(&rec, "warning", rgb(0xFE, 0xA6, 0x2B)),
+                        hex_of(&rec, "danger", rgb(0xB9, 0x3C, 0x5B)),
+                        hex_of(&rec, "border", mix(primary, canvas, 0.35)),
+                    ),
+                },
+            );
+        }
+    }
+    map.insert("high-contrast", high_contrast());
+    map
+}
+
+fn catalog() -> &'static BTreeMap<&'static str, NamedTheme> {
+    static CATALOG: OnceLock<BTreeMap<&'static str, NamedTheme>> = OnceLock::new();
+    CATALOG.get_or_init(load_catalog)
+}
+
+fn builtin(name: &str) -> Option<NamedTheme> {
+    let key = alias(name.trim());
+    catalog().get(key).copied()
+}
+
+/// Built-in catalog keys, `dark` / `light` / `high-contrast` first.
+pub fn builtin_names() -> Vec<&'static str> {
+    let mut names: Vec<&'static str> = catalog().keys().copied().collect();
+    names.sort_unstable();
+    let mut ordered = Vec::with_capacity(names.len());
+    for first in ["dark", "light", "high-contrast"] {
+        if names.contains(&first) {
+            ordered.push(first);
+        }
+    }
+    for n in names {
+        if !ordered.contains(&n) {
+            ordered.push(n);
+        }
+    }
+    ordered
+}
+
+/// Rec. 709 luma in 0..1.
+pub fn relative_luma(c: Color) -> f32 {
+    0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
+}
+
+impl Tokens {
+    /// True when the canvas is a dark background.
+    pub fn canvas_is_dark(self) -> bool {
+        relative_luma(self.canvas) < 0.45
+    }
+}
+
+/// iced highlighter face that fits this UI colorway.
+pub fn code_highlight(name: &str) -> iced::highlighter::Theme {
+    use iced::highlighter::Theme as H;
+    let t = named(name);
+    if !t.dark {
+        return H::InspiredGitHub;
+    }
+    let n = t.name;
+    if n.contains("solarized") {
+        H::SolarizedDark
+    } else if n.contains("mocha")
+        || n.contains("frappe")
+        || n.contains("macchiato")
+        || n.contains("catppuccin")
+        || n.contains("rose-pine")
+        || n.contains("flexoki")
+        || n.contains("palenight")
+        || n.contains("material")
+        || n.contains("night-owl")
+        || n.contains("poimandres")
+    {
+        H::Base16Mocha
+    } else if n.contains("nord")
+        || n.contains("tokyo")
+        || n.contains("iceberg")
+        || n.contains("nightfox")
+        || n.contains("kanagawa")
+        || n.contains("ayu")
+        || n.contains("github")
+        || n.contains("oxocarbon")
+        || n.contains("carbonfox")
+    {
+        H::Base16Ocean
+    } else if n.contains("gruvbox")
+        || n.contains("monokai")
+        || n.contains("dracula")
+        || n.contains("horizon")
+        || n.contains("synthwave")
+        || n.contains("everforest")
+        || n.contains("zenburn")
+        || n.contains("jellybeans")
+        || n.contains("cobalt")
+        || n.contains("tomorrow")
+        || n.contains("oceanic")
+        || n.contains("seoul")
+        || n.contains("apprentice")
+        || n.contains("papercolor")
+    {
+        H::Base16Eighties
+    } else {
+        H::SolarizedDark
+    }
+}
+
+/// Look up a built-in theme by name. Unknown names resolve to `dark`.
+///
+/// ```
+/// let t = icedtea::theme::named("nope");
+/// assert_eq!(t.name, "dark");
+/// assert!(icedtea::theme::named("solarized-light").tokens.canvas_is_dark() == false);
+/// ```
+pub fn named(name: &str) -> NamedTheme {
+    builtin(name).unwrap_or_else(|| builtin("dark").expect("dark exists"))
+}
+
+/// Application-owned catalog: builtins plus registered extras.
+///
+/// ```
+/// let mut cat = icedtea::theme::ThemeCatalog::new();
+/// assert!(cat.get("dark").is_some());
+/// let custom = icedtea::theme::named("dark").tokens;
+/// cat.register("app-brand", custom, true);
+/// assert!(cat.get("app-brand").is_some());
+/// assert_eq!(cat.resolve("app-brand").primary, custom.primary);
+/// ```
+#[derive(Debug, Clone, Default)]
+pub struct ThemeCatalog {
+    extra: BTreeMap<String, (Tokens, bool)>,
+}
+
+impl ThemeCatalog {
+    /// Built-in themes only.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Register or replace an application theme.
+    pub fn register(&mut self, name: impl Into<String>, tokens: Tokens, dark: bool) {
+        self.extra.insert(name.into(), (tokens, dark));
+    }
+
+    /// Tokens for `name`, or dark if missing.
+    pub fn resolve(&self, name: &str) -> Tokens {
+        self.get(name)
+            .map(|t| t.tokens)
+            .unwrap_or_else(|| named("dark").tokens)
+    }
+
+    /// Full named theme if present (builtin or registered).
+    pub fn get(&self, name: &str) -> Option<ResolvedTheme> {
+        let key = name.trim();
+        if let Some((tokens, dark)) = self.extra.get(key) {
+            return Some(ResolvedTheme {
+                name: key.to_string(),
+                tokens: *tokens,
+                dark: *dark,
+            });
+        }
+        builtin(key).map(|n| ResolvedTheme {
+            name: n.name.to_string(),
+            tokens: n.tokens,
+            dark: n.dark,
+        })
+    }
+
+    /// Catalog keys: builtins then registered names, sorted extras after.
+    pub fn names(&self) -> Vec<String> {
+        let mut names: Vec<String> = builtin_names().into_iter().map(str::to_string).collect();
+        for k in self.extra.keys() {
+            if !names.iter().any(|n| n == k) {
+                names.push(k.clone());
+            }
+        }
+        names
+    }
+}
+
+/// Owned theme from the catalog (registered names are not `&'static`).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResolvedTheme {
+    pub name: String,
+    pub tokens: Tokens,
+    pub dark: bool,
+}
+
+/// iced [`Theme`](iced::Theme) built from tokens.
+pub fn iced_theme(name: &str, tokens: Tokens) -> iced::Theme {
+    iced::Theme::custom(
+        name.to_string(),
+        iced::theme::Palette {
+            background: tokens.canvas,
+            text: tokens.text,
+            primary: tokens.primary,
+            success: tokens.success,
+            warning: tokens.warning,
+            danger: tokens.danger,
+        },
+    )
+}
+
+/// Persistable theme id.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ThemeId(pub String);
+
+impl ThemeId {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self(name.into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mix_is_opaque_between_endpoints() {
+        let a = Color::from_rgb8(255, 0, 0);
+        let b = Color::from_rgb8(0, 0, 0);
+        let m = mix(a, b, 0.5);
+        assert!((m.r - 0.5).abs() < 0.01);
+        assert_eq!(m.a, 1.0);
+        assert_eq!(mix(a, b, 0.0), b);
+        assert_eq!(mix(a, b, 1.0).r, a.r);
+        assert_eq!(mix(a, b, 2.0).r, a.r);
+        assert_eq!(mix(a, b, -1.0), b);
+    }
+
+    #[test]
+    fn washes_are_between_text_and_canvas() {
+        let t = named("dark").tokens;
+        let h = hover_fill(t);
+        assert!(h.r > t.canvas.r);
+        assert!(pressed_fill(t).r >= h.r);
+        assert!(chip_fill(t).a == 1.0);
+        let sel = selection_fill(t);
+        assert_eq!(sel, mix(t.primary, t.canvas, 0.28));
+    }
+
+    #[test]
+    fn builtin_names_resolve() {
+        let names = builtin_names();
+        assert!(names.len() >= 40);
+        assert_eq!(names[0], "dark");
+        assert_eq!(names[1], "light");
+        assert_eq!(names[2], "high-contrast");
+        for name in &names {
+            let t = named(name);
+            assert_eq!(t.name, *name);
+        }
+        assert_eq!(named("").name, "dark");
+        assert_eq!(named("  nord  ").name, "nord");
+        assert!(named("light").tokens.canvas.r > named("dark").tokens.canvas.r);
+        assert_eq!(named("high-contrast").tokens.border, rgb(0xFF, 0xFF, 0xFF));
+        assert_ne!(named("gruvbox").tokens.canvas, named("nord").tokens.canvas);
+        assert_eq!(named("gruvbox-dark").name, "gruvbox");
+        assert!(!named("solarized-light").dark);
+        assert!(named("solarized-dark").dark);
+        assert!(named("catppuccin-mocha").dark);
+        assert!(!named("catppuccin-latte").tokens.canvas_is_dark());
+        assert_eq!(named("one-dark").name, "atom-one-dark");
+        assert!(named("everforest-dark").dark);
+        assert!(!named("kanagawa-lotus").dark);
+    }
+
+    #[test]
+    fn code_highlight_follows_colorway() {
+        use iced::highlighter::Theme as H;
+        assert_eq!(code_highlight("solarized-dark"), H::SolarizedDark);
+        assert_eq!(code_highlight("solarized-light"), H::InspiredGitHub);
+        assert_eq!(code_highlight("light"), H::InspiredGitHub);
+        assert_eq!(code_highlight("catppuccin-mocha"), H::Base16Mocha);
+        assert_eq!(code_highlight("nord"), H::Base16Ocean);
+        assert_eq!(code_highlight("gruvbox"), H::Base16Eighties);
+        assert_eq!(code_highlight("dracula"), H::Base16Eighties);
+    }
+
+    #[test]
+    fn catalog_register_and_resolve() {
+        let mut cat = ThemeCatalog::new();
+        assert_eq!(cat.names().len(), builtin_names().len());
+        assert!(cat.get("dark").is_some());
+        assert!(cat.get("missing").is_none());
+        assert_eq!(cat.resolve("missing"), named("dark").tokens);
+        let brand = named("light").tokens;
+        cat.register("brand", brand, false);
+        assert_eq!(cat.resolve("brand"), brand);
+        assert!(!cat.get("brand").unwrap().dark);
+        assert!(cat.names().contains(&"brand".to_string()));
+        cat.register("dark", brand, false);
+        assert_eq!(cat.resolve("dark"), brand);
+    }
+
+    #[test]
+    fn iced_theme_uses_token_canvas() {
+        let t = named("dark").tokens;
+        let iced = iced_theme("dark", t);
+        assert_eq!(iced.palette().background, t.canvas);
+        let id = ThemeId::new("dark");
+        assert_eq!(id.0, "dark");
+    }
+
+    #[test]
+    fn light_selection_keeps_dark_ink() {
+        let t = named("light").tokens;
+        assert_eq!(t.selection_text, t.text);
+        assert!(t.selection.r < 1.0);
+        let sun = named("solarized-light").tokens;
+        assert_eq!(sun.selection_text, sun.text);
+        assert!((relative_luma(sun.selection) - relative_luma(sun.text)).abs() > 0.15);
+    }
+}
