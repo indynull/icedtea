@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 edition = "2021"
 rust-version = "1.89"
-license = "MIT OR Apache-2.0"
+license = "MIT"
 authors = ["Ali-Akber Saifee <ali@indydevs.org>"]
 repository = "https://github.com/indynull/icedtea"
 homepage = "https://github.com/indynull/icedtea"
@@ -29,8 +29,7 @@ include = [
     "assets/**",
     "book/**",
     "README.md",
-    "LICENSE-MIT",
-    "LICENSE-APACHE",
+    "LICENSE",
     "CHANGELOG.md",
 ]
 

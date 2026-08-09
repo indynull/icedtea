@@ -1237,7 +1237,7 @@ impl Gallery {
             "about" => pattern::about_page(
                 "icedtea",
                 "0.1.0",
-                "MIT OR Apache-2.0",
+                "MIT",
                 "Gallery",
                 tok,
                 &self.catalog,

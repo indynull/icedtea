@@ -32,7 +32,7 @@ cargo run -p icedtea-gallery
 | `.github/workflows/publish.yml` | Tag `vX.Y.Z` publishes `icedtea` to crates.io |
 
 Workspace members: `icedtea`, `icedtea-gallery`, `examples/consumer`.
-Rust 1.89, edition 2021, iced 0.14. License MIT OR Apache-2.0.
+Rust 1.89, edition 2021, iced 0.14. License MIT.
 
 ## Product
 
@@ -149,7 +149,7 @@ Working code only. Plausibility is not correctness.
   with a verification check each when the work is multi-step.
 - Read the files you will touch and the callers that bound them. Match
   existing icedtea patterns over greenfield taste.
-- Prefer libraries that fit MIT OR Apache-2.0 over inventing parallel
+- Prefer libraries that fit MIT over inventing parallel
   machinery. iced is the renderer; do not wrap it twice.
 
 **Simplicity**
