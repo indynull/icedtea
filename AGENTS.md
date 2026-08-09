@@ -4,8 +4,9 @@ icedtea is reusable widgets and chrome for native desktop applications
 on [iced](https://iced.rs/). Design system, layouts, window chrome,
 actions mapped to messages, widgets, and patterns.
 
-Product contract: [`GOAL.md`](GOAL.md). This file is how to work in the
-repo. It wins over visitor home rules when they conflict.
+Product contract: [`GOAL.md`](GOAL.md) (internal; do not package or
+link from README). This file is how to work in the repo. It wins over
+visitor home rules when they conflict.
 
 When the human corrects an icedtea approach that will recur, append one
 concrete line to **this file** (Always / Never). Tighten a duplicate
@@ -218,9 +219,9 @@ continuous integration is not authorization.
   example over a tutorial that mirrors upstream.
 - State what the system is and does. Rejected alternatives once in
   `GOAL.md` Non-goals.
-- Durable docs (this file, `GOAL.md`, README, book) stand alone: no
-  issue-tracker numbers or URLs, no live infra snapshots, no private
-  hostnames or home paths. Tickets close; the doc must still make sense.
+- Durable public docs (README, book) stand alone: no issue-tracker
+  numbers or URLs, no live infra snapshots, no private hostnames or
+  home paths. `GOAL.md` is internal and is not shipped in the crate.
 - No internal thought trail. The decision stays; the iterations do not.
 - Plain professional English. No slang metaphors (door, spine, theater,
   folklore, junk drawer, “gate”, “wire”, “hygiene”). Prefer entrypoint,
@@ -234,7 +235,7 @@ continuous integration is not authorization.
 - Expand abbreviations: pull request, continuous integration,
   command-line interface, application programming interface. Code,
   paths, flags, and proper names stay as they are (`just check`,
-  `GOAL.md`, `icedtea::run!`).
+  `icedtea::run!`).
 - Say what was sent or returned in ordinary words. Do not use insider
   protocol jargon with the human.
 

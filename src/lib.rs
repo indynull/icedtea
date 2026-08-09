@@ -102,7 +102,6 @@ mod tests {
         let arch = include_str!("../book/src/architecture.md");
         let first = include_str!("../book/src/first-window.md");
         assert!(readme.contains("icedtea::run!"));
-        assert!(include_str!("../GOAL.md").contains("icedtea::run!"));
         assert!(first.contains("icedtea::run!"));
         assert!(arch.contains("Action"));
         assert!(arch.contains("Tokens"));

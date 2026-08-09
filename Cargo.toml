@@ -32,7 +32,6 @@ include = [
     "LICENSE-MIT",
     "LICENSE-APACHE",
     "CHANGELOG.md",
-    "GOAL.md",
 ]
 
 [lib]
