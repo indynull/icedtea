@@ -109,10 +109,12 @@ workspace `-D warnings`, `cargo test --workspace --all-features`,
   `cargo run -p icedtea-gallery` and confirm iced starts without panic.
   A timeout after a clean start is a successful smoke. Compile + unit
   tests + consumer if there is no display.
-- Continuous integration runs the same `just check` on Linux, macOS, and
-  Windows. This environment proves Linux; do not invent green results
-  for the others. Tag `vX.Y.Z` (matching `Cargo.toml` `version`)
-  publishes `icedtea` to crates.io via `.github/workflows/publish.yml`.
+- Continuous integration runs `just check` on Linux, macOS, and Windows
+  at Rust 1.89, plus `cargo test --workspace --all-features` on Ubuntu
+  `stable` and `beta`. This environment proves Linux; do not invent
+  green results for the others. Tag `vX.Y.Z` (matching `Cargo.toml`
+  `version`) publishes `icedtea` to crates.io via
+  `.github/workflows/publish.yml`.
 - Lint and format before commit or handoff (`cargo fmt`, clippy via
   `just check`). Do not reformat unrelated files.
 

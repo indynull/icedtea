@@ -268,7 +268,8 @@ Match the discipline of ruff and fd, applied to a library:
   consumer binaries (`publish = false`).
 - `just check` runs format, clippy (`-D warnings`), tests, rustdoc, and
   coverage fail-under. Continuous integration runs that check on Linux,
-  macOS, and Windows. A version tag `vX.Y.Z` publishes `icedtea` to
+  macOS, and Windows at Rust 1.89, and runs the test suite on Ubuntu
+  `stable` and `beta`. A version tag `vX.Y.Z` publishes `icedtea` to
   crates.io.
 - Coverage fail-under on **our** package, aimed at complete line
   coverage of library code. Mock the host where needed. Tests cover

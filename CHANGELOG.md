@@ -2,8 +2,9 @@
 
 ## 0.1.0
 
-- GitHub check runs `just check` on Linux, macOS, and Windows. Tag
-  `vX.Y.Z` publishes `icedtea` to crates.io.
+- GitHub check runs `just check` on Linux, macOS, and Windows at Rust
+  1.89, and the test suite on Ubuntu `stable` and `beta`. Tag `vX.Y.Z`
+  publishes `icedtea` to crates.io.
 - Built-in colorways: Solarized, Gruvbox, Catppuccin, Nord, Tokyo Night,
   Dracula, Everforest, Kanagawa, Ayu, and more. Gallery theme page and
   header select switch chrome and code highlighting together.
