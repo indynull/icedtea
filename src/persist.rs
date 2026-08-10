@@ -60,6 +60,10 @@ pub struct UiState {
     pub splits: BTreeMap<String, f32>,
     pub docks: BTreeMap<String, DockLayout>,
     pub theme: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub family: Option<String>,
+    #[serde(default)]
+    pub follow_os: bool,
     pub density: DensityName,
 }
 
@@ -70,6 +74,8 @@ impl Default for UiState {
             splits: BTreeMap::new(),
             docks: BTreeMap::new(),
             theme: "dark".into(),
+            family: None,
+            follow_os: false,
             density: DensityName::Default,
         }
     }
@@ -163,6 +169,8 @@ mod tests {
             },
         );
         ui.theme = "light".into();
+        ui.family = Some("github".into());
+        ui.follow_os = true;
         ui.density = DensityName::Compact;
         ui.window.x = 12.0;
         let json = ui.to_json().unwrap();
@@ -178,6 +186,12 @@ mod tests {
         ui.save_file(&file).unwrap();
         let loaded = UiState::load_file(&file).unwrap();
         assert_eq!(loaded.theme, "light");
+        assert_eq!(loaded.family.as_deref(), Some("github"));
+        assert!(loaded.follow_os);
+        let named_only = UiState::from_json(r#"{"window":{"x":0,"y":0,"width":1,"height":1},"splits":{},"docks":{},"theme":"nord","density":"Default"}"#).unwrap();
+        assert_eq!(named_only.theme, "nord");
+        assert!(named_only.family.is_none());
+        assert!(!named_only.follow_os);
         assert!(UiState::load_file(Path::new("/no/such/icedtea.json")).is_err());
         let blocker = std::env::temp_dir().join("icedtea-persist-not-a-dir");
         std::fs::write(&blocker, b"x").unwrap();

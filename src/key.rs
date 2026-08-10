@@ -104,7 +104,7 @@ pub fn typed(event: &KeyEvent) -> Option<String> {
     }
 }
 
-/// Named pad keys that are not characters (Enter, Escape, Backspace, Delete, F9).
+/// Named pad keys that are not characters (Enter, Escape, arrows, page, home, end).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Press {
     Character(String),
@@ -112,7 +112,35 @@ pub enum Press {
     Escape,
     Backspace,
     Delete,
+    ArrowUp,
+    ArrowDown,
+    ArrowLeft,
+    ArrowRight,
+    PageUp,
+    PageDown,
+    Home,
+    End,
     Function(u8),
+}
+
+impl Press {
+    /// Move a highlight index. Wraps at the ends for arrows; page jumps
+    /// by `page`; home/end go to the first or last item.
+    pub fn step_index(self, index: usize, len: usize, page: usize) -> usize {
+        if len == 0 {
+            return 0;
+        }
+        let last = len - 1;
+        match self {
+            Self::ArrowUp | Self::ArrowLeft => index.saturating_sub(1),
+            Self::ArrowDown | Self::ArrowRight => (index + 1).min(last),
+            Self::PageUp => index.saturating_sub(page.max(1)),
+            Self::PageDown => (index + page.max(1)).min(last),
+            Self::Home => 0,
+            Self::End => last,
+            _ => index.min(last),
+        }
+    }
 }
 
 /// Typed character or a named pad key. Control/alt/logo chords are `None`
@@ -129,6 +157,16 @@ pub fn press(event: &KeyEvent) -> Option<Press> {
         iced::keyboard::Key::Named(iced::keyboard::key::Named::Escape) => Some(Press::Escape),
         iced::keyboard::Key::Named(iced::keyboard::key::Named::Backspace) => Some(Press::Backspace),
         iced::keyboard::Key::Named(iced::keyboard::key::Named::Delete) => Some(Press::Delete),
+        iced::keyboard::Key::Named(iced::keyboard::key::Named::ArrowUp) => Some(Press::ArrowUp),
+        iced::keyboard::Key::Named(iced::keyboard::key::Named::ArrowDown) => Some(Press::ArrowDown),
+        iced::keyboard::Key::Named(iced::keyboard::key::Named::ArrowLeft) => Some(Press::ArrowLeft),
+        iced::keyboard::Key::Named(iced::keyboard::key::Named::ArrowRight) => {
+            Some(Press::ArrowRight)
+        }
+        iced::keyboard::Key::Named(iced::keyboard::key::Named::PageUp) => Some(Press::PageUp),
+        iced::keyboard::Key::Named(iced::keyboard::key::Named::PageDown) => Some(Press::PageDown),
+        iced::keyboard::Key::Named(iced::keyboard::key::Named::Home) => Some(Press::Home),
+        iced::keyboard::Key::Named(iced::keyboard::key::Named::End) => Some(Press::End),
         iced::keyboard::Key::Named(iced::keyboard::key::Named::F9) => Some(Press::Function(9)),
         _ => typed(event).map(Press::Character),
     }
@@ -382,5 +420,28 @@ mod tests {
         );
         assert_eq!(typed(&delete), None);
         assert_eq!(super::press(&delete), Some(Press::Delete));
+        for (named, want) in [
+            (Named::ArrowUp, Press::ArrowUp),
+            (Named::ArrowDown, Press::ArrowDown),
+            (Named::ArrowLeft, Press::ArrowLeft),
+            (Named::ArrowRight, Press::ArrowRight),
+            (Named::PageUp, Press::PageUp),
+            (Named::PageDown, Press::PageDown),
+            (Named::Home, Press::Home),
+            (Named::End, Press::End),
+        ] {
+            let ev = press(Key::Named(named), Modifiers::empty());
+            assert_eq!(super::press(&ev), Some(want));
+        }
+        assert_eq!(Press::ArrowDown.step_index(0, 10, 5), 1);
+        assert_eq!(Press::ArrowUp.step_index(0, 10, 5), 0);
+        assert_eq!(Press::PageDown.step_index(0, 10, 5), 5);
+        assert_eq!(Press::PageUp.step_index(7, 10, 5), 2);
+        assert_eq!(Press::Home.step_index(7, 10, 5), 0);
+        assert_eq!(Press::End.step_index(2, 10, 5), 9);
+        assert_eq!(Press::Enter.step_index(2, 10, 5), 2);
+        assert_eq!(Press::ArrowDown.step_index(0, 0, 5), 0);
+        assert_eq!(Press::ArrowLeft.step_index(3, 10, 1), 2);
+        assert_eq!(Press::ArrowRight.step_index(3, 10, 1), 4);
     }
 }

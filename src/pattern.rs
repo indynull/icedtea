@@ -192,10 +192,16 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
                 "Type a command",
                 query,
                 on_query,
+                None,
                 tok,
                 A11y::new(query, Role::TextBox),
             ),
-            themed_scroll(list.into(), tok, A11y::new("palette-list", Role::List)),
+            themed_scroll(
+                list.into(),
+                tok,
+                A11y::new("palette-list", Role::List),
+                false,
+            ),
         ]
         .spacing(8),
     )
@@ -319,10 +325,11 @@ pub fn preferences_page<'a, M: Clone + 'a>(
             cat.t("search"),
             query,
             on_query,
+            None,
             tok,
             A11y::new(query, Role::TextBox),
         ),
-        themed_scroll(body.into(), tok, A11y::new("prefs", Role::Group)),
+        themed_scroll(body.into(), tok, A11y::new("prefs", Role::Group), false),
     ]
     .spacing(12)
     .into()

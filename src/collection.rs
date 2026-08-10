@@ -1,6 +1,47 @@
 //! List / table / tree models and virtualization.
 
+/// Extra rows mounted above and below the strict viewport.
+pub const OVERSCAN: usize = 4;
+
 /// Visible row window for a virtualized list or table.
+///
+/// `start..end` are mounted indices (overscan and cover already applied).
+/// `scroll` is the pixel offset the rail needs; pixel motion stays in the
+/// scrollable. The application stores this window, not every pixel tick.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct VisibleWindow {
+    pub start: usize,
+    pub end: usize,
+    pub scroll: f32,
+    pub viewport: f32,
+}
+
+impl VisibleWindow {
+    pub fn new(viewport: f32) -> Self {
+        Self {
+            start: 0,
+            end: 0,
+            scroll: 0.0,
+            viewport,
+        }
+    }
+
+    pub fn mounted(self) -> usize {
+        self.end.saturating_sub(self.start)
+    }
+
+    pub fn range(self) -> std::ops::Range<usize> {
+        self.start..self.end
+    }
+}
+
+impl Default for VisibleWindow {
+    fn default() -> Self {
+        Self::new(240.0)
+    }
+}
+
+/// Strict viewport indices (no overscan, no cover).
 ///
 /// ```
 /// let v = icedtea::collection::visible_range(40.0, 200.0, 20.0, 100);
@@ -17,25 +58,91 @@ pub fn visible_range(scroll: f32, viewport: f32, row_h: f32, n: usize) -> std::o
     start..end
 }
 
-/// Top pad, visible indices, bottom pad so a scrollable can reach every row.
+/// Mounted window: viewport plus overscan, plus an optional cover index
+/// so a selected row stays mounted when it leaves the viewport.
 ///
 /// ```
-/// let (top, vis, bot) = icedtea::collection::virtual_pads(100, 20.0, 40.0, 200.0);
-/// assert_eq!(vis.start, 2);
+/// let w = icedtea::collection::visible_window(40.0, 200.0, 20.0, 100, 2, Some(0));
+/// assert_eq!(w.start, 0);
+/// assert!(w.end > 10);
+/// assert_eq!(w.scroll, 40.0);
+/// ```
+pub fn visible_window(
+    scroll: f32,
+    viewport: f32,
+    row_h: f32,
+    n: usize,
+    overscan: usize,
+    cover: Option<usize>,
+) -> VisibleWindow {
+    let scroll = scroll.max(0.0);
+    let vis = visible_range(scroll, viewport, row_h, n);
+    if n == 0 {
+        return VisibleWindow {
+            start: 0,
+            end: 0,
+            scroll,
+            viewport,
+        };
+    }
+    let mut start = vis.start.saturating_sub(overscan);
+    let mut end = vis.end.saturating_add(overscan).min(n);
+    if let Some(c) = cover {
+        if c < n {
+            start = start.min(c);
+            end = end.max(c.saturating_add(1)).min(n);
+        }
+    }
+    VisibleWindow {
+        start,
+        end,
+        scroll,
+        viewport,
+    }
+}
+
+/// `Some(next)` when the mounted index range or viewport size changed.
+///
+/// ```
+/// use icedtea::collection::{range_if_changed, VisibleWindow};
+/// let a = VisibleWindow { start: 0, end: 10, scroll: 0.0, viewport: 200.0 };
+/// let pixel = VisibleWindow { start: 0, end: 10, scroll: 4.0, viewport: 200.0 };
+/// assert!(range_if_changed(a, pixel).is_none());
+/// let next = VisibleWindow { start: 1, end: 11, scroll: 20.0, viewport: 200.0 };
+/// assert_eq!(range_if_changed(a, next).unwrap().start, 1);
+/// ```
+pub fn range_if_changed(prev: VisibleWindow, next: VisibleWindow) -> Option<VisibleWindow> {
+    if prev.start != next.start
+        || prev.end != next.end
+        || (prev.viewport - next.viewport).abs() > f32::EPSILON
+    {
+        Some(next)
+    } else {
+        None
+    }
+}
+
+/// Top pad, mounted window, bottom pad so a scrollable can reach every row.
+///
+/// ```
+/// let (top, win, bot) = icedtea::collection::virtual_pads(100, 20.0, 40.0, 200.0, 0, None);
+/// assert_eq!(win.start, 2);
 /// assert!((top - 40.0).abs() < 0.01);
-/// assert!(top + (vis.end - vis.start) as f32 * 20.0 + bot >= 2000.0 - 20.0);
+/// assert!(top + win.mounted() as f32 * 20.0 + bot >= 2000.0 - 20.0);
 /// ```
 pub fn virtual_pads(
     len: usize,
     row_h: f32,
     scroll: f32,
     viewport: f32,
-) -> (f32, std::ops::Range<usize>, f32) {
+    overscan: usize,
+    cover: Option<usize>,
+) -> (f32, VisibleWindow, f32) {
     let h = row_h.max(0.0);
-    let vis = visible_range(scroll, viewport, h, len);
-    let top = vis.start as f32 * h;
-    let bot = (len.saturating_sub(vis.end) as f32) * h;
-    (top, vis, bot)
+    let win = visible_window(scroll, viewport, h, len, overscan, cover);
+    let top = win.start as f32 * h;
+    let bot = (len.saturating_sub(win.end) as f32) * h;
+    (top, win, bot)
 }
 
 /// Thumb offset and length on a rail. `min_handle` keeps the grab usable
@@ -83,20 +190,53 @@ pub fn scroll_from_rail(
     (thumb_y.clamp(0.0, usable) / usable) * max_scroll
 }
 
-/// List model: length, identity, label.
+/// List model: length, identity, borrowed title and optional meta.
 pub trait ListModel {
     fn len(&self) -> usize;
     fn id(&self, index: usize) -> u64;
-    fn label(&self, index: usize) -> String;
+    fn title(&self, index: usize) -> &str;
+    fn meta(&self, index: usize) -> Option<&str> {
+        let _ = index;
+        None
+    }
     fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+}
+
+/// One owned list row.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ListRow {
+    pub title: String,
+    pub meta: Option<String>,
+}
+
+impl ListRow {
+    pub fn new(title: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            meta: None,
+        }
+    }
+
+    pub fn with_meta(mut self, meta: impl Into<String>) -> Self {
+        self.meta = Some(meta.into());
+        self
     }
 }
 
 /// Simple owned list.
 #[derive(Debug, Clone, Default)]
 pub struct VecList {
-    pub items: Vec<String>,
+    pub items: Vec<ListRow>,
+}
+
+impl VecList {
+    pub fn titles(items: impl IntoIterator<Item = impl Into<String>>) -> Self {
+        Self {
+            items: items.into_iter().map(ListRow::new).collect(),
+        }
+    }
 }
 
 impl ListModel for VecList {
@@ -106,8 +246,14 @@ impl ListModel for VecList {
     fn id(&self, index: usize) -> u64 {
         index as u64
     }
-    fn label(&self, index: usize) -> String {
-        self.items.get(index).cloned().unwrap_or_default()
+    fn title(&self, index: usize) -> &str {
+        self.items
+            .get(index)
+            .map(|r| r.title.as_str())
+            .unwrap_or("")
+    }
+    fn meta(&self, index: usize) -> Option<&str> {
+        self.items.get(index).and_then(|r| r.meta.as_deref())
     }
 }
 
@@ -342,24 +488,89 @@ mod tests {
     fn virtualize_select_sort_tree_tabs() {
         assert_eq!(visible_range(0.0, 0.0, 20.0, 10), 0..0);
         assert_eq!(visible_range(0.0, 100.0, 0.0, 10), 0..0);
-        let (top, vis, bot) = virtual_pads(100, 20.0, 40.0, 200.0);
+        let (top, vis, bot) = virtual_pads(100, 20.0, 40.0, 200.0, 0, None);
         assert_eq!(vis.start, 2);
         assert!((top - 40.0).abs() < 0.01);
-        assert!((top + (vis.end - vis.start) as f32 * 20.0 + bot - 2000.0).abs() < 0.01);
-        let (t0, v0, b0) = virtual_pads(0, 20.0, 0.0, 100.0);
-        assert_eq!((t0, v0, b0), (0.0, 0..0, 0.0));
+        assert!((top + vis.mounted() as f32 * 20.0 + bot - 2000.0).abs() < 0.01);
+        let (t0, v0, b0) = virtual_pads(0, 20.0, 0.0, 100.0, 0, None);
+        assert_eq!(t0, 0.0);
+        assert_eq!(v0.range(), 0..0);
+        assert_eq!(b0, 0.0);
         let v = visible_range(40.0, 200.0, 20.0, 100);
         assert_eq!(v.start, 2);
         assert!(v.end <= 100);
+        let over = visible_window(40.0, 200.0, 20.0, 100, 2, None);
+        assert_eq!(over.start, 0);
+        assert!(over.end >= 13);
+        let covered = visible_window(400.0, 200.0, 20.0, 100, 0, Some(0));
+        assert_eq!(covered.start, 0);
+        assert!(covered.end > 20);
+        let same = VisibleWindow {
+            start: 2,
+            end: 14,
+            scroll: 40.0,
+            viewport: 200.0,
+        };
+        let pixel = VisibleWindow {
+            start: 2,
+            end: 14,
+            scroll: 48.0,
+            viewport: 200.0,
+        };
+        assert!(range_if_changed(same, pixel).is_none());
+        assert!(range_if_changed(
+            same,
+            VisibleWindow {
+                start: 3,
+                end: 15,
+                scroll: 60.0,
+                viewport: 200.0,
+            }
+        )
+        .is_some());
+        assert!(range_if_changed(
+            same,
+            VisibleWindow {
+                start: 2,
+                end: 14,
+                scroll: 40.0,
+                viewport: 240.0,
+            }
+        )
+        .is_some());
+        assert_eq!(VisibleWindow::default().viewport, 240.0);
+        assert_eq!(VisibleWindow::new(100.0).range(), 0..0);
+        struct Titles(&'static [&'static str]);
+        impl ListModel for Titles {
+            fn len(&self) -> usize {
+                self.0.len()
+            }
+            fn id(&self, index: usize) -> u64 {
+                index as u64
+            }
+            fn title(&self, index: usize) -> &str {
+                self.0.get(index).copied().unwrap_or("")
+            }
+        }
+        let titles = Titles(&["a"]);
+        assert_eq!(titles.len(), 1);
+        assert_eq!(titles.id(0), 0);
+        assert_eq!(titles.title(0), "a");
+        assert_eq!(titles.title(9), "");
+        assert!(titles.meta(0).is_none());
+        assert_eq!(VecList::titles(["a", "b"]).title(0), "a");
         let list = VecList {
-            items: vec!["a".into(), "b".into()],
+            items: vec![ListRow::new("a"), ListRow::new("b").with_meta("meta")],
         };
         assert_eq!(list.len(), 2);
         assert_eq!(list.id(0), 0);
-        assert_eq!(list.label(1), "b");
+        assert_eq!(list.title(1), "b");
+        assert_eq!(list.meta(1), Some("meta"));
+        assert!(list.meta(0).is_none());
         assert!(!list.is_empty());
         assert!(VecList::default().is_empty());
-        assert_eq!(list.label(9), "");
+        assert_eq!(list.title(9), "");
+        assert!(list.meta(9).is_none());
         let mut sel = Selection::None;
         assert!(!sel.contains(0));
         assert!(sel.primary().is_none());

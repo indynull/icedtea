@@ -16,7 +16,10 @@ use crate::host_canvas::ArcRing;
 use crate::scroll::ScrollRail;
 
 use crate::a11y::{self, A11y, Role};
-use crate::collection::{page_range, Accordion, ListModel, Selection, TableModel, Tabs, TreeNode};
+use crate::collection::{
+    page_range, visible_window, Accordion, ListModel, Selection, TableModel, Tabs, TreeNode,
+    VisibleWindow,
+};
 use crate::i18n::Direction;
 use crate::icon::Icon;
 use crate::style;
@@ -378,7 +381,7 @@ pub fn number_input<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let shown = a11y.apply_name(format!("{value}"));
+    let shown = format!("{value}");
     let mut i = text_input("0", &shown)
         .style(style::search_style(tok))
         .padding(pad());
@@ -397,15 +400,18 @@ pub fn themed_text_input<'a, M: Clone + 'a>(
     placeholder: &str,
     value: &str,
     on_input: impl Fn(String) -> M + 'a,
+    on_submit: Option<M>,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let value = a11y.apply_name(value);
-    let mut i = text_input(placeholder, &value)
+    let mut i = text_input(placeholder, value)
         .style(style::search_style(tok))
         .padding(pad());
     if !a11y.disabled {
         i = i.on_input(on_input);
+        if let Some(m) = a11y.apply_message(on_submit) {
+            i = i.on_submit(m);
+        }
     }
     a11y::attach(i.into(), &a11y)
 }
@@ -417,8 +423,7 @@ pub fn password_input<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let value = a11y.apply_name(value);
-    let mut i = text_input(placeholder, &value)
+    let mut i = text_input(placeholder, value)
         .secure(true)
         .style(style::search_style(tok))
         .padding(pad());
@@ -526,6 +531,7 @@ pub fn search_input<'a, M: Clone + 'a>(
                 "Search",
                 value,
                 on_input,
+                None,
                 tok,
                 A11y::new(a11y.apply_name(value), Role::TextBox),
             ),
@@ -691,6 +697,41 @@ pub fn color_swatch<'a, M: Clone + 'a>(
     a11y::attach(area.into(), &a11y)
 }
 
+/// Parsed markdown the application owns. Parse in `update` (or a `Task`);
+/// [`markdown_view`] borrows the items.
+///
+/// ```
+/// let doc = icedtea::widget::MarkdownDoc::parse("# Hi\n\nA paragraph.");
+/// assert!(!doc.items.is_empty());
+/// let again = icedtea::widget::parse("# Hi\n\nA paragraph.");
+/// assert_eq!(doc.hash, again.hash);
+/// assert_ne!(doc.hash, icedtea::widget::parse("# Other").hash);
+/// ```
+#[derive(Debug, Clone)]
+pub struct MarkdownDoc {
+    pub source: String,
+    pub hash: u64,
+    pub items: Vec<markdown::Item>,
+}
+
+impl MarkdownDoc {
+    pub fn parse(source: impl Into<String>) -> Self {
+        parse(&source.into())
+    }
+}
+
+/// Pure parse: source hash plus iced markdown items.
+pub fn parse(source: &str) -> MarkdownDoc {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    source.hash(&mut hasher);
+    MarkdownDoc {
+        source: source.to_string(),
+        hash: hasher.finish(),
+        items: markdown::parse(source).collect(),
+    }
+}
+
 pub fn markdown_view<'a, M: Clone + 'a>(
     items: &'a [markdown::Item],
     _tok: Tokens,
@@ -752,35 +793,63 @@ pub fn dismiss_button<'a, M: Clone + 'a>(msg: M, tok: Tokens, a11y: A11y) -> Ele
     a11y::attach(b.into(), &a11y)
 }
 
+fn chip_wash(tok: Tokens, variant: Variant) -> iced::Color {
+    match variant {
+        Variant::Primary => crate::theme::selection_fill(tok),
+        Variant::Danger => crate::theme::mix(tok.danger, tok.canvas, 0.28),
+        Variant::Quiet | Variant::Ghost | Variant::Chip => crate::theme::chip_fill(tok),
+    }
+}
+
 pub fn chip<'a, M: Clone + 'a>(
     title: impl Into<String>,
-    msg: M,
+    dismiss: Option<M>,
     tok: Tokens,
+    variant: Variant,
     a11y: A11y,
 ) -> Element<'a, M> {
     let title = a11y.apply_name(title);
+    let ink = match variant {
+        Variant::Danger => tok.danger,
+        _ => tok.text,
+    };
+    let mut line = row![text(title.clone()).size(typo::META).color(ink)]
+        .spacing(4)
+        .align_y(Alignment::Center);
+    if let Some(msg) = dismiss {
+        line = line.push(dismiss_button(
+            msg,
+            tok,
+            A11y::button(format!("dismiss {title}")),
+        ));
+    }
+    let wash = chip_wash(tok, variant);
     a11y::attach(
-        container(
-            row![
-                text(title.clone()).size(typo::META).color(tok.text),
-                dismiss_button(msg, tok, A11y::button(format!("dismiss {title}"))),
-            ]
-            .spacing(4)
-            .align_y(Alignment::Center),
-        )
-        .padding([4, 8])
-        .style(move |_| style::fill(crate::theme::chip_fill(tok), tok.text))
-        .into(),
+        container(line)
+            .padding([4, 8])
+            .style(move |_| style::fill(wash, ink))
+            .into(),
         &a11y,
     )
 }
 
-pub fn badge<'a, M: 'a>(title: impl Into<String>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
+pub fn badge<'a, M: 'a>(
+    title: impl Into<String>,
+    tok: Tokens,
+    variant: Variant,
+    a11y: A11y,
+) -> Element<'a, M> {
     let title = a11y.apply_name(title);
+    let ink = match variant {
+        Variant::Danger => tok.danger,
+        Variant::Primary => tok.primary,
+        _ => tok.muted,
+    };
+    let wash = chip_wash(tok, variant);
     a11y::attach(
-        container(text(title).size(typo::META).color(tok.muted))
+        container(text(title).size(typo::META).color(ink))
             .padding([4, 8])
-            .style(move |_| style::fill(crate::theme::chip_fill(tok), tok.muted))
+            .style(move |_| style::fill(wash, ink))
             .into(),
         &a11y,
     )
@@ -954,19 +1023,24 @@ pub fn placeholder_skeleton<'a, M: 'a>(tok: Tokens, a11y: A11y) -> Element<'a, M
     )
 }
 
-pub fn themed_scroll<'a, M: 'a>(child: Element<'a, M>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
-    a11y::attach(
-        scrollable(child)
-            .height(Length::Fill)
-            .direction(ScrollDir::Vertical(
-                Scrollbar::new()
-                    .width(SCROLL_RAIL_WIDTH)
-                    .scroller_width(SCROLL_RAIL_WIDTH),
-            ))
-            .style(style::scroll_style(tok))
-            .into(),
-        &a11y,
-    )
+pub fn themed_scroll<'a, M: 'a>(
+    child: Element<'a, M>,
+    tok: Tokens,
+    a11y: A11y,
+    stick: bool,
+) -> Element<'a, M> {
+    let mut s = scrollable(child)
+        .height(Length::Fill)
+        .direction(ScrollDir::Vertical(
+            Scrollbar::new()
+                .width(SCROLL_RAIL_WIDTH)
+                .scroller_width(SCROLL_RAIL_WIDTH),
+        ))
+        .style(style::scroll_style(tok));
+    if stick {
+        s = s.anchor_bottom();
+    }
+    a11y::attach(s.into(), &a11y)
 }
 
 pub(crate) fn wheel_scroll(
@@ -996,55 +1070,90 @@ fn list_body_and_rail<'a, M: Clone + 'a>(
         mouse_area(body).on_scroll(move |d| on_scroll(wheel_scroll(d, scroll, row_h, max))),
         Element::from(ScrollRail::new(content, viewport, scroll, on_scroll, tok)),
     ]
-    .height(viewport)
+    .width(crate::layout::FILL)
+    .height(crate::layout::FILL)
     .into()
+}
+
+fn two_line_row<'a, M: 'a>(
+    title: &str,
+    meta_s: Option<&str>,
+    selected: bool,
+    row_h: f32,
+    tok: Tokens,
+) -> Element<'a, M> {
+    let mut col = column![text(title.to_string())
+        .size(typo::BODY)
+        .color(tok.text)
+        .font(typo::UI)]
+    .spacing(2);
+    if let Some(m) = meta_s.filter(|s| !s.is_empty()) {
+        col = col.push(text(m.to_string()).size(typo::META).color(tok.muted));
+    }
+    container(col)
+        .width(Length::Fill)
+        .height(row_h)
+        .padding(8)
+        .style(move |_| style::list_row(tok, selected))
+        .into()
 }
 
 #[allow(clippy::too_many_arguments)]
 pub fn list_view<'a, M, L>(
-    model: &L,
+    model: &'a L,
     selection: &Selection,
     on_select: impl Fn(usize) -> M + Copy + 'a,
     tok: Tokens,
-    scroll: f32,
+    window: VisibleWindow,
     row_h: f32,
-    viewport: f32,
-    on_scroll: impl Fn(f32) -> M + Copy + 'a,
+    overscan: usize,
+    on_scroll: impl Fn(VisibleWindow) -> M + Copy + 'a,
     a11y: A11y,
 ) -> Element<'a, M>
 where
     M: Clone + 'a,
-    L: ListModel,
+    L: ListModel + ?Sized,
 {
-    let vis = crate::collection::visible_range(scroll, viewport, row_h, model.len());
+    let cover = selection.primary();
+    let win = visible_window(
+        window.scroll,
+        window.viewport,
+        row_h,
+        model.len(),
+        overscan,
+        cover,
+    );
     let mut col = column![].spacing(0);
     if model.is_empty() {
         col = col.push(meta("Empty", tok, A11y::new("Empty", Role::Status)));
     } else {
-        for i in vis {
+        for i in win.range() {
             let selected = selection.contains(i);
-            let name = model.label(i);
+            let title = model.title(i);
+            let meta_s = model.meta(i);
+            let name = title.to_string();
             col = col.push(a11y::attach(
-                mouse_area(
-                    container(label(
-                        name.clone(),
-                        tok,
-                        A11y::new(name.clone(), Role::ListItem).with_checked(selected),
-                    ))
-                    .width(Length::Fill)
-                    .height(row_h)
-                    .padding(10)
-                    .style(move |_| style::list_row(tok, selected)),
-                )
-                .on_press(on_select(i))
-                .into(),
+                mouse_area(two_line_row(title, meta_s, selected, row_h, tok))
+                    .on_press(on_select(i))
+                    .into(),
                 &A11y::new(name, Role::ListItem).with_checked(selected),
             ));
         }
     }
     let content = model.len() as f32 * row_h.max(0.0);
+    let len = model.len();
+    let viewport = window.viewport;
+    let emit = move |y: f32| on_scroll(visible_window(y, viewport, row_h, len, overscan, cover));
     a11y::attach(
-        list_body_and_rail(col.into(), content, viewport, scroll, row_h, on_scroll, tok),
+        list_body_and_rail(
+            col.into(),
+            content,
+            window.viewport,
+            window.scroll,
+            row_h,
+            emit,
+            tok,
+        ),
         &a11y,
     )
 }
@@ -1073,18 +1182,20 @@ pub fn item_grid<'a, M: Clone + 'a>(
 
 #[allow(clippy::too_many_arguments)]
 pub fn data_table<'a, M: Clone + 'a>(
-    model: &TableModel,
+    model: &'a TableModel,
     selection: &Selection,
-    scroll: f32,
+    window: VisibleWindow,
     row_h: f32,
-    viewport: f32,
+    overscan: usize,
     on_select: impl Fn(usize) -> M + Copy + 'a,
     on_sort: impl Fn(usize) -> M + Copy + 'a,
-    on_scroll: impl Fn(f32) -> M + Copy + 'a,
+    on_scroll: impl Fn(VisibleWindow) -> M + Copy + 'a,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let vis = crate::collection::visible_range(scroll, viewport, row_h, model.rows.len());
+    let cover = selection.primary();
+    let n = model.rows.len();
+    let win = visible_window(window.scroll, window.viewport, row_h, n, overscan, cover);
     let mut header = row![].spacing(8);
     for (i, h) in model.headers.iter().enumerate() {
         header = header.push(themed_button(
@@ -1096,41 +1207,41 @@ pub fn data_table<'a, M: Clone + 'a>(
         ));
     }
     let mut body = column![].spacing(0);
-    for i in vis {
+    for i in win.range() {
         let selected = selection.contains(i);
-        let line = model.rows.get(i).cloned().unwrap_or_default().join("  ");
+        let title = model.cell(i, 0);
+        let meta_s = if model.headers.len() > 1 {
+            Some(model.cell(i, 1))
+        } else {
+            None
+        };
+        let name = title.to_string();
         body = body.push(a11y::attach(
-            mouse_area(
-                container(label(
-                    line.clone(),
-                    tok,
-                    A11y::new(line.clone(), Role::ListItem).with_checked(selected),
-                ))
-                .width(Length::Fill)
-                .height(row_h)
-                .padding(8)
-                .style(move |_| style::list_row(tok, selected)),
-            )
-            .on_press(on_select(i))
-            .into(),
-            &A11y::new(line, Role::ListItem).with_checked(selected),
+            mouse_area(two_line_row(title, meta_s, selected, row_h, tok))
+                .on_press(on_select(i))
+                .into(),
+            &A11y::new(name, Role::ListItem).with_checked(selected),
         ));
     }
-    let content = model.rows.len() as f32 * row_h.max(0.0);
+    let content = n as f32 * row_h.max(0.0);
+    let viewport = window.viewport;
+    let emit = move |y: f32| on_scroll(visible_window(y, viewport, row_h, n, overscan, cover));
     a11y::attach(
         column![
             header,
             list_body_and_rail(
                 body.into(),
                 content,
-                viewport,
-                scroll,
+                window.viewport,
+                window.scroll,
                 row_h,
-                on_scroll,
+                emit,
                 tok
             ),
         ]
         .spacing(4)
+        .width(crate::layout::FILL)
+        .height(crate::layout::FILL)
         .into(),
         &a11y,
     )
@@ -1182,7 +1293,12 @@ pub fn tree_view<'a, M: Clone + 'a>(
         col = col.push(line);
     }
     a11y::attach(
-        themed_scroll(col.into(), tok, A11y::new("tree-scroll", Role::Group)),
+        themed_scroll(
+            col.into(),
+            tok,
+            A11y::new("tree-scroll", Role::Group),
+            false,
+        ),
         &a11y,
     )
 }
@@ -1456,7 +1572,18 @@ mod tests {
             tok,
             role("n", Role::SpinButton).with_value("3"),
         );
-        let _: Element<'_, ()> = themed_text_input("p", "v", |_| (), tok, role("v", Role::TextBox));
+        let _: Element<'_, ()> =
+            themed_text_input("p", "v", |_| (), Some(()), tok, role("v", Role::TextBox));
+        let _: Element<'_, ()> =
+            themed_text_input("p", "", |_| (), None, tok, role("Name", Role::TextBox));
+        let _: Element<'_, ()> = themed_text_input(
+            "p",
+            "",
+            |_| (),
+            Some(()),
+            tok,
+            role("Name", Role::TextBox).with_disabled(true),
+        );
         let _: Element<'_, ()> = password_input(
             "p",
             "v",
@@ -1549,8 +1676,16 @@ mod tests {
         );
         let _: Element<'_, ()> = rule_h(tok, role("rule", Role::Separator));
         let _: Element<'_, ()> = dismiss_button((), tok, btn("dismiss"));
-        let _: Element<'_, ()> = chip("c", (), tok, btn("c"));
-        let _: Element<'_, ()> = badge("b", tok, role("b", Role::Status));
+        let _: Element<'_, ()> = chip("c", Some(()), tok, Variant::Quiet, btn("c"));
+        let _: Element<'_, ()> = chip("plain", None, tok, Variant::Primary, btn("plain"));
+        let _: Element<'_, ()> = chip("hot", Some(()), tok, Variant::Danger, btn("hot"));
+        let _: Element<'_, ()> = chip("g", None, tok, Variant::Ghost, btn("g"));
+        let _: Element<'_, ()> = chip("k", None, tok, Variant::Chip, btn("k"));
+        let _: Element<'_, ()> = badge("b", tok, Variant::Quiet, role("b", Role::Status));
+        let _: Element<'_, ()> = badge("new", tok, Variant::Primary, role("new", Role::Status));
+        let _: Element<'_, ()> = badge("!", tok, Variant::Danger, role("bang", Role::Status));
+        let _: Element<'_, ()> = badge("g", tok, Variant::Ghost, role("g", Role::Status));
+        let _: Element<'_, ()> = badge("chip", tok, Variant::Chip, role("chip", Role::Status));
         let _: Element<'_, ()> = group_box(
             "g",
             label("x", tok, role("x", Role::Header)),
@@ -1582,17 +1717,21 @@ mod tests {
         let _: Element<'_, ()> = teaching_tip("t", "b", (), tok, role("tip", Role::Tooltip));
         let _: Element<'_, ()> = placeholder_skeleton(tok, role("sk", Role::Status));
         let list = VecList {
-            items: vec!["a".into()],
+            items: vec![
+                crate::collection::ListRow::new("a").with_meta("meta"),
+                crate::collection::ListRow::new("b").with_meta(""),
+            ],
         };
         let empty = VecList::default();
+        let win = VisibleWindow::new(100.0);
         let _: Element<'_, ()> = list_view(
             &list,
             &Sel::Single(0),
             |_| (),
             tok,
-            0.0,
+            win,
             24.0,
-            100.0,
+            crate::collection::OVERSCAN,
             |_| (),
             role("list", Role::List),
         );
@@ -1601,9 +1740,9 @@ mod tests {
             &Sel::None,
             |_| (),
             tok,
-            0.0,
+            win,
             24.0,
-            100.0,
+            0,
             |_| (),
             role("list", Role::List),
         );
@@ -1614,17 +1753,17 @@ mod tests {
             role("grid", Role::List),
         );
         let table = TableModel {
-            headers: vec!["A".into()],
-            rows: vec![vec!["1".into()], vec!["2".into()]],
+            headers: vec!["A".into(), "B".into()],
+            rows: vec![vec!["1".into(), "x".into()], vec!["2".into(), "y".into()]],
             sort_col: None,
             sort_asc: true,
         };
         let _: Element<'_, ()> = data_table(
             &table,
             &Sel::Single(0),
-            0.0,
+            VisibleWindow::new(100.0),
             24.0,
-            100.0,
+            crate::collection::OVERSCAN,
             |_| (),
             |_| (),
             |_| (),
@@ -1640,9 +1779,14 @@ mod tests {
         let _: Element<'_, ()> = data_table(
             &big,
             &Sel::None,
-            200.0,
+            VisibleWindow {
+                start: 0,
+                end: 0,
+                scroll: 200.0,
+                viewport: 80.0,
+            },
             20.0,
-            80.0,
+            2,
             |_| (),
             |_| (),
             |_| (),
@@ -1709,6 +1853,49 @@ mod tests {
             .with_disabled(true)
             .node_id()
             .contains("button|Save|idle|1|"));
+        let _: Element<'_, ()> = themed_scroll(
+            label("log", tok, role("log", Role::Status)),
+            tok,
+            role("scroll", Role::Group),
+            true,
+        );
+        let _: Element<'_, ()> = themed_scroll(
+            label("body", tok, role("body", Role::Status)),
+            tok,
+            role("scroll", Role::Group),
+            false,
+        );
+        assert!(crate::layout::stick_to_end(80.0, 100.0, 20.0, 4.0));
+        let input_src = src
+            .split("pub fn themed_text_input")
+            .nth(1)
+            .unwrap()
+            .split("pub fn password_input")
+            .next()
+            .unwrap();
+        assert!(!input_src.contains("apply_name(value)"));
+        assert!(input_src.contains("on_submit"));
+        let pass_src = src
+            .split("pub fn password_input")
+            .nth(1)
+            .unwrap()
+            .split("pub fn textarea")
+            .next()
+            .unwrap();
+        assert!(!pass_src.contains("apply_name(value)"));
+        let num_src = src
+            .split("pub fn number_input")
+            .nth(1)
+            .unwrap()
+            .split("pub fn step_number")
+            .next()
+            .unwrap();
+        assert!(!num_src.contains("apply_name"));
+        let doc = parse("# Hi\n\nBody.");
+        assert!(!doc.items.is_empty());
+        assert_eq!(doc.hash, MarkdownDoc::parse("# Hi\n\nBody.").hash);
+        assert_ne!(doc.hash, parse("# Other").hash);
+        let _: Element<'_, ()> = markdown_view(&doc.items, tok, |_| (), role("md", Role::Group));
     }
 
     #[test]

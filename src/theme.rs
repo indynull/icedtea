@@ -393,6 +393,141 @@ impl ThemeId {
     }
 }
 
+/// Light or dark appearance. Injected in tests; live apps take
+/// [`iced::theme::Mode`] from iced / mundy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Appearance {
+    Light,
+    Dark,
+}
+
+impl Appearance {
+    pub fn from_mode(mode: iced::theme::Mode) -> Self {
+        match mode {
+            iced::theme::Mode::Light => Self::Light,
+            iced::theme::Mode::Dark | iced::theme::Mode::None => Self::Dark,
+        }
+    }
+}
+
+/// Explicit light/dark pair in the catalog.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Family {
+    pub id: &'static str,
+    pub light: &'static str,
+    pub dark: &'static str,
+}
+
+/// Built-in pairs. Names that are not a member stay on themselves.
+pub const FAMILIES: &[Family] = &[
+    Family {
+        id: "default",
+        light: "light",
+        dark: "dark",
+    },
+    Family {
+        id: "atom-one",
+        light: "atom-one-light",
+        dark: "atom-one-dark",
+    },
+    Family {
+        id: "ayu",
+        light: "ayu-light",
+        dark: "ayu-dark",
+    },
+    Family {
+        id: "catppuccin",
+        light: "catppuccin-latte",
+        dark: "catppuccin-mocha",
+    },
+    Family {
+        id: "everforest",
+        light: "everforest-light",
+        dark: "everforest-dark",
+    },
+    Family {
+        id: "github",
+        light: "github-light",
+        dark: "github-dark",
+    },
+    Family {
+        id: "gruvbox",
+        light: "gruvbox-light",
+        dark: "gruvbox",
+    },
+    Family {
+        id: "kanagawa",
+        light: "kanagawa-lotus",
+        dark: "kanagawa-wave",
+    },
+    Family {
+        id: "modus",
+        light: "modus-operandi",
+        dark: "modus-vivendi",
+    },
+    Family {
+        id: "rose-pine",
+        light: "rose-pine-dawn",
+        dark: "rose-pine",
+    },
+    Family {
+        id: "solarized",
+        light: "solarized-light",
+        dark: "solarized-dark",
+    },
+    Family {
+        id: "tokyo-night",
+        light: "tokyo-night-day",
+        dark: "tokyo-night",
+    },
+];
+
+pub fn family(id: &str) -> Option<&'static Family> {
+    FAMILIES.iter().find(|f| f.id == id)
+}
+
+pub fn family_of_name(name: &str) -> Option<&'static Family> {
+    let key = alias(name.trim());
+    FAMILIES
+        .iter()
+        .find(|f| f.id == key || f.light == key || f.dark == key)
+}
+
+/// Light or dark member of `family_id`.
+pub fn follow(family_id: &str, appearance: Appearance) -> Option<&'static str> {
+    let f = family(family_id)?;
+    Some(match appearance {
+        Appearance::Light => f.light,
+        Appearance::Dark => f.dark,
+    })
+}
+
+/// Concrete catalog name for a preference.
+///
+/// Follow-OS uses the family (or the pair of `name`). High-contrast and
+/// unpaired names stay on themselves. `Boot.theme` stays a concrete name.
+pub fn resolve_pref(
+    name: &str,
+    family_id: Option<&str>,
+    follow_os: bool,
+    appearance: Appearance,
+) -> String {
+    if !follow_os {
+        return named(name).name.to_string();
+    }
+    if alias(name.trim()) == "high-contrast" {
+        return "high-contrast".into();
+    }
+    let fam = family_id.and_then(family).or_else(|| family_of_name(name));
+    match fam {
+        Some(f) => match appearance {
+            Appearance::Light => f.light.to_string(),
+            Appearance::Dark => f.dark.to_string(),
+        },
+        None => named(name).name.to_string(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -482,6 +617,49 @@ mod tests {
         assert_eq!(iced.palette().background, t.canvas);
         let id = ThemeId::new("dark");
         assert_eq!(id.0, "dark");
+    }
+
+    #[test]
+    fn families_follow_os_and_leave_unpaired() {
+        assert_eq!(family("github").unwrap().light, "github-light");
+        assert_eq!(family_of_name("github-dark").unwrap().id, "github");
+        assert_eq!(family_of_name("gruvbox-dark").unwrap().id, "gruvbox");
+        assert!(family_of_name("nord").is_none());
+        assert!(family_of_name("high-contrast").is_none());
+        assert_eq!(follow("default", Appearance::Light), Some("light"));
+        assert_eq!(follow("default", Appearance::Dark), Some("dark"));
+        assert!(follow("missing", Appearance::Dark).is_none());
+        assert_eq!(
+            resolve_pref("github-dark", None, true, Appearance::Light),
+            "github-light"
+        );
+        assert_eq!(resolve_pref("nord", None, true, Appearance::Light), "nord");
+        assert_eq!(
+            resolve_pref("high-contrast", Some("default"), true, Appearance::Light),
+            "high-contrast"
+        );
+        assert_eq!(
+            resolve_pref("nord", Some("github"), true, Appearance::Light),
+            "github-light"
+        );
+        assert_eq!(resolve_pref("dark", None, false, Appearance::Light), "dark");
+        assert_eq!(
+            resolve_pref("default", Some("default"), true, Appearance::Dark),
+            "dark"
+        );
+        assert_eq!(
+            Appearance::from_mode(iced::theme::Mode::Light),
+            Appearance::Light
+        );
+        assert_eq!(
+            Appearance::from_mode(iced::theme::Mode::Dark),
+            Appearance::Dark
+        );
+        assert_eq!(
+            Appearance::from_mode(iced::theme::Mode::None),
+            Appearance::Dark
+        );
+        assert_eq!(FAMILIES[0].id, "default");
     }
 
     #[test]

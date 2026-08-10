@@ -95,6 +95,26 @@ impl CommandPalette {
         self.selected = next as usize;
     }
 
+    /// Arrow, page, home, and end move the highlight.
+    pub fn apply_press(&mut self, press: &crate::key::Press, page: usize) {
+        use crate::key::Press;
+        if matches!(
+            press,
+            Press::ArrowUp
+                | Press::ArrowDown
+                | Press::ArrowLeft
+                | Press::ArrowRight
+                | Press::PageUp
+                | Press::PageDown
+                | Press::Home
+                | Press::End
+        ) {
+            self.selected = press
+                .clone()
+                .step_index(self.selected, self.hits.len(), page);
+        }
+    }
+
     pub fn results<'a, M: Clone>(&self, table: &'a ActionTable<M>) -> Vec<&'a Action<M>> {
         self.hits.iter().filter_map(|id| table.get(id)).collect()
     }
@@ -131,6 +151,15 @@ mod tests {
         assert_eq!(pal.invoke_selected(&table), None);
         pal.move_sel(3);
         assert_eq!(pal.selected(), 0);
+        pal.set_query(&table, "");
+        pal.apply_press(&crate::key::Press::End, 5);
+        assert_eq!(pal.selected(), 1);
+        pal.apply_press(&crate::key::Press::Home, 5);
+        assert_eq!(pal.selected(), 0);
+        pal.apply_press(&crate::key::Press::ArrowDown, 5);
+        assert_eq!(pal.selected(), 1);
+        pal.apply_press(&crate::key::Press::Enter, 5);
+        assert_eq!(pal.selected(), 1);
         pal.close();
         assert!(!pal.open);
     }

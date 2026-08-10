@@ -153,8 +153,16 @@ impl A11y {
 }
 
 /// Attach name/role/value/disabled/checked to a child (iced 0.14 has no accesskit slot).
+///
+/// The wrapper keeps the child's width and height so a fill child still
+/// stretches.
 pub fn attach<'a, M: 'a>(child: Element<'a, M>, a11y: &A11y) -> Element<'a, M> {
-    container(child).id(Id::from(a11y.node_id())).into()
+    let size = child.as_widget().size();
+    container(child)
+        .width(size.width)
+        .height(size.height)
+        .id(Id::from(a11y.node_id()))
+        .into()
 }
 
 #[cfg(test)]
@@ -207,6 +215,7 @@ mod tests {
         assert!(disabled.apply_message(Some(1u8)).is_none());
         assert_eq!(disabled.apply_name("other"), "other");
         assert_eq!(A11y::button("").apply_name("Save"), "Save");
+        assert_eq!(A11y::button("Name").apply_name(""), "Name");
         assert_eq!(A11y::button("Backspace").apply_name("⌫"), "⌫");
         assert_eq!(A11y::button("Backspace").name, "Backspace");
         assert!(A11y::new("c", Role::Checkbox)
@@ -217,5 +226,22 @@ mod tests {
             A11y::button("Go").with_checked(false).node_id(),
             "button|Go||0|0"
         );
+    }
+
+    #[test]
+    fn attach_keeps_fill_child() {
+        use iced::widget::{container, Space};
+        use iced::Length;
+        let fill: Element<'_, ()> = container(Space::new())
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into();
+        let wrapped = attach(fill, &A11y::button("pane"));
+        let size = wrapped.as_widget().size();
+        assert_eq!(size.width, Length::Fill);
+        assert_eq!(size.height, Length::Fill);
+        let shrink: Element<'_, ()> = iced::widget::text("x").into();
+        let wrapped = attach(shrink, &A11y::new("x", Role::Status));
+        assert_eq!(wrapped.as_widget().size().width, Length::Shrink);
     }
 }

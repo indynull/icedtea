@@ -10,7 +10,8 @@ Built-in names are 40 palettes: `dark`, `light`, `high-contrast`, and
 community colorways (Solarized, Gruvbox, Catppuccin, Nord, Tokyo Night,
 Dracula, Everforest, Kanagawa, Ayu, GitHub, and others). `theme::named`
 and `theme::code_highlight` pick UI tokens and the iced highlighter
-face together. Register more on `ThemeCatalog`.
+face together. Register more on `ThemeCatalog`. `Boot.theme` is a
+concrete name and defaults to `dark`.
 
 ```rust,ignore
 let mut cat = icedtea::theme::ThemeCatalog::new();
@@ -20,3 +21,11 @@ let tokens = cat.resolve("brand");
 
 Live switch: store a theme name on state and return
 `icedtea::theme::iced_theme(&name, tokens)` from the theme function.
+The gallery theme page registers `gallery-brand` and switches to it.
+
+Families are explicit pairs (`github` → `github-dark` / `github-light`,
+and the other real couples). A follow-OS preference selects the light
+or dark member of one family (default family: `light` / `dark`).
+High-contrast is its own name. Names without a pair do not follow the
+OS. Persist stores `theme` plus optional `family` and `follow_os`.
+Mode changes come from iced (`system::theme` / `theme_changes`).

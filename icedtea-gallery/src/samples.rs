@@ -3,9 +3,10 @@
 /// Full markdown document: every construct icedtea's markdown view must show.
 pub const MARKDOWN: &str = r#"# Markdown
 
-A document control, not a one-line stub. This page is the acceptance
-content for headings, emphasis, lists, quotes, tables, rules, tasks,
-links, and fenced code.
+A document control, not a one-line stub. The gallery parses this
+source with `MarkdownDoc::parse` in `update` and `markdown_view`
+borrows the items. Acceptance content: headings, emphasis, lists,
+quotes, tables, rules, tasks, links, and fenced code.
 
 ## Headings
 

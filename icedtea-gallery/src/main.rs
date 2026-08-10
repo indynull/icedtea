@@ -5,10 +5,12 @@ mod samples;
 use icedtea::a11y::{A11y, Role};
 use icedtea::action::{Action, ActionTable};
 use icedtea::catalog::{self, Entry};
-use icedtea::collection::{Accordion, Selection, TableModel, Tabs, TreeNode, VecList};
+use icedtea::collection::{
+    visible_window, Accordion, ListModel, ListRow, Selection, TableModel, Tabs, TreeNode, VecList,
+    VisibleWindow, OVERSCAN,
+};
 use icedtea::i18n::Catalog;
 use icedtea::i18n::Direction;
-use icedtea::iced::widget::markdown;
 use icedtea::iced::widget::text_editor::Content;
 use icedtea::iced::widget::{button, column, container, row, text, Space};
 use icedtea::iced::{Alignment, Length, Padding, Subscription, Theme};
@@ -18,11 +20,11 @@ use icedtea::layout;
 use icedtea::nav::NavStack;
 use icedtea::pattern::{self, PrefGroup};
 use icedtea::shortcut::Shortcut;
-use icedtea::theme::{self, Tokens};
+use icedtea::theme::{self, Appearance, ThemeCatalog, Tokens};
 use icedtea::toast::{ToastKind, ToastQueue};
 use icedtea::variant::Variant;
 use icedtea::widget;
-use icedtea::widget::{DateValue, TimeValue};
+use icedtea::widget::{DateValue, MarkdownDoc, TimeValue};
 use icedtea::{Boot, Element, Task};
 use samples::CodeLang;
 
@@ -94,8 +96,16 @@ enum Message {
     Sort(usize),
     Tree(u64),
     TreeSelect(u64),
-    ListScroll(f32),
-    TableScroll(f32),
+    ListScroll(VisibleWindow),
+    TableScroll(VisibleWindow),
+    ListSel(usize),
+    TableSel(usize),
+    Submit,
+    Tick,
+    Family(String),
+    Follow(bool),
+    OsMode(icedtea::iced::theme::Mode),
+    Appearance(Appearance),
     Key(icedtea::iced::keyboard::Event),
     Drop(icedtea::dnd::DragPayload),
     CatalogQuery(String),
@@ -135,9 +145,14 @@ struct Gallery {
     nav: NavStack,
     prefs: Vec<PrefGroup>,
     editor: Content,
-    md: Vec<markdown::Item>,
-    list_scroll: f32,
-    table_scroll: f32,
+    md: MarkdownDoc,
+    list_window: VisibleWindow,
+    table_window: VisibleWindow,
+    themes: ThemeCatalog,
+    family: String,
+    follow_os: bool,
+    appearance: Appearance,
+    tick: u64,
     direction: Direction,
     catalog_query: String,
     code_lang: String,
@@ -188,7 +203,7 @@ impl Gallery {
                 page_i: 0,
                 table: TableModel {
                     headers: vec!["Name".into(), "Role".into()],
-                    rows: (0..400)
+                    rows: (0..1_000)
                         .map(|i| vec![format!("Row {i}"), format!("r{i}")])
                         .collect(),
                     sort_col: None,
@@ -204,7 +219,9 @@ impl Gallery {
                 ),
                 tree_sel: None,
                 list: VecList {
-                    items: (0..900).map(|i| format!("Item {i}")).collect(),
+                    items: (0..1_000)
+                        .map(|i| ListRow::new(format!("Item {i}")).with_meta(format!("row {i}")))
+                        .collect(),
                 },
                 sel: Selection::Single(0),
                 actions,
@@ -216,17 +233,45 @@ impl Gallery {
                 editor: Content::with_text(
                     "A longer textarea so the page is not an empty box.\nSecond line.\nThird line.\n",
                 ),
-                md: markdown::parse(samples::MARKDOWN).collect(),
-                list_scroll: 0.0,
-                table_scroll: 0.0,
+                md: MarkdownDoc::parse(samples::MARKDOWN),
+                list_window: VisibleWindow::new(400.0),
+                table_window: VisibleWindow::new(360.0),
+                themes: {
+                    let mut c = ThemeCatalog::new();
+                    c.register(
+                        "gallery-brand",
+                        theme::named("nord").tokens,
+                        true,
+                    );
+                    c
+                },
+                family: "default".into(),
+                follow_os: false,
+                appearance: Appearance::Dark,
+                tick: 0,
                 direction,
                 catalog_query: String::new(),
                 code_lang: "Rust".into(),
                 code_editor: Content::with_text(CodeLang::named("Rust").unwrap().source),
                 dialog_note: String::new(),
             },
-            Task::none(),
+            icedtea::iced::system::theme().map(Message::OsMode),
         )
+    }
+
+    fn apply_theme_pref(&mut self) {
+        let name = theme::resolve_pref(
+            &self.theme,
+            Some(self.family.as_str()),
+            self.follow_os,
+            self.appearance,
+        );
+        self.theme = name.clone();
+        self.tokens = self
+            .themes
+            .get(&name)
+            .map(|t| t.tokens)
+            .unwrap_or_else(|| theme::named(&name).tokens);
     }
 
     fn theme(&self) -> Theme {
@@ -238,7 +283,15 @@ impl Gallery {
             Message::Select(id) => self.page = id,
             Message::Theme(name) => {
                 self.theme = name.clone();
-                self.tokens = theme::named(&name).tokens;
+                self.follow_os = false;
+                if let Some(f) = theme::family_of_name(&name) {
+                    self.family = f.id.to_string();
+                }
+                self.tokens = self
+                    .themes
+                    .get(&name)
+                    .map(|t| t.tokens)
+                    .unwrap_or_else(|| theme::named(&name).tokens);
             }
             Message::Query(q) => self.query = q,
             Message::Toggle(v) => {
@@ -267,8 +320,34 @@ impl Gallery {
                 let _ = icedtea::collection::tree_toggle(&mut self.tree, id);
             }
             Message::TreeSelect(id) => self.tree_sel = Some(id),
-            Message::ListScroll(y) => self.list_scroll = y,
-            Message::TableScroll(y) => self.table_scroll = y,
+            Message::ListScroll(w) => self.list_window = w,
+            Message::TableScroll(w) => self.table_window = w,
+            Message::ListSel(i) => self.sel.select_single(i),
+            Message::TableSel(i) => self.sel.select_single(i),
+            Message::Submit => {
+                self.dialog_note = format!("submit: {}", self.query);
+            }
+            Message::Tick => self.tick = self.tick.saturating_add(1),
+            Message::Family(id) => {
+                self.family = id;
+                self.apply_theme_pref();
+            }
+            Message::Follow(on) => {
+                self.follow_os = on;
+                self.apply_theme_pref();
+            }
+            Message::OsMode(mode) => {
+                self.appearance = Appearance::from_mode(mode);
+                if self.follow_os {
+                    self.apply_theme_pref();
+                }
+            }
+            Message::Appearance(mode) => {
+                self.appearance = mode;
+                if self.follow_os {
+                    self.apply_theme_pref();
+                }
+            }
             Message::Key(ev) => {
                 let ctx = KeyContext {
                     text_input_focused: !self.query.is_empty() && self.page == "search",
@@ -276,6 +355,19 @@ impl Gallery {
                 };
                 if let Some(msg) = icedtea::key::handle(ctx, &self.actions, &ev) {
                     return self.update(msg);
+                }
+                if let Some(press) = icedtea::key::press(&ev) {
+                    if matches!(self.page, "list" | "table" | "palette") {
+                        let len = if self.page == "table" {
+                            self.table.rows.len()
+                        } else if self.page == "list" {
+                            self.list.len()
+                        } else {
+                            self.actions.iter().count()
+                        };
+                        let next = press.step_index(self.sel.primary().unwrap_or(0), len, 10);
+                        self.sel.select_single(next);
+                    }
                 }
             }
             Message::Drop(_p) => {}
@@ -322,6 +414,8 @@ impl Gallery {
         Subscription::batch([
             icedtea::key::listen().map(Message::Key),
             icedtea::dnd::listen_files().map(Message::Drop),
+            icedtea::iced::time::every(std::time::Duration::from_secs(1)).map(|_| Message::Tick),
+            icedtea::iced::system::theme_changes().map(Message::OsMode),
         ])
     }
 
@@ -373,7 +467,7 @@ impl Gallery {
         }
         let sidebar = column![
             header,
-            widget::themed_scroll(nav.into(), tok, named("nav", Role::List)),
+            widget::themed_scroll(nav.into(), tok, named("nav", Role::List), false),
         ]
         .width(248)
         .height(Length::Fill);
@@ -389,19 +483,19 @@ impl Gallery {
             .padding(24)
             .width(Length::Fill)
             .height(Length::Fill);
-        let body = if matches!(self.page, "textarea" | "code" | "tree" | "list-detail") {
+        let body = if matches!(
+            self.page,
+            "textarea" | "code" | "tree" | "list-detail" | "list" | "table"
+        ) {
             page.into()
         } else {
-            widget::themed_scroll(page.into(), tok, named("page", Role::Group))
+            widget::themed_scroll(page.into(), tok, named("page", Role::Group), false)
         };
         let themes = container(
             row![
                 widget::meta("Theme", tok, named("theme", Role::Status)),
                 widget::themed_pick_list(
-                    icedtea::theme::builtin_names()
-                        .into_iter()
-                        .map(str::to_string)
-                        .collect::<Vec<_>>(),
+                    self.themes.names(),
                     Some(self.theme.clone()),
                     Message::Theme,
                     tok,
@@ -673,13 +767,27 @@ impl Gallery {
                 tok,
                 named("number", Role::SpinButton).with_value("3"),
             ),
-            "text-input" => widget::themed_text_input(
-                "Name",
-                &self.query,
-                Message::Query,
-                tok,
-                named(&self.query, Role::TextBox),
-            ),
+            "text-input" => column![
+                widget::themed_text_input(
+                    "Name",
+                    &self.query,
+                    Message::Query,
+                    Some(Message::Submit),
+                    tok,
+                    named("Name", Role::TextBox),
+                ),
+                widget::meta(
+                    if self.dialog_note.is_empty() {
+                        "Enter submits.".into()
+                    } else {
+                        self.dialog_note.clone()
+                    },
+                    tok,
+                    named("submit-note", Role::Status),
+                ),
+            ]
+            .spacing(8)
+            .into(),
             "password" => widget::password_input(
                 "Secret",
                 &self.query,
@@ -747,11 +855,29 @@ impl Gallery {
             ]
             .spacing(8)
             .into(),
-            "markdown" => widget::themed_scroll(
-                widget::markdown_view(&self.md, tok, |_| Message::Nop, named("md", Role::Group)),
-                tok,
-                named("md-scroll", Role::Group),
-            ),
+            "markdown" => column![
+                widget::meta(
+                    format!(
+                        "MarkdownDoc hash {:#x}. Parsed in update; the view borrows items.",
+                        self.md.hash
+                    ),
+                    tok,
+                    named("md-hash", Role::Status),
+                ),
+                widget::themed_scroll(
+                    widget::markdown_view(
+                        &self.md.items,
+                        tok,
+                        |_| Message::Nop,
+                        named("md", Role::Group)
+                    ),
+                    tok,
+                    named("md-scroll", Role::Group),
+                    false,
+                ),
+            ]
+            .spacing(8)
+            .into(),
             "code" => {
                 let lang = CodeLang::named(&self.code_lang).unwrap_or(&samples::CODE_LANGS[0]);
                 let hl = icedtea::theme::code_highlight(&self.theme);
@@ -785,23 +911,28 @@ impl Gallery {
                 .into()
             }
             "theme" => {
-                let swatches: Vec<Element<'_, Message>> = icedtea::theme::builtin_names()
+                let names = self.themes.names();
+                let swatches: Vec<Element<'_, Message>> = names
                     .into_iter()
                     .map(|name| {
-                        let t = icedtea::theme::named(name).tokens;
-                        let hl = icedtea::theme::code_highlight(name);
+                        let t = self
+                            .themes
+                            .get(&name)
+                            .map(|n| n.tokens)
+                            .unwrap_or_else(|| theme::named(&name).tokens);
+                        let hl = icedtea::theme::code_highlight(&name);
                         container(
                             column![
                                 widget::themed_button(
-                                    name,
-                                    Some(Message::Theme(name.to_string())),
+                                    name.clone(),
+                                    Some(Message::Theme(name.clone())),
                                     t,
                                     if self.theme == name {
                                         Variant::Primary
                                     } else {
                                         Variant::Quiet
                                     },
-                                    btn(name),
+                                    btn(&name),
                                 ),
                                 widget::meta(
                                     format!("{hl}"),
@@ -828,12 +959,65 @@ impl Gallery {
                         .into()
                     })
                     .collect();
+                let families: Vec<String> =
+                    theme::FAMILIES.iter().map(|f| f.id.to_string()).collect();
                 column![
                     widget::meta(
-                        "Community colorways. Pick one; chrome and code highlighting follow.",
+                        "ThemeCatalog::register adds gallery-brand. Family + follow-OS picks the pair member.",
                         tok,
                         named("theme-hint", Role::Status),
                     ),
+                    row![
+                        widget::themed_button(
+                            "gallery-brand",
+                            Some(Message::Theme("gallery-brand".into())),
+                            tok,
+                            if self.theme == "gallery-brand" {
+                                Variant::Primary
+                            } else {
+                                Variant::Quiet
+                            },
+                            btn("gallery-brand"),
+                        ),
+                        widget::themed_pick_list(
+                            families,
+                            Some(self.family.clone()),
+                            Message::Family,
+                            tok,
+                            named("family", Role::ComboBox),
+                        ),
+                        widget::themed_checkbox(
+                            "Follow OS",
+                            self.follow_os,
+                            Message::Follow,
+                            tok,
+                            named("follow", Role::Checkbox).with_checked(self.follow_os),
+                        ),
+                        widget::themed_button(
+                            "Light",
+                            Some(Message::Appearance(Appearance::Light)),
+                            tok,
+                            if self.appearance == Appearance::Light {
+                                Variant::Primary
+                            } else {
+                                Variant::Quiet
+                            },
+                            btn("Light"),
+                        ),
+                        widget::themed_button(
+                            "Dark",
+                            Some(Message::Appearance(Appearance::Dark)),
+                            tok,
+                            if self.appearance == Appearance::Dark {
+                                Variant::Primary
+                            } else {
+                                Variant::Quiet
+                            },
+                            btn("Dark"),
+                        ),
+                    ]
+                    .spacing(8)
+                    .align_y(Alignment::Center),
                     layout::wrap(swatches, 160.0, 8.0, 720.0),
                 ]
                 .spacing(12)
@@ -883,17 +1067,44 @@ impl Gallery {
                 named("Tip", Role::Tooltip),
             ),
             "link" => widget::hyperlink("docs", Message::Nop, tok, named("docs", Role::Link)),
-            "list" => widget::list_view(
-                &self.list,
-                &self.sel,
-                |_| Message::Nop,
-                tok,
-                self.list_scroll,
-                28.0,
-                220.0,
-                Message::ListScroll,
-                named("list", Role::List),
-            ),
+            "list" => {
+                let win = visible_window(
+                    self.list_window.scroll,
+                    self.list_window.viewport,
+                    48.0,
+                    self.list.len(),
+                    OVERSCAN,
+                    self.sel.primary(),
+                );
+                column![
+                    widget::meta(
+                        format!(
+                            "tick={} mounted={} rows={} range={start}..{end}",
+                            self.tick,
+                            win.mounted(),
+                            self.list.len(),
+                            start = win.start,
+                            end = win.end
+                        ),
+                        tok,
+                        named("list-status", Role::Status),
+                    ),
+                    widget::list_view(
+                        &self.list,
+                        &self.sel,
+                        Message::ListSel,
+                        tok,
+                        self.list_window,
+                        48.0,
+                        OVERSCAN,
+                        Message::ListScroll,
+                        named("list", Role::List),
+                    ),
+                ]
+                .spacing(8)
+                .height(Length::Fill)
+                .into()
+            }
             "grid" => column![
                 widget::item_grid(
                     &["A".into(), "B".into(), "C".into()],
@@ -923,18 +1134,45 @@ impl Gallery {
             ]
             .spacing(12)
             .into(),
-            "table" => widget::data_table(
-                &self.table,
-                &self.sel,
-                self.table_scroll,
-                28.0,
-                200.0,
-                |_| Message::Nop,
-                Message::Sort,
-                Message::TableScroll,
-                tok,
-                named("table", Role::Table),
-            ),
+            "table" => {
+                let win = visible_window(
+                    self.table_window.scroll,
+                    self.table_window.viewport,
+                    48.0,
+                    self.table.rows.len(),
+                    OVERSCAN,
+                    self.sel.primary(),
+                );
+                column![
+                    widget::meta(
+                        format!(
+                            "tick={} mounted={} rows={} range={start}..{end}",
+                            self.tick,
+                            win.mounted(),
+                            self.table.rows.len(),
+                            start = win.start,
+                            end = win.end
+                        ),
+                        tok,
+                        named("table-status", Role::Status),
+                    ),
+                    widget::data_table(
+                        &self.table,
+                        &self.sel,
+                        self.table_window,
+                        48.0,
+                        OVERSCAN,
+                        Message::TableSel,
+                        Message::Sort,
+                        Message::TableScroll,
+                        tok,
+                        named("table", Role::Table),
+                    ),
+                ]
+                .spacing(8)
+                .height(Length::Fill)
+                .into()
+            }
             "tree" => {
                 let picked = self
                     .tree_sel
@@ -1033,24 +1271,30 @@ impl Gallery {
                     named("chip-hint", Role::Status),
                 ),
                 row![
-                    widget::chip("Rust", Message::Nop, tok, btn("Rust")),
-                    widget::chip("iced", Message::Nop, tok, btn("iced")),
-                    widget::chip("desktop", Message::Nop, tok, btn("desktop")),
-                    widget::badge("3", tok, named("chip-count", Role::Status)),
+                    widget::chip("Rust", Some(Message::Nop), tok, Variant::Quiet, btn("Rust"),),
+                    widget::chip("iced", None, tok, Variant::Primary, btn("iced")),
+                    widget::chip(
+                        "desktop",
+                        Some(Message::Nop),
+                        tok,
+                        Variant::Danger,
+                        btn("desktop"),
+                    ),
+                    widget::badge("3", tok, Variant::Quiet, named("chip-count", Role::Status)),
                 ]
                 .spacing(8)
                 .align_y(Alignment::Center),
             ]
             .spacing(8)
             .into(),
-            "badge" => widget::badge("New", tok, named("New", Role::Status)),
+            "badge" => widget::badge("New", tok, Variant::Primary, named("New", Role::Status)),
             "wrap" => {
                 let chips: Vec<Element<'_, Message>> = [
                     "New", "Open", "Save", "Export", "Print", "Share", "Undo", "Redo", "Cut",
                     "Copy", "Paste", "Find",
                 ]
                 .into_iter()
-                .map(|t| widget::chip(t, Message::Nop, tok, btn(t)))
+                .map(|t| widget::chip(t, Some(Message::Nop), tok, Variant::Quiet, btn(t)))
                 .collect();
                 layout::wrap(chips, 120.0, 8.0, 480.0)
             }
@@ -1103,6 +1347,7 @@ impl Gallery {
                 .into(),
                 tok,
                 named("scroll", Role::Group),
+                true,
             ),
             "callout" => widget::info_bar(
                 ToastKind::Warning,
@@ -1124,8 +1369,9 @@ impl Gallery {
                             "Name",
                             &self.query,
                             Message::Query,
+                            None,
                             tok,
-                            named(&self.query, Role::TextBox),
+                            named("Name", Role::TextBox),
                         ),
                         widget::themed_checkbox(
                             "Remember",
@@ -1253,11 +1499,11 @@ impl Gallery {
                 widget::list_view(
                     &self.list,
                     &self.sel,
-                    |_| Message::Nop,
+                    Message::ListSel,
                     tok,
-                    self.list_scroll,
-                    28.0,
-                    280.0,
+                    self.list_window,
+                    48.0,
+                    OVERSCAN,
                     Message::ListScroll,
                     named("list", Role::List),
                 ),

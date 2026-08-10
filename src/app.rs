@@ -6,7 +6,7 @@ use crate::density::{Density, DensityName};
 use crate::i18n::{Catalog, Locale};
 use crate::theme::{self, ThemeCatalog, Tokens};
 use crate::typo;
-use crate::window::{self, WindowKind};
+use crate::window::{self, DisplayBounds, WindowKind};
 
 /// How an icedtea application boots.
 ///
@@ -27,6 +27,8 @@ pub struct Boot {
     pub size: Option<Size>,
     pub min_size: Option<Size>,
     pub max_size: Option<Size>,
+    pub pointer: Option<(f32, f32)>,
+    pub displays: Vec<DisplayBounds>,
 }
 
 impl Boot {
@@ -41,6 +43,8 @@ impl Boot {
             size: None,
             min_size: None,
             max_size: None,
+            pointer: None,
+            displays: Vec::new(),
         }
     }
 
@@ -84,6 +88,18 @@ impl Boot {
     /// Maximum inner window size in pixels.
     pub fn max_size(mut self, width: f32, height: f32) -> Self {
         self.max_size = Some(Size::new(width, height));
+        self
+    }
+
+    /// Pointer used to pick the overlay's display.
+    pub fn pointer(mut self, x: f32, y: f32) -> Self {
+        self.pointer = Some((x, y));
+        self
+    }
+
+    /// Display rectangles in the same space as [`Self::pointer`].
+    pub fn displays(mut self, displays: impl Into<Vec<DisplayBounds>>) -> Self {
+        self.displays = displays.into();
         self
     }
 }
@@ -141,6 +157,15 @@ pub fn bootstrap_with_catalog(boot: &Boot, themes: &ThemeCatalog) -> Prepared {
             if let Some(max) = boot.max_size {
                 win.max_size = Some(max);
             }
+            if boot.window == WindowKind::Overlay {
+                if let Some(pointer) = boot.pointer {
+                    win.position = iced::window::Position::Specific(window::place(
+                        pointer,
+                        win.size,
+                        &boot.displays,
+                    ));
+                }
+            }
             win
         },
         iced_theme,
@@ -195,6 +220,30 @@ mod tests {
         assert_eq!(default_font(), typo::UI);
         let ov = bootstrap(&Boot::new("p", "dev.x").overlay());
         assert!(!ov.window.decorations);
+        assert!(ov.window.max_size.is_none());
+        let placed = bootstrap(
+            &Boot::new("p", "dev.x")
+                .overlay()
+                .size(900.0, 700.0)
+                .pointer(100.0, 80.0)
+                .displays(vec![DisplayBounds {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 1920.0,
+                    height: 1080.0,
+                }]),
+        );
+        assert_eq!(placed.window.size.width, 900.0);
+        assert_eq!(placed.window.size.height, 700.0);
+        assert!(placed.window.max_size.is_none());
+        assert!(matches!(
+            placed.window.position,
+            iced::window::Position::Specific(_)
+        ));
+        if let iced::window::Position::Specific(p) = placed.window.position {
+            assert_eq!(p.x, 100.0);
+            assert_eq!(p.y, 80.0);
+        }
         let dlg = bootstrap(&Boot::new("d", "dev.x").dialog());
         assert!(dlg.window.decorations);
         let mut cat = ThemeCatalog::new();
