@@ -7,73 +7,69 @@ change. Measure before claiming smoothness.
 Shipped: fill list/table with `virtual_pads` and range messages,
 `on_submit`, list keys, overlay `size` / `place` / `should_hide`,
 chip without dismiss, stick-to-end, `MarkdownDoc`, theme families and
-follow-OS, gallery 1_000-row measure, palette overlay demo.
+follow-OS, large-list gallery measure, overlay hide/place demo.
 
 ## Order
 
-1. List: scroll `Id`, 24px rail, empty copy, row meta color
-2. `themed_scroll`: `Id` and `on_scroll`
-3. Overlay hide: Escape while a field is focused
-4. `place_centered` on the pointer's display
-5. Overlay pop-out helpers
-6. Text-input `Id`; overlay shell compose
+1. List: scroll `Id`, usable rail, empty copy, row color
+2. Scroll: `Id` and `on_scroll`
+3. Overlay: Escape from a focused field
+4. Place: center on the pointer's display
+5. Overlay to decorated window
+6. Text-input `Id`; compact chrome compose
 7. `lazy` only if a heavy sibling still remounts after 1–2
 
 ## Do
 
-- **List scroll host.** Optional iced `Id` on `list_view` so the
-  application can `scroll_to` a selected or matched row (keyboard
-  highlight, search). Use the existing 24px `ScrollRail` on the list
-  (one constructor) so a tall catalog stays grabbable. Optional
-  empty-state string. Optional per-row meta color (or a small
-  row-style hook) for success / warning / danger, not only muted.
+- **List host.** Optional iced `Id` on `list_view` so the application
+  can `scroll_to` the highlighted or matched row. Use the existing
+  24px `ScrollRail` on that constructor so a long list stays
+  grabbable. Optional empty-state string. Optional per-row meta
+  color (or a small row-style hook) for success / warning / danger.
   Keep `ListModel` as title + meta + id + len; cover from
   `Selection::primary()`.
-- **`themed_scroll` id and viewport.** Optional `Id` and optional
-  `on_scroll` (`scrollable::Viewport` → message) so a log, transcript,
-  or timeline can jump and can tell when a card leaves the pane.
-  Keep `stick`.
-- **Escape hides the overlay.** `in_palette` only suppresses
-  `HideEvent::FocusLoss` (clicking from search to the result list).
-  Escape still hides, including while a text field is focused.
-  Document that iced 0.14 `text_input` captures Escape and the
-  application must forward that captured key into `should_hide`.
-- **`place_centered`.** Pick the display under the pointer (else
-  first) and center `size` in that rectangle (launcher, palette,
-  dialog). Keep `place` for menus that sit on the pointer.
+- **Scroll host.** Optional `Id` and optional `on_scroll`
+  (`scrollable::Viewport` → message) on `themed_scroll` so the
+  application can jump and can react when content leaves the
+  viewport. Keep `stick`.
+- **Overlay Escape.** `in_palette` (or a renamed inside-card flag)
+  only suppresses `HideEvent::FocusLoss`. Escape hides the overlay
+  even when a text field is focused. Document that iced 0.14
+  `text_input` captures Escape and the application must forward that
+  captured key into `should_hide`.
+- **Centered place.** `place_centered`: display under the pointer
+  (else first), center `size` in that rectangle. Keep `place` for
+  pointer-origin menus.
 
 ## Consider
 
-- **Overlay pop-out.** Helpers to retarget window settings from an
-  undecorated always-on-top card to a decorated application
-  (resizable, `Level::Normal`, no override-redirect). macOS accessory
-  vs regular policy. The summon / hide / pop-out loop stays in the
-  application.
-- **Overlay shell compose.** `Tabs { closable: false }` already
-  hides close buttons; document that. Optional `Id` on
-  `themed_text_input` so search can take focus after show. Document
-  composing search + `list_detail` + tabs + footer. Optional
-  `Corner::None` for flush overlay cards. Extract a dedicated shell
-  constructor only when a second in-tree consumer needs the same
-  recipe.
-- **Markdown previews.** Application can slice source before `parse`.
-  Optional `Tokens.accent` / `primary` on inline code and links if
-  iced's markdown style allows it.
+- **Window retarget.** Helpers to change an overlay into a decorated
+  application window (resizable, `Level::Normal`, platform policy
+  for Dock / task switcher). The application owns when to summon,
+  hide, or pop out.
+- **Compact chrome.** Optional `Id` on `themed_text_input` so a field
+  can take focus after show. Document `Tabs { closable: false }`,
+  and composing search + `list_detail` + tabs + footer. Optional
+  `Corner::None` for flush cards. A dedicated shell constructor only
+  after a second in-tree consumer needs the same recipe.
+- **Markdown in tokens.** Optional `Tokens` faces on inline code and
+  links if iced's markdown style allows it. Truncation is slicing
+  source before `parse`.
 - **`widget::lazy`.** Thin constructor over iced `lazy`. The
   application owns the key. Do not auto-lazy `list_detail`.
-- **Estimated-height rows on the same list.** One collection path.
-  Only if uniform rows plus `lazy` are not enough.
-- **Secret row.** Mask, reveal, and a copy `Action` for settings.
-  Password stays the field.
+- **Variable-height rows.** Same collection path as the uniform
+  list. Only if fixed row height plus `lazy` are not enough.
+- **Secret field.** Mask, reveal, and a copy `Action` on a settings
+  row. `password_input` stays the editor.
 - **Navigation width.** Document the one resize subscription
   (`Subscription::map` non-capturing; convert in `update`).
   `navigation_view` keeps taking width.
-- **Card meta row.** Compose `group_box` plus chips. New filter type
-  only if `Tabs` or radio cannot do exclusive filters.
-- **OS accent as `primary`.** When follow-OS is on, mundy's accent
-  color can fill `Tokens.primary`. Canvas and text stay the family's
-  tokens. Decorated windows keep the native title bar.
+- **Card plus chips.** Compose `group_box` and chips for filters and
+  meta. A new exclusive-filter type only if `Tabs` or radio cannot
+  do it.
+- **OS accent.** When follow-OS is on, the desktop accent can fill
+  `Tokens.primary`. Canvas and text stay the family's tokens.
+  Decorated windows keep the native title bar.
 
-Caller-built `Tokens` already style list, tabs, inputs, and scroll.
-Named catalog keys are optional. Mapping a host config file onto
-`Tokens` stays in the application.
+Caller-built `Tokens` style every constructor. Named catalog keys
+are optional. Host config files map into `Tokens` in the application.
