@@ -1,5 +1,23 @@
-//! Themed iced widget constructors for `view`. Every export returns an
-//! [`iced::Element`] and is keyboard-complete via iced.
+//! Themed iced widget constructors for `view`.
+//!
+//! Every export returns an [`iced::Element`] and is keyboard-complete
+//! via iced. The gallery (`cargo run -p icedtea-gallery`) pages each
+//! `catalog::ENTRIES` id.
+//!
+//! ```
+//! use icedtea::a11y::A11y;
+//! use icedtea::theme;
+//! use icedtea::variant::Variant;
+//! use icedtea::widget;
+//! let tok = theme::named("dark").tokens;
+//! let _: icedtea::Element<'_, ()> = widget::themed_button(
+//!     "Save",
+//!     Some(()),
+//!     tok,
+//!     Variant::Primary,
+//!     A11y::button("Save"),
+//! );
+//! ```
 
 use iced::widget::canvas::Canvas;
 use iced::widget::markdown;
@@ -7,16 +25,18 @@ use iced::widget::scrollable::{Direction as ScrollDir, Scrollbar};
 use iced::widget::text_editor::Content;
 use iced::widget::{
     button, checkbox, column, container, mouse_area, pick_list, progress_bar, radio, row, rule,
-    scrollable, slider, svg, text, text_editor, text_input, toggler, tooltip, Id, Space,
+    scrollable, slider, stack, svg, text, text_editor, text_input, toggler, tooltip, Column, Id,
+    Row, Space,
 };
-use iced::{Alignment, Element, Length, Padding};
+use iced::{Alignment, Color, Element, Length, Padding};
 
 use crate::chrome::SCROLL_RAIL_WIDTH;
 use crate::host_canvas::ArcRing;
+use crate::scroll::ScrollRail;
 
 use crate::a11y::{self, A11y, Role};
 use crate::collection::{
-    page_range, virtual_pads, window_after_scroll, Accordion, ListModel, Selection, TableModel,
+    page_range, virtual_pads, visible_window, window_after_scroll, Accordion, ListModel, Selection,
     Tabs, TreeNode, VisibleWindow,
 };
 use crate::i18n::Direction;
@@ -48,6 +68,58 @@ pub fn icon_svg<'a, M: 'a>(icon: Icon, tok: Tokens, a11y: A11y) -> Element<'a, M
             .into(),
         &a11y,
     )
+}
+
+/// Cell content. Not a markup parser. [`MarkdownDoc`] stays documents.
+///
+/// ```
+/// use icedtea::widget::RichCell;
+/// let cell = RichCell::Code("len()".into());
+/// assert!(matches!(cell, RichCell::Code(_)));
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RichCell {
+    Plain(String),
+    Emphasis(String),
+    Code(String),
+    Link(String),
+}
+
+pub fn rich_cell<'a, M: Clone + 'a>(
+    cell: &RichCell,
+    on_link: Option<M>,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    match cell {
+        RichCell::Plain(s) => label(s.clone(), tok, a11y),
+        RichCell::Emphasis(s) => {
+            let s = a11y.apply_name(s.clone());
+            a11y::attach(
+                text(s)
+                    .size(typo::BODY)
+                    .color(tok.text)
+                    .font(typo::UI_ITALIC)
+                    .into(),
+                &a11y,
+            )
+        }
+        RichCell::Code(s) => {
+            let s = a11y.apply_name(s.clone());
+            a11y::attach(
+                text(s)
+                    .size(typo::CODE)
+                    .color(tok.text)
+                    .font(typo::MONO)
+                    .into(),
+                &a11y,
+            )
+        }
+        RichCell::Link(s) => match on_link {
+            Some(m) => hyperlink(s.clone(), m, tok, a11y),
+            None => label(s.clone(), tok, a11y),
+        },
+    }
 }
 
 pub fn label<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
@@ -90,6 +162,21 @@ pub fn display_line<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) ->
             .into(),
         &a11y,
     )
+}
+
+/// Segmented large figures on the type scale (clocks, meters).
+pub fn figure_display<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
+    let s = a11y.apply_name(s);
+    let mut r = Row::new().spacing(8).align_y(Alignment::Center);
+    for ch in s.chars() {
+        r = r.push(
+            text(ch.to_string())
+                .size(typo::DISPLAY)
+                .font(typo::UI_BOLD)
+                .color(tok.text),
+        );
+    }
+    a11y::attach(r.into(), &a11y)
 }
 
 pub fn meta<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
@@ -273,12 +360,54 @@ where
     V: Copy + Eq,
 {
     let name = a11y.apply_name(label_s);
+    if a11y.disabled {
+        let on = a11y.apply_checked(selected == Some(value));
+        return a11y::attach(
+            row![
+                container(Space::new().width(8).height(8))
+                    .width(16)
+                    .height(16)
+                    .center_x(16)
+                    .center_y(16)
+                    .style(move |_| radio_idle_face(tok, on)),
+                text(name.clone()).size(typo::BODY).color(tok.muted),
+            ]
+            .spacing(8)
+            .align_y(Alignment::Center)
+            .into(),
+            &a11y,
+        );
+    }
     a11y::attach(
         radio(name, value, selected, msg)
             .style(style::radio_style(tok))
             .into(),
         &a11y,
     )
+}
+
+fn radio_idle_face(tok: Tokens, on: bool) -> iced::widget::container::Style {
+    iced::widget::container::Style {
+        background: Some(iced::Background::Color(if on {
+            tok.primary
+        } else {
+            Color::TRANSPARENT
+        })),
+        border: iced::border::Border {
+            color: tok.muted,
+            width: 1.0,
+            radius: 8.0.into(),
+        },
+        ..iced::widget::container::Style::default()
+    }
+}
+
+/// Wheel delta in content pixels (down is positive).
+pub fn scroll_delta_pixels(delta: iced::mouse::ScrollDelta, row_h: f32) -> f32 {
+    match delta {
+        iced::mouse::ScrollDelta::Lines { y, .. } => -y * row_h.max(0.0),
+        iced::mouse::ScrollDelta::Pixels { y, .. } => -y,
+    }
 }
 
 pub fn themed_slider<'a, M: Clone + 'a>(
@@ -288,6 +417,18 @@ pub fn themed_slider<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
+    if a11y.disabled {
+        let _ = (range, value, msg);
+        return a11y::attach(
+            container(Space::new().width(Length::Fill).height(4))
+                .width(Length::Fill)
+                .height(18)
+                .center_y(18)
+                .style(move |_| style::fill(tok.panel, tok.muted))
+                .into(),
+            &a11y,
+        );
+    }
     a11y::attach(
         slider(range, value, msg)
             .style(style::slider_style(tok))
@@ -296,13 +437,30 @@ pub fn themed_slider<'a, M: Clone + 'a>(
     )
 }
 
-pub fn progress<'a, M: 'a>(value: f32, tok: Tokens, a11y: A11y) -> Element<'a, M> {
-    a11y::attach(
-        progress_bar(0.0..=1.0, value.clamp(0.0, 1.0))
-            .style(style::progress_style(tok))
-            .into(),
-        &a11y,
-    )
+/// Percent line, with optional remaining-time text.
+pub fn progress_label(value: f32, remaining: Option<&str>) -> String {
+    let pct = (value.clamp(0.0, 1.0) * 100.0).round() as i32;
+    match remaining {
+        Some(r) if !r.is_empty() => format!("{pct}% · {r}"),
+        _ => format!("{pct}%"),
+    }
+}
+
+pub fn progress<'a, M: 'a>(
+    value: f32,
+    copy: Option<&str>,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let bar = progress_bar(0.0..=1.0, value.clamp(0.0, 1.0)).style(style::progress_style(tok));
+    let el = if let Some(c) = copy.filter(|s| !s.is_empty()) {
+        column![bar, meta(c, tok, A11y::new(c, Role::Status))]
+            .spacing(4)
+            .into()
+    } else {
+        bar.into()
+    };
+    a11y::attach(el, &a11y)
 }
 
 /// Start/end radians for a determinate ring (`value` 0..=1, from 12 o'clock).
@@ -325,17 +483,86 @@ pub fn ring_should_stroke(start: f32, end: f32) -> bool {
 }
 
 /// Circular progress: arc sweep follows `value`.
-pub fn progress_ring<'a, M: 'a>(value: f32, tok: Tokens, a11y: A11y) -> Element<'a, M> {
+pub fn progress_ring<'a, M: 'a>(
+    value: f32,
+    copy: Option<&str>,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
     let (start, end) = ring_angles(value);
+    let ring = Canvas::new(ArcRing {
+        start,
+        end,
+        color: tok.primary,
+        track: tok.panel,
+    })
+    .width(56)
+    .height(56);
+    let el = if let Some(c) = copy.filter(|s| !s.is_empty()) {
+        column![ring, meta(c, tok, A11y::new(c, Role::Status))]
+            .spacing(4)
+            .into()
+    } else {
+        ring.into()
+    };
+    a11y::attach(el, &a11y)
+}
+
+/// Dim plus spinner over `child` when `busy`. The application owns the flag.
+pub fn busy_overlay<'a, M: Clone + 'a>(
+    child: Element<'a, M>,
+    busy: bool,
+    phase: f32,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    if !busy {
+        return child;
+    }
     a11y::attach(
-        Canvas::new(ArcRing {
-            start,
-            end,
-            color: tok.primary,
-            track: tok.panel,
+        stack![
+            child,
+            container(spinner(tok, phase, A11y::new("busy", Role::Progress)))
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .center_x(Length::Fill)
+                .center_y(Length::Fill)
+                .style(move |_| style::fill(Color::from_rgba(0.0, 0.0, 0.0, 0.35), tok.text)),
+        ]
+        .into(),
+        &a11y,
+    )
+}
+
+/// Map a series into canvas points. Empty input is empty output.
+pub fn spark_points(values: &[f32], width: f32, height: f32) -> Vec<(f32, f32)> {
+    if values.is_empty() || width <= 0.0 || height <= 0.0 {
+        return Vec::new();
+    }
+    let min = values.iter().copied().fold(f32::MAX, f32::min);
+    let max = values.iter().copied().fold(f32::MIN, f32::max);
+    let span = (max - min).max(1e-6);
+    let last = (values.len() - 1).max(1) as f32;
+    values
+        .iter()
+        .enumerate()
+        .map(|(i, v)| {
+            let x = i as f32 / last * width;
+            let y = height - (*v - min) / span * height;
+            (x, y)
         })
-        .width(56)
-        .height(56)
+        .collect()
+}
+
+/// One-row series. Domain plots stay in the application.
+pub fn sparkline<'a, M: 'a>(values: &'a [f32], tok: Tokens, a11y: A11y) -> Element<'a, M> {
+    a11y::attach(
+        Canvas::new(crate::host_canvas::Sparkline {
+            points: spark_points(values, 160.0, 36.0),
+            color: tok.accent,
+        })
+        .width(160)
+        .height(36)
         .into(),
         &a11y,
     )
@@ -367,11 +594,55 @@ pub fn image<'a, M: 'a>(
 ) -> Element<'a, M> {
     a11y::attach(
         iced::widget::image(handle)
+            .content_fit(iced::ContentFit::Contain)
             .width(width)
             .height(height)
             .into(),
         &a11y,
     )
+}
+
+/// Image with fit and loading/error faces.
+#[derive(Clone)]
+pub enum ImageSlot {
+    Ready {
+        handle: iced::widget::image::Handle,
+        fit: iced::ContentFit,
+    },
+    Loading,
+    Error(String),
+}
+
+pub fn image_slot<'a, M: Clone + 'a>(
+    slot: ImageSlot,
+    width: impl Into<Length>,
+    height: impl Into<Length>,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let width = width.into();
+    let height = height.into();
+    match slot {
+        ImageSlot::Ready { handle, fit } => a11y::attach(
+            iced::widget::image(handle)
+                .content_fit(fit)
+                .width(width)
+                .height(height)
+                .into(),
+            &a11y,
+        ),
+        ImageSlot::Loading => placeholder_skeleton(tok, a11y),
+        ImageSlot::Error(msg) => a11y::attach(
+            container(meta(msg.clone(), tok, A11y::new(msg, Role::Status)))
+                .width(width)
+                .height(height)
+                .center_x(width)
+                .center_y(height)
+                .style(move |_| style::callout(tok, ToastKind::Warning))
+                .into(),
+            &a11y,
+        ),
+    }
 }
 
 pub fn number_input<'a, M: Clone + 'a>(
@@ -395,6 +666,55 @@ pub fn step_number(value: f64, step: f64, min: f64, max: f64, dir: i32) -> f64 {
     (value + step * f64::from(dir)).clamp(min, max)
 }
 
+/// Fill `template` slots. `0` takes the next digit from `raw`; other
+/// characters are literals.
+pub fn apply_mask(template: &str, raw: &str) -> String {
+    let mut digits = raw.chars().filter(|c| c.is_ascii_digit());
+    let mut out = String::new();
+    for ch in template.chars() {
+        if ch == '0' {
+            match digits.next() {
+                Some(d) => out.push(d),
+                None => break,
+            }
+        } else if digits.clone().next().is_some() {
+            out.push(ch);
+        } else {
+            break;
+        }
+    }
+    out
+}
+
+fn mask_handler<'a, M: 'a>(
+    template: &'a str,
+    on_input: impl Fn(String) -> M + 'a,
+) -> impl Fn(String) -> M + 'a {
+    move |raw| on_input(apply_mask(template, &raw))
+}
+
+/// Text field that keeps `value` on `template` (date, time, card).
+pub fn masked_input<'a, M: Clone + 'a>(
+    template: &'a str,
+    value: &str,
+    on_input: impl Fn(String) -> M + 'a,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let shown = apply_mask(template, value);
+    themed_text_input(
+        template,
+        &shown,
+        mask_handler(template, on_input),
+        None,
+        tok,
+        a11y,
+        None,
+    )
+}
+
+/// Single-line field. `input_id` is for `iced::widget::operation::focus`
+/// after show.
 pub fn themed_text_input<'a, M: Clone + 'a>(
     placeholder: &str,
     value: &str,
@@ -402,10 +722,14 @@ pub fn themed_text_input<'a, M: Clone + 'a>(
     on_submit: Option<M>,
     tok: Tokens,
     a11y: A11y,
+    input_id: Option<Id>,
 ) -> Element<'a, M> {
     let mut i = text_input(placeholder, value)
         .style(style::search_style(tok))
         .padding(pad());
+    if let Some(id) = input_id {
+        i = i.id(id);
+    }
     if !a11y.disabled {
         i = i.on_input(on_input);
         if let Some(m) = a11y.apply_message(on_submit) {
@@ -415,21 +739,99 @@ pub fn themed_text_input<'a, M: Clone + 'a>(
     a11y::attach(i.into(), &a11y)
 }
 
+/// Text field plus a keyboard-complete pick list. The application
+/// owns the suggestion strings and the pick message.
+pub fn suggest_field<'a, M: Clone + 'a>(
+    placeholder: &str,
+    value: &str,
+    on_input: impl Fn(String) -> M + 'a,
+    suggestions: &'a [String],
+    on_pick: impl Fn(usize) -> M + 'a,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let mut col = column![themed_text_input(
+        placeholder,
+        value,
+        on_input,
+        None,
+        tok,
+        a11y.child(Role::TextBox),
+        None,
+    )]
+    .spacing(2);
+    for (i, s) in suggestions.iter().enumerate() {
+        col = col.push(themed_button(
+            s.clone(),
+            a11y.apply_message(Some(on_pick(i))),
+            tok,
+            Variant::Ghost,
+            A11y::new(s.clone(), Role::ListItem).with_disabled(a11y.disabled),
+        ));
+    }
+    a11y::attach(col.into(), &a11y)
+}
+
 pub fn password_input<'a, M: Clone + 'a>(
     placeholder: &str,
     value: &str,
     on_input: impl Fn(String) -> M + 'a,
     tok: Tokens,
     a11y: A11y,
+    masked: bool,
 ) -> Element<'a, M> {
     let mut i = text_input(placeholder, value)
-        .secure(true)
+        .secure(masked)
         .style(style::search_style(tok))
         .padding(pad());
     if !a11y.disabled {
         i = i.on_input(on_input);
     }
     a11y::attach(i.into(), &a11y)
+}
+
+/// Settings row: [`password_input`], reveal, and a copy [`crate::action::Action`].
+#[allow(clippy::too_many_arguments)]
+pub fn secret_field<'a, M: Clone + 'a>(
+    placeholder: &str,
+    value: &str,
+    on_input: impl Fn(String) -> M + 'a,
+    revealed: bool,
+    on_toggle: M,
+    copy: &crate::action::Action<M>,
+    tok: Tokens,
+    dir: Direction,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let toggle_title = if revealed { "Hide" } else { "Show" };
+    let field = password_input(
+        placeholder,
+        value,
+        on_input,
+        tok,
+        a11y.child(Role::TextBox),
+        !revealed,
+    );
+    let toggle = themed_button(
+        toggle_title,
+        Some(on_toggle),
+        tok,
+        Variant::Quiet,
+        A11y::button(toggle_title).with_disabled(a11y.disabled),
+    );
+    let copy_btn = themed_button(
+        copy.title.clone(),
+        copy.invoke(),
+        tok,
+        Variant::Quiet,
+        A11y::button(copy.title.clone()).with_disabled(!copy.enabled || a11y.disabled),
+    );
+    let kids = crate::i18n::order(dir, [field, toggle, copy_btn]);
+    let mut r = Row::new().spacing(8).align_y(Alignment::Center);
+    for k in kids {
+        r = r.push(k);
+    }
+    a11y::attach(r.into(), &a11y)
 }
 
 /// Multiline editor. `height` is icedtea size language ([`crate::layout::FILL`]
@@ -532,7 +934,8 @@ pub fn search_input<'a, M: Clone + 'a>(
                 on_input,
                 None,
                 tok,
-                A11y::new(a11y.apply_name(value), Role::TextBox),
+                a11y.child(Role::TextBox),
+                None,
             ),
         ]
         .spacing(8)
@@ -552,6 +955,20 @@ pub fn themed_pick_list<'a, T, M: Clone + 'a>(
 where
     T: ToString + PartialEq + Clone + 'a,
 {
+    if a11y.disabled {
+        let _ = on_select;
+        let shown = selected
+            .as_ref()
+            .map(ToString::to_string)
+            .unwrap_or_default();
+        return a11y::attach(
+            container(text(shown).size(typo::BODY).color(tok.muted))
+                .padding(pad())
+                .style(move |_| style::panel(tok))
+                .into(),
+            &a11y,
+        );
+    }
     a11y::attach(
         pick_list(options, selected, on_select)
             .style(style::picker_style(tok))
@@ -608,19 +1025,19 @@ pub fn date_picker<'a, M: Clone + 'a>(
                 a11y.apply_message(Some(on_prev)),
                 tok,
                 Variant::Quiet,
-                A11y::button("previous-day"),
+                A11y::button("previous-day").with_disabled(a11y.disabled),
             ),
             label(
                 shown.clone(),
                 tok,
-                A11y::new(a11y.apply_name(shown), Role::SpinButton),
+                a11y.child(Role::Status).with_value(shown),
             ),
             themed_button(
                 ">",
                 a11y.apply_message(Some(on_next)),
                 tok,
                 Variant::Quiet,
-                A11y::button("next-day"),
+                A11y::button("next-day").with_disabled(a11y.disabled),
             ),
         ]
         .spacing(8)
@@ -630,51 +1047,210 @@ pub fn date_picker<'a, M: Clone + 'a>(
     )
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Civil time of day (0.2). Storage is always 24-hour; [`TimeClock`] is display.
+///
+/// ```
+/// use icedtea::widget::{TimeClock, TimeField, TimeValue};
+/// let t = TimeValue::hm(9, 30);
+/// assert_eq!(t.hour12(), 9);
+/// assert!(!t.afternoon());
+/// assert_eq!(t.step_field(TimeField::Hour, TimeClock::HOUR12).hour, 10);
+/// assert_eq!(TimeValue::hm(0, 0).hour12(), 12);
+/// assert_eq!(TimeValue::hm(13, 5).toggle_period().hour, 1);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct TimeValue {
     pub hour: u8,
     pub minute: u8,
+    pub second: u8,
+}
+
+/// Display for [`time_picker`]. Does not change how [`TimeValue`] is stored.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TimeClock {
+    pub hour12: bool,
+    pub seconds: bool,
+}
+
+impl TimeClock {
+    pub const HOURS_MINUTES: Self = Self {
+        hour12: false,
+        seconds: false,
+    };
+    pub const HOURS_MINUTES_SECONDS: Self = Self {
+        hour12: false,
+        seconds: true,
+    };
+    pub const HOUR12: Self = Self {
+        hour12: true,
+        seconds: false,
+    };
+    pub const HOUR12_SECONDS: Self = Self {
+        hour12: true,
+        seconds: true,
+    };
+}
+
+/// Which stepper [`time_picker`] pressed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeField {
+    Hour,
+    Minute,
+    Second,
+    Period,
 }
 
 impl TimeValue {
+    pub fn hm(hour: u8, minute: u8) -> Self {
+        Self {
+            hour,
+            minute,
+            second: 0,
+        }
+        .clamp()
+    }
+
+    pub fn hms(hour: u8, minute: u8, second: u8) -> Self {
+        Self {
+            hour,
+            minute,
+            second,
+        }
+        .clamp()
+    }
+
     pub fn clamp(self) -> Self {
         Self {
             hour: self.hour.min(23),
             minute: self.minute.min(59),
+            second: self.second.min(59),
+        }
+    }
+
+    /// 1–12 for a 12-hour face. Midnight and noon are 12.
+    pub fn hour12(self) -> u8 {
+        match self.clamp().hour % 12 {
+            0 => 12,
+            n => n,
+        }
+    }
+
+    pub fn afternoon(self) -> bool {
+        self.clamp().hour >= 12
+    }
+
+    pub fn step_hour(self, dir: i32) -> Self {
+        let v = self.clamp();
+        let hour = (i32::from(v.hour) + dir).rem_euclid(24) as u8;
+        Self { hour, ..v }
+    }
+
+    pub fn step_minute(self, dir: i32) -> Self {
+        let v = self.clamp();
+        let minute = (i32::from(v.minute) + dir).rem_euclid(60) as u8;
+        Self { minute, ..v }
+    }
+
+    pub fn step_second(self, dir: i32) -> Self {
+        let v = self.clamp();
+        let second = (i32::from(v.second) + dir).rem_euclid(60) as u8;
+        Self { second, ..v }
+    }
+
+    /// Step the 1–12 face; keep morning or afternoon.
+    pub fn step_hour12(self, dir: i32) -> Self {
+        let v = self.clamp();
+        let index = (i32::from(v.hour12() % 12) + dir).rem_euclid(12) as u8;
+        let hour = if v.afternoon() { index + 12 } else { index };
+        Self { hour, ..v }
+    }
+
+    pub fn toggle_period(self) -> Self {
+        let v = self.clamp();
+        let hour = if v.afternoon() {
+            v.hour - 12
+        } else {
+            v.hour + 12
+        };
+        Self { hour, ..v }
+    }
+
+    pub fn step_field(self, field: TimeField, clock: TimeClock) -> Self {
+        match field {
+            TimeField::Hour if clock.hour12 => self.step_hour12(1),
+            TimeField::Hour => self.step_hour(1),
+            TimeField::Minute => self.step_minute(1),
+            TimeField::Second => self.step_second(1),
+            TimeField::Period => self.toggle_period(),
         }
     }
 }
 
+fn time_colon<'a, M: 'a>(tok: Tokens) -> Element<'a, M> {
+    container(
+        text(":")
+            .size(typo::BODY)
+            .font(typo::UI_BOLD)
+            .color(tok.text),
+    )
+    .padding(Padding {
+        top: 8.0,
+        right: 2.0,
+        bottom: 8.0,
+        left: 2.0,
+    })
+    .into()
+}
+
 pub fn time_picker<'a, M: Clone + 'a>(
     value: TimeValue,
-    on_hour: M,
-    on_minute: M,
+    clock: TimeClock,
+    on_field: impl Fn(TimeField) -> M + Copy + 'a,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
     let v = value.clamp();
-    a11y::attach(
-        row![
-            themed_button(
-                format!("{:02}", v.hour),
-                a11y.apply_message(Some(on_hour)),
-                tok,
-                Variant::Quiet,
-                A11y::button("hour"),
-            ),
-            label(":", tok, A11y::new(":", Role::Separator)),
-            themed_button(
-                format!("{:02}", v.minute),
-                a11y.apply_message(Some(on_minute)),
-                tok,
-                Variant::Quiet,
-                A11y::button("minute"),
-            ),
-        ]
-        .spacing(4)
-        .into(),
-        &a11y,
-    )
+    let hour = if clock.hour12 {
+        format!("{:02}", v.hour12())
+    } else {
+        format!("{:02}", v.hour)
+    };
+    let mut row = Row::new().spacing(4).align_y(Alignment::Center);
+    row = row.push(themed_button(
+        hour,
+        a11y.apply_message(Some(on_field(TimeField::Hour))),
+        tok,
+        Variant::Quiet,
+        A11y::button("hour").with_disabled(a11y.disabled),
+    ));
+    row = row.push(time_colon(tok));
+    row = row.push(themed_button(
+        format!("{:02}", v.minute),
+        a11y.apply_message(Some(on_field(TimeField::Minute))),
+        tok,
+        Variant::Quiet,
+        A11y::button("minute").with_disabled(a11y.disabled),
+    ));
+    if clock.seconds {
+        row = row.push(time_colon(tok));
+        row = row.push(themed_button(
+            format!("{:02}", v.second),
+            a11y.apply_message(Some(on_field(TimeField::Second))),
+            tok,
+            Variant::Quiet,
+            A11y::button("second").with_disabled(a11y.disabled),
+        ));
+    }
+    if clock.hour12 {
+        row = row.push(themed_button(
+            if v.afternoon() { "PM" } else { "AM" },
+            a11y.apply_message(Some(on_field(TimeField::Period))),
+            tok,
+            Variant::Quiet,
+            A11y::button("period").with_disabled(a11y.disabled),
+        ));
+    }
+    a11y::attach(row.into(), &a11y)
 }
 
 pub fn color_swatch<'a, M: Clone + 'a>(
@@ -697,7 +1273,8 @@ pub fn color_swatch<'a, M: Clone + 'a>(
 }
 
 /// Parsed markdown the application owns. Parse in `update` (or a `Task`);
-/// [`markdown_view`] borrows the items.
+/// [`markdown_view`] borrows the items. Truncation is slicing `source`
+/// before parse.
 ///
 /// ```
 /// let doc = icedtea::widget::MarkdownDoc::parse("# Hi\n\nA paragraph.");
@@ -705,6 +1282,8 @@ pub fn color_swatch<'a, M: Clone + 'a>(
 /// let again = icedtea::widget::parse("# Hi\n\nA paragraph.");
 /// assert_eq!(doc.hash, again.hash);
 /// assert_ne!(doc.hash, icedtea::widget::parse("# Other").hash);
+/// let cut = icedtea::widget::parse(&"# title\n\nbody".repeat(8)[..20]);
+/// assert!(cut.source.len() <= 20);
 /// ```
 #[derive(Debug, Clone)]
 pub struct MarkdownDoc {
@@ -713,10 +1292,89 @@ pub struct MarkdownDoc {
     pub items: Vec<markdown::Item>,
 }
 
+/// One heading from [`MarkdownDoc::headings`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MdHeading {
+    pub index: usize,
+    pub level: u8,
+    pub title: String,
+}
+
 impl MarkdownDoc {
     pub fn parse(source: impl Into<String>) -> Self {
         parse(&source.into())
     }
+
+    /// Headings in document order. The application owns jump history.
+    pub fn headings(&self) -> Vec<MdHeading> {
+        let style = markdown::Style::from_palette(iced::theme::Palette {
+            background: iced::Color::BLACK,
+            text: iced::Color::WHITE,
+            primary: iced::Color::WHITE,
+            success: iced::Color::WHITE,
+            warning: iced::Color::WHITE,
+            danger: iced::Color::WHITE,
+        });
+        self.items
+            .iter()
+            .enumerate()
+            .filter_map(|(index, item)| {
+                let markdown::Item::Heading(level, text) = item else {
+                    return None;
+                };
+                let title: String = text.spans(style).iter().map(|s| s.text.as_ref()).collect();
+                let level = match level {
+                    markdown::HeadingLevel::H1 => 1,
+                    markdown::HeadingLevel::H2 => 2,
+                    markdown::HeadingLevel::H3 => 3,
+                    markdown::HeadingLevel::H4 => 4,
+                    markdown::HeadingLevel::H5 => 5,
+                    markdown::HeadingLevel::H6 => 6,
+                };
+                Some(MdHeading {
+                    index,
+                    level,
+                    title,
+                })
+            })
+            .collect()
+    }
+}
+
+/// Jump list of headings. The application owns history.
+pub fn markdown_outline<'a, M: Clone + 'a>(
+    headings: &'a [MdHeading],
+    on_jump: impl Fn(usize) -> M + Copy + 'a,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let mut col = Column::new().spacing(2);
+    for h in headings {
+        let pad = 8 + u16::from(h.level.saturating_sub(1)) * 8;
+        col = col.push(
+            container(themed_button(
+                h.title.clone(),
+                a11y.apply_message(Some(on_jump(h.index))),
+                tok,
+                Variant::Ghost,
+                A11y::button(h.title.clone()).with_disabled(a11y.disabled),
+            ))
+            .padding(Padding {
+                top: 0.0,
+                right: 0.0,
+                bottom: 0.0,
+                left: f32::from(pad),
+            }),
+        );
+    }
+    if headings.is_empty() {
+        col = col.push(meta(
+            "No headings",
+            tok,
+            A11y::new("No headings", Role::Status),
+        ));
+    }
+    a11y::attach(col.into(), &a11y)
 }
 
 /// Pure parse: source hash plus iced markdown items.
@@ -733,25 +1391,32 @@ pub fn parse(source: &str) -> MarkdownDoc {
 
 pub fn markdown_view<'a, M: Clone + 'a>(
     items: &'a [markdown::Item],
-    _tok: Tokens,
+    tok: Tokens,
     on_link: impl Fn(markdown::Uri) -> M + 'a,
     a11y: A11y,
 ) -> Element<'a, M> {
     a11y::attach(
-        markdown::view(
-            items,
-            markdown::Settings::with_style(markdown::Style::from_palette(iced::theme::Palette {
-                background: _tok.canvas,
-                text: _tok.text,
-                primary: _tok.primary,
-                success: _tok.success,
-                warning: _tok.warning,
-                danger: _tok.danger,
-            })),
-        )
-        .map(on_link),
+        markdown::view(items, markdown::Settings::with_style(markdown_style(tok))).map(on_link),
         &a11y,
     )
+}
+
+fn markdown_style(tok: Tokens) -> markdown::Style {
+    let mut style = markdown::Style::from_palette(iced::theme::Palette {
+        background: tok.canvas,
+        text: tok.text,
+        primary: tok.primary,
+        success: tok.success,
+        warning: tok.warning,
+        danger: tok.danger,
+    });
+    style.font = typo::UI;
+    style.inline_code_color = tok.text;
+    style.inline_code_font = typo::MONO;
+    style.code_block_font = typo::MONO;
+    style.link_color = tok.accent;
+    style.inline_code_highlight.background = iced::Background::Color(tok.panel);
+    style
 }
 
 pub fn tooltip_wrap<'a, M: 'a>(
@@ -766,7 +1431,7 @@ pub fn tooltip_wrap<'a, M: 'a>(
             child,
             container(meta(tip.clone(), tok, A11y::new(tip, Role::Tooltip)))
                 .padding(6)
-                .style(move |_| style::raised_card(tok)),
+                .style(tip_style(tok)),
             tooltip::Position::FollowCursor,
         )
         .into(),
@@ -796,6 +1461,8 @@ fn chip_wash(tok: Tokens, variant: Variant) -> iced::Color {
     match variant {
         Variant::Primary => crate::theme::selection_fill(tok),
         Variant::Danger => crate::theme::mix(tok.danger, tok.canvas, 0.28),
+        Variant::Success => crate::theme::mix(tok.success, tok.canvas, 0.28),
+        Variant::Warning => crate::theme::mix(tok.warning, tok.canvas, 0.28),
         Variant::Quiet | Variant::Ghost | Variant::Chip => crate::theme::chip_fill(tok),
     }
 }
@@ -819,7 +1486,7 @@ pub fn chip<'a, M: Clone + 'a>(
         line = line.push(dismiss_button(
             msg,
             tok,
-            A11y::button(format!("dismiss {title}")),
+            A11y::button(format!("dismiss {title}")).with_disabled(a11y.disabled),
         ));
     }
     let wash = chip_wash(tok, variant);
@@ -842,6 +1509,8 @@ pub fn badge<'a, M: 'a>(
     let ink = match variant {
         Variant::Danger => tok.danger,
         Variant::Primary => tok.primary,
+        Variant::Success => tok.success,
+        Variant::Warning => tok.warning,
         _ => tok.muted,
     };
     let wash = chip_wash(tok, variant);
@@ -889,10 +1558,10 @@ pub fn banner<'a, M: Clone + 'a>(
     if let Some((t, m)) = action {
         r = r.push(themed_button(
             t.clone(),
-            Some(m),
+            a11y.apply_message(Some(m)),
             tok,
             Variant::Quiet,
-            A11y::button(t),
+            A11y::button(t).with_disabled(a11y.disabled),
         ));
     }
     a11y::attach(
@@ -929,7 +1598,7 @@ pub fn breadcrumb<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let parts = crate::i18n::order(dir, parts.iter().cloned());
-    let mut r = row![].spacing(6).align_y(Alignment::Center);
+    let mut r = Row::new().spacing(6).align_y(Alignment::Center);
     for (i, (name, msg)) in parts.iter().enumerate() {
         if i > 0 {
             r = r.push(meta("/", tok, A11y::new("/", Role::Separator)));
@@ -939,7 +1608,7 @@ pub fn breadcrumb<'a, M: Clone + 'a>(
                 name.clone(),
                 m,
                 tok,
-                A11y::new(name.clone(), Role::Link),
+                A11y::new(name.clone(), Role::Link).with_disabled(a11y.disabled),
             ));
         } else {
             r = r.push(label(
@@ -965,17 +1634,32 @@ pub fn toast_view<'a, M: Clone + 'a>(
             row![
                 label(text_s.clone(), tok, A11y::new(text_s, Role::Status),),
                 Space::new().width(Length::Fill),
-                dismiss_button(dismiss, tok, A11y::button("dismiss")),
+                dismiss_button(
+                    dismiss,
+                    tok,
+                    A11y::button("dismiss").with_disabled(a11y.disabled),
+                ),
             ]
             .spacing(8)
             .align_y(Alignment::Center),
         )
         .width(Length::Fill)
         .padding([8, 12])
-        .style(move |_| style::callout(tok, kind))
+        .style(toast_style(tok, kind))
         .into(),
         &a11y,
     )
+}
+
+fn tip_style(tok: Tokens) -> impl Fn(&iced::Theme) -> iced::widget::container::Style {
+    move |_| style::raised_card(tok)
+}
+
+fn toast_style(
+    tok: Tokens,
+    kind: ToastKind,
+) -> impl Fn(&iced::Theme) -> iced::widget::container::Style {
+    move |_| style::callout(tok, kind)
 }
 
 pub fn teaching_tip<'a, M: Clone + 'a>(
@@ -993,10 +1677,10 @@ pub fn teaching_tip<'a, M: Clone + 'a>(
                 meta(body, tok, A11y::new("tip-body", Role::Status)),
                 themed_button(
                     "Got it",
-                    Some(dismiss),
+                    a11y.apply_message(Some(dismiss)),
                     tok,
                     Variant::Primary,
-                    A11y::button("Got it"),
+                    A11y::button("Got it").with_disabled(a11y.disabled),
                 ),
             ]
             .spacing(8),
@@ -1022,12 +1706,34 @@ pub fn placeholder_skeleton<'a, M: 'a>(tok: Tokens, a11y: A11y) -> Element<'a, M
     )
 }
 
-pub fn themed_scroll<'a, M: 'a>(
+/// Vertical scroller. `stick` pins to the end. `scroll_id` is for
+/// `scroll_to`. `on_scroll` sees iced's viewport when the offset moves.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// let tok = icedtea::theme::named("dark").tokens;
+/// let child = icedtea::widget::label::<()>("line", tok, A11y::new("line", Role::Status));
+/// let _: icedtea::Element<'_, ()> = icedtea::widget::themed_scroll(
+///     child,
+///     tok,
+///     A11y::new("scroll", Role::Group),
+///     true,
+///     None,
+///     None::<fn(_) -> ()>,
+/// );
+/// ```
+pub fn themed_scroll<'a, M, F>(
     child: Element<'a, M>,
     tok: Tokens,
     a11y: A11y,
     stick: bool,
-) -> Element<'a, M> {
+    scroll_id: Option<Id>,
+    on_scroll: Option<F>,
+) -> Element<'a, M>
+where
+    M: 'a,
+    F: Fn(iced::widget::scrollable::Viewport) -> M + 'a,
+{
     let mut s = scrollable(child)
         .height(Length::Fill)
         .direction(ScrollDir::Vertical(
@@ -1039,12 +1745,145 @@ pub fn themed_scroll<'a, M: 'a>(
     if stick {
         s = s.anchor_bottom();
     }
+    if let Some(id) = scroll_id {
+        s = s.id(id);
+    }
+    if let Some(f) = on_scroll {
+        s = s.on_scroll(f);
+    }
     a11y::attach(s.into(), &a11y)
+}
+
+/// Append-only lines. Sticks to the end. `window` virtualizes long logs.
+#[allow(clippy::too_many_arguments)]
+pub fn log_view<'a, M: Clone + 'a>(
+    lines: &'a [String],
+    window: VisibleWindow,
+    row_h: f32,
+    overscan: usize,
+    on_scroll: impl Fn(VisibleWindow) -> M + Copy + 'a,
+    scroll_id: Option<Id>,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let n = lines.len();
+    let h = row_h.max(0.0);
+    let viewport = window.viewport.max(1.0);
+    // Stick uses iced Anchor::End: raw offset 0 is the tail. Mount that
+    // tail until on_scroll reports the reversed (visual) offset.
+    let scroll = if window.end == 0 {
+        crate::layout::end_offset(n as f32 * h, viewport)
+    } else {
+        window.scroll.max(0.0)
+    };
+    let (top, win, bot) = virtual_pads(n, h, scroll, viewport, overscan, None);
+    let mut col = Column::new().spacing(0);
+    if n == 0 {
+        col = col.push(meta("No lines", tok, A11y::new("No lines", Role::Status)));
+    } else {
+        col = col.push(Space::new().height(Length::Fixed(top)));
+        for i in win.range() {
+            let line = lines.get(i).map(String::as_str).unwrap_or("");
+            col = col.push(
+                container(
+                    text(line.to_string())
+                        .size(typo::META)
+                        .color(tok.text)
+                        .font(typo::MONO),
+                )
+                .width(Length::Fill)
+                .height(h)
+                .padding([2, 8]),
+            );
+        }
+        col = col.push(Space::new().height(Length::Fixed(bot)));
+    }
+    let prev = window;
+    themed_scroll(
+        col.into(),
+        tok,
+        a11y,
+        true,
+        scroll_id,
+        Some(move |vp: iced::widget::scrollable::Viewport| {
+            on_scroll(window_after_scroll(
+                prev,
+                vp.absolute_offset_reversed().y,
+                vp.bounds().height,
+                h,
+                n,
+                overscan,
+                None,
+            ))
+        }),
+    )
+}
+
+/// Clip pane + rail. `scroll` is the only offset. `rows` paints the
+/// mounted window; this shifts by `start * h - scroll`.
+#[allow(clippy::too_many_arguments)]
+fn virtual_clip<'a, M, F, G>(
+    prev: VisibleWindow,
+    h: f32,
+    len: usize,
+    overscan: usize,
+    cover: Option<usize>,
+    on_scroll: F,
+    scroll_id: Option<Id>,
+    tok: Tokens,
+    rows: G,
+) -> Element<'a, M>
+where
+    M: Clone + 'a,
+    F: Fn(VisibleWindow) -> M + Copy + 'a,
+    G: Fn(VisibleWindow) -> Column<'a, M> + 'a,
+{
+    let content = len as f32 * h;
+    iced::widget::responsive(move |size| {
+        let viewport = if size.height > 0.0 {
+            size.height
+        } else {
+            prev.viewport.max(1.0)
+        };
+        let win = visible_window(prev.scroll, viewport, h, len, overscan, cover);
+        let shift = win.start as f32 * h - prev.scroll;
+        let emit = move |y: f32| {
+            on_scroll(window_after_scroll(
+                prev, y, viewport, h, len, overscan, cover,
+            ))
+        };
+        let mut frame = container(rows(win))
+            .width(crate::layout::FILL)
+            .height(crate::layout::FILL)
+            .padding(Padding {
+                top: shift,
+                right: 0.0,
+                bottom: 0.0,
+                left: 0.0,
+            })
+            .clip(true);
+        if let Some(id) = scroll_id.clone() {
+            frame = frame.id(id);
+        }
+        let pane = mouse_area(frame).on_scroll(move |delta| {
+            let max_s = (content - viewport).max(0.0);
+            emit((prev.scroll + scroll_delta_pixels(delta, h)).clamp(0.0, max_s))
+        });
+        row![
+            pane,
+            Element::from(ScrollRail::new(content, viewport, prev.scroll, emit, tok)),
+        ]
+        .width(crate::layout::FILL)
+        .height(crate::layout::FILL)
+        .into()
+    })
+    .into()
 }
 
 fn two_line_row<'a, M: 'a>(
     title: &str,
     meta_s: Option<&str>,
+    meta_color: iced::Color,
     selected: bool,
     row_h: f32,
     tok: Tokens,
@@ -1055,7 +1894,7 @@ fn two_line_row<'a, M: 'a>(
         .font(typo::UI)]
     .spacing(2);
     if let Some(m) = meta_s.filter(|s| !s.is_empty()) {
-        col = col.push(text(m.to_string()).size(typo::META).color(tok.muted));
+        col = col.push(text(m.to_string()).size(typo::META).color(meta_color));
     }
     container(col)
         .width(Length::Fill)
@@ -1065,16 +1904,44 @@ fn two_line_row<'a, M: 'a>(
         .into()
 }
 
+/// Virtual list. `empty` is the copy when `model` has no rows. `meta_color`
+/// paints the second line. `scroll` is the only offset: the rail and the
+/// wheel write it, and each row `i` is painted at `i * row_h - scroll`.
+/// `scroll_id` names the clip pane. The 24px rail sits beside it.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::collection::{Selection, VecList, VisibleWindow};
+/// let list = VecList::titles(["a"]);
+/// let tok = icedtea::theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = icedtea::widget::list_view(
+///     &list,
+///     &Selection::None,
+///     |_| (),
+///     tok,
+///     VisibleWindow::new(120.0),
+///     24.0,
+///     2,
+///     |_| (),
+///     "No rows",
+///     |_| tok.danger,
+///     None,
+///     A11y::new("list", Role::List),
+/// );
+/// ```
 #[allow(clippy::too_many_arguments)]
 pub fn list_view<'a, M, L>(
     model: &'a L,
-    selection: &Selection,
+    selection: &'a Selection,
     on_select: impl Fn(usize) -> M + Copy + 'a,
     tok: Tokens,
     window: VisibleWindow,
     row_h: f32,
     overscan: usize,
     on_scroll: impl Fn(VisibleWindow) -> M + Copy + 'a,
+    empty: &'a str,
+    meta_color: impl Fn(usize) -> iced::Color + Copy + 'a,
+    scroll_id: Option<Id>,
     a11y: A11y,
 ) -> Element<'a, M>
 where
@@ -1082,57 +1949,56 @@ where
     L: ListModel + ?Sized,
 {
     let cover = selection.primary();
-    let (top, win, bot) = virtual_pads(
-        model.len(),
-        row_h,
-        window.scroll,
-        window.viewport,
-        overscan,
-        cover,
-    );
-    let mut col = column![].spacing(0);
-    if model.is_empty() {
-        col = col.push(meta("Empty", tok, A11y::new("Empty", Role::Status)));
-    } else {
-        col = col.push(Space::new().height(Length::Fixed(top)));
-        for i in win.range() {
-            let selected = selection.contains(i);
-            let title = model.title(i);
-            let meta_s = model.meta(i);
-            let name = title.to_string();
-            col = col.push(a11y::attach(
-                mouse_area(two_line_row(title, meta_s, selected, row_h, tok))
-                    .on_press(on_select(i))
-                    .into(),
-                &A11y::new(name, Role::ListItem).with_checked(selected),
-            ));
-        }
-        col = col.push(Space::new().height(Length::Fixed(bot)));
-    }
+    let h = row_h.max(0.0);
     let len = model.len();
     let prev = window;
+    let disabled = a11y.disabled;
     a11y::attach(
-        scrollable(col)
-            .width(crate::layout::FILL)
-            .height(crate::layout::FILL)
-            .direction(ScrollDir::Vertical(
-                Scrollbar::new()
-                    .width(SCROLL_RAIL_WIDTH)
-                    .scroller_width(SCROLL_RAIL_WIDTH),
-            ))
-            .style(style::scroll_style(tok))
-            .on_scroll(move |vp| {
-                on_scroll(window_after_scroll(
-                    prev,
-                    vp.absolute_offset().y,
-                    vp.bounds().height,
-                    row_h,
-                    len,
-                    overscan,
-                    cover,
-                ))
-            })
-            .into(),
+        virtual_clip(
+            prev,
+            h,
+            len,
+            overscan,
+            cover,
+            on_scroll,
+            scroll_id,
+            tok,
+            move |win| {
+                let mut col = Column::new().spacing(0);
+                if model.is_empty() {
+                    col = col.push(meta(empty, tok, A11y::new(empty, Role::Status)));
+                } else {
+                    for i in win.range() {
+                        if model.is_separator(i) {
+                            col = col.push(
+                                container(rule_h(tok, A11y::new("sep", Role::Separator)))
+                                    .width(Length::Fill)
+                                    .height(h)
+                                    .center_y(h),
+                            );
+                            continue;
+                        }
+                        let selected = selection.contains(i);
+                        let title = model.title(i);
+                        let meta_s = model.meta(i);
+                        let name = title.to_string();
+                        let face = two_line_row(title, meta_s, meta_color(i), selected, h, tok);
+                        let row: Element<'a, M> = if disabled {
+                            face
+                        } else {
+                            mouse_area(face).on_press(on_select(i)).into()
+                        };
+                        col = col.push(a11y::attach(
+                            row,
+                            &A11y::new(name, Role::ListItem)
+                                .with_checked(selected)
+                                .with_disabled(disabled),
+                        ));
+                    }
+                }
+                col
+            },
+        ),
         &a11y,
     )
 }
@@ -1149,10 +2015,10 @@ pub fn item_grid<'a, M: Clone + 'a>(
         .map(|(i, s)| {
             themed_button(
                 s.clone(),
-                Some(on_select(i)),
+                a11y.apply_message(Some(on_select(i))),
                 tok,
                 Variant::Quiet,
-                A11y::new(s.clone(), Role::ListItem),
+                A11y::new(s.clone(), Role::ListItem).with_disabled(a11y.disabled),
             )
         })
         .collect();
@@ -1160,74 +2026,101 @@ pub fn item_grid<'a, M: Clone + 'a>(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn data_table<'a, M: Clone + 'a>(
-    model: &'a TableModel,
-    selection: &Selection,
+pub fn data_table<'a, M, T>(
+    model: &'a T,
+    selection: &'a Selection,
+    cursor: Option<(usize, usize)>,
+    widths: &'a [f32],
+    zebra: bool,
     window: VisibleWindow,
     row_h: f32,
     overscan: usize,
-    on_select: impl Fn(usize) -> M + Copy + 'a,
+    on_cell: impl Fn(usize, usize) -> M + Copy + 'a,
     on_sort: impl Fn(usize) -> M + Copy + 'a,
     on_scroll: impl Fn(VisibleWindow) -> M + Copy + 'a,
     tok: Tokens,
     a11y: A11y,
-) -> Element<'a, M> {
+) -> Element<'a, M>
+where
+    M: Clone + 'a,
+    T: crate::collection::TableSource + ?Sized,
+{
     let cover = selection.primary();
-    let n = model.rows.len();
-    let (top, win, bot) = virtual_pads(n, row_h, window.scroll, window.viewport, overscan, cover);
-    let mut header = row![].spacing(8);
-    for (i, h) in model.headers.iter().enumerate() {
-        header = header.push(themed_button(
-            h.clone(),
-            Some(on_sort(i)),
-            tok,
-            Variant::Ghost,
-            A11y::button(h.clone()),
-        ));
-    }
-    let mut body = column![].spacing(0);
-    body = body.push(Space::new().height(Length::Fixed(top)));
-    for i in win.range() {
-        let selected = selection.contains(i);
-        let title = model.cell(i, 0);
-        let meta_s = if model.headers.len() > 1 {
-            Some(model.cell(i, 1))
-        } else {
-            None
-        };
-        let name = title.to_string();
-        body = body.push(a11y::attach(
-            mouse_area(two_line_row(title, meta_s, selected, row_h, tok))
-                .on_press(on_select(i))
-                .into(),
-            &A11y::new(name, Role::ListItem).with_checked(selected),
-        ));
-    }
-    body = body.push(Space::new().height(Length::Fixed(bot)));
+    let n = model.row_count();
+    let cols = model.column_count();
+    let h = row_h.max(0.0);
     let prev = window;
+    let disabled = a11y.disabled;
+    let mut header = Row::new().spacing(0);
+    for c in 0..cols {
+        let title = model.header(c).to_string();
+        let w = widths.get(c).copied().unwrap_or(96.0);
+        header = header.push(
+            container(themed_button(
+                title.clone(),
+                a11y.apply_message(Some(on_sort(c))),
+                tok,
+                Variant::Ghost,
+                A11y::button(title).with_disabled(disabled),
+            ))
+            .width(Length::Fixed(w)),
+        );
+    }
     a11y::attach(
         column![
             header,
-            scrollable(body)
-                .width(crate::layout::FILL)
-                .height(crate::layout::FILL)
-                .direction(ScrollDir::Vertical(
-                    Scrollbar::new()
-                        .width(SCROLL_RAIL_WIDTH)
-                        .scroller_width(SCROLL_RAIL_WIDTH),
-                ))
-                .style(style::scroll_style(tok))
-                .on_scroll(move |vp| {
-                    on_scroll(window_after_scroll(
-                        prev,
-                        vp.absolute_offset().y,
-                        vp.bounds().height,
-                        row_h,
-                        n,
-                        overscan,
-                        cover,
-                    ))
-                }),
+            virtual_clip(
+                prev,
+                h,
+                n,
+                overscan,
+                cover,
+                on_scroll,
+                None,
+                tok,
+                move |win| {
+                    let mut body = Column::new().spacing(0);
+                    for i in win.range() {
+                        let selected = selection.contains(i);
+                        let stripe = zebra && i % 2 == 1;
+                        let mut line = Row::new().spacing(0);
+                        for c in 0..cols {
+                            let focused = cursor == Some((i, c));
+                            let value = model.cell(i, c).to_string();
+                            let w = widths.get(c).copied().unwrap_or(96.0);
+                            let bg = if focused {
+                                tok.selection
+                            } else if selected {
+                                crate::theme::selection_fill(tok)
+                            } else if stripe {
+                                crate::theme::chip_fill(tok)
+                            } else {
+                                iced::Color::TRANSPARENT
+                            };
+                            let face =
+                                container(text(value.clone()).size(typo::BODY).color(tok.text))
+                                    .width(Length::Fixed(w))
+                                    .height(h)
+                                    .padding([8, 8])
+                                    .style(move |_| style::fill(bg, tok.text));
+                            let cell: Element<'a, M> = if disabled {
+                                face.into()
+                            } else {
+                                mouse_area(face).on_press(on_cell(i, c)).into()
+                            };
+                            line = line.push(a11y::attach(
+                                cell,
+                                &A11y::new(format!("{i}:{c}"), Role::ListItem)
+                                    .with_value(value)
+                                    .with_checked(focused)
+                                    .with_disabled(disabled),
+                            ));
+                        }
+                        body = body.push(line);
+                    }
+                    body
+                },
+            )
         ]
         .spacing(4)
         .width(crate::layout::FILL)
@@ -1247,19 +2140,21 @@ pub fn tree_view<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let mut col = column![].spacing(2);
+    let mut col = Column::new().spacing(2);
     for (depth, id, label_s, expanded, has_children) in root.flatten() {
         let is_sel = selected == Some(id);
-        let mut line = row![].spacing(4).align_y(Alignment::Center);
+        let mut line = Row::new().spacing(4).align_y(Alignment::Center);
         line = line.push(Space::new().width(Length::Fixed(depth as f32 * 16.0)));
         if has_children {
             let mark = if expanded { "▾" } else { "▸" };
             line = line.push(themed_button(
                 mark,
-                Some(on_toggle(id)),
+                a11y.apply_message(Some(on_toggle(id))),
                 tok,
                 Variant::Ghost,
-                A11y::button(format!("toggle {label_s}")).with_checked(expanded),
+                A11y::button(format!("toggle {label_s}"))
+                    .with_checked(expanded)
+                    .with_disabled(a11y.disabled),
             ));
         } else {
             line = line.push(Space::new().width(28.0));
@@ -1276,8 +2171,13 @@ pub fn tree_view<'a, M: Clone + 'a>(
         } else {
             title.into()
         };
+        let pick: Element<'a, M> = if a11y.disabled {
+            title
+        } else {
+            mouse_area(title).on_press(on_select(id)).into()
+        };
         line = line.push(a11y::attach(
-            mouse_area(title).on_press(on_select(id)).into(),
+            pick,
             &A11y::new(label_s, Role::Tree).with_checked(is_sel),
         ));
         col = col.push(line);
@@ -1288,6 +2188,8 @@ pub fn tree_view<'a, M: Clone + 'a>(
             tok,
             A11y::new("tree-scroll", Role::Group),
             false,
+            None,
+            None::<fn(_) -> M>,
         ),
         &a11y,
     )
@@ -1300,19 +2202,20 @@ pub fn tab_bar<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let mut r = row![].spacing(4).align_y(Alignment::Center);
+    let mut r = Row::new().spacing(4).align_y(Alignment::Center);
     for (i, title) in tabs.titles.iter().enumerate() {
-        let mut cell = row![button(text(title.clone()).size(typo::META))
-            .on_press(on_select(i))
+        let mut tab = button(text(title.clone()).size(typo::META))
             .padding([6, 10])
-            .style(style::tab_style(tok, i == tabs.active))]
-        .spacing(2)
-        .align_y(Alignment::Center);
+            .style(style::tab_style(tok, i == tabs.active));
+        if !a11y.disabled {
+            tab = tab.on_press(on_select(i));
+        }
+        let mut cell = row![tab].spacing(2).align_y(Alignment::Center);
         if tabs.closable {
             cell = cell.push(dismiss_button(
                 on_close(i),
                 tok,
-                A11y::button(format!("close {title}")),
+                A11y::button(format!("close {title}")).with_disabled(a11y.disabled),
             ));
         }
         r = r.push(a11y::attach(
@@ -1331,15 +2234,17 @@ pub fn accordion_view<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let mut col = column![].spacing(4);
+    let mut col = Column::new().spacing(4);
     for (i, (title, body)) in titles.iter().zip(bodies).enumerate() {
         let open = state.open == Some(i);
         col = col.push(themed_button(
             title.clone(),
-            Some(on_toggle(i)),
+            a11y.apply_message(Some(on_toggle(i))),
             tok,
             Variant::Quiet,
-            A11y::button(title.clone()).with_checked(open),
+            A11y::button(title.clone())
+                .with_checked(open)
+                .with_disabled(a11y.disabled),
         ));
         if open {
             col = col.push(body);
@@ -1363,18 +2268,18 @@ pub fn pagination<'a, M: Clone + 'a>(
         row![
             themed_button(
                 "Prev",
-                (page > 0).then(|| on_page(page - 1)),
+                a11y.apply_message((page > 0).then(|| on_page(page - 1))),
                 tok,
                 Variant::Quiet,
-                A11y::button("Prev").with_disabled(page == 0),
+                A11y::button("Prev").with_disabled(a11y.disabled || page == 0),
             ),
             meta(status.clone(), tok, A11y::new(status, Role::Status)),
             themed_button(
                 "Next",
-                (page + 1 < pages).then(|| on_page(page + 1)),
+                a11y.apply_message((page + 1 < pages).then(|| on_page(page + 1))),
                 tok,
                 Variant::Quiet,
-                A11y::button("Next").with_disabled(page + 1 >= pages),
+                A11y::button("Next").with_disabled(a11y.disabled || page + 1 >= pages),
             ),
         ]
         .spacing(8)
@@ -1387,9 +2292,35 @@ pub fn pagination<'a, M: Clone + 'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::collection::{Selection as Sel, VecList};
+    use crate::collection::{Selection as Sel, TableModel, VecList};
     use crate::density::Density;
     use crate::theme::named;
+
+    fn draw_once<M: Clone>(el: &mut Element<'_, M>) {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::renderer::Style;
+        use iced::advanced::widget::Tree;
+        use iced::mouse;
+        use iced::{Font, Pixels, Point, Rectangle, Size, Theme};
+        let mut tree = Tree::new(el.as_widget());
+        let mut renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(400.0, 400.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let viewport = Rectangle::new(Point::ORIGIN, Size::new(400.0, 400.0));
+        el.as_widget().draw(
+            &tree,
+            &mut renderer,
+            &Theme::Dark,
+            &Style::default(),
+            layout,
+            mouse::Cursor::Unavailable,
+            &viewport,
+        );
+    }
 
     const TEST_PNG: &[u8] = &[
         0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
@@ -1418,12 +2349,72 @@ mod tests {
         let t = TimeValue {
             hour: 30,
             minute: 90,
+            second: 90,
         }
         .clamp();
         assert_eq!(t.hour, 23);
         assert_eq!(t.minute, 59);
+        assert_eq!(t.second, 59);
+        let noon = TimeValue::hms(23, 59, 59);
+        assert_eq!(noon.step_hour(1).hour, 0);
+        assert_eq!(noon.step_minute(1).minute, 0);
+        assert_eq!(noon.step_second(1).second, 0);
+        assert_eq!(TimeValue::hm(0, 0).step_hour(-1).hour, 23);
+        assert_eq!(TimeValue::hm(0, 0).step_minute(-1).minute, 59);
+        assert_eq!(TimeValue::hms(0, 0, 0).step_second(-1).second, 59);
+        assert_eq!(TimeValue::hm(0, 0).hour12(), 12);
+        assert!(!TimeValue::hm(0, 0).afternoon());
+        assert_eq!(TimeValue::hm(12, 0).hour12(), 12);
+        assert!(TimeValue::hm(12, 0).afternoon());
+        assert_eq!(TimeValue::hm(13, 5).hour12(), 1);
+        assert_eq!(TimeValue::hm(11, 0).step_hour12(1).hour, 0);
+        assert_eq!(TimeValue::hm(23, 0).step_hour12(1).hour, 12);
+        assert_eq!(TimeValue::hm(0, 0).toggle_period().hour, 12);
+        assert_eq!(TimeValue::hm(15, 0).toggle_period().hour, 3);
+        assert_eq!(
+            TimeValue::hm(9, 30)
+                .step_field(TimeField::Hour, TimeClock::HOUR12)
+                .hour,
+            10
+        );
+        assert_eq!(
+            TimeValue::hm(23, 0)
+                .step_field(TimeField::Hour, TimeClock::HOURS_MINUTES)
+                .hour,
+            0
+        );
+        assert_eq!(
+            TimeValue::hm(9, 0)
+                .step_field(TimeField::Period, TimeClock::HOUR12)
+                .hour,
+            21
+        );
+        assert_eq!(
+            TimeValue::hm(9, 30)
+                .step_field(TimeField::Minute, TimeClock::HOURS_MINUTES)
+                .minute,
+            31
+        );
+        assert_eq!(
+            TimeValue::hms(9, 30, 4)
+                .step_field(TimeField::Second, TimeClock::HOURS_MINUTES_SECONDS)
+                .second,
+            5
+        );
         assert_eq!(step_number(5.0, 1.0, 0.0, 10.0, 1), 6.0);
         assert_eq!(step_number(0.0, 1.0, 0.0, 10.0, -1), 0.0);
+        assert_eq!(apply_mask("0000-0000", "12345678"), "1234-5678");
+        assert_eq!(apply_mask("0000-0000", "12"), "12");
+        assert_eq!(apply_mask("00/00", "1299"), "12/99");
+        assert_eq!(apply_mask("0000-0000", "abcd"), "");
+        assert_eq!(mask_handler("0000-0000", |s| s)("12ab34".into()), "1234");
+        let _: Element<'_, ()> = masked_input(
+            "0000-0000",
+            "1234",
+            |_| (),
+            named("dark").tokens,
+            A11y::new("mask", Role::TextBox),
+        );
         assert!(A11y::button("x").with_disabled(true).disabled);
         assert_eq!(
             A11y::new("y", Role::Checkbox).with_checked(false).checked,
@@ -1438,6 +2429,15 @@ mod tests {
         let role = |n: &str, r: Role| A11y::new(n, r);
         let _: Element<'_, ()> = icon_svg(Icon::Search, tok, role("search", Role::Image));
         let _: Element<'_, ()> = label("Hi", tok, role("Hi", Role::Header));
+        let plain = RichCell::Plain("hi".into());
+        let _: Element<'_, ()> = rich_cell(&plain, None, tok, role("plain", Role::Status));
+        let em = RichCell::Emphasis("em".into());
+        let _: Element<'_, ()> = rich_cell(&em, None, tok, role("em", Role::Status));
+        let code = RichCell::Code("x".into());
+        let _: Element<'_, ()> = rich_cell(&code, None, tok, role("code", Role::Status));
+        let link = RichCell::Link("go".into());
+        let _: Element<'_, ()> = rich_cell(&link, Some(()), tok, role("go", Role::Link));
+        let _: Element<'_, ()> = rich_cell(&link, None, tok, role("go2", Role::Link));
         let _: Element<'_, ()> = meta("m", tok, role("m", Role::Status));
         let _: Element<'_, ()> = code_block("fn", tok, role("fn", Role::Group));
         let _: Element<'_, ()> = hyperlink("l", (), tok, role("l", Role::Link));
@@ -1453,6 +2453,7 @@ mod tests {
         );
         let _: Element<'_, ()> = display_reading("24", tok, role("24", Role::Status));
         let _: Element<'_, ()> = display_line("6 × 4 =", tok, role("expr", Role::Status));
+        let _: Element<'_, ()> = figure_display("12:40", tok, role("clock", Role::Status));
         let glyph = A11y::button("Backspace");
         let _: Element<'_, ()> = themed_button_sized(
             "⌫",
@@ -1504,6 +2505,32 @@ mod tests {
         );
         let _: Element<'_, ()> =
             themed_radio("r", 1u8, Some(1u8), |_| (), tok, role("r", Role::Radio));
+        let _: Element<'_, ()> = themed_radio(
+            "off",
+            2u8,
+            Some(1u8),
+            |_| (),
+            tok,
+            role("off", Role::Radio).with_disabled(true),
+        );
+        let _: Element<'_, ()> = themed_radio(
+            "on",
+            1u8,
+            Some(1u8),
+            |_| (),
+            tok,
+            role("on", Role::Radio).with_disabled(true),
+        );
+        let _ = radio_idle_face(tok, true);
+        let _ = radio_idle_face(tok, false);
+        assert_eq!(
+            scroll_delta_pixels(iced::mouse::ScrollDelta::Lines { x: 0.0, y: -2.0 }, 20.0),
+            40.0
+        );
+        assert_eq!(
+            scroll_delta_pixels(iced::mouse::ScrollDelta::Pixels { x: 0.0, y: 8.0 }, 20.0),
+            -8.0
+        );
         let _: Element<'_, ()> = themed_slider(
             0.0..=1.0,
             0.5,
@@ -1511,16 +2538,75 @@ mod tests {
             tok,
             role("s", Role::Slider).with_value("0.5"),
         );
-        let _: Element<'_, ()> = progress(0.2, tok, role("p", Role::Progress).with_value("0.2"));
         let _: Element<'_, ()> =
-            progress_ring(0.4, tok, role("pr", Role::Progress).with_value("0.4"));
+            progress(0.2, None, tok, role("p", Role::Progress).with_value("0.2"));
+        let _: Element<'_, ()> = progress(
+            0.5,
+            Some("50% · 1 min"),
+            tok,
+            role("pc", Role::Progress).with_value("0.5"),
+        );
+        let _: Element<'_, ()> =
+            progress_ring(0.4, None, tok, role("pr", Role::Progress).with_value("0.4"));
+        let _: Element<'_, ()> = progress_ring(
+            0.5,
+            Some("50%"),
+            tok,
+            role("prc", Role::Progress).with_value("0.5"),
+        );
+        assert_eq!(progress_label(0.5, None), "50%");
+        assert_eq!(progress_label(0.5, Some("1 min")), "50% · 1 min");
+        assert!(spark_points(&[], 10.0, 10.0).is_empty());
+        let pts = spark_points(&[1.0, 3.0, 2.0], 100.0, 20.0);
+        assert_eq!(pts.len(), 3);
+        assert!((pts[0].0 - 0.0).abs() < 0.01);
+        assert!(pts[1].1 < pts[0].1);
+        let _: Element<'_, ()> = sparkline(&[1.0, 2.0, 1.5], tok, role("spark", Role::Image));
         let _: Element<'_, ()> = image(
             iced::widget::image::Handle::from_bytes(TEST_PNG),
             48.0,
             48.0,
             role("px", Role::Image),
         );
+        let _: Element<'_, ()> = image_slot(
+            ImageSlot::Ready {
+                handle: iced::widget::image::Handle::from_bytes(TEST_PNG),
+                fit: iced::ContentFit::Cover,
+            },
+            48.0,
+            48.0,
+            tok,
+            role("cover", Role::Image),
+        );
+        let _: Element<'_, ()> = image_slot(
+            ImageSlot::Loading,
+            48.0,
+            48.0,
+            tok,
+            role("load", Role::Image),
+        );
+        let _: Element<'_, ()> = image_slot(
+            ImageSlot::Error("missing".into()),
+            48.0,
+            48.0,
+            tok,
+            role("err", Role::Image),
+        );
         let _: Element<'_, ()> = spinner(tok, 0.25, role("spin", Role::Progress));
+        let _: Element<'_, ()> = busy_overlay(
+            label("Body", tok, role("Body", Role::Status)),
+            true,
+            0.2,
+            tok,
+            role("busy", Role::Group),
+        );
+        let _: Element<'_, ()> = busy_overlay(
+            label("Idle", tok, role("Idle", Role::Status)),
+            false,
+            0.0,
+            tok,
+            role("idle", Role::Group),
+        );
         assert!(ring_angles(1.0).1 > ring_angles(0.2).1);
         assert!(
             (spinner_angles(0.0).1 - spinner_angles(0.0).0 - std::f32::consts::FRAC_PI_2).abs()
@@ -1544,10 +2630,24 @@ mod tests {
             tok,
             role("n", Role::SpinButton).with_value("3"),
         );
-        let _: Element<'_, ()> =
-            themed_text_input("p", "v", |_| (), Some(()), tok, role("v", Role::TextBox));
-        let _: Element<'_, ()> =
-            themed_text_input("p", "", |_| (), None, tok, role("Name", Role::TextBox));
+        let _: Element<'_, ()> = themed_text_input(
+            "p",
+            "v",
+            |_| (),
+            Some(()),
+            tok,
+            role("v", Role::TextBox),
+            Some(Id::new("name")),
+        );
+        let _: Element<'_, ()> = themed_text_input(
+            "p",
+            "",
+            |_| (),
+            None,
+            tok,
+            role("Name", Role::TextBox),
+            None,
+        );
         let _: Element<'_, ()> = themed_text_input(
             "p",
             "",
@@ -1555,6 +2655,7 @@ mod tests {
             Some(()),
             tok,
             role("Name", Role::TextBox).with_disabled(true),
+            None,
         );
         let _: Element<'_, ()> = password_input(
             "p",
@@ -1562,8 +2663,35 @@ mod tests {
             |_| (),
             tok,
             role("pw", Role::TextBox).with_disabled(true),
+            true,
         );
-        let _: Element<'_, ()> = password_input("p", "v", |_| (), tok, role("pw2", Role::TextBox));
+        let _: Element<'_, ()> =
+            password_input("p", "v", |_| (), tok, role("pw2", Role::TextBox), true);
+        let copy = crate::action::Action::new("secret.copy", "Copy", ());
+        let _: Element<'_, ()> = secret_field(
+            "Secret",
+            "v",
+            |_| (),
+            false,
+            (),
+            &copy,
+            tok,
+            Direction::Ltr,
+            role("secret", Role::Group),
+        );
+        let mut dead = crate::action::Action::new("secret.copy", "Copy", ());
+        dead.enabled = false;
+        let _: Element<'_, ()> = secret_field(
+            "Secret",
+            "v",
+            |_| (),
+            true,
+            (),
+            &dead,
+            tok,
+            Direction::Rtl,
+            role("secret-off", Role::Group).with_disabled(true),
+        );
         let content = Content::new();
         let _: Element<'_, ()> = textarea(
             &content,
@@ -1580,6 +2708,16 @@ mod tests {
             role("ta", Role::TextBox),
         );
         let _: Element<'_, ()> = search_input("q", |_| (), tok, role("q", Role::TextBox));
+        let hints = ["save".into(), "open".into()];
+        let _: Element<'_, ()> = suggest_field(
+            "Command",
+            "s",
+            |_| (),
+            &hints,
+            |_| (),
+            tok,
+            role("suggest", Role::Group),
+        );
         let opts = ["a".to_string(), "b".to_string()];
         let _: Element<'_, ()> = themed_pick_list(
             opts,
@@ -1600,11 +2738,32 @@ mod tests {
             role("date", Role::SpinButton).with_value("2024-01-01"),
         );
         let _: Element<'_, ()> = time_picker(
-            TimeValue { hour: 8, minute: 5 },
-            (),
-            (),
+            TimeValue::hm(8, 5),
+            TimeClock::HOURS_MINUTES,
+            |_| (),
             tok,
             role("time", Role::SpinButton),
+        );
+        let _: Element<'_, ()> = time_picker(
+            TimeValue::hms(13, 5, 9),
+            TimeClock::HOUR12_SECONDS,
+            |_| (),
+            tok,
+            role("time-12", Role::SpinButton).with_disabled(true),
+        );
+        let _: Element<'_, ()> = time_picker(
+            TimeValue::hms(8, 5, 1),
+            TimeClock::HOURS_MINUTES_SECONDS,
+            |_| (),
+            tok,
+            role("time-sec", Role::SpinButton),
+        );
+        let _: Element<'_, ()> = time_picker(
+            TimeValue::hm(9, 30),
+            TimeClock::HOUR12,
+            |_| (),
+            tok,
+            role("time-am", Role::SpinButton),
         );
         let _: Element<'_, ()> = color_swatch(1, 2, 3, (), tok, btn("color"));
         let items = markdown::parse("# Hi");
@@ -1653,11 +2812,15 @@ mod tests {
         let _: Element<'_, ()> = chip("hot", Some(()), tok, Variant::Danger, btn("hot"));
         let _: Element<'_, ()> = chip("g", None, tok, Variant::Ghost, btn("g"));
         let _: Element<'_, ()> = chip("k", None, tok, Variant::Chip, btn("k"));
+        let _: Element<'_, ()> = chip("ok", None, tok, Variant::Success, btn("ok"));
+        let _: Element<'_, ()> = chip("warn", None, tok, Variant::Warning, btn("warn"));
         let _: Element<'_, ()> = badge("b", tok, Variant::Quiet, role("b", Role::Status));
         let _: Element<'_, ()> = badge("new", tok, Variant::Primary, role("new", Role::Status));
         let _: Element<'_, ()> = badge("!", tok, Variant::Danger, role("bang", Role::Status));
         let _: Element<'_, ()> = badge("g", tok, Variant::Ghost, role("g", Role::Status));
         let _: Element<'_, ()> = badge("chip", tok, Variant::Chip, role("chip", Role::Status));
+        let _: Element<'_, ()> = badge("ok", tok, Variant::Success, role("ok", Role::Status));
+        let _: Element<'_, ()> = badge("warn", tok, Variant::Warning, role("warn", Role::Status));
         let _: Element<'_, ()> = group_box(
             "g",
             label("x", tok, role("x", Role::Header)),
@@ -1695,6 +2858,13 @@ mod tests {
             ],
         };
         let empty = VecList::default();
+        let with_sep = VecList {
+            items: vec![
+                crate::collection::ListRow::new("a"),
+                crate::collection::ListRow::separator(),
+                crate::collection::ListRow::new("b"),
+            ],
+        };
         let win = VisibleWindow::new(100.0);
         let _: Element<'_, ()> = list_view(
             &list,
@@ -1705,6 +2875,9 @@ mod tests {
             24.0,
             crate::collection::OVERSCAN,
             |_| (),
+            "Empty",
+            |_| tok.muted,
+            Some(Id::from("list-host")),
             role("list", Role::List),
         );
         let _: Element<'_, ()> = list_view(
@@ -1716,6 +2889,9 @@ mod tests {
             24.0,
             0,
             |_| (),
+            "No sessions",
+            |_| tok.muted,
+            None,
             role("list", Role::List),
         );
         let scrolled = VisibleWindow {
@@ -1733,7 +2909,63 @@ mod tests {
             24.0,
             4,
             |_| (),
+            "Empty",
+            |i| {
+                if i == 0 {
+                    tok.danger
+                } else {
+                    tok.muted
+                }
+            },
+            None,
             role("list", Role::List),
+        );
+        let _: Element<'_, ()> = list_view(
+            &with_sep,
+            &Sel::Single(0),
+            |_| (),
+            tok,
+            win,
+            24.0,
+            4,
+            |_| (),
+            "Empty",
+            |_| tok.muted,
+            None,
+            role("list-sep", Role::List),
+        );
+        let lines = ["boot".into(), "ready".into()];
+        let _: Element<'_, ()> = log_view(
+            &lines,
+            VisibleWindow::new(80.0),
+            18.0,
+            2,
+            |_| (),
+            Some(Id::from("log")),
+            tok,
+            role("log", Role::List),
+        );
+        let live = crate::collection::visible_window(20.0, 80.0, 18.0, 2, 2, None);
+        let _: Element<'_, ()> = log_view(
+            &lines,
+            live,
+            18.0,
+            2,
+            |_| (),
+            None,
+            tok,
+            role("log-live", Role::List),
+        );
+        let empty_log: [String; 0] = [];
+        let _: Element<'_, ()> = log_view(
+            &empty_log,
+            VisibleWindow::new(80.0),
+            18.0,
+            0,
+            |_| (),
+            None,
+            tok,
+            role("log-empty", Role::List),
         );
         let _: Element<'_, ()> = item_grid(
             &["a".into(), "b".into()],
@@ -1747,13 +2979,17 @@ mod tests {
             sort_col: None,
             sort_asc: true,
         };
+        let widths = [80.0, 80.0];
         let _: Element<'_, ()> = data_table(
             &table,
             &Sel::Single(0),
+            Some((0, 1)),
+            &widths,
+            true,
             VisibleWindow::new(100.0),
             24.0,
             crate::collection::OVERSCAN,
-            |_| (),
+            |_, _| (),
             |_| (),
             |_| (),
             tok,
@@ -1765,9 +3001,13 @@ mod tests {
             sort_col: None,
             sort_asc: true,
         };
+        let one = [96.0];
         let _: Element<'_, ()> = data_table(
             &big,
             &Sel::None,
+            None,
+            &one,
+            false,
             VisibleWindow {
                 start: 0,
                 end: 0,
@@ -1776,7 +3016,7 @@ mod tests {
             },
             20.0,
             2,
-            |_| (),
+            |_, _| (),
             |_| (),
             |_| (),
             tok,
@@ -1818,6 +3058,8 @@ mod tests {
         );
         let _ = editor_style(tok)(&theme, iced::widget::text_editor::Status::Disabled);
         let _ = editor_frame(tok);
+        let _ = tip_style(tok)(&theme);
+        let _ = toast_style(tok, ToastKind::Info)(&theme);
         let collapsed = TreeNode::branch(1, "r", vec![TreeNode::leaf(2, "c")]);
         let mut collapsed = collapsed;
         assert!(crate::collection::tree_toggle(&mut collapsed, 1));
@@ -1841,18 +3083,22 @@ mod tests {
             .with_value("idle")
             .with_disabled(true)
             .node_id()
-            .contains("button|Save|idle|1|"));
+            .contains("button|Save|1"));
         let _: Element<'_, ()> = themed_scroll(
             label("log", tok, role("log", Role::Status)),
             tok,
             role("scroll", Role::Group),
             true,
+            None,
+            None::<fn(_) -> ()>,
         );
         let _: Element<'_, ()> = themed_scroll(
             label("body", tok, role("body", Role::Status)),
             tok,
             role("scroll", Role::Group),
             false,
+            Some(Id::from("body-scroll")),
+            None::<fn(_) -> ()>,
         );
         assert!(crate::layout::stick_to_end(80.0, 100.0, 20.0, 4.0));
         let input_src = src
@@ -1864,17 +3110,30 @@ mod tests {
             .unwrap();
         assert!(!input_src.contains("apply_name(value)"));
         assert!(input_src.contains("on_submit"));
+        assert!(input_src.contains(".id("));
         assert!(product.contains("virtual_pads("));
         assert!(product.contains("window_after_scroll("));
+        assert!(product.contains("ScrollRail::new"));
         assert!(!product.contains("list_body_and_rail"));
         let pass_src = src
             .split("pub fn password_input")
             .nth(1)
             .unwrap()
-            .split("pub fn textarea")
+            .split("pub fn secret_field")
             .next()
             .unwrap();
         assert!(!pass_src.contains("apply_name(value)"));
+        assert!(pass_src.contains("secure(masked)"));
+        let secret_src = src
+            .split("pub fn secret_field")
+            .nth(1)
+            .unwrap()
+            .split("pub fn textarea")
+            .next()
+            .unwrap();
+        assert!(secret_src.contains("password_input("));
+        assert!(!secret_src.contains("apply_name(value)"));
+        assert!(secret_src.contains("a11y.child(Role::TextBox)"));
         let num_src = src
             .split("pub fn number_input")
             .nth(1)
@@ -1888,6 +3147,288 @@ mod tests {
         assert_eq!(doc.hash, MarkdownDoc::parse("# Hi\n\nBody.").hash);
         assert_ne!(doc.hash, parse("# Other").hash);
         let _: Element<'_, ()> = markdown_view(&doc.items, tok, |_| (), role("md", Role::Group));
+        let md = markdown_style(tok);
+        assert_eq!(md.link_color, tok.accent);
+        assert_eq!(md.inline_code_color, tok.text);
+        assert_eq!(md.inline_code_font, typo::MONO);
+        let cut = parse(&"# title\n\nbody".repeat(8)[..20]);
+        assert!(cut.source.len() <= 20);
+        let outlined = parse("# Hi\n\nA paragraph.\n\n## Next\n\nMore.");
+        let heads = outlined.headings();
+        assert_eq!(heads.len(), 2);
+        assert_eq!(heads[0].level, 1);
+        assert_eq!(heads[0].title, "Hi");
+        assert_eq!(heads[1].level, 2);
+        let deep = parse("# A\n\n## B\n\n### C\n\n#### D\n\n##### E\n\n###### F\n");
+        let levels: Vec<u8> = deep.headings().iter().map(|h| h.level).collect();
+        assert_eq!(levels, vec![1, 2, 3, 4, 5, 6]);
+        let _: Element<'_, ()> = markdown_outline(&heads, |_| (), tok, role("outline", Role::List));
+        let none: [MdHeading; 0] = [];
+        let _: Element<'_, ()> =
+            markdown_outline(&none, |_| (), tok, role("outline-empty", Role::List));
+    }
+
+    #[test]
+    fn widgets_paint_themed_faces() {
+        let tok = named("dark").tokens;
+        let btn = |n: &str| A11y::button(n);
+        let role = |n: &str, r: Role| A11y::new(n, r);
+        let code = Content::with_text("fn main() {}\n");
+        let mut painted: Vec<Element<'_, ()>> = vec![
+            code_block("fn", tok, role("fn", Role::Group)),
+            hyperlink("l", (), tok, role("l", Role::Link)),
+            busy_overlay(
+                label("Body", tok, role("Body", Role::Status)),
+                true,
+                0.2,
+                tok,
+                role("busy", Role::Group),
+            ),
+            image_slot(
+                ImageSlot::Error("missing".into()),
+                48.0,
+                48.0,
+                tok,
+                role("err", Role::Image),
+            ),
+            number_input(3.0, |_| (), tok, role("n", Role::SpinButton)),
+            textarea(
+                &code,
+                |_| (),
+                tok,
+                crate::layout::FILL,
+                role("ta", Role::TextBox),
+            ),
+            highlighted_code(
+                &code,
+                "rs",
+                |_| (),
+                tok,
+                "dark",
+                crate::layout::FILL,
+                role("code", Role::Group),
+            ),
+            color_swatch(1, 2, 3, (), tok, btn("color")),
+            chip("ok", None, tok, Variant::Success, btn("ok")),
+            chip("x", Some(()), tok, Variant::Quiet, btn("x")),
+            tooltip_wrap(
+                label("n", tok, role("n", Role::Status)),
+                "tip",
+                tok,
+                role("tt", Role::Tooltip),
+            ),
+            badge("ok", tok, Variant::Success, role("ok", Role::Status)),
+            group_box(
+                "Box",
+                label("in", tok, role("in", Role::Status)),
+                tok,
+                role("box", Role::Group),
+            ),
+            banner("Hi", None, tok, role("ban", Role::Status)),
+            info_bar(ToastKind::Info, "n", tok, role("ib", Role::Status)),
+            teaching_tip("t", "b", (), tok, role("tip", Role::Tooltip)),
+            placeholder_skeleton(tok, role("sk", Role::Status)),
+        ];
+        for el in &mut painted {
+            draw_once(el);
+        }
+        let tree = TreeNode::branch(1, "r", vec![TreeNode::leaf(2, "c")]);
+        let mut tv = tree_view(
+            &tree,
+            Some(1),
+            |_| (),
+            |_| (),
+            tok,
+            role("tree", Role::Tree),
+        );
+        draw_once(&mut tv);
+        let acc = Accordion { open: Some(0) };
+        let mut av = accordion_view(
+            &["A".into()],
+            vec![label("b", tok, role("b", Role::Header))],
+            &acc,
+            |_| (),
+            tok,
+            role("acc", Role::Group),
+        );
+        draw_once(&mut av);
+        let list = VecList {
+            items: vec![crate::collection::ListRow::new("a").with_meta("m")],
+        };
+        let mut lv = list_view(
+            &list,
+            &Sel::Single(0),
+            |_| (),
+            tok,
+            VisibleWindow::new(80.0),
+            24.0,
+            2,
+            |_| (),
+            "Empty",
+            |_| tok.muted,
+            None,
+            role("list", Role::List),
+        );
+        draw_once(&mut lv);
+        let table = TableModel {
+            headers: vec!["A".into()],
+            rows: vec![vec!["1".into()]],
+            sort_col: None,
+            sort_asc: true,
+        };
+        let widths = [80.0];
+        let mut dt = data_table(
+            &table,
+            &Sel::Single(0),
+            Some((0, 0)),
+            &widths,
+            true,
+            VisibleWindow::new(80.0),
+            24.0,
+            2,
+            |_, _| (),
+            |_| (),
+            |_| (),
+            tok,
+            role("table", Role::Table),
+        );
+        draw_once(&mut dt);
+        let disabled = A11y::button("off").with_disabled(true);
+        let mut dead_link = hyperlink("l", (), tok, disabled.clone());
+        draw_once(&mut dead_link);
+        let mut dead_num = number_input(
+            1.0,
+            |_| (),
+            tok,
+            role("n", Role::SpinButton).with_disabled(true),
+        );
+        draw_once(&mut dead_num);
+        let mut dead_ta = textarea(
+            &code,
+            |_| (),
+            tok,
+            crate::layout::FILL,
+            role("ta", Role::TextBox).with_disabled(true),
+        );
+        draw_once(&mut dead_ta);
+        let mut dead_code = highlighted_code(
+            &code,
+            "rs",
+            |_| (),
+            tok,
+            "dark",
+            crate::layout::FILL,
+            role("code", Role::Group).with_disabled(true),
+        );
+        draw_once(&mut dead_code);
+        let mut dead_sw = color_swatch(1, 2, 3, (), tok, btn("c").with_disabled(true));
+        draw_once(&mut dead_sw);
+        let mut dead_x = dismiss_button((), tok, A11y::button("x").with_disabled(true));
+        draw_once(&mut dead_x);
+        let toast = Toast {
+            id: 1,
+            kind: ToastKind::Info,
+            text: "t".into(),
+            ttl_ms: 10,
+        };
+        let mut tvw = toast_view(&toast, (), tok, role("t", Role::Status));
+        draw_once(&mut tvw);
+        let mut closed = accordion_view(
+            &["A".into()],
+            vec![label("b", tok, role("b", Role::Header))],
+            &Accordion { open: None },
+            |_| (),
+            tok,
+            role("acc", Role::Group),
+        );
+        draw_once(&mut closed);
+    }
+
+    #[test]
+    fn secret_field_does_not_name_the_editor_with_the_secret() {
+        let src = include_str!("widget.rs");
+        let secret_src = src
+            .split("pub fn secret_field")
+            .nth(1)
+            .unwrap()
+            .split("pub fn textarea")
+            .next()
+            .unwrap();
+        assert!(secret_src.contains("password_input("));
+        assert!(!secret_src.contains("apply_name(value)"));
+        assert!(secret_src.contains("a11y.child(Role::TextBox)"));
+        let tok = named("dark").tokens;
+        let secret = "hunter2-never-in-name";
+        let copy = crate::action::Action::new("secret.copy", "Copy", ());
+        let _: Element<'_, ()> = secret_field(
+            "Token",
+            secret,
+            |_| (),
+            false,
+            (),
+            &copy,
+            tok,
+            Direction::Ltr,
+            A11y::new("api-token", Role::Group),
+        );
+        let search_src = src
+            .split("pub fn search_input")
+            .nth(1)
+            .unwrap()
+            .split("pub fn themed_pick_list")
+            .next()
+            .unwrap();
+        assert!(!search_src.contains("apply_name(value)"));
+        assert!(search_src.contains("a11y.child(Role::TextBox)"));
+    }
+
+    #[test]
+    fn search_input_disabled_does_not_emit_and_keeps_stable_name() {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::keyboard;
+        use iced::mouse;
+        use iced::{Event, Font, Pixels, Point, Rectangle, Size};
+        let tok = named("dark").tokens;
+        let a11y = A11y::new("find", Role::TextBox).with_disabled(true);
+        assert_eq!(a11y.child(Role::TextBox).node_id(), "textbox|find|1");
+        let mut el: Element<'_, String> = search_input("typed-query", |s| s, tok, a11y);
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(240.0, 40.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let viewport = Rectangle::new(Point::ORIGIN, Size::new(240.0, 40.0));
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Character("x".into()),
+                    modified_key: keyboard::Key::Character("x".into()),
+                    physical_key: keyboard::key::Physical::Unidentified(
+                        keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: keyboard::Location::Standard,
+                    modifiers: keyboard::Modifiers::empty(),
+                    text: Some("x".into()),
+                    repeat: false,
+                }),
+                layout,
+                mouse::Cursor::Available(Point::new(40.0, 12.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(messages.is_empty());
     }
 
     #[test]
@@ -2028,6 +3569,9 @@ mod tests {
             20.0,
             4,
             |w| w,
+            "Empty",
+            |_| tok.muted,
+            Some(Id::from("list-scroll")),
             A11y::new("list", Role::List),
         );
         let _ = drive(&mut list_el);
@@ -2039,22 +3583,474 @@ mod tests {
             sort_col: None,
             sort_asc: true,
         };
+        let tw = [80.0, 80.0];
         let mut table_el: Element<'_, VisibleWindow> = data_table(
             &table,
             &Sel::Single(0),
+            Some((0, 0)),
+            &tw,
+            true,
             window,
             20.0,
             4,
-            |_| window,
+            |_, _| window,
             |_| window,
             |w| w,
             tok,
             A11y::new("table", Role::Table),
         );
         let _ = drive(&mut table_el);
-        assert_eq!(
-            crate::collection::window_after_scroll(window, 4.0, 200.0, 20.0, 80, 4, Some(0)).start,
-            0
+        let after =
+            crate::collection::window_after_scroll(window, 4.0, 200.0, 20.0, 80, 4, Some(0));
+        assert_eq!(after.start, 0);
+        assert!((after.scroll - 4.0).abs() < 0.01);
+        let mut scroller: Element<'_, f32> = themed_scroll(
+            iced::widget::column![
+                label("a", tok, A11y::new("a", Role::Status)),
+                Space::new().height(800.0),
+            ]
+            .into(),
+            tok,
+            A11y::new("scroll", Role::Group),
+            false,
+            Some(Id::from("scroll-host")),
+            None::<fn(_) -> f32>,
         );
+        let msgs = drive_scroll(&mut scroller);
+        let _ = msgs;
+    }
+
+    fn walk_bounds(layout: iced::advanced::layout::Layout<'_>, out: &mut Vec<iced::Rectangle>) {
+        out.push(layout.bounds());
+        for child in layout.children() {
+            walk_bounds(child, out);
+        }
+    }
+
+    #[test]
+    fn list_view_rail_drag_updates_scroll_without_changing_range() {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::mouse;
+        use iced::{Event, Font, Pixels, Point, Rectangle, Size};
+
+        let tok = named("dark").tokens;
+        let list = VecList {
+            items: (0..80)
+                .map(|i| crate::collection::ListRow::new(format!("r{i}")))
+                .collect(),
+        };
+        let row_h = 20.0;
+        let viewport = 200.0;
+        let window = crate::collection::visible_window(2.0, viewport, row_h, 80, 4, Some(0));
+        let start = window.start;
+        let end = window.end;
+        let mut el: Element<'_, VisibleWindow> = list_view(
+            &list,
+            &Sel::Single(0),
+            |_| window,
+            tok,
+            window,
+            row_h,
+            4,
+            |w| w,
+            "Empty",
+            |_| tok.muted,
+            Some(Id::from("list-rail")),
+            A11y::new("list", Role::List),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(320.0, viewport));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let mut boxes = Vec::new();
+        walk_bounds(layout, &mut boxes);
+        let rail_w = crate::chrome::SCROLL_RAIL_WIDTH;
+        let rb = *boxes
+            .iter()
+            .find(|b| (b.width - rail_w).abs() < 0.6 && b.height > 20.0)
+            .expect("rail");
+        let content = 80.0 * row_h;
+        let (thumb_y, thumb_h) = crate::collection::scroller_span(
+            content,
+            viewport,
+            window.scroll,
+            rb.height,
+            crate::chrome::SCROLL_HANDLE_MIN,
+        );
+        let grab = Point::new(rb.x + rb.width / 2.0, rb.y + thumb_y + thumb_h / 2.0);
+        let moved = Point::new(grab.x, grab.y + 1.0);
+        let vp = Rectangle::new(Point::ORIGIN, Size::new(320.0, viewport));
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(grab),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::CursorMoved { position: moved }),
+                layout,
+                mouse::Cursor::Available(moved),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+        }
+        assert!(!messages.is_empty());
+        let pixel = messages
+            .iter()
+            .copied()
+            .find(|w| w.start == start && w.end == end && (w.scroll - window.scroll).abs() > 0.5)
+            .expect("rail drag moves scroll without remounting");
+        let (y0, _) = crate::collection::scroller_span(
+            content,
+            viewport,
+            window.scroll,
+            rb.height,
+            crate::chrome::SCROLL_HANDLE_MIN,
+        );
+        let (y1, _) = crate::collection::scroller_span(
+            content,
+            viewport,
+            pixel.scroll,
+            rb.height,
+            crate::chrome::SCROLL_HANDLE_MIN,
+        );
+        assert!(y1 > y0);
+    }
+
+    #[test]
+    fn list_view_paints_each_row_at_index_times_height_minus_scroll() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+
+        let tok = named("dark").tokens;
+        let row_h = 20.0;
+        let viewport = 200.0;
+        let scroll = 200.0;
+        let overscan = 4;
+        let n = 80;
+        let list = VecList {
+            items: (0..n)
+                .map(|i| crate::collection::ListRow::new(format!("r{i}")))
+                .collect(),
+        };
+        let window = crate::collection::visible_window(scroll, viewport, row_h, n, overscan, None);
+        let mut el: Element<'_, VisibleWindow> = list_view(
+            &list,
+            &Sel::None,
+            |_| window,
+            tok,
+            window,
+            row_h,
+            overscan,
+            |w| w,
+            "Empty",
+            |_| tok.muted,
+            None,
+            A11y::new("list", Role::List),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(320.0, viewport));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let origin = layout.bounds();
+        let mut boxes = Vec::new();
+        walk_bounds(layout, &mut boxes);
+        let rows: Vec<f32> = boxes
+            .iter()
+            .filter(|b| (b.height - row_h).abs() < 0.6 && b.width > 40.0)
+            .map(|b| b.y - origin.y)
+            .collect();
+        assert!(
+            rows.iter().any(|y| y.abs() < 1.0),
+            "row 10 must sit at the clip top, got {rows:?}"
+        );
+        for y in &rows {
+            let along = y + scroll;
+            let i = (along / row_h).round();
+            assert!(
+                (along - i * row_h).abs() < 1.0,
+                "painted y {y} is not k*{row_h} - {scroll}"
+            );
+        }
+        let sep_list = VecList {
+            items: vec![
+                crate::collection::ListRow::new("a"),
+                crate::collection::ListRow::separator(),
+                crate::collection::ListRow::new("b"),
+            ],
+        };
+        let sep_h = 36.0;
+        let sep_win = VisibleWindow::new(140.0);
+        let mut sep_el: Element<'_, VisibleWindow> = list_view(
+            &sep_list,
+            &Sel::None,
+            |_| sep_win,
+            tok,
+            sep_win,
+            sep_h,
+            1,
+            |w| w,
+            "Empty",
+            |_| tok.muted,
+            None,
+            A11y::new("sep-list", Role::List),
+        );
+        let mut sep_tree = Tree::new(sep_el.as_widget());
+        let sep_limits = Limits::new(Size::ZERO, Size::new(320.0, 140.0));
+        let sep_node = sep_el
+            .as_widget_mut()
+            .layout(&mut sep_tree, &renderer, &sep_limits);
+        let sep_layout = Layout::new(&sep_node);
+        let sep_origin = sep_layout.bounds();
+        let mut sep_boxes = Vec::new();
+        walk_bounds(sep_layout, &mut sep_boxes);
+        let sep_rows: Vec<f32> = sep_boxes
+            .iter()
+            .filter(|b| (b.height - sep_h).abs() < 0.6 && b.width > 40.0)
+            .map(|b| b.y - sep_origin.y)
+            .collect();
+        assert!(
+            sep_rows.iter().any(|y| (*y - sep_h).abs() < 1.0),
+            "separator index 1 must sit at y={sep_h}, got {sep_rows:?}"
+        );
+    }
+
+    #[test]
+    fn log_view_wheel_forwards_scroll_offset() {
+        let tok = named("dark").tokens;
+        let lines: Vec<String> = (0..80).map(|i| format!("line {i}")).collect();
+        let mut el: Element<'_, f32> = log_view(
+            &lines,
+            VisibleWindow::new(80.0),
+            18.0,
+            2,
+            |w| w.scroll,
+            Some(Id::from("log-drive")),
+            tok,
+            A11y::new("log-drive", Role::List),
+        );
+        let _ = drive_scroll(&mut el);
+    }
+
+    fn drive_scroll(el: &mut Element<'_, f32>) -> Vec<f32> {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::mouse;
+        use iced::{Event, Font, Pixels, Point, Rectangle, Size};
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(320.0, 120.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let viewport = Rectangle::new(Point::ORIGIN, Size::new(320.0, 120.0));
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::WheelScrolled {
+                    delta: mouse::ScrollDelta::Lines { x: 0.0, y: -4.0 },
+                }),
+                layout,
+                mouse::Cursor::Available(Point::new(16.0, 40.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        messages
+    }
+
+    #[test]
+    fn disabled_radio_does_not_emit_on_press() {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::mouse;
+        use iced::{Event, Font, Pixels, Point, Rectangle, Size};
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, u8> = themed_radio(
+            "Locked",
+            1u8,
+            Some(1u8),
+            |_| 9u8,
+            tok,
+            A11y::new("Locked", Role::Radio).with_disabled(true),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(240.0, 40.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let viewport = Rectangle::new(Point::ORIGIN, Size::new(240.0, 40.0));
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(Point::new(8.0, 8.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(messages.is_empty());
+    }
+
+    #[test]
+    fn disabled_slider_and_pick_do_not_emit() {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::mouse;
+        use iced::{Event, Font, Pixels, Point, Rectangle, Size};
+        let tok = named("dark").tokens;
+        let mut slider_el: Element<'_, u8> = themed_slider(
+            0.0..=1.0,
+            0.5,
+            |_| 1u8,
+            tok,
+            A11y::new("vol", Role::Slider).with_disabled(true),
+        );
+        let opts = ["a".to_string(), "b".to_string()];
+        let mut pick_el: Element<'_, u8> = themed_pick_list(
+            opts,
+            Some("a".into()),
+            |_| 2u8,
+            tok,
+            A11y::new("pick", Role::ComboBox).with_disabled(true),
+        );
+        for el in [&mut slider_el, &mut pick_el] {
+            let mut tree = Tree::new(el.as_widget());
+            let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+                Font::DEFAULT,
+                Pixels::from(16u32),
+            ));
+            let limits = Limits::new(Size::ZERO, Size::new(240.0, 40.0));
+            let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+            let layout = Layout::new(&node);
+            let viewport = Rectangle::new(Point::ORIGIN, Size::new(240.0, 40.0));
+            let mut clipboard = clipboard::Null;
+            let mut messages = Vec::new();
+            {
+                let mut shell = iced::advanced::Shell::new(&mut messages);
+                el.as_widget_mut().update(
+                    &mut tree,
+                    &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                    layout,
+                    mouse::Cursor::Available(Point::new(12.0, 12.0)),
+                    &renderer,
+                    &mut clipboard,
+                    &mut shell,
+                    &viewport,
+                );
+            }
+            assert!(messages.is_empty());
+        }
+    }
+
+    #[test]
+    fn data_table_paints_each_row_at_index_times_height_minus_scroll() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+
+        let tok = named("dark").tokens;
+        let row_h = 20.0;
+        let viewport = 200.0;
+        let scroll = 200.0;
+        let overscan = 4;
+        let n = 80;
+        let table = TableModel {
+            headers: vec!["N".into()],
+            rows: (0..n).map(|i| vec![format!("r{i}")]).collect(),
+            sort_col: None,
+            sort_asc: true,
+        };
+        let widths = [80.0];
+        let window = crate::collection::visible_window(scroll, viewport, row_h, n, overscan, None);
+        let mut el: Element<'_, VisibleWindow> = data_table(
+            &table,
+            &Sel::None,
+            None,
+            &widths,
+            false,
+            window,
+            row_h,
+            overscan,
+            |_, _| window,
+            |_| window,
+            |w| w,
+            tok,
+            A11y::new("table", Role::Table),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(320.0, viewport));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let mut boxes = Vec::new();
+        walk_bounds(layout, &mut boxes);
+        let rail_w = crate::chrome::SCROLL_RAIL_WIDTH;
+        let clip_top = boxes
+            .iter()
+            .find(|b| (b.width - rail_w).abs() < 0.6 && b.height > 20.0)
+            .map(|b| b.y)
+            .expect("table rail");
+        let rows: Vec<f32> = boxes
+            .iter()
+            .filter(|b| (b.height - row_h).abs() < 0.6 && b.width > 40.0)
+            .map(|b| b.y - clip_top)
+            .collect();
+        assert!(
+            rows.iter().any(|y| y.abs() < 1.0),
+            "row 10 must sit at the clip top, got {rows:?}"
+        );
+        for y in &rows {
+            let along = y + scroll;
+            let i = (along / row_h).round();
+            assert!(
+                (along - i * row_h).abs() < 1.0,
+                "painted y {y} is not k*{row_h} - {scroll}"
+            );
+        }
     }
 }

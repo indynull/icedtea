@@ -204,6 +204,15 @@ mod tests {
     use super::*;
     use crate::i18n::Locale;
 
+    fn specific_xy(pos: iced::window::Position) -> Option<(f32, f32)> {
+        match pos {
+            iced::window::Position::Specific(p) => Some((p.x, p.y)),
+            iced::window::Position::Centered
+            | iced::window::Position::Default
+            | iced::window::Position::SpecificWith(_) => None,
+        }
+    }
+
     #[test]
     fn bootstrap_loads_theme_and_window_kinds() {
         let mut boot = Boot::new("App", "dev.icedtea.app")
@@ -236,14 +245,18 @@ mod tests {
         assert_eq!(placed.window.size.width, 900.0);
         assert_eq!(placed.window.size.height, 700.0);
         assert!(placed.window.max_size.is_none());
-        assert!(matches!(
-            placed.window.position,
-            iced::window::Position::Specific(_)
-        ));
-        if let iced::window::Position::Specific(p) = placed.window.position {
-            assert_eq!(p.x, 100.0);
-            assert_eq!(p.y, 80.0);
-        }
+        assert_eq!(specific_xy(placed.window.position), Some((100.0, 80.0)));
+        assert_eq!(specific_xy(iced::window::Position::Centered), None);
+        assert_eq!(specific_xy(iced::window::Position::Default), None);
+        let place: fn(iced::Size, iced::Size) -> iced::Point = |_, _| iced::Point::ORIGIN;
+        assert_eq!(
+            place(iced::Size::ZERO, iced::Size::ZERO),
+            iced::Point::ORIGIN
+        );
+        assert_eq!(
+            specific_xy(iced::window::Position::SpecificWith(place)),
+            None
+        );
         let dlg = bootstrap(&Boot::new("d", "dev.x").dialog());
         assert!(dlg.window.decorations);
         let mut cat = ThemeCatalog::new();

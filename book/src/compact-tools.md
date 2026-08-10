@@ -36,9 +36,42 @@ fn main() -> icedtea::iced::Result {
 // layout::pad(tiles, 4, Density::default().space)
 ```
 
-The README pad is that window: a four-function keypad on
-`layout::pad`, `display_reading` for the value, `key::press` for
-digits and Shift+8 as `*`. The application owns the arithmetic.
+A four-function keypad on `layout::pad`, `display_reading` for the
+value, and `key::press` for digits and Shift+8 as `*` is the compact
+tool shape. The application owns the arithmetic. The README first
+window is `examples/hello.rs`.
 
 The caption on a tile can be a glyph; the accessible name stays
 readable (`⌫` on the face, name `Backspace`).
+
+## Field focus
+
+`themed_text_input` takes an optional iced `Id`. After the window
+shows, focus that field with `iced::widget::operation::focus`.
+
+## Chrome compose
+
+There is no dedicated shell constructor. Compose search,
+`list_detail`, `Tabs { closable: false }`, and a footer
+(`status_bar`). `style::shell` uses `Corner::None` for a flush card;
+use that preset, not a second radius type.
+
+```rust,ignore
+// Pinned tabs
+let tabs = icedtea::collection::Tabs::new(["Read", "Write"]);
+// tabs.closable is false
+
+// Focus after show
+iced::widget::operation::focus(iced::widget::Id::new("query"))
+```
+
+## Card plus chips
+
+Compose `group_box` with chips for tags and meta. Exclusive filters
+are `Tabs` or radio.
+
+## Secret field
+
+`secret_field` is a settings row: `password_input` (mask or reveal)
+plus a copy `Action`. The application owns the copy message
+(`icedtea::copy_text`).

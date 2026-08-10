@@ -111,18 +111,18 @@ impl A11y {
         self
     }
 
-    /// Encodes name, role, value, disabled, and checked for the iced widget id.
+    /// Same name and disabled, new role. Value and checked stay unset.
+    pub fn child(&self, role: Role) -> Self {
+        Self::new(self.name.clone(), role).with_disabled(self.disabled)
+    }
+
+    /// Stable iced widget id: role, name, disabled. Value and checked
+    /// are state; they must not change the node identity.
     pub fn node_id(&self) -> String {
-        let checked = match self.checked {
-            Some(true) => "1",
-            Some(false) => "0",
-            None => "",
-        };
         format!(
-            "{}|{}|{}|{}|{checked}",
+            "{}|{}|{}",
             self.role.as_str(),
             self.name,
-            self.value.as_deref().unwrap_or(""),
             u8::from(self.disabled),
         )
     }
@@ -207,11 +207,11 @@ mod tests {
         ] {
             let a = A11y::new("x", role).with_value("v");
             assert!(a.node_id().starts_with(role.as_str()));
-            assert!(a.node_id().contains("|x|v|"));
+            assert!(a.node_id().contains("|x|"));
             let _: Element<'_, ()> = attach(iced::widget::text("x").into(), &a);
         }
         let disabled = A11y::button("Save").with_disabled(true).with_value("idle");
-        assert_eq!(disabled.node_id(), "button|Save|idle|1|");
+        assert_eq!(disabled.node_id(), "button|Save|1");
         assert!(disabled.apply_message(Some(1u8)).is_none());
         assert_eq!(disabled.apply_name("other"), "other");
         assert_eq!(A11y::button("").apply_name("Save"), "Save");
@@ -224,8 +224,26 @@ mod tests {
         assert!(!A11y::new("c", Role::Checkbox).apply_checked(false));
         assert_eq!(
             A11y::button("Go").with_checked(false).node_id(),
-            "button|Go||0|0"
+            A11y::button("Go").with_checked(true).node_id()
         );
+        assert_eq!(
+            A11y::button("Go").with_value("idle").node_id(),
+            A11y::button("Go").with_value("busy").node_id()
+        );
+        assert_eq!(
+            A11y::button("Go").with_checked(false).node_id(),
+            "button|Go|0"
+        );
+        let parent = A11y::new("find", Role::Group)
+            .with_disabled(true)
+            .with_value("q");
+        let child = parent.child(Role::TextBox);
+        assert_eq!(child.name, "find");
+        assert_eq!(child.role, Role::TextBox);
+        assert!(child.disabled);
+        assert!(child.value.is_none());
+        assert_eq!(child.node_id(), "textbox|find|1");
+        assert_eq!(parent.node_id(), "group|find|1");
     }
 
     #[test]

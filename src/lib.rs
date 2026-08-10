@@ -1,14 +1,4 @@
-//! Reusable widgets and chrome for [iced](https://iced.rs/) applications.
-//!
-//! [`run!`] boots theme and starts the window. Constructors
-//! return [`Element`]s and emit the application's messages.
-//!
-//! ```
-//! let tokens = icedtea::theme::named("dark").tokens;
-//! let mixed = icedtea::theme::mix(tokens.primary, tokens.canvas, 0.28);
-//! assert_eq!(mixed, tokens.selection);
-//! ```
-
+#![doc = include_str!("../README.md")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod a11y;
@@ -100,7 +90,19 @@ mod tests {
         let arch = include_str!("../book/src/architecture.md");
         let first = include_str!("../book/src/first-window.md");
         assert!(readme.contains("icedtea::run!"));
+        assert!(readme.contains("icedtea-gallery"));
+        assert!(readme.contains("example hello"));
         assert!(first.contains("icedtea::run!"));
+        let install = include_str!("../book/src/install.md");
+        for src in [readme, install] {
+            let at = src
+                .find("icedtea =")
+                .expect("install story names the crate");
+            assert!(
+                src[at..].starts_with("icedtea = { git ="),
+                "first icedtea line must be git until the product tag"
+            );
+        }
         assert!(arch.contains("Action"));
         assert!(arch.contains("Tokens"));
         assert!(arch.contains("catalog::ENTRIES"));

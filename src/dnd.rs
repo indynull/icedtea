@@ -93,7 +93,15 @@ pub fn drop_zone<'a, M: Clone + 'a>(
 
 /// Listen for OS file drops (not captured by a widget).
 pub fn listen_files() -> iced::Subscription<DragPayload> {
-    iced::event::listen_with(|event, _status, _id| drop_from_event(&event, DropAccept::Files))
+    iced::event::listen_with(files_from_event)
+}
+
+fn files_from_event(
+    event: iced::Event,
+    _status: iced::event::Status,
+    _id: iced::window::Id,
+) -> Option<DragPayload> {
+    drop_from_event(&event, DropAccept::Files)
 }
 
 #[cfg(test)]
@@ -137,5 +145,9 @@ mod tests {
             |_| (),
         );
         let _ = listen_files();
+        assert!(
+            files_from_event(ev, iced::event::Status::Ignored, iced::window::Id::unique(),)
+                .is_some()
+        );
     }
 }

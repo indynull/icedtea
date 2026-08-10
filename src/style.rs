@@ -98,7 +98,11 @@ pub fn dim_backdrop(tok: Tokens) -> container::Style {
 }
 
 pub fn list_row(tok: Tokens, selected: bool) -> container::Style {
-    let bg = if selected { tok.selection } else { tok.panel };
+    let bg = if selected {
+        tok.selection
+    } else {
+        Color::TRANSPARENT
+    };
     let fg = if selected {
         tok.selection_text
     } else {
@@ -142,6 +146,14 @@ fn button_colors(tok: Tokens, variant: Variant, status: button::Status) -> (Colo
         Variant::Danger => (
             mix(tok.danger, tok.canvas, if hover { 0.55 } else { 0.35 }),
             tok.danger,
+        ),
+        Variant::Success => (
+            mix(tok.success, tok.canvas, if hover { 0.55 } else { 0.35 }),
+            tok.success,
+        ),
+        Variant::Warning => (
+            mix(tok.warning, tok.canvas, if hover { 0.55 } else { 0.35 }),
+            tok.warning,
         ),
         Variant::Quiet => (
             if hover {
@@ -391,7 +403,7 @@ pub fn scroll_style(tok: Tokens) -> impl Fn(&iced::Theme, scrollable::Status) ->
             },
         };
         scrollable::Style {
-            container: fill(tok.canvas, tok.text),
+            container: fill(Color::TRANSPARENT, tok.text),
             vertical_rail: rail,
             horizontal_rail: rail,
             gap: None,

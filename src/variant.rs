@@ -13,15 +13,19 @@ pub enum Variant {
     Danger,
     Ghost,
     Chip,
+    Success,
+    Warning,
 }
 
 impl Variant {
-    pub const ALL: [Variant; 5] = [
+    pub const ALL: [Variant; 7] = [
         Variant::Primary,
         Variant::Quiet,
         Variant::Danger,
         Variant::Ghost,
         Variant::Chip,
+        Variant::Success,
+        Variant::Warning,
     ];
 }
 
@@ -36,6 +40,6 @@ mod tests {
         for v in Variant::ALL {
             assert!(seen.insert(v));
         }
-        assert_eq!(seen.len(), 5);
+        assert_eq!(seen.len(), 7);
     }
 }

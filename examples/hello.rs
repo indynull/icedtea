@@ -1,8 +1,5 @@
-# First window
+//! Short first window. Same shape as the README example.
 
-`icedtea::run!` starts the window. `Boot` sets title and theme:
-
-```rust,ignore
 use icedtea::a11y::A11y;
 use icedtea::theme;
 use icedtea::variant::Variant;
@@ -55,19 +52,3 @@ impl Hello {
         theme::iced_theme("dark", theme::named("dark").tokens)
     }
 }
-```
-
-Same program: `cargo run --example hello`.
-
-`Boot` loads tokens, locale, and window settings. Text uses the
-platform sans; code uses the platform mono. Load a named family on
-the iced application if you want a specific face.
-
-A compact tool sets size on `Boot` (`.size(380.0, 560.0).min_size(...)`)
-instead of calling iced window resize. See [Compact tools](compact-tools.md).
-
-`icedtea-gallery` is the living catalog: markdown shows a full
-document; the code page picks a language and highlights it. Widget
-constructors, time, and virtual lists are in [Widgets](widgets.md).
-`bootstrap(&boot)` is the same path without opening a window — use it
-in tests. Compact tools are in [Compact tools](compact-tools.md).

@@ -1,4 +1,14 @@
 //! Semantic color tokens, mixing rules, and the named community catalog.
+//!
+//! `named` picks a colorway. `mix` builds washes. The gallery Colors
+//! page shows the token tree.
+//!
+//! ```
+//! let dark = icedtea::theme::named("dark");
+//! assert_eq!(dark.name, "dark");
+//! let mixed = icedtea::theme::mix(dark.tokens.primary, dark.tokens.canvas, 0.28);
+//! assert_eq!(mixed, dark.tokens.selection);
+//! ```
 
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
@@ -74,6 +84,45 @@ pub fn chip_fill(tok: Tokens) -> Color {
 /// Primary wash used for selected rows.
 pub fn selection_fill(tok: Tokens) -> Color {
     mix(tok.primary, tok.canvas, 0.28)
+}
+
+/// Mix `color` toward white.
+pub fn lighten(color: Color, amount: f32) -> Color {
+    mix(Color::WHITE, color, amount)
+}
+
+/// Mix `color` toward black.
+pub fn darken(color: Color, amount: f32) -> Color {
+    mix(Color::BLACK, color, amount)
+}
+
+/// Token ink that stays readable on `bg`.
+pub fn text_on(tok: Tokens, bg: Color) -> Color {
+    let on_text = (relative_luma(tok.text) - relative_luma(bg)).abs();
+    let on_canvas = (relative_luma(tok.canvas) - relative_luma(bg)).abs();
+    if on_text >= on_canvas {
+        tok.text
+    } else {
+        tok.canvas
+    }
+}
+
+/// Washes and chrome colors derived from [`Tokens`] via [`mix`].
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Faces {
+    pub hover: Color,
+    pub pressed: Color,
+    pub chip: Color,
+    pub selection: Color,
+    pub text_on_canvas: Color,
+    pub text_on_surface: Color,
+    pub text_on_panel: Color,
+    pub text_on_primary: Color,
+    pub scrollbar: Color,
+    pub input_cursor: Color,
+    pub input_selection: Color,
+    pub link: Color,
+    pub focus: Color,
 }
 
 fn rgb(r: u8, g: u8, b: u8) -> Color {
@@ -166,9 +215,9 @@ fn alias(name: &str) -> &str {
     }
 }
 
-fn load_catalog() -> BTreeMap<&'static str, NamedTheme> {
+fn catalog_from_json(raw: &str) -> BTreeMap<&'static str, NamedTheme> {
     let mut map = BTreeMap::new();
-    if let Ok(Value::Object(root)) = serde_json::from_str::<Value>(CATALOG_JSON) {
+    if let Ok(Value::Object(root)) = serde_json::from_str::<Value>(raw) {
         for (name, rec) in root {
             let Some(obj) = rec.as_object() else {
                 continue;
@@ -204,6 +253,10 @@ fn load_catalog() -> BTreeMap<&'static str, NamedTheme> {
     }
     map.insert("high-contrast", high_contrast());
     map
+}
+
+fn load_catalog() -> BTreeMap<&'static str, NamedTheme> {
+    catalog_from_json(CATALOG_JSON)
 }
 
 fn catalog() -> &'static BTreeMap<&'static str, NamedTheme> {
@@ -243,6 +296,32 @@ impl Tokens {
     /// True when the canvas is a dark background.
     pub fn canvas_is_dark(self) -> bool {
         relative_luma(self.canvas) < 0.45
+    }
+
+    /// Derived washes and chrome colors. Named colorways stay the input.
+    ///
+    /// ```
+    /// let tok = icedtea::theme::named("dark").tokens;
+    /// let faces = tok.faces();
+    /// assert_eq!(faces.link, tok.accent);
+    /// assert_eq!(faces.hover, icedtea::theme::hover_fill(tok));
+    /// ```
+    pub fn faces(self) -> Faces {
+        Faces {
+            hover: hover_fill(self),
+            pressed: pressed_fill(self),
+            chip: chip_fill(self),
+            selection: selection_fill(self),
+            text_on_canvas: text_on(self, self.canvas),
+            text_on_surface: text_on(self, self.surface),
+            text_on_panel: text_on(self, self.panel),
+            text_on_primary: text_on(self, self.primary),
+            scrollbar: mix(self.text, self.canvas, 0.35),
+            input_cursor: self.primary,
+            input_selection: self.selection,
+            link: self.accent,
+            focus: self.primary,
+        }
     }
 }
 
@@ -528,6 +607,31 @@ pub fn resolve_pref(
     }
 }
 
+/// When `follow_os` is on, fill [`Tokens::primary`] from the desktop
+/// accent. Canvas and text stay. Decorated windows keep the native
+/// title bar.
+///
+/// ```
+/// use iced::Color;
+/// let tok = icedtea::theme::named("dark").tokens;
+/// let accent = Color::from_rgb8(0, 122, 255);
+/// let out = icedtea::theme::apply_os_accent(tok, true, Some(accent));
+/// assert_eq!(out.primary, accent);
+/// assert_eq!(out.canvas, tok.canvas);
+/// assert_eq!(out.text, tok.text);
+/// ```
+pub fn apply_os_accent(tokens: Tokens, follow_os: bool, os_accent: Option<Color>) -> Tokens {
+    match (follow_os, os_accent) {
+        (true, Some(accent)) => {
+            let mut tokens = tokens;
+            tokens.primary = accent;
+            tokens.selection = selection_fill(tokens);
+            tokens
+        }
+        _ => tokens,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -578,6 +682,7 @@ mod tests {
         assert!(named("catppuccin-mocha").dark);
         assert!(!named("catppuccin-latte").tokens.canvas_is_dark());
         assert_eq!(named("one-dark").name, "atom-one-dark");
+        assert_eq!(named("one-light").name, "atom-one-light");
         assert!(named("everforest-dark").dark);
         assert!(!named("kanagawa-lotus").dark);
     }
@@ -670,5 +775,59 @@ mod tests {
         let sun = named("solarized-light").tokens;
         assert_eq!(sun.selection_text, sun.text);
         assert!((relative_luma(sun.selection) - relative_luma(sun.text)).abs() > 0.15);
+    }
+
+    #[test]
+    fn os_accent_fills_primary_when_follow_os() {
+        let tok = named("dark").tokens;
+        let accent = Color::from_rgb8(0, 122, 255);
+        let on = apply_os_accent(tok, true, Some(accent));
+        assert_eq!(on.primary, accent);
+        assert_eq!(on.canvas, tok.canvas);
+        assert_eq!(on.text, tok.text);
+        assert_ne!(on.selection, tok.selection);
+        assert_eq!(
+            apply_os_accent(tok, false, Some(accent)).primary,
+            tok.primary
+        );
+        assert_eq!(apply_os_accent(tok, true, None).primary, tok.primary);
+    }
+
+    #[test]
+    fn catalog_json_skips_bad_records_and_hex() {
+        assert!(parse_hex("12").is_none());
+        assert!(parse_hex("zzzzzz").is_none());
+        assert_eq!(parse_hex("#4ebf71"), Some(rgb(0x4E, 0xBF, 0x71)));
+        let skip = catalog_from_json(r#"{"x": 1}"#);
+        assert!(!skip.contains_key("x"));
+        assert!(skip.contains_key("high-contrast"));
+        let empty = catalog_from_json("not-json");
+        assert_eq!(empty.len(), 1);
+        assert!(empty.contains_key("high-contrast"));
+        let fallback = hex_of(
+            &serde_json::json!({"canvas": "nope"}),
+            "canvas",
+            rgb(0x01, 0x02, 0x03),
+        );
+        assert_eq!(fallback, rgb(0x01, 0x02, 0x03));
+    }
+
+    #[test]
+    fn faces_derive_from_tokens() {
+        let tok = named("dark").tokens;
+        let faces = tok.faces();
+        assert_eq!(faces.link, tok.accent);
+        assert_eq!(faces.hover, hover_fill(tok));
+        assert_eq!(faces.pressed, pressed_fill(tok));
+        assert_eq!(faces.chip, chip_fill(tok));
+        assert_eq!(faces.selection, selection_fill(tok));
+        assert_eq!(faces.input_selection, tok.selection);
+        assert_eq!(faces.focus, tok.primary);
+        assert_eq!(text_on(tok, tok.canvas), tok.text);
+        let red = Color::from_rgb8(200, 40, 40);
+        assert!(relative_luma(lighten(red, 0.4)) > relative_luma(red));
+        assert!(relative_luma(darken(red, 0.4)) < relative_luma(red));
+        let light = named("light").tokens;
+        assert_eq!(text_on(light, light.primary), light.canvas);
     }
 }

@@ -4,11 +4,12 @@ use iced::border::Radius;
 use iced::Shadow;
 use iced::{Color, Vector};
 
-/// Corner rounding.
+/// Corner rounding. [`Corner::None`] is flush (no radius).
 ///
 /// ```
 /// use icedtea::chrome::Corner;
 /// assert_eq!(Corner::Tight.radius_px(), 4.0);
+/// assert_eq!(Corner::None.radius_px(), 0.0);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Corner {

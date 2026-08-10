@@ -66,8 +66,12 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
 - Chrome rows (menu, toolbar, status, breadcrumb, form) take
   `i18n::Direction` from `Boot` / `Prepared::direction`. Use
   `i18n::order`.
-- Key order: focused text → modal → window → application
-  (`key::handle` + `key::listen`).
+- Key order: an open modal consumes (even if a field is focused);
+  otherwise focused text owns unmodified typing; otherwise
+  `key::handle` matches the action table. `ctrl` in a shortcut is the
+  host accelerator (Command on macOS, Control elsewhere). `key::press`
+  and `Shortcut::parse` cover F1-F24. `KeyContext::capturing_layer`
+  reports the same three states `handle` uses.
 - A widget or pattern is public only when it is themed (all visual
   states), keyboard-complete, tested, documented, and listed in
   `catalog::ENTRIES` with a gallery page. Unfinished surfaces are not
@@ -76,17 +80,24 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
 - Always keep `TODO.md` current with shipped product and real
   consumer requests. Sort them into Do / Consider / discard in the
   same change. Never leave Order or Do pointing at finished work.
+- Coverage fail-under is 99 on `just check` (llvm-cov const/macro
+  mapping). Never claim 100 while the tool reports less.
 - `catalog::ENTRIES` is the gallery checklist. Adding an export means
   adding an entry and a gallery page in the same change. Gallery pages
   use representative content (full markdown document, multi-language
   highlighted code, variants and disabled). A one-line stub is not a
-  page.
+  page. Live samples update application state. Never demo a usable
+  control with `Nop` or a hardcoded value. When a page looks broken,
+  read the widget (offset, stick, viewport) before blaming seed data.
 - 4px spacing grid (default density 8px). Design-system numbers live in
   `density`, `typo`, `chrome`, and tokens — not one-off magic in widgets.
 - Never leave a process-global `OnceLock` or env mutation that freezes
   the first workspace, locale, or theme for the process lifetime.
 - Extract a second crate only after a second in-tree consumer needs it.
   Experiments live in `icedtea` or `icedtea-gallery`.
+- Never grow `CHANGELOG.md` Unreleased into a session diary. 0.1.0 on
+  crates.io was a publish check. The first product cut is Unreleased
+  until it is tagged.
 - Gallery fixtures (sample documents, language snippets, bitmaps) live
   in `icedtea-gallery`. Never export them from `icedtea`.
 - Never ship a document undo stack. The application owns document
@@ -132,9 +143,10 @@ workspace `-D warnings`, `cargo test --workspace --all-features`,
 - Coverage ignore is host glue only: `src/host.rs` (native dialogs,
   clipboard tasks) and `src/host_canvas.rs` (iced canvas stroke). Do not
   grow that prefix for convenience.
-- This crate is greenfield: aim at complete line coverage of **our**
-  package. Mock the host; still exercise `bootstrap`, window kinds,
-  actions, layouts, every widget module, and error paths.
+- Fail-under is 99: `llvm-cov` still counts some macro-mapped lines
+  as missed while the HTML report shows 0 uncovered. Do not claim
+  100 while the tool prints less. Exercise every real branch; do
+  not add ignore prefixes.
 - Tests are named after production behavior, never leftover line counts
   or coverage percentages. Drive shipped entry points. No `*_for_test`
   product hooks, no `#[cfg(test)]` product paths.
@@ -291,9 +303,11 @@ version: `Update changelog for X.Y.Z`. No AI attribution footers.
 Good: `Fix sash drag using window-space pointer events`
 
 **History.** Small reviewable commits. Squash noisy work-in-progress
-only before the first push. Once on the remote, use follow-up commits —
-do not amend, rebase-onto, or force-push unless explicitly asked. Never
-rewrite published history. Never commit secrets or `.env`.
+only before the first push. Rewrite unpushed commits so each story
+appears once (no later commit that undoes an earlier subject). Once
+on the remote, use follow-up commits — do not amend, rebase-onto, or
+force-push unless explicitly asked. Never rewrite published history.
+Never commit secrets or `.env`.
 
 **Pull requests.** Title matches commit style. Body stands alone: purpose
 and effect in ordinary sentences, then bullets. Headings:
@@ -329,8 +343,13 @@ tables or essays in discussion notes.
 ## Done for a change
 
 - `just check` green (full check before claiming a feature complete).
-- New or changed public API: rustdoc example, `CHANGELOG.md` line,
-  gallery page if it is a widget or pattern, `catalog::ENTRIES` updated.
+- New or changed public API: rustdoc example, gallery page if it is a
+  widget or pattern, `catalog::ENTRIES` updated, and the matching
+  book page (or a short glue paragraph) in the same change. Update
+  README install or the first-window example when that path changes.
+  Documentation is part of the change, not a follow-up.
+- `CHANGELOG.md` describes the product for a version. Fold work into
+  the first-release Unreleased section until that version is tagged.
 - A third-party app still needs only icedtea for chrome, actions,
   layout, and theme.
 - `git status` clean for the work you reported, or an explicit park.

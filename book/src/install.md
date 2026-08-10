@@ -9,15 +9,12 @@ installs rustfmt, clippy, and llvm-tools.
 
 ```toml
 [dependencies]
-icedtea = "0.1"
-```
-
-Until the first crates.io publish, use git:
-
-```toml
-[dependencies]
+iced = "0.14"
 icedtea = { git = "https://github.com/indynull/icedtea" }
 ```
+
+`0.1` on crates.io is the publish check. This tree is `0.2`. Use git
+until the product tag. After that tag: `icedtea = "0.2"`.
 
 ## Host libraries
 
@@ -38,7 +35,8 @@ cargo run -p icedtea-gallery
 ```
 
 `just check` runs format, clippy (`-D warnings`), tests, rustdoc, and
-coverage fail-under on the `icedtea` package.
+line coverage fail-under 99 on the `icedtea` package (host glue
+ignored; llvm-cov maps some const/macro lines as missed).
 
 ## Publish
 

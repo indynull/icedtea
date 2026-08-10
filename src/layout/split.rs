@@ -110,7 +110,15 @@ pub fn sash_from_window_event(event: &Event) -> Option<PointerDrive> {
 
 /// Listen for window cursor motion and left-button release (sash drag).
 pub fn listen_sash() -> Subscription<PointerDrive> {
-    iced::event::listen_with(|event, _status, _id| sash_from_window_event(&event))
+    iced::event::listen_with(sash_listen)
+}
+
+fn sash_listen(
+    event: iced::Event,
+    _status: iced::event::Status,
+    _id: iced::window::Id,
+) -> Option<PointerDrive> {
+    sash_from_window_event(&event)
 }
 
 /// Drag session for a sash (last pointer position while pressed).
@@ -234,5 +242,11 @@ mod tests {
             total
         ));
         let _ = listen_sash();
+        assert!(sash_listen(
+            moved,
+            iced::event::Status::Ignored,
+            iced::window::Id::unique(),
+        )
+        .is_some());
     }
 }

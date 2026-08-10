@@ -1,4 +1,8 @@
-//! Key handling order: focused text input → modal → window → application.
+//! Key handling: focused text owns unmodified typing; an open modal
+//! consumes; otherwise the action table matches chords and named keys.
+//!
+//! [`dispatch`] / [`KeyLayer`] remain for applications that build their
+//! own stack. [`handle`] implements text, modal, then the action table.
 
 use iced::keyboard::Event as KeyEvent;
 use iced::Subscription;
@@ -60,19 +64,48 @@ pub struct KeyContext {
 }
 
 impl KeyContext {
+    /// Layer [`handle`] treats this context as.
+    ///
+    /// An open modal consumes, even if a field is focused. Otherwise a
+    /// focused field owns unmodified typing. Idle is the action table
+    /// ([`KeyLayer::Application`]).
     pub fn capturing_layer(self) -> Option<KeyLayer> {
-        dispatch([
-            (KeyLayer::TextInput, self.text_input_focused),
-            (KeyLayer::Modal, self.modal_open),
-            (KeyLayer::Window, true),
-            (KeyLayer::Application, true),
-        ])
+        if self.modal_open {
+            Some(KeyLayer::Modal)
+        } else if self.text_input_focused {
+            Some(KeyLayer::TextInput)
+        } else {
+            Some(KeyLayer::Application)
+        }
     }
 }
 
 /// Subscription of ignored keyboard events (compose in `run!`).
+///
+/// iced 0.14 `text_input` captures Escape. Overlay hide must use
+/// [`listen_raw`] and pass that key into [`crate::window::should_hide`].
 pub fn listen() -> Subscription<KeyEvent> {
     iced::keyboard::listen()
+}
+
+/// Keyboard events including those a focused `text_input` captured.
+pub fn listen_raw() -> Subscription<KeyEvent> {
+    iced::event::listen_with(raw_keyboard)
+}
+
+fn raw_keyboard(
+    event: iced::Event,
+    _status: iced::event::Status,
+    _id: iced::window::Id,
+) -> Option<KeyEvent> {
+    keyboard_from(event)
+}
+
+fn keyboard_from(event: iced::Event) -> Option<KeyEvent> {
+    match event {
+        iced::Event::Keyboard(ev) => Some(ev),
+        _ => None,
+    }
 }
 
 /// What the user typed (`*` from Shift+8). `None` for chords and named keys.
@@ -104,7 +137,7 @@ pub fn typed(event: &KeyEvent) -> Option<String> {
     }
 }
 
-/// Named pad keys that are not characters (Enter, Escape, arrows, page, home, end).
+/// Named pad keys that are not characters (Enter, Escape, arrows, page, home, end, F1-F24).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Press {
     Character(String),
@@ -120,6 +153,7 @@ pub enum Press {
     PageDown,
     Home,
     End,
+    /// F1 is `Function(1)` through F24.
     Function(u8),
 }
 
@@ -141,6 +175,36 @@ impl Press {
             _ => index.min(last),
         }
     }
+
+    /// Move a cell cursor. Arrows stay on the grid; page moves rows;
+    /// home/end go to the first or last column of the current row.
+    pub fn step_cell(
+        self,
+        row: usize,
+        col: usize,
+        rows: usize,
+        cols: usize,
+        page: usize,
+    ) -> (usize, usize) {
+        if rows == 0 || cols == 0 {
+            return (0, 0);
+        }
+        let last_r = rows - 1;
+        let last_c = cols - 1;
+        let row = row.min(last_r);
+        let col = col.min(last_c);
+        match self {
+            Self::ArrowUp => (row.saturating_sub(1), col),
+            Self::ArrowDown => ((row + 1).min(last_r), col),
+            Self::ArrowLeft => (row, col.saturating_sub(1)),
+            Self::ArrowRight => (row, (col + 1).min(last_c)),
+            Self::PageUp => (row.saturating_sub(page.max(1)), col),
+            Self::PageDown => ((row + page.max(1)).min(last_r), col),
+            Self::Home => (row, 0),
+            Self::End => (row, last_c),
+            _ => (row, col),
+        }
+    }
 }
 
 /// Typed character or a named pad key. Control/alt/logo chords are `None`
@@ -153,45 +217,51 @@ pub fn press(event: &KeyEvent) -> Option<Press> {
         return None;
     }
     match key {
-        iced::keyboard::Key::Named(iced::keyboard::key::Named::Enter) => Some(Press::Enter),
-        iced::keyboard::Key::Named(iced::keyboard::key::Named::Escape) => Some(Press::Escape),
-        iced::keyboard::Key::Named(iced::keyboard::key::Named::Backspace) => Some(Press::Backspace),
-        iced::keyboard::Key::Named(iced::keyboard::key::Named::Delete) => Some(Press::Delete),
-        iced::keyboard::Key::Named(iced::keyboard::key::Named::ArrowUp) => Some(Press::ArrowUp),
-        iced::keyboard::Key::Named(iced::keyboard::key::Named::ArrowDown) => Some(Press::ArrowDown),
-        iced::keyboard::Key::Named(iced::keyboard::key::Named::ArrowLeft) => Some(Press::ArrowLeft),
-        iced::keyboard::Key::Named(iced::keyboard::key::Named::ArrowRight) => {
-            Some(Press::ArrowRight)
+        iced::keyboard::Key::Named(named) => {
+            if let Some(n) = crate::shortcut::function_number(*named) {
+                return Some(Press::Function(n));
+            }
+            match named {
+                iced::keyboard::key::Named::Enter => Some(Press::Enter),
+                iced::keyboard::key::Named::Escape => Some(Press::Escape),
+                iced::keyboard::key::Named::Backspace => Some(Press::Backspace),
+                iced::keyboard::key::Named::Delete => Some(Press::Delete),
+                iced::keyboard::key::Named::ArrowUp => Some(Press::ArrowUp),
+                iced::keyboard::key::Named::ArrowDown => Some(Press::ArrowDown),
+                iced::keyboard::key::Named::ArrowLeft => Some(Press::ArrowLeft),
+                iced::keyboard::key::Named::ArrowRight => Some(Press::ArrowRight),
+                iced::keyboard::key::Named::PageUp => Some(Press::PageUp),
+                iced::keyboard::key::Named::PageDown => Some(Press::PageDown),
+                iced::keyboard::key::Named::Home => Some(Press::Home),
+                iced::keyboard::key::Named::End => Some(Press::End),
+                _ => typed(event).map(Press::Character),
+            }
         }
-        iced::keyboard::Key::Named(iced::keyboard::key::Named::PageUp) => Some(Press::PageUp),
-        iced::keyboard::Key::Named(iced::keyboard::key::Named::PageDown) => Some(Press::PageDown),
-        iced::keyboard::Key::Named(iced::keyboard::key::Named::Home) => Some(Press::Home),
-        iced::keyboard::Key::Named(iced::keyboard::key::Named::End) => Some(Press::End),
-        iced::keyboard::Key::Named(iced::keyboard::key::Named::F9) => Some(Press::Function(9)),
         _ => typed(event).map(Press::Character),
     }
 }
 
-/// Resolve a key event against an action table using [`dispatch`] order.
+/// Resolve a key event against an action table.
 ///
-/// Focused text still owns unmodified typing. Modifier chords
-/// (Ctrl/Cmd/Alt) match `table` so Save stays live while the caret is
-/// in an editor.
+/// An open modal consumes (no application shortcut), even if a field
+/// is focused. Focused text owns unmodified typing. Otherwise chords
+/// and named keys match `table`.
 pub fn handle<M: Clone>(ctx: KeyContext, table: &ActionTable<M>, event: &KeyEvent) -> Option<M> {
     let KeyEvent::KeyPressed { key, modifiers, .. } = event else {
         return None;
     };
-    let chord = modifiers.control() || modifiers.alt() || modifiers.logo();
-    match ctx.capturing_layer()? {
-        KeyLayer::TextInput if !chord => None,
-        KeyLayer::TextInput | KeyLayer::Modal | KeyLayer::Window | KeyLayer::Application => {
-            let sc = Shortcut {
-                modifiers: *modifiers,
-                key: key.clone(),
-            };
-            table.match_shortcut(&sc).and_then(|a| a.invoke())
-        }
+    if ctx.modal_open {
+        return None;
     }
+    let chord = modifiers.control() || modifiers.alt() || modifiers.logo();
+    if ctx.text_input_focused && !chord {
+        return None;
+    }
+    let sc = Shortcut {
+        modifiers: *modifiers,
+        key: key.clone(),
+    };
+    table.match_shortcut(&sc).and_then(|a| a.invoke())
 }
 
 #[cfg(test)]
@@ -246,6 +316,28 @@ mod tests {
         );
         assert_eq!(index(KeyLayer::Application), 3);
         let _ = listen();
+        let _ = listen_raw();
+        let esc = press(
+            Key::Named(iced::keyboard::key::Named::Escape),
+            Modifiers::empty(),
+        );
+        assert!(matches!(
+            keyboard_from(iced::Event::Keyboard(esc.clone())),
+            Some(KeyEvent::KeyPressed { .. })
+        ));
+        assert!(keyboard_from(iced::Event::Mouse(iced::mouse::Event::CursorEntered)).is_none());
+        assert!(raw_keyboard(
+            iced::Event::Keyboard(esc),
+            iced::event::Status::Ignored,
+            iced::window::Id::unique(),
+        )
+        .is_some());
+        assert!(raw_keyboard(
+            iced::Event::Mouse(iced::mouse::Event::CursorEntered),
+            iced::event::Status::Ignored,
+            iced::window::Id::unique(),
+        )
+        .is_none());
     }
 
     #[test]
@@ -254,7 +346,7 @@ mod tests {
         table.insert(
             Action::new("file.save", "Save", 1u8).with_shortcut(Shortcut::parse("ctrl+s").unwrap()),
         );
-        let ev = press(Key::Character("s".into()), Modifiers::CTRL);
+        let ev = press(Key::Character("s".into()), crate::shortcut::primary());
         let focused = KeyContext {
             text_input_focused: true,
             modal_open: false,
@@ -264,6 +356,7 @@ mod tests {
         let typing = press(Key::Character("s".into()), Modifiers::empty());
         assert_eq!(handle(focused, &table, &typing), None);
         let idle = KeyContext::default();
+        assert_eq!(idle.capturing_layer(), Some(KeyLayer::Application));
         assert_eq!(handle(idle, &table, &ev), Some(1));
         let rel = KeyEvent::KeyReleased {
             key: Key::Character("s".into()),
@@ -272,14 +365,63 @@ mod tests {
                 iced::keyboard::key::NativeCode::Unidentified,
             ),
             location: iced::keyboard::Location::Standard,
-            modifiers: Modifiers::CTRL,
+            modifiers: crate::shortcut::primary(),
         };
         assert_eq!(handle(idle, &table, &rel), None);
         let modal = KeyContext {
             text_input_focused: false,
             modal_open: true,
         };
-        assert_eq!(handle(modal, &table, &ev), Some(1));
+        assert_eq!(handle(modal, &table, &ev), None);
+        assert_eq!(modal.capturing_layer(), Some(KeyLayer::Modal));
+    }
+
+    #[test]
+    fn modal_consumes_even_when_text_is_focused() {
+        let mut table = ActionTable::new();
+        table.insert(
+            Action::new("file.save", "Save", 1u8).with_shortcut(Shortcut::parse("ctrl+s").unwrap()),
+        );
+        let save = press(Key::Character("s".into()), crate::shortcut::primary());
+        let typing = press(Key::Character("s".into()), Modifiers::empty());
+        let both = KeyContext {
+            text_input_focused: true,
+            modal_open: true,
+        };
+        assert_eq!(both.capturing_layer(), Some(KeyLayer::Modal));
+        assert_eq!(handle(both, &table, &save), None);
+        assert_eq!(handle(both, &table, &typing), None);
+
+        let text = KeyContext {
+            text_input_focused: true,
+            modal_open: false,
+        };
+        assert_eq!(text.capturing_layer(), Some(KeyLayer::TextInput));
+        assert_eq!(handle(text, &table, &typing), None);
+        assert_eq!(handle(text, &table, &save), Some(1));
+
+        let parsed = Shortcut::parse("ctrl+s").unwrap();
+        assert!(parsed.matches(crate::shortcut::primary(), &Key::Character("s".into())));
+        assert_eq!(
+            parsed.to_string(),
+            if cfg!(target_os = "macos") {
+                "cmd+s"
+            } else {
+                "ctrl+s"
+            }
+        );
+
+        use iced::keyboard::key::Named;
+        assert_eq!(
+            super::press(&press(Key::Named(Named::F1), Modifiers::empty())),
+            Some(Press::Function(1))
+        );
+        assert_eq!(
+            super::press(&press(Key::Named(Named::F24), Modifiers::empty())),
+            Some(Press::Function(24))
+        );
+        assert_eq!(Shortcut::parse("f1").unwrap().key, Key::Named(Named::F1));
+        assert_eq!(Shortcut::parse("f24").unwrap().key, Key::Named(Named::F24));
     }
 
     fn typed_event(key: Key, modified: Key, modifiers: Modifiers, text: Option<&str>) -> KeyEvent {
@@ -323,15 +465,15 @@ mod tests {
         table.insert(
             Action::new("file.save", "Save", 1u8).with_shortcut(Shortcut::parse("ctrl+s").unwrap()),
         );
-        let chord = press(Key::Character("s".into()), Modifiers::CTRL);
+        let chord = press(Key::Character("s".into()), crate::shortcut::primary());
         assert_eq!(typed(&chord), None);
         assert_eq!(super::press(&chord), None);
         assert_eq!(handle(KeyContext::default(), &table, &chord), Some(1));
-        let f9 = press(
-            Key::Named(iced::keyboard::key::Named::F9),
-            Modifiers::empty(),
-        );
-        assert_eq!(super::press(&f9), Some(Press::Function(9)));
+        for n in 1u8..=24 {
+            let named = crate::shortcut::function_named(n).unwrap();
+            let ev = press(Key::Named(named), Modifiers::empty());
+            assert_eq!(super::press(&ev), Some(Press::Function(n)));
+        }
         let esc = press(
             Key::Named(iced::keyboard::key::Named::Escape),
             Modifiers::empty(),
@@ -443,5 +585,15 @@ mod tests {
         assert_eq!(Press::ArrowDown.step_index(0, 0, 5), 0);
         assert_eq!(Press::ArrowLeft.step_index(3, 10, 1), 2);
         assert_eq!(Press::ArrowRight.step_index(3, 10, 1), 4);
+        assert_eq!(Press::ArrowRight.step_cell(0, 0, 4, 3, 2), (0, 1));
+        assert_eq!(Press::ArrowDown.step_cell(0, 2, 4, 3, 2), (1, 2));
+        assert_eq!(Press::Home.step_cell(2, 2, 4, 3, 2), (2, 0));
+        assert_eq!(Press::End.step_cell(2, 0, 4, 3, 2), (2, 2));
+        assert_eq!(Press::PageDown.step_cell(0, 1, 4, 3, 2), (2, 1));
+        assert_eq!(Press::ArrowUp.step_cell(0, 0, 0, 0, 2), (0, 0));
+        assert_eq!(Press::ArrowUp.step_cell(2, 1, 4, 3, 2), (1, 1));
+        assert_eq!(Press::ArrowLeft.step_cell(1, 2, 4, 3, 2), (1, 1));
+        assert_eq!(Press::PageUp.step_cell(3, 1, 4, 3, 2), (1, 1));
+        assert_eq!(Press::Enter.step_cell(1, 1, 4, 3, 2), (1, 1));
     }
 }

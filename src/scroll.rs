@@ -263,7 +263,7 @@ mod tests {
         );
         let layout = Layout::new(&node);
         let bounds = layout.bounds();
-        assert!((bounds.height - 400.0).abs() < 1.0 || bounds.height > 0.0);
+        assert!(bounds.height > 0.0);
         let viewport = Rectangle::new(Point::ORIGIN, Size::new(40.0, 400.0));
         let mut clipboard = clipboard::Null;
         let mut messages = Vec::new();
@@ -449,6 +449,94 @@ mod tests {
             &Theme::Dark,
             &iced::advanced::renderer::Style::default(),
             Layout::new(&enode),
+            mouse::Cursor::Unavailable,
+            &viewport,
+        );
+        let outside = Point::new(bounds.x - 20.0, bounds.y + 10.0);
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            Widget::<f32, Theme, iced_tiny_skia::Renderer>::update(
+                &mut widget,
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(mid),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+            Widget::<f32, Theme, iced_tiny_skia::Renderer>::update(
+                &mut widget,
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(outside),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+            Widget::<f32, Theme, iced_tiny_skia::Renderer>::update(
+                &mut widget,
+                &mut tree,
+                &Event::Mouse(mouse::Event::CursorMoved { position: mid }),
+                layout,
+                mouse::Cursor::Available(mid),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+            Widget::<f32, Theme, iced_tiny_skia::Renderer>::update(
+                &mut widget,
+                &mut tree,
+                &Event::Mouse(mouse::Event::WheelScrolled {
+                    delta: mouse::ScrollDelta::Pixels { x: 0.0, y: 20.0 },
+                }),
+                layout,
+                mouse::Cursor::Available(mid),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert_eq!(
+            Widget::<f32, Theme, iced_tiny_skia::Renderer>::mouse_interaction(
+                &widget,
+                &tree,
+                layout,
+                mouse::Cursor::Available(outside),
+                &viewport,
+                &renderer,
+            ),
+            mouse::Interaction::default()
+        );
+        assert_eq!(
+            Widget::<f32, Theme, iced_tiny_skia::Renderer>::mouse_interaction(
+                &widget,
+                &tree,
+                layout,
+                mouse::Cursor::Available(mid),
+                &viewport,
+                &renderer,
+            ),
+            mouse::Interaction::Pointer
+        );
+        let limits0 = Limits::new(Size::ZERO, Size::new(12.0, 0.0));
+        let mut flat = ScrollRail::new(10.0, 400.0, 0.0, |y| y, tok);
+        let mut ftree = Tree::new(&flat as &dyn Widget<f32, Theme, iced_tiny_skia::Renderer>);
+        let fnode = Widget::<f32, Theme, iced_tiny_skia::Renderer>::layout(
+            &mut flat, &mut ftree, &renderer, &limits0,
+        );
+        Widget::<f32, Theme, iced_tiny_skia::Renderer>::draw(
+            &flat,
+            &ftree,
+            &mut renderer,
+            &Theme::Dark,
+            &iced::advanced::renderer::Style::default(),
+            Layout::new(&fnode),
             mouse::Cursor::Unavailable,
             &viewport,
         );

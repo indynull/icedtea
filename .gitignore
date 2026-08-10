@@ -1,5 +1,7 @@
 /target
 /book/book
+.superpowers/
+.ruff_cache/
 **/*.rs.bk
 .idea/
 .vscode/

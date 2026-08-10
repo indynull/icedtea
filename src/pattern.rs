@@ -1,7 +1,10 @@
 //! Application chrome as view helpers: main window, list/detail, nav, prefs, about.
-//! Each constructor returns an [`iced::Element`] and emits the application's messages.
+//!
+//! Each constructor returns an [`iced::Element`] and emits the
+//! application's messages. The gallery Patterns group pages these
+//! helpers.
 
-use iced::widget::{column, container, row, text};
+use iced::widget::{column, container, row, text, Column, Row};
 use iced::{Element, Length};
 
 use crate::a11y::{A11y, Role};
@@ -63,6 +66,10 @@ pub fn pick_menu_message<M: Clone>(entries: &[(String, M)], chosen: &str) -> M {
         .expect("menu item")
 }
 
+fn bind_menu_pick<M: Clone>(entries: Vec<(String, M)>) -> impl Fn(String) -> M {
+    move |chosen| pick_menu_message(&entries, &chosen)
+}
+
 /// In-window menu bar: File / Edit / View titles; each opens an overlay list.
 pub fn menu_bar<'a, M: Clone + 'a>(
     table: &'a ActionTable<M>,
@@ -71,7 +78,7 @@ pub fn menu_bar<'a, M: Clone + 'a>(
     cat: &Catalog,
 ) -> Element<'a, M> {
     let groups = order(dir, menu_groups(table));
-    let mut titles = row![].spacing(0).padding([2, 4]);
+    let mut titles = Row::new().spacing(0).padding([2, 4]);
     for (prefix, acts) in groups {
         let heading = menu_heading(cat, prefix);
         let entries: Vec<(String, M)> = acts
@@ -86,7 +93,7 @@ pub fn menu_bar<'a, M: Clone + 'a>(
         titles = titles.push(crate::menubar::drop_menu(
             heading,
             labels,
-            move |chosen| pick_menu_message(&entries, &chosen),
+            bind_menu_pick(entries),
             tok,
         ));
     }
@@ -106,7 +113,7 @@ pub fn toolbar<'a, M: Clone + 'a>(
     dir: Direction,
 ) -> Element<'a, M> {
     let actions: Vec<_> = order(dir, actions);
-    let mut r = row![].spacing(4).padding(8);
+    let mut r = Row::new().spacing(4).padding(8);
     for a in actions {
         r = r.push(themed_button(
             a.title.clone(),
@@ -172,18 +179,20 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
     on_pick: impl Fn(usize) -> M + Copy + 'a,
     tok: Tokens,
 ) -> Element<'a, M> {
-    let mut list = column![].spacing(2);
+    let mut list = Column::new().spacing(2);
     for (i, a) in results.iter().enumerate() {
         list = list.push(themed_button(
             a.title.clone(),
-            Some(on_pick(i)),
+            a.enabled.then(|| on_pick(i)),
             tok,
             if i == selected {
                 Variant::Primary
             } else {
                 Variant::Ghost
             },
-            A11y::new(a.title.clone(), Role::MenuItem).with_checked(i == selected),
+            A11y::new(a.title.clone(), Role::MenuItem)
+                .with_checked(i == selected)
+                .with_disabled(!a.enabled),
         ));
     }
     container(
@@ -194,13 +203,16 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
                 on_query,
                 None,
                 tok,
-                A11y::new(query, Role::TextBox),
+                A11y::new("palette-query", Role::TextBox),
+                Some(iced::widget::Id::new("palette-query")),
             ),
             themed_scroll(
                 list.into(),
                 tok,
                 A11y::new("palette-list", Role::List),
                 false,
+                None,
+                None::<fn(_) -> M>,
             ),
         ]
         .spacing(8),
@@ -299,7 +311,7 @@ pub fn preferences_page<'a, M: Clone + 'a>(
     cat: &Catalog,
 ) -> Element<'a, M> {
     let filtered = filter_prefs(groups, query);
-    let mut body = column![].spacing(12);
+    let mut body = Column::new().spacing(12);
     if filtered.is_empty() {
         body = body.push(meta(
             cat.t("empty"),
@@ -308,7 +320,7 @@ pub fn preferences_page<'a, M: Clone + 'a>(
         ));
     }
     for g in filtered {
-        let mut lines = column![].spacing(4);
+        let mut lines = Column::new().spacing(4);
         for (k, v) in &g.keys {
             let line = format!("{k}: {v}");
             lines = lines.push(meta(line.clone(), tok, A11y::new(line, Role::Status)));
@@ -327,9 +339,17 @@ pub fn preferences_page<'a, M: Clone + 'a>(
             on_query,
             None,
             tok,
-            A11y::new(query, Role::TextBox),
+            A11y::new(cat.t("search"), Role::TextBox),
+            None,
         ),
-        themed_scroll(body.into(), tok, A11y::new("prefs", Role::Group), false),
+        themed_scroll(
+            body.into(),
+            tok,
+            A11y::new("prefs", Role::Group),
+            false,
+            None,
+            None::<fn(_) -> M>,
+        ),
     ]
     .spacing(12)
     .into()
@@ -365,6 +385,10 @@ pub fn list_detail<'a, M: 'a>(
 }
 
 /// Navigation view: sidebar + content; compact shows back.
+///
+/// `width` is the window inner width. Subscribe with
+/// `iced::window::resize_events` and a non-capturing
+/// `Subscription::map`; store the width in `update`.
 pub fn navigation_view<'a, M: Clone + 'a>(
     sidebar: Element<'a, M>,
     content: Element<'a, M>,
@@ -444,7 +468,7 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let title = title.into();
     let body = body.into();
-    let mut actions = row![].spacing(8);
+    let mut actions = Row::new().spacing(8);
     if let Some((t, m)) = cancel {
         actions = actions.push(themed_button(
             t.clone(),
@@ -479,7 +503,7 @@ pub fn context_menu<'a, M: Clone + 'a>(
     actions: impl IntoIterator<Item = &'a Action<M>>,
     tok: Tokens,
 ) -> Element<'a, M> {
-    let mut col = column![].spacing(2).padding(6);
+    let mut col = Column::new().spacing(2).padding(6);
     for a in actions {
         col = col.push(themed_button(
             a.title.clone(),
@@ -533,12 +557,25 @@ mod tests {
         assert_eq!(menu_heading(&cat, "custom"), "Custom");
         assert_eq!(menu_heading(&cat, ""), "");
         let save = table.iter().find(|a| a.id.as_str() == "file.save").unwrap();
-        assert!(menu_item_label(save).contains("ctrl+s"));
+        let host = if cfg!(target_os = "macos") {
+            "cmd+s"
+        } else {
+            "ctrl+s"
+        };
+        assert!(
+            menu_item_label(save).contains(host),
+            "Save row must show the host chord {host}, got {}",
+            menu_item_label(save)
+        );
         let undo = table.iter().find(|a| a.id.as_str() == "edit.undo").unwrap();
         assert_eq!(menu_item_label(undo), "Undo");
         assert_eq!(
             pick_menu_message(&[("Open".into(), 1u8), ("Save".into(), 2)], "Save"),
             2
+        );
+        assert_eq!(
+            bind_menu_pick(vec![("Open".into(), 1u8), ("Save".into(), 2)])("Open".into()),
+            1
         );
         let _: Element<'_, ()> = menu_bar(&table, tok, ltr, &cat);
         let _: Element<'_, ()> = menu_bar(&table, tok, rtl, &cat);
@@ -558,6 +595,27 @@ mod tests {
         );
         let _: Element<'_, ()> = dialog_sheet("Note", "Hello", ("OK".into(), ()), None, tok);
         let acts: Vec<_> = table.iter().collect();
+        let src = include_str!("pattern.rs");
+        let palette_src = src
+            .split("pub fn command_palette_view")
+            .nth(1)
+            .unwrap()
+            .split("pub fn status_page")
+            .next()
+            .unwrap();
+        assert!(
+            !palette_src.contains("A11y::new(query"),
+            "query text is state; it must not be the node name"
+        );
+        assert!(palette_src.contains("A11y::new(\"palette-query\""));
+        let pref_src = src
+            .split("pub fn preferences_page")
+            .nth(1)
+            .unwrap()
+            .split("pub fn list_detail")
+            .next()
+            .unwrap();
+        assert!(!pref_src.contains("A11y::new(query"));
         let _: Element<'_, ()> = toolbar(acts.iter().copied(), tok, ltr);
         let _: Element<'_, ()> = toolbar(acts.iter().copied(), tok, rtl);
         let _: Element<'_, ()> = command_bar(table.iter(), tok, rtl);
@@ -571,6 +629,8 @@ mod tests {
         assert_eq!(loc.direction, Direction::Rtl);
         let res: Vec<&Action<()>> = table.iter().collect();
         let _: Element<'_, ()> = command_palette_view("", &res, 0, |_| (), |_| (), tok);
+        let dead_res: Vec<&Action<()>> = disabled.iter().collect();
+        let _: Element<'_, ()> = command_palette_view("q", &dead_res, 0, |_| (), |_| (), tok);
         let _: Element<'_, ()> = status_page("Empty", "Nothing", Some(("New".into(), ())), tok);
         let _: Element<'_, ()> = status_page("Empty", "Nothing", None, tok);
         let _: Element<'_, ()> = about_page("App", "0.1.0", "MIT", "us", tok, &cat);
@@ -590,5 +650,60 @@ mod tests {
         let _: Element<'_, ()> = main_window(lab("m"), lab("t"), lab("c"), lab("s"), tok);
         let _: Element<'_, ()> = modal_card(lab("b"), lab("c"));
         let _: Element<'_, ()> = context_menu(table.iter(), tok);
+        fn paint(el: &mut Element<'_, ()>) {
+            use iced::advanced::layout::{Layout, Limits};
+            use iced::advanced::renderer::Style;
+            use iced::advanced::widget::Tree;
+            use iced::mouse;
+            use iced::{Font, Pixels, Point, Rectangle, Size, Theme};
+            let mut tree = Tree::new(el.as_widget());
+            let mut renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+                Font::DEFAULT,
+                Pixels::from(16u32),
+            ));
+            let limits = Limits::new(Size::ZERO, Size::new(640.0, 400.0));
+            let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+            let layout = Layout::new(&node);
+            let viewport = Rectangle::new(Point::ORIGIN, Size::new(640.0, 400.0));
+            el.as_widget().draw(
+                &tree,
+                &mut renderer,
+                &Theme::Dark,
+                &Style::default(),
+                layout,
+                mouse::Cursor::Unavailable,
+                &viewport,
+            );
+        }
+        let mut bar = menu_bar(&table, tok, ltr, &cat);
+        paint(&mut bar);
+        let mut tb = toolbar(acts.iter().copied(), tok, ltr);
+        paint(&mut tb);
+        let mut sb = status_bar("ready", &table, tok, ltr);
+        paint(&mut sb);
+        let mut pal = command_palette_view("", &res, 0, |_| (), |_| (), tok);
+        paint(&mut pal);
+        let mut page = status_page("Empty", "Nothing", Some(("New".into(), ())), tok);
+        paint(&mut page);
+        let mut about = about_page("App", "0.1.0", "MIT", "us", tok, &cat);
+        paint(&mut about);
+        let mut prefs_el = preferences_page(&prefs, "", |_| (), tok, &cat);
+        paint(&mut prefs_el);
+        let mut mw = main_window(lab("m"), lab("t"), lab("c"), lab("s"), tok);
+        paint(&mut mw);
+        let mut cm = context_menu(table.iter(), tok);
+        paint(&mut cm);
+        let mut ld = list_detail(lab("l"), lab("d"), crate::layout::fixed(260.0), tok);
+        paint(&mut ld);
+        let mut nv = navigation_view(lab("s"), lab("c"), &nav, 900.0, (), tok, &cat);
+        paint(&mut nv);
+        let mut tv = tab_view(&tabs, lab("b"), |_| (), |_| (), tok);
+        paint(&mut tv);
+        let mut mc = modal_card(lab("b"), lab("c"));
+        paint(&mut mc);
+        let mut cb = command_bar(table.iter(), tok, ltr);
+        paint(&mut cb);
+        let mut dlg = dialog_sheet("Note", "Hello", ("OK".into(), ()), None, tok);
+        paint(&mut dlg);
     }
 }

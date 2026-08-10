@@ -6,8 +6,7 @@ pub const OVERSCAN: usize = 4;
 /// Visible row window for a virtualized list or table.
 ///
 /// `start..end` are mounted indices (overscan and cover already applied).
-/// `scroll` is the pixel offset the rail needs; pixel motion stays in the
-/// scrollable. The application stores this window, not every pixel tick.
+/// `scroll` is the live pixel offset. The rail is a view of that number.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct VisibleWindow {
     pub start: usize,
@@ -122,7 +121,7 @@ pub fn range_if_changed(prev: VisibleWindow, next: VisibleWindow) -> Option<Visi
     }
 }
 
-/// Next window after a scrollable offset. Pixel-only motion returns `prev`.
+/// Next window after a rail, wheel, or pane resize. One pixel `scroll`.
 pub fn window_after_scroll(
     prev: VisibleWindow,
     scroll: f32,
@@ -132,11 +131,21 @@ pub fn window_after_scroll(
     overscan: usize,
     cover: Option<usize>,
 ) -> VisibleWindow {
-    range_if_changed(
-        prev,
-        visible_window(scroll, viewport, row_h, len, overscan, cover),
+    let h = row_h.max(0.0);
+    let viewport = if viewport > 0.0 {
+        viewport
+    } else {
+        prev.viewport
+    };
+    let max_scroll = (len as f32 * h - viewport).max(0.0);
+    visible_window(
+        scroll.clamp(0.0, max_scroll),
+        viewport,
+        h,
+        len,
+        overscan,
+        cover,
     )
-    .unwrap_or(prev)
 }
 
 /// Top pad, mounted window, bottom pad so a scrollable can reach every row.
@@ -219,6 +228,11 @@ pub trait ListModel {
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    fn is_separator(&self, index: usize) -> bool {
+        let _ = index;
+        false
+    }
 }
 
 /// One owned list row.
@@ -226,6 +240,7 @@ pub trait ListModel {
 pub struct ListRow {
     pub title: String,
     pub meta: Option<String>,
+    pub separator: bool,
 }
 
 impl ListRow {
@@ -233,12 +248,21 @@ impl ListRow {
         Self {
             title: title.into(),
             meta: None,
+            separator: false,
         }
     }
 
     pub fn with_meta(mut self, meta: impl Into<String>) -> Self {
         self.meta = Some(meta.into());
         self
+    }
+
+    pub fn separator() -> Self {
+        Self {
+            title: String::new(),
+            meta: None,
+            separator: true,
+        }
     }
 }
 
@@ -271,6 +295,10 @@ impl ListModel for VecList {
     }
     fn meta(&self, index: usize) -> Option<&str> {
         self.items.get(index).and_then(|r| r.meta.as_deref())
+    }
+
+    fn is_separator(&self, index: usize) -> bool {
+        self.items.get(index).is_some_and(|r| r.separator)
     }
 }
 
@@ -363,6 +391,32 @@ impl TableModel {
     }
 }
 
+/// App-owned table storage. [`TableModel`] is one impl.
+pub trait TableSource {
+    fn row_count(&self) -> usize;
+    fn column_count(&self) -> usize;
+    fn header(&self, col: usize) -> &str;
+    fn cell(&self, row: usize, col: usize) -> &str;
+}
+
+impl TableSource for TableModel {
+    fn row_count(&self) -> usize {
+        self.rows.len()
+    }
+
+    fn column_count(&self) -> usize {
+        self.headers.len()
+    }
+
+    fn header(&self, col: usize) -> &str {
+        self.headers.get(col).map(String::as_str).unwrap_or("")
+    }
+
+    fn cell(&self, row: usize, col: usize) -> &str {
+        TableModel::cell(self, row, col)
+    }
+}
+
 /// Tree node.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TreeNode {
@@ -370,6 +424,7 @@ pub struct TreeNode {
     pub label: String,
     pub expanded: bool,
     pub children: Vec<TreeNode>,
+    pub dir: bool,
 }
 
 impl TreeNode {
@@ -379,6 +434,7 @@ impl TreeNode {
             label: label.into(),
             expanded: false,
             children: Vec::new(),
+            dir: false,
         }
     }
 
@@ -388,6 +444,18 @@ impl TreeNode {
             label: label.into(),
             expanded: true,
             children,
+            dir: true,
+        }
+    }
+
+    /// Empty folder. The application fills `children` when expanded.
+    pub fn folder(id: u64, label: impl Into<String>) -> Self {
+        Self {
+            id,
+            label: label.into(),
+            expanded: false,
+            children: Vec::new(),
+            dir: true,
         }
     }
 
@@ -399,7 +467,7 @@ impl TreeNode {
 }
 
 fn flatten_into(node: &TreeNode, depth: u32, out: &mut Vec<(u32, u64, String, bool, bool)>) {
-    let has_children = !node.children.is_empty();
+    let has_children = node.dir || !node.children.is_empty();
     out.push((
         depth,
         node.id,
@@ -448,7 +516,7 @@ pub fn page_count(len: usize, per_page: usize) -> usize {
     len.div_ceil(per_page.max(1))
 }
 
-/// Tab strip.
+/// Tab strip. [`Tabs::new`] starts with `closable: false` (pinned).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tabs {
     pub titles: Vec<String>,
@@ -501,6 +569,30 @@ impl Accordion {
 mod tests {
     use super::*;
 
+    struct TitlesOnly;
+
+    impl ListModel for TitlesOnly {
+        fn len(&self) -> usize {
+            1
+        }
+        fn id(&self, _index: usize) -> u64 {
+            0
+        }
+        fn title(&self, _index: usize) -> &str {
+            "row"
+        }
+    }
+
+    #[test]
+    fn list_model_default_row_is_not_a_separator() {
+        assert_eq!(TitlesOnly.len(), 1);
+        assert_eq!(TitlesOnly.id(0), 0);
+        assert_eq!(TitlesOnly.title(0), "row");
+        assert!(!TitlesOnly.is_separator(0));
+        assert!(TitlesOnly.meta(0).is_none());
+        assert!(!TitlesOnly.is_empty());
+    }
+
     #[test]
     fn cover_keeps_selected_row_mounted_above_the_viewport() {
         let row_h = 20.0;
@@ -522,10 +614,14 @@ mod tests {
             viewport,
         };
         assert!(range_if_changed(win, pixel).is_none());
-        assert_eq!(
-            window_after_scroll(win, scroll + 4.0, viewport, row_h, n, 4, Some(0)).start,
-            win.start
-        );
+        let pixel_moved = window_after_scroll(win, scroll + 4.0, viewport, row_h, n, 4, Some(0));
+        assert_eq!(pixel_moved.start, win.start);
+        assert_eq!(pixel_moved.end, win.end);
+        assert!((pixel_moved.scroll - (scroll + 4.0)).abs() < 0.01);
+        let content = n as f32 * row_h;
+        let (thumb0, _) = scroller_span(content, viewport, win.scroll, viewport, 24.0);
+        let (thumb1, _) = scroller_span(content, viewport, pixel_moved.scroll, viewport, 24.0);
+        assert!(thumb1 > thumb0);
         let jumped = window_after_scroll(win, viewport, viewport, row_h, n, 4, Some(0));
         assert_eq!(jumped.start, 0);
         assert_ne!(jumped.end, win.end);
@@ -617,6 +713,12 @@ mod tests {
         assert_eq!(list.title(1), "b");
         assert_eq!(list.meta(1), Some("meta"));
         assert!(list.meta(0).is_none());
+        assert!(!list.is_separator(0));
+        let mut opts = VecList::titles(["All"]);
+        opts.items.push(ListRow::separator());
+        opts.items.push(ListRow::new("A"));
+        assert!(opts.is_separator(1));
+        assert!(!opts.is_separator(2));
         assert!(!list.is_empty());
         assert!(VecList::default().is_empty());
         assert_eq!(list.title(9), "");
@@ -647,6 +749,11 @@ mod tests {
         table.sort(0);
         assert_eq!(table.cell(0, 0), "b");
         assert_eq!(table.cell(9, 9), "");
+        assert_eq!(TableSource::row_count(&table), 2);
+        assert_eq!(TableSource::column_count(&table), 1);
+        assert_eq!(TableSource::header(&table, 0), "n");
+        assert_eq!(TableSource::cell(&table, 0, 0), "b");
+        assert_eq!(TableSource::header(&table, 9), "");
         let mut widths = [80.0, 80.0];
         TableModel::resize_column(&mut widths, 0, 10.0, 40.0);
         assert_eq!(widths[0], 90.0);
@@ -663,6 +770,10 @@ mod tests {
         assert!(tree_toggle(&mut tree, 1));
         assert!(tree_toggle(&mut tree, 2));
         assert!(!tree_toggle(&mut tree, 99));
+        let folder = TreeNode::folder(9, "empty");
+        assert!(folder.dir);
+        assert!(folder.children.is_empty());
+        assert!(!TreeNode::leaf(8, "file").dir);
         assert_eq!(page_range(100, 2, 10), 20..30);
         assert_eq!(page_range(5, 9, 10), 5..5);
         assert_eq!(page_count(0, 10), 0);
@@ -691,6 +802,23 @@ mod tests {
     }
 
     #[test]
+    fn window_after_scroll_keeps_pixel_offset() {
+        let row_h = 20.0;
+        let viewport = 200.0;
+        let n = 100;
+        let prev = visible_window(40.0, viewport, row_h, n, 4, None);
+        let next = window_after_scroll(prev, 44.0, viewport, row_h, n, 4, None);
+        assert_eq!(next.start, prev.start);
+        assert_eq!(next.end, prev.end);
+        assert!((next.scroll - 44.0).abs() < 0.01);
+        let content = n as f32 * row_h;
+        let (y0, h0) = scroller_span(content, viewport, prev.scroll, viewport, 24.0);
+        let (y1, h1) = scroller_span(content, viewport, next.scroll, viewport, 24.0);
+        assert_eq!(h0, h1);
+        assert!(y1 > y0);
+    }
+
+    #[test]
     fn scroller_keeps_a_usable_handle_on_tall_content() {
         let (y, h) = scroller_span(900.0 * 60.0, 400.0, 0.0, 400.0, 24.0);
         assert_eq!(h, 24.0);
@@ -705,5 +833,30 @@ mod tests {
         assert_eq!((y0, full), (0.0, 400.0));
         assert_eq!(scroller_span(100.0, 50.0, 0.0, 0.0, 24.0), (0.0, 0.0));
         assert_eq!(scroll_from_rail(100.0, 400.0, 10.0, 400.0, 24.0), 0.0);
+    }
+
+    #[test]
+    fn one_offset_drives_pads_and_separator_geometry() {
+        let row_h = 20.0;
+        let viewport = 200.0;
+        let n = 100;
+        let prev = VisibleWindow::new(viewport);
+        let next = window_after_scroll(prev, 44.0, viewport, row_h, n, 4, None);
+        assert!((next.scroll - 44.0).abs() < 0.01);
+        assert!((next.viewport - viewport).abs() < 0.01);
+        let (top, win, bot) = virtual_pads(n, row_h, next.scroll, next.viewport, 4, None);
+        assert!((win.scroll - next.scroll).abs() < 0.01);
+        assert!((top - win.start as f32 * row_h).abs() < 0.01);
+        assert_eq!(top + win.mounted() as f32 * row_h + bot, n as f32 * row_h);
+        let vis = visible_range(44.0, viewport, row_h, n);
+        assert_eq!(vis.start, 2);
+        assert!(vis.end - vis.start <= (viewport / row_h).ceil() as usize + 2);
+        let sep = 1usize;
+        assert!((sep as f32 * row_h - 20.0).abs() < 0.01);
+        let zero_vp = window_after_scroll(next, 44.0, 0.0, row_h, n, 4, None);
+        assert!((zero_vp.viewport - viewport).abs() < 0.01);
+        let clamped = window_after_scroll(prev, 9_000.0, viewport, row_h, n, 4, None);
+        let max_scroll = n as f32 * row_h - viewport;
+        assert!((clamped.scroll - max_scroll).abs() < 0.01);
     }
 }

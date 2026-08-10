@@ -86,6 +86,11 @@ pub fn escape_closes(is_open: bool) -> bool {
     is_open
 }
 
+fn pick_and_close<M>(is_open: &mut bool, on_select: &dyn Fn(String) -> M, option: String) -> M {
+    *is_open = false;
+    on_select(option)
+}
+
 const TITLE_PAD: [u16; 2] = [4, 10];
 
 /// One menu title ("File") whose items float in an iced overlay list.
@@ -308,10 +313,7 @@ where
             &mut state.menu,
             &self.options,
             &mut state.hovered_option,
-            |option| {
-                state.is_open = false;
-                (on_select)(option)
-            },
+            |option| pick_and_close(&mut state.is_open, on_select, option),
             None,
             &self.menu_class,
         )
@@ -348,11 +350,7 @@ mod tests {
         let size = 14.0;
         let file = title_extents("File", pad, size, 18.0);
         let save = overlay_list_width(&["Save    ctrl+s", "Open…"], pad, size);
-        assert!(
-            file.width < 80.0,
-            "title must stay a short word, got {}",
-            file.width
-        );
+        assert!(file.width < 80.0);
         assert!(save > file.width);
         assert!(save >= 160.0);
         assert!(text_advance("File", size) < text_advance("Save    ctrl+s", size));
@@ -385,12 +383,14 @@ mod tests {
     #[test]
     fn drop_menu_builds_an_element() {
         let tok = named("dark").tokens;
-        let _: Element<'_, u8> = drop_menu(
-            "File",
-            vec!["Open".into(), "Save".into()],
-            |s| crate::pattern::pick_menu_message(&[("Open".into(), 1u8), ("Save".into(), 2)], &s),
-            tok,
-        );
+        fn pick(s: String) -> u8 {
+            crate::pattern::pick_menu_message(&[("Open".into(), 1u8), ("Save".into(), 2)], &s)
+        }
+        assert_eq!(pick("Open".into()), 1);
+        let mut open = true;
+        assert_eq!(pick_and_close(&mut open, &pick, "Save".into()), 2);
+        assert!(!open);
+        let _: Element<'_, u8> = drop_menu("File", vec!["Open".into(), "Save".into()], pick, tok);
         let empty: Element<'_, ()> = drop_menu("Help", vec!["About".into()], |_| (), tok);
         let _ = empty;
         assert!(overlay_list_width(&[] as &[&str], Padding::from(TITLE_PAD), 14.0) >= 160.0);
@@ -576,6 +576,56 @@ mod tests {
         )
         .is_some());
 
+        {
+            let mut ov = Widget::<String, Theme, iced_tiny_skia::Renderer>::overlay(
+                &mut widget,
+                &mut tree,
+                layout,
+                &renderer,
+                &viewport,
+                Vector::ZERO,
+            )
+            .expect("open list");
+            let node = ov
+                .as_overlay_mut()
+                .layout(&renderer, Size::new(800.0, 600.0));
+            let ol = Layout::new(&node);
+            let at = Point::new(ol.bounds().x + 8.0, ol.bounds().y + 8.0);
+            let cursor = mouse::Cursor::Available(at);
+            {
+                let mut shell = iced::advanced::Shell::new(&mut messages);
+                ov.as_overlay_mut().update(
+                    &Event::Mouse(mouse::Event::CursorMoved { position: at }),
+                    ol,
+                    cursor,
+                    &renderer,
+                    &mut clipboard,
+                    &mut shell,
+                );
+                ov.as_overlay_mut().update(
+                    &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                    ol,
+                    cursor,
+                    &renderer,
+                    &mut clipboard,
+                    &mut shell,
+                );
+            }
+        }
+        assert!(messages.contains(&"Open".to_string()));
+        messages.clear();
+
+        pump_title(
+            &mut widget,
+            &mut tree,
+            &renderer,
+            &mut clipboard,
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+            layout,
+            over,
+            &viewport,
+            &mut messages,
+        );
         pump_title(
             &mut widget,
             &mut tree,

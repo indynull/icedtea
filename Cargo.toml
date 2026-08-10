@@ -12,14 +12,14 @@ homepage = "https://github.com/indynull/icedtea"
 
 [package]
 name = "icedtea"
-version = "0.1.0"
+version = "0.2.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
 homepage.workspace = true
-description = "Reusable widgets and chrome for iced desktop applications"
+description = "Native desktop widgets and chrome for iced"
 readme = "README.md"
 documentation = "https://docs.rs/icedtea"
 keywords = ["gui", "iced", "desktop", "widgets", "theme"]
@@ -28,6 +28,7 @@ include = [
     "src/**",
     "assets/**",
     "book/**",
+    "examples/**",
     "README.md",
     "LICENSE",
     "CHANGELOG.md",

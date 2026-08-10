@@ -5,13 +5,18 @@ Styling is Rust: semantic tokens plus mixing rules.
 Tokens: `canvas`, `surface`, `panel`, `text`, `muted`, `primary`,
 `accent`, `success`, `warning`, `danger`, `border`, `selection`,
 `selection-text`. Washes (hover, pressed, chip) come from `theme::mix`.
+`Tokens::faces` adds lighten/darken, text-on-wash, scrollbar, input,
+link, and focus. Constructors still take `Tokens`. The gallery Colors
+page shows the tree.
 
 Built-in names are 40 palettes: `dark`, `light`, `high-contrast`, and
 community colorways (Solarized, Gruvbox, Catppuccin, Nord, Tokyo Night,
 Dracula, Everforest, Kanagawa, Ayu, GitHub, and others). `theme::named`
 and `theme::code_highlight` pick UI tokens and the iced highlighter
 face together. Register more on `ThemeCatalog`. `Boot.theme` is a
-concrete name and defaults to `dark`.
+concrete name and defaults to `dark`. `markdown_view` paints inline
+code and links from `Tokens` (`text`, `panel`, `accent`). Truncation
+is slicing the source before `MarkdownDoc::parse`.
 
 ```rust,ignore
 let mut cat = icedtea::theme::ThemeCatalog::new();
@@ -29,3 +34,6 @@ or dark member of one family (default family: `light` / `dark`).
 High-contrast is its own name. Names without a pair do not follow the
 OS. Persist stores `theme` plus optional `family` and `follow_os`.
 Mode changes come from iced (`system::theme` / `theme_changes`).
+When follow-OS is on, `theme::apply_os_accent` can fill
+`Tokens.primary` from the desktop accent. Canvas and text stay the
+family's tokens. Decorated windows keep the native title bar.

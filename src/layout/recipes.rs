@@ -1,6 +1,8 @@
 //! Layout recipe helpers: clamp, wrap, dock, form, overlay, scroll stick.
 
-use iced::widget::{column, container, mouse_area, row, scrollable, stack, Space};
+use iced::widget::{
+    column, container, mouse_area, row, scrollable, stack, Column, Row, Space, Stack,
+};
 use iced::{Alignment, Element, Length, Padding};
 
 /// Fill the parent on this axis.
@@ -192,7 +194,7 @@ where
     Theme: 'a,
     Renderer: iced::advanced::Renderer + 'a,
 {
-    let mut mid = row![];
+    let mut mid = Row::new();
     if let Some(l) = left {
         mid = mid.push(l);
     }
@@ -201,7 +203,7 @@ where
         mid = mid.push(r);
     }
     let mid = mid.width(Length::Fill).height(Length::Fill);
-    let mut col = column![];
+    let mut col = Column::new();
     if let Some(h) = header {
         col = col.push(h);
     }
@@ -214,15 +216,16 @@ where
 
 /// Center a child with optional dim overlay fill.
 pub fn overlay_center<'a, M: 'a>(backdrop: Element<'a, M>, card: Element<'a, M>) -> Element<'a, M> {
-    iced::widget::stack![
-        backdrop,
-        container(card)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .center_x(Length::Fill)
-            .center_y(Length::Fill),
-    ]
-    .into()
+    Stack::new()
+        .push(backdrop)
+        .push(
+            container(card)
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .center_x(Length::Fill)
+                .center_y(Length::Fill),
+        )
+        .into()
 }
 
 /// Vertical scroll with fill height.
@@ -291,10 +294,10 @@ pub fn pad<'a, M: 'a>(cells: Vec<Element<'a, M>>, columns: usize, spacing: u32) 
 /// Grid as wrapped rows of `columns` cells.
 pub fn grid<'a, M: 'a>(cells: Vec<Element<'a, M>>, columns: usize, spacing: u32) -> Element<'a, M> {
     let cols = columns.max(1);
-    let mut rows = column![].spacing(spacing);
+    let mut rows = Column::new().spacing(spacing);
     let mut iter = cells.into_iter().peekable();
     while iter.peek().is_some() {
-        let mut r = row![].spacing(spacing);
+        let mut r = Row::new().spacing(spacing);
         for _ in 0..cols {
             if let Some(c) = iter.next() {
                 r = r.push(c);
@@ -313,13 +316,13 @@ pub fn form<'a, M: 'a>(
     spacing: u32,
     dir: Direction,
 ) -> Element<'a, M> {
-    let mut col = column![].spacing(spacing);
+    let mut col = Column::new().spacing(spacing);
     for (label, field) in rows_in {
         let label = container(label).width(Length::Fixed(140.0));
         let field = container(field).width(Length::Fill);
         let pair = match dir {
-            Direction::Ltr => row![label, field],
-            Direction::Rtl => row![field, label],
+            Direction::Ltr => Row::new().push(label).push(field),
+            Direction::Rtl => Row::new().push(field).push(label),
         };
         col = col.push(pair.spacing(spacing).align_y(Alignment::Center));
     }
@@ -356,20 +359,20 @@ pub fn split_view<'a, M: Clone + 'a>(
         Axis::Vertical => iced::mouse::Interaction::ResizingVertically,
     });
     match axis {
-        Axis::Horizontal => row![
-            container(first).width(Length::Fixed(a.max(1.0))),
-            grip,
-            container(second)
-                .width(Length::Fixed(b.max(1.0)))
-                .width(Length::Fill),
-        ]
-        .into(),
-        Axis::Vertical => column![
-            container(first).height(Length::Fixed(a.max(1.0))),
-            grip,
-            container(second).height(Length::Fill),
-        ]
-        .into(),
+        Axis::Horizontal => Row::new()
+            .push(container(first).width(Length::Fixed(a.max(1.0))))
+            .push(grip)
+            .push(
+                container(second)
+                    .width(Length::Fixed(b.max(1.0)))
+                    .width(Length::Fill),
+            )
+            .into(),
+        Axis::Vertical => Column::new()
+            .push(container(first).height(Length::Fixed(a.max(1.0))))
+            .push(grip)
+            .push(container(second).height(Length::Fill))
+            .into(),
     }
 }
 
@@ -436,6 +439,8 @@ mod tests {
         assert_eq!(wrap_rows(5, 20.0, 4.0, 100.0), 2);
         assert_eq!(wrap_rows(3, 0.0, 4.0, 100.0), 1);
         assert_eq!(wrap_per_row(0.0, 4.0, 100.0), 1);
+        assert_eq!(wrap_per_row(20.0, 4.0, 0.0), 1);
+        assert_eq!(wrap_rows(3, 20.0, 4.0, 0.0), 1);
         let (def, min) = window_size_from_dock(DockSpec::default());
         assert!(def.width >= min.width);
         let (l, f) = form_columns(400.0, 140.0);
@@ -538,6 +543,55 @@ mod tests {
         );
         let _: Element<'_, ()> = grid_spanned(vec![], 40.0, 20.0, 4.0);
         let _: Element<'_, ()> = clamp(t().into(), 480.0);
+        fn paint(el: &mut Element<'_, ()>) {
+            use iced::advanced::layout::{Layout, Limits};
+            use iced::advanced::renderer::Style;
+            use iced::advanced::widget::Tree;
+            use iced::mouse;
+            use iced::{Font, Pixels, Point, Rectangle, Size, Theme};
+            let mut tree = Tree::new(el.as_widget());
+            let mut renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+                Font::DEFAULT,
+                Pixels::from(16u32),
+            ));
+            let limits = Limits::new(Size::ZERO, Size::new(400.0, 300.0));
+            let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+            let layout = Layout::new(&node);
+            let viewport = Rectangle::new(Point::ORIGIN, Size::new(400.0, 300.0));
+            el.as_widget().draw(
+                &tree,
+                &mut renderer,
+                &Theme::Dark,
+                &Style::default(),
+                layout,
+                mouse::Cursor::Unavailable,
+                &viewport,
+            );
+        }
+        let mut d = dock(
+            Some(t().into()),
+            Some(t().into()),
+            Some(t().into()),
+            Some(t().into()),
+            t().into(),
+        );
+        paint(&mut d);
+        let mut ov = overlay_center(t().into(), t().into());
+        paint(&mut ov);
+        let mut sv = split_view(
+            t().into(),
+            t().into(),
+            SplitState::new(Axis::Vertical, 0.3),
+            400.0,
+            |_| (),
+        );
+        paint(&mut sv);
+        let mut gs = grid_spanned(vec![], 40.0, 20.0, 4.0);
+        paint(&mut gs);
+        let mut g = grid(vec![t().into(), t().into(), t().into()], 2, 8);
+        paint(&mut g);
+        let mut sc = stack_child(vec![], 3);
+        paint(&mut sc);
     }
 
     #[test]

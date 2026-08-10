@@ -85,12 +85,15 @@ pub fn distribute(total: f32, policies: &[SizePolicy]) -> Vec<f32> {
     }
     let used: f32 = sizes.iter().sum();
     if used < total - 0.01 {
-        if let Some((i, _)) = policies
-            .iter()
-            .enumerate()
-            .filter(|(i, p)| sizes[*i] < p.max)
-            .max_by(|a, b| a.1.stretch.partial_cmp(&b.1.stretch).unwrap())
-        {
+        let mut best: Option<usize> = None;
+        let mut best_stretch = f32::NEG_INFINITY;
+        for (i, p) in policies.iter().enumerate() {
+            if sizes[i] < p.max && p.stretch >= best_stretch {
+                best_stretch = p.stretch;
+                best = Some(i);
+            }
+        }
+        if let Some(i) = best {
             sizes[i] = (sizes[i] + (total - used)).min(policies[i].max);
         }
     }
@@ -142,5 +145,15 @@ mod tests {
         assert!(leftover[0] <= 20.0 + 0.01);
         assert!(leftover[1] > 50.0);
         let _ = SizePolicy::between(10.0, 5.0, 8.0, -1.0);
+        assert_eq!(distribute(0.0, &[SizePolicy::fixed(0.0)]), vec![0.0]);
+        let rem = distribute(
+            80.0,
+            &[
+                SizePolicy::between(10.0, 10.0, 15.0, 1.0),
+                SizePolicy::between(10.0, 10.0, 200.0, 1.0),
+            ],
+        );
+        assert!(rem[0] <= 15.01);
+        assert!(rem[1] >= 60.0);
     }
 }

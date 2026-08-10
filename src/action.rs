@@ -1,5 +1,19 @@
 //! One action type for menus, toolbars, shortcuts, and the command palette.
+//!
 //! An action carries the application's message; `update` applies it.
+//! The gallery Menu, Toolbar, and Command palette pages show the same
+//! table in each chrome.
+//!
+//! ```
+//! use icedtea::action::{Action, ActionTable};
+//! use icedtea::shortcut::Shortcut;
+//! let mut table = ActionTable::new();
+//! table.insert(
+//!     Action::new("file.save", "Save", "saved")
+//!         .with_shortcut(Shortcut::parse("ctrl+s").unwrap()),
+//! );
+//! assert_eq!(table.invoke("file.save"), Some("saved"));
+//! ```
 
 use crate::icon::Icon;
 use crate::shortcut::Shortcut;

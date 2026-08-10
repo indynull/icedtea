@@ -20,14 +20,16 @@ highlighting follows the active colorway (`theme::code_highlight`).
 
 One `Action` feeds the menu bar, toolbar, shortcuts, context menus,
 footer hints, and the command palette. The action carries your message
-type.
+type. Write `ctrl+s` once: Command on macOS, Control on Linux and
+Windows.
 
 ## Layout and chrome
 
 Recipes (`dock`, `split`, `clamp`, `form`, `overlay`) compose rows and
-columns. Patterns (`list_detail`, `nav_view`, `preferences`, `about`)
-combine recipes with widgets.
+columns. Patterns (`list_detail`, `navigation_view`, `preferences`,
+`about`) combine recipes with widgets.
 
 ## Catalog
 
 `catalog::ENTRIES` is the public surface. Each id has a gallery page.
+Constructors, time, and virtual lists are in [Widgets](widgets.md).

@@ -1,4 +1,15 @@
 //! Layout recipes, size policy, and breakpoints.
+//!
+//! `dock`, `split_view`, `clamp`, `form`, and `pad` return iced
+//! [`Element`](crate::Element)s. The gallery Pad and List/detail pages
+//! use these recipes.
+//!
+//! ```
+//! use icedtea::layout::{distribute, SizePolicy};
+//! let sizes = distribute(100.0, &[SizePolicy::fixed(20.0), SizePolicy::expand(1.0)]);
+//! assert_eq!(sizes[0], 20.0);
+//! assert_eq!(sizes[1], 80.0);
+//! ```
 
 pub mod breakpoint;
 pub mod recipes;
