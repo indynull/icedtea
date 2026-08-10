@@ -73,6 +73,9 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   `catalog::ENTRIES` with a gallery page. Unfinished surfaces are not
   exported.
 - One path per feature. Pick it and delete the other. Fallbacks re-grow.
+- Always keep `TODO.md` current with shipped product and real
+  consumer requests. Sort them into Do / Consider / discard in the
+  same change. Never leave Order or Do pointing at finished work.
 - `catalog::ENTRIES` is the gallery checklist. Adding an export means
   adding an entry and a gallery page in the same change. Gallery pages
   use representative content (full markdown document, multi-language
