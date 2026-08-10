@@ -13,6 +13,7 @@ change. Measure before claiming smoothness.
 4. Markdown document helper; theme catalog in the book and gallery
 5. Measure the list and table gallery pages
 6. `lazy` constructor if a heavy sibling still remounts on list scroll
+7. Theme families and follow-OS (after the list/overlay work)
 
 ## Do
 
@@ -46,6 +47,15 @@ change. Measure before claiming smoothness.
 - **Theme catalog.** Book theming page and gallery show
   `ThemeCatalog::register` for a custom name and a live switch. No new
   API.
+- **Theme families and follow-OS.** Catalog lists explicit pairs
+  (`github` → `github-dark` / `github-light`, and the other real
+  couples). A follow-OS preference selects the light or dark member of
+  one family (default family: our `light` / `dark`). `Boot.theme` stays
+  a concrete name and defaults to `dark`. High contrast is its own
+  name, not a light/dark flip. Names without a pair do not follow the
+  OS. Mode changes come from iced / mundy; persist stores family +
+  follow, or a concrete name. Book shows the pref. Gallery can switch
+  family and follow.
 - **Measure.** On the list and table gallery pages: large row count, a
   status line that ticks, mounted widget count recorded on the page or
   here. Command: `cargo run -p icedtea-gallery`.
@@ -68,3 +78,6 @@ After the list above, or as a thin iced pass-through.
   the application.
 - **Card meta row.** Compose `group_box` plus chips. New filter type
   only if `Tabs` or radio cannot do exclusive filters.
+- **OS accent as `primary`.** When follow-OS is on, mundy's accent
+  color can fill `Tokens.primary`. Canvas and text stay the family's
+  tokens. Decorated windows keep the native title bar.
