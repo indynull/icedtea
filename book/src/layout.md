@@ -2,7 +2,32 @@
 
 Layout is Rust functions that return iced `Element`s. Recipes live in
 `icedtea::layout`: `dock`, `split_view`, `clamp`, `form`, `grid`,
-`overlay_center`, `scroll_y`, plus size policy and breakpoints.
+`pad` (equal-fill tiles), `overlay_center`, `scroll_y`, plus size
+policy and breakpoints.
+
+`layout::pad(cells, 4, density.space)` shares row width across cells.
+Pair it with `widget::themed_button_sized` and `Density::tile()` for a
+key pad.
+
+`layout::FILL`, `layout::SHRINK`, and `layout::fixed(px)` are the size
+language for boxes and editors. `row_box` / `column_box` take width and
+height. A fill-height column gives leftover space to children that
+themselves fill (a caption above a filling `textarea`).
+`pattern::list_detail` takes the sidebar as that same size.
+
+```rust,ignore
+use icedtea::layout::{self, column_box, row_box};
+
+let panes = row_box(
+    [source, preview],
+    8,
+    0,
+    layout::FILL,
+    layout::FILL,
+    icedtea::i18n::Direction::Ltr,
+);
+let _ = column_box([caption, editor], 4, 8, layout::FILL, layout::FILL);
+```
 
 ```rust,ignore
 use icedtea::layout::{Breakpoint, SizePolicy, distribute};

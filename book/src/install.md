@@ -34,7 +34,6 @@ Install [`just`](https://github.com/casey/just) and
 cargo install just cargo-llvm-cov
 just check
 cargo run -p icedtea-gallery
-cargo run -p icedtea-consumer
 ```
 
 `just check` runs format, clippy (`-D warnings`), tests, rustdoc, and
@@ -53,6 +52,6 @@ Home: <https://github.com/indynull/icedtea>.
 5. GitHub Actions job `crates-io` checks the tag, runs `just check`, and
    `cargo publish -p icedtea --locked`.
 
-Gallery and consumer crates set `publish = false`; only `icedtea` goes
-to crates.io. Docs build on [docs.rs](https://docs.rs/icedtea) from that
+The gallery crate sets `publish = false`; only `icedtea` goes to
+crates.io. Docs build on [docs.rs](https://docs.rs/icedtea) from that
 publish.

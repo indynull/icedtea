@@ -4,7 +4,8 @@ icedtea is reusable widgets and chrome for native desktop applications
 on [iced](https://iced.rs/). Design system, layouts, window chrome,
 actions mapped to messages, widgets, and patterns.
 
-Product contract: [`GOAL.md`](GOAL.md) (internal; do not package or
+Product contract: this file's Product section, `catalog::ENTRIES`, and
+the book. Work list: [`TODO.md`](TODO.md) (internal; do not package or
 link from README). This file is how to work in the repo. It wins over
 visitor home rules when they conflict.
 
@@ -24,14 +25,13 @@ cargo run -p icedtea-gallery
 | --- | --- |
 | `src/` | Public library `icedtea` |
 | `icedtea-gallery/` | Shipping gallery; every `catalog::ENTRIES` id has a page |
-| `examples/consumer/` | Fresh-path consumer (theme mix, Action, breakpoint) |
 | `book/` | Install, architecture, first window, actions, layout, theming, navigation, overlay windows |
-| `assets/fonts/` | JetBrains Mono only (code). User-facing text uses the platform sans |
+| `TODO.md` | Remaining work |
 | `assets/icons/` | Chrome SVGs |
 | `.github/workflows/ci.yml` | Linux, macOS, Windows run `just check` |
 | `.github/workflows/publish.yml` | Tag `vX.Y.Z` publishes `icedtea` to crates.io |
 
-Workspace members: `icedtea`, `icedtea-gallery`, `examples/consumer`.
+Workspace members: `icedtea`, `icedtea-gallery`.
 Rust 1.89, edition 2021, iced 0.14. License MIT.
 
 ## Product
@@ -48,9 +48,9 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   (`theme::named`, `theme::builtin_names`) plus high-contrast. Apps may
   register more that implement the same tokens.
 - User-facing text uses `typo::UI` (`Font::DEFAULT`, platform sans).
-  Apps that want a named family load it on the iced application
-  themselves. Do not bundle a user-interface sans. JetBrains Mono is
-  bundled for code and loaded by `run!` / `bootstrap`.
+  Code uses `typo::MONO` (`Font::MONOSPACE`). Never bundle a font
+  file. Apps that want a named family load it on the iced application
+  themselves.
 - Every public widget constructor takes `a11y::A11y` and calls
   `a11y::attach` (name, role, value, disabled, checked). iced 0.14 has
   no accesskit slot; the widget id carries the node id.
@@ -81,9 +81,40 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   the first workspace, locale, or theme for the process lifetime.
 - Extract a second crate only after a second in-tree consumer needs it.
   Experiments live in `icedtea` or `icedtea-gallery`.
+- Gallery fixtures (sample documents, language snippets, bitmaps) live
+  in `icedtea-gallery`. Never export them from `icedtea`.
+- Never ship a document undo stack. The application owns document
+  history.
+- Performance: first useful frame quickly; scrolling and typing stay
+  smooth at ordinary data sizes; virtualized collections for large
+  data. Measure before claiming.
 
-Rejected alternatives live once under Non-goals in `GOAL.md`. Do not
-add a “what it is not” section anywhere else.
+A third-party app ships with only icedtea for chrome, actions, layout,
+and theme. A compact tool does not import iced `button`, window
+resize, or keyboard key enums to finish. The gallery is the document
+shell; the README pad is the tool-sized window.
+
+Rejected alternatives live once under Non-goals below. Do not add a
+“what it is not” section anywhere else.
+
+## Non-goals
+
+- A new renderer or a fork of iced. icedtea tracks iced releases.
+- A stylesheet or markup language. Authors write Rust.
+- Mobile, web, or embedded targets.
+- A visual form designer.
+- An in-process web view, print pipeline, or multimedia stack.
+- Multiple-document-interface window mosaics.
+- Binding the look to one desktop shell. Themes may follow system
+  light/dark; chrome stays icedtea’s.
+- Domain widgets for a specific product (session timelines, containers,
+  editors' language services). Applications own those.
+- Document undo/redo. Applications own history.
+- Gallery copy and sample bitmaps as library API.
+- A second collection widget for variable-height cards. Extend list.
+- Library-owned parse caches or live-update daemons.
+- System-wide hotkeys, host focus steal, or baking another toolkit’s
+  theme files.
 
 ## Check and coverage
 
@@ -103,12 +134,11 @@ workspace `-D warnings`, `cargo test --workspace --all-features`,
   product hooks, no `#[cfg(test)]` product paths.
 - `just check` green is necessary, not product proof. Report the exact
   command and result. Product proof for a widget is the gallery page
-  plus tests that call the shipped constructor. For a consumer path,
-  run `examples/consumer` (twice when claiming it).
+  plus tests that call the shipped constructor.
 - Gallery launch: if a display is present, start
   `cargo run -p icedtea-gallery` and confirm iced starts without panic.
   A timeout after a clean start is a successful smoke. Compile + unit
-  tests + consumer if there is no display.
+  tests if there is no display.
 - Continuous integration runs `just check` on Linux, macOS, and Windows
   at Rust 1.89, plus `cargo test --workspace --all-features` on Ubuntu
   `stable` and `beta`. This environment proves Linux; do not invent
@@ -188,8 +218,8 @@ Rewrite vague asks before coding:
 | Make it faster | Benchmark the hot path, change it, show the number improved |
 
 1. State success criteria before writing code.
-2. Prefer real verification (`just check`, named tests, gallery,
-   consumer) over a plausible-looking diff.
+2. Prefer real verification (`just check`, named tests, gallery)
+   over a plausible-looking diff.
 3. Run the check. Read the output. Do not claim done without evidence.
 4. Fix the cause, not the test. After two failed corrections on the
    same issue, stop, summarize, and ask.
@@ -220,10 +250,10 @@ continuous integration is not authorization.
 - Document our glue. Do not restate iced’s docs. Prefer a concrete
   example over a tutorial that mirrors upstream.
 - State what the system is and does. Rejected alternatives once in
-  `GOAL.md` Non-goals.
+  Non-goals above.
 - Durable public docs (README, book) stand alone: no issue-tracker
   numbers or URLs, no live infra snapshots, no private hostnames or
-  home paths. `GOAL.md` is internal and is not shipped in the crate.
+  home paths. `TODO.md` is internal and is not shipped in the crate.
 - No internal thought trail. The decision stays; the iterations do not.
 - Plain professional English. No slang metaphors (door, spine, theater,
   folklore, junk drawer, “gate”, “wire”, “hygiene”). Prefer entrypoint,

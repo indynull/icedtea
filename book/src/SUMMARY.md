@@ -8,3 +8,4 @@
 - [Theming](theming.md)
 - [Navigation](navigation.md)
 - [Overlay windows](overlay-windows.md)
+- [Compact tools](compact-tools.md)

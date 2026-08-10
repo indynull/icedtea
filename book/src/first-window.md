@@ -1,6 +1,6 @@
 # First window
 
-`icedtea::run!` starts the window. `Boot` sets title, theme, and fonts:
+`icedtea::run!` starts the window. `Boot` sets title and theme:
 
 ```rust,ignore
 use icedtea::widget;
@@ -53,12 +53,15 @@ fn main() -> icedtea::iced::Result {
 }
 ```
 
-`Boot` loads tokens, locale, window settings, and the bundled
-monospace for code. User-facing text uses the platform sans; load your
-own family on the iced application if you want a specific face.
+`Boot` loads tokens, locale, and window settings. Text uses the
+platform sans; code uses the platform mono. Load a named family on
+the iced application if you want a specific face.
 
-`examples/consumer` is a small themed window (actions, list/detail,
-toasts, live theme). `icedtea-gallery` is the living catalog: markdown
-shows a full document; the code page picks a language and highlights it.
-`bootstrap(&boot)` is the same path without opening a window — use it in
-tests.
+A compact tool sets size on `Boot` (`.size(380.0, 560.0).min_size(...)`)
+instead of calling iced window resize. See [Compact tools](compact-tools.md).
+
+The README pad is a compact tool (sized `Boot`, display reading,
+density tiles, typed keys). `icedtea-gallery` is the living catalog:
+markdown shows a full document; the code page picks a language and
+highlights it. `bootstrap(&boot)` is the same path without opening a
+window — use it in tests.

@@ -1,7 +1,7 @@
 # Architecture
 
 icedtea is the design system, layouts, chrome, and widgets for a
-desktop window. `icedtea::run!` loads fonts and theme, then starts the
+desktop window. `icedtea::run!` loads theme, then starts the
 window from `Boot` and your `new`, `update`, `view`, and `theme`
 functions. `bootstrap` is the same path without opening a window.
 
