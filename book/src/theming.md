@@ -6,11 +6,11 @@ Tokens: `canvas`, `surface`, `panel`, `text`, `muted`, `primary`,
 `accent`, `success`, `warning`, `danger`, `border`, `selection`,
 `selection-text`. Washes (hover, pressed, chip) come from `theme::mix`.
 
-Built-in names are community colorways: Solarized, Gruvbox, Catppuccin,
-Nord, Tokyo Night, Dracula, Everforest, Kanagawa, Ayu, and more, plus
-`dark`, `light`, and `high-contrast`. `theme::named` and
-`theme::code_highlight` pick UI tokens and the iced highlighter face
-together. Register more on `ThemeCatalog`.
+Built-in names are 40 palettes: `dark`, `light`, `high-contrast`, and
+community colorways (Solarized, Gruvbox, Catppuccin, Nord, Tokyo Night,
+Dracula, Everforest, Kanagawa, Ayu, GitHub, and others). `theme::named`
+and `theme::code_highlight` pick UI tokens and the iced highlighter
+face together. Register more on `ThemeCatalog`.
 
 ```rust,ignore
 let mut cat = icedtea::theme::ThemeCatalog::new();

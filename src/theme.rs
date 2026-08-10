@@ -261,38 +261,25 @@ pub fn code_highlight(name: &str) -> iced::highlighter::Theme {
         || n.contains("macchiato")
         || n.contains("catppuccin")
         || n.contains("rose-pine")
-        || n.contains("flexoki")
         || n.contains("palenight")
         || n.contains("material")
         || n.contains("night-owl")
-        || n.contains("poimandres")
     {
         H::Base16Mocha
     } else if n.contains("nord")
         || n.contains("tokyo")
-        || n.contains("iceberg")
         || n.contains("nightfox")
         || n.contains("kanagawa")
         || n.contains("ayu")
         || n.contains("github")
         || n.contains("oxocarbon")
-        || n.contains("carbonfox")
     {
         H::Base16Ocean
     } else if n.contains("gruvbox")
         || n.contains("monokai")
         || n.contains("dracula")
-        || n.contains("horizon")
-        || n.contains("synthwave")
         || n.contains("everforest")
-        || n.contains("zenburn")
-        || n.contains("jellybeans")
         || n.contains("cobalt")
-        || n.contains("tomorrow")
-        || n.contains("oceanic")
-        || n.contains("seoul")
-        || n.contains("apprentice")
-        || n.contains("papercolor")
     {
         H::Base16Eighties
     } else {
@@ -437,7 +424,7 @@ mod tests {
     #[test]
     fn builtin_names_resolve() {
         let names = builtin_names();
-        assert!(names.len() >= 40);
+        assert_eq!(names.len(), 40);
         assert_eq!(names[0], "dark");
         assert_eq!(names[1], "light");
         assert_eq!(names[2], "high-contrast");
