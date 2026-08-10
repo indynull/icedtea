@@ -12,9 +12,10 @@ defaults:
   run:
     shell: bash
 
+# Official Pages recipe: never cancel an in-flight deploy.
 concurrency:
-  group: book-${{ github.ref }}
-  cancel-in-progress: true
+  group: pages
+  cancel-in-progress: false
 
 jobs:
   build:
