@@ -13,12 +13,11 @@ use iced::{Alignment, Element, Length, Padding};
 
 use crate::chrome::SCROLL_RAIL_WIDTH;
 use crate::host_canvas::ArcRing;
-use crate::scroll::ScrollRail;
 
 use crate::a11y::{self, A11y, Role};
 use crate::collection::{
-    page_range, visible_window, Accordion, ListModel, Selection, TableModel, Tabs, TreeNode,
-    VisibleWindow,
+    page_range, virtual_pads, window_after_scroll, Accordion, ListModel, Selection, TableModel,
+    Tabs, TreeNode, VisibleWindow,
 };
 use crate::i18n::Direction;
 use crate::icon::Icon;
@@ -1043,38 +1042,6 @@ pub fn themed_scroll<'a, M: 'a>(
     a11y::attach(s.into(), &a11y)
 }
 
-pub(crate) fn wheel_scroll(
-    delta: iced::mouse::ScrollDelta,
-    scroll: f32,
-    row_h: f32,
-    max: f32,
-) -> f32 {
-    let dy = match delta {
-        iced::mouse::ScrollDelta::Lines { y, .. } => -y * row_h,
-        iced::mouse::ScrollDelta::Pixels { y, .. } => -y,
-    };
-    (scroll + dy).clamp(0.0, max)
-}
-
-fn list_body_and_rail<'a, M: Clone + 'a>(
-    body: Element<'a, M>,
-    content: f32,
-    viewport: f32,
-    scroll: f32,
-    row_h: f32,
-    on_scroll: impl Fn(f32) -> M + Copy + 'a,
-    tok: Tokens,
-) -> Element<'a, M> {
-    let max = (content - viewport).max(0.0);
-    row![
-        mouse_area(body).on_scroll(move |d| on_scroll(wheel_scroll(d, scroll, row_h, max))),
-        Element::from(ScrollRail::new(content, viewport, scroll, on_scroll, tok)),
-    ]
-    .width(crate::layout::FILL)
-    .height(crate::layout::FILL)
-    .into()
-}
-
 fn two_line_row<'a, M: 'a>(
     title: &str,
     meta_s: Option<&str>,
@@ -1115,11 +1082,11 @@ where
     L: ListModel + ?Sized,
 {
     let cover = selection.primary();
-    let win = visible_window(
+    let (top, win, bot) = virtual_pads(
+        model.len(),
+        row_h,
         window.scroll,
         window.viewport,
-        row_h,
-        model.len(),
         overscan,
         cover,
     );
@@ -1127,6 +1094,7 @@ where
     if model.is_empty() {
         col = col.push(meta("Empty", tok, A11y::new("Empty", Role::Status)));
     } else {
+        col = col.push(Space::new().height(Length::Fixed(top)));
         for i in win.range() {
             let selected = selection.contains(i);
             let title = model.title(i);
@@ -1139,21 +1107,32 @@ where
                 &A11y::new(name, Role::ListItem).with_checked(selected),
             ));
         }
+        col = col.push(Space::new().height(Length::Fixed(bot)));
     }
-    let content = model.len() as f32 * row_h.max(0.0);
     let len = model.len();
-    let viewport = window.viewport;
-    let emit = move |y: f32| on_scroll(visible_window(y, viewport, row_h, len, overscan, cover));
+    let prev = window;
     a11y::attach(
-        list_body_and_rail(
-            col.into(),
-            content,
-            window.viewport,
-            window.scroll,
-            row_h,
-            emit,
-            tok,
-        ),
+        scrollable(col)
+            .width(crate::layout::FILL)
+            .height(crate::layout::FILL)
+            .direction(ScrollDir::Vertical(
+                Scrollbar::new()
+                    .width(SCROLL_RAIL_WIDTH)
+                    .scroller_width(SCROLL_RAIL_WIDTH),
+            ))
+            .style(style::scroll_style(tok))
+            .on_scroll(move |vp| {
+                on_scroll(window_after_scroll(
+                    prev,
+                    vp.absolute_offset().y,
+                    vp.bounds().height,
+                    row_h,
+                    len,
+                    overscan,
+                    cover,
+                ))
+            })
+            .into(),
         &a11y,
     )
 }
@@ -1195,7 +1174,7 @@ pub fn data_table<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let cover = selection.primary();
     let n = model.rows.len();
-    let win = visible_window(window.scroll, window.viewport, row_h, n, overscan, cover);
+    let (top, win, bot) = virtual_pads(n, row_h, window.scroll, window.viewport, overscan, cover);
     let mut header = row![].spacing(8);
     for (i, h) in model.headers.iter().enumerate() {
         header = header.push(themed_button(
@@ -1207,6 +1186,7 @@ pub fn data_table<'a, M: Clone + 'a>(
         ));
     }
     let mut body = column![].spacing(0);
+    body = body.push(Space::new().height(Length::Fixed(top)));
     for i in win.range() {
         let selected = selection.contains(i);
         let title = model.cell(i, 0);
@@ -1223,21 +1203,31 @@ pub fn data_table<'a, M: Clone + 'a>(
             &A11y::new(name, Role::ListItem).with_checked(selected),
         ));
     }
-    let content = n as f32 * row_h.max(0.0);
-    let viewport = window.viewport;
-    let emit = move |y: f32| on_scroll(visible_window(y, viewport, row_h, n, overscan, cover));
+    body = body.push(Space::new().height(Length::Fixed(bot)));
+    let prev = window;
     a11y::attach(
         column![
             header,
-            list_body_and_rail(
-                body.into(),
-                content,
-                window.viewport,
-                window.scroll,
-                row_h,
-                emit,
-                tok
-            ),
+            scrollable(body)
+                .width(crate::layout::FILL)
+                .height(crate::layout::FILL)
+                .direction(ScrollDir::Vertical(
+                    Scrollbar::new()
+                        .width(SCROLL_RAIL_WIDTH)
+                        .scroller_width(SCROLL_RAIL_WIDTH),
+                ))
+                .style(style::scroll_style(tok))
+                .on_scroll(move |vp| {
+                    on_scroll(window_after_scroll(
+                        prev,
+                        vp.absolute_offset().y,
+                        vp.bounds().height,
+                        row_h,
+                        n,
+                        overscan,
+                        cover,
+                    ))
+                }),
         ]
         .spacing(4)
         .width(crate::layout::FILL)
@@ -1434,24 +1424,6 @@ mod tests {
         assert_eq!(t.minute, 59);
         assert_eq!(step_number(5.0, 1.0, 0.0, 10.0, 1), 6.0);
         assert_eq!(step_number(0.0, 1.0, 0.0, 10.0, -1), 0.0);
-        assert_eq!(
-            wheel_scroll(
-                iced::mouse::ScrollDelta::Lines { x: 0.0, y: -1.0 },
-                0.0,
-                20.0,
-                100.0
-            ),
-            20.0
-        );
-        assert_eq!(
-            wheel_scroll(
-                iced::mouse::ScrollDelta::Pixels { x: 0.0, y: 8.0 },
-                10.0,
-                20.0,
-                100.0
-            ),
-            2.0
-        );
         assert!(A11y::button("x").with_disabled(true).disabled);
         assert_eq!(
             A11y::new("y", Role::Checkbox).with_checked(false).checked,
@@ -1746,6 +1718,23 @@ mod tests {
             |_| (),
             role("list", Role::List),
         );
+        let scrolled = VisibleWindow {
+            start: 0,
+            end: 0,
+            scroll: 24.0,
+            viewport: 100.0,
+        };
+        let _: Element<'_, ()> = list_view(
+            &list,
+            &Sel::Single(0),
+            |_| (),
+            tok,
+            scrolled,
+            24.0,
+            4,
+            |_| (),
+            role("list", Role::List),
+        );
         let _: Element<'_, ()> = item_grid(
             &["a".into(), "b".into()],
             |_| (),
@@ -1875,6 +1864,9 @@ mod tests {
             .unwrap();
         assert!(!input_src.contains("apply_name(value)"));
         assert!(input_src.contains("on_submit"));
+        assert!(product.contains("virtual_pads("));
+        assert!(product.contains("window_after_scroll("));
+        assert!(!product.contains("list_body_and_rail"));
         let pass_src = src
             .split("pub fn password_input")
             .nth(1)
@@ -1976,5 +1968,93 @@ mod tests {
             A11y::new("body", Role::TextBox),
         );
         assert_eq!(fixed.as_widget().size().height, Length::Fixed(120.0));
+    }
+
+    #[test]
+    fn list_and_table_forward_scrollable_offset() {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::mouse;
+        use iced::{Event, Font, Pixels, Point, Rectangle, Size};
+
+        let tok = named("dark").tokens;
+        let list = VecList {
+            items: (0..80)
+                .map(|i| crate::collection::ListRow::new(format!("r{i}")))
+                .collect(),
+        };
+        let window = VisibleWindow {
+            start: 0,
+            end: 0,
+            scroll: 0.0,
+            viewport: 200.0,
+        };
+        let drive = |el: &mut Element<'_, VisibleWindow>| {
+            let mut tree = Tree::new(el.as_widget());
+            let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+                Font::DEFAULT,
+                Pixels::from(16u32),
+            ));
+            let limits = Limits::new(Size::ZERO, Size::new(320.0, 200.0));
+            let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+            let layout = Layout::new(&node);
+            let viewport = Rectangle::new(Point::ORIGIN, Size::new(320.0, 200.0));
+            let mut clipboard = clipboard::Null;
+            let mut messages = Vec::new();
+            {
+                let mut shell = iced::advanced::Shell::new(&mut messages);
+                el.as_widget_mut().update(
+                    &mut tree,
+                    &Event::Mouse(mouse::Event::WheelScrolled {
+                        delta: mouse::ScrollDelta::Lines { x: 0.0, y: -10.0 },
+                    }),
+                    layout,
+                    mouse::Cursor::Available(Point::new(16.0, 40.0)),
+                    &renderer,
+                    &mut clipboard,
+                    &mut shell,
+                    &viewport,
+                );
+            }
+            messages
+        };
+        let mut list_el: Element<'_, VisibleWindow> = list_view(
+            &list,
+            &Sel::Single(0),
+            |_| window,
+            tok,
+            window,
+            20.0,
+            4,
+            |w| w,
+            A11y::new("list", Role::List),
+        );
+        let _ = drive(&mut list_el);
+        let table = TableModel {
+            headers: vec!["N".into(), "M".into()],
+            rows: (0..80)
+                .map(|i| vec![format!("r{i}"), format!("m{i}")])
+                .collect(),
+            sort_col: None,
+            sort_asc: true,
+        };
+        let mut table_el: Element<'_, VisibleWindow> = data_table(
+            &table,
+            &Sel::Single(0),
+            window,
+            20.0,
+            4,
+            |_| window,
+            |_| window,
+            |w| w,
+            tok,
+            A11y::new("table", Role::Table),
+        );
+        let _ = drive(&mut table_el);
+        assert_eq!(
+            crate::collection::window_after_scroll(window, 4.0, 200.0, 20.0, 80, 4, Some(0)).start,
+            0
+        );
     }
 }

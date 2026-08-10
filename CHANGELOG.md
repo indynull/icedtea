@@ -4,8 +4,9 @@
 
 - List and table fill the pane. Rows are a title plus optional meta.
   `ListModel` borrows; `virtual_pads` takes overscan and a cover index.
-  Scroll messages carry a `VisibleWindow` (range + viewport). Gallery
-  list and table pages show 1_000 rows, a ticking status line, and the
+  Mounted rows sit at `start * row_h` inside iced's scrollable. Scroll
+  messages fire when the index range or viewport changes. Gallery list
+  and table pages show 1_000 rows, a ticking status line, and the
   mounted widget count.
 - `themed_text_input` takes optional `on_submit`. Empty text, password,
   and number fields keep an empty value (access name stays on the node

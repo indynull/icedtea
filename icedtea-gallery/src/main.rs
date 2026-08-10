@@ -6,8 +6,8 @@ use icedtea::a11y::{A11y, Role};
 use icedtea::action::{Action, ActionTable};
 use icedtea::catalog::{self, Entry};
 use icedtea::collection::{
-    visible_window, Accordion, ListModel, ListRow, Selection, TableModel, Tabs, TreeNode, VecList,
-    VisibleWindow, OVERSCAN,
+    Accordion, ListModel, ListRow, Selection, TableModel, Tabs, TreeNode, VecList, VisibleWindow,
+    OVERSCAN,
 };
 use icedtea::i18n::Catalog;
 use icedtea::i18n::Direction;
@@ -1068,11 +1068,11 @@ impl Gallery {
             ),
             "link" => widget::hyperlink("docs", Message::Nop, tok, named("docs", Role::Link)),
             "list" => {
-                let win = visible_window(
+                let (_, win, _) = icedtea::collection::virtual_pads(
+                    self.list.len(),
+                    48.0,
                     self.list_window.scroll,
                     self.list_window.viewport,
-                    48.0,
-                    self.list.len(),
                     OVERSCAN,
                     self.sel.primary(),
                 );
@@ -1135,11 +1135,11 @@ impl Gallery {
             .spacing(12)
             .into(),
             "table" => {
-                let win = visible_window(
+                let (_, win, _) = icedtea::collection::virtual_pads(
+                    self.table.rows.len(),
+                    48.0,
                     self.table_window.scroll,
                     self.table_window.viewport,
-                    48.0,
-                    self.table.rows.len(),
                     OVERSCAN,
                     self.sel.primary(),
                 );

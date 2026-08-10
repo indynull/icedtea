@@ -122,6 +122,23 @@ pub fn range_if_changed(prev: VisibleWindow, next: VisibleWindow) -> Option<Visi
     }
 }
 
+/// Next window after a scrollable offset. Pixel-only motion returns `prev`.
+pub fn window_after_scroll(
+    prev: VisibleWindow,
+    scroll: f32,
+    viewport: f32,
+    row_h: f32,
+    len: usize,
+    overscan: usize,
+    cover: Option<usize>,
+) -> VisibleWindow {
+    range_if_changed(
+        prev,
+        visible_window(scroll, viewport, row_h, len, overscan, cover),
+    )
+    .unwrap_or(prev)
+}
+
 /// Top pad, mounted window, bottom pad so a scrollable can reach every row.
 ///
 /// ```
@@ -483,6 +500,39 @@ impl Accordion {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cover_keeps_selected_row_mounted_above_the_viewport() {
+        let row_h = 20.0;
+        let viewport = 200.0;
+        let n = 100;
+        let scroll = row_h;
+        let vis = visible_range(scroll, viewport, row_h, n);
+        assert_eq!(vis.start, 1);
+        let (top, win, bot) = virtual_pads(n, row_h, scroll, viewport, 4, Some(0));
+        assert_eq!(win.start, 0);
+        assert!(win.range().contains(&0));
+        assert_eq!(top, win.start as f32 * row_h);
+        assert!(vis.start > win.start);
+        assert!((top + win.mounted() as f32 * row_h + bot - n as f32 * row_h).abs() < 0.01);
+        let pixel = VisibleWindow {
+            start: win.start,
+            end: win.end,
+            scroll: scroll + 4.0,
+            viewport,
+        };
+        assert!(range_if_changed(win, pixel).is_none());
+        assert_eq!(
+            window_after_scroll(win, scroll + 4.0, viewport, row_h, n, 4, Some(0)).start,
+            win.start
+        );
+        let jumped = window_after_scroll(win, viewport, viewport, row_h, n, 4, Some(0));
+        assert_eq!(jumped.start, 0);
+        assert_ne!(jumped.end, win.end);
+        let next_row = visible_window(viewport, viewport, row_h, n, 4, Some(0));
+        assert_eq!(next_row.start, 0);
+        assert!(range_if_changed(win, next_row).is_some());
+    }
 
     #[test]
     fn virtualize_select_sort_tree_tabs() {
