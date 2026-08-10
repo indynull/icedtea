@@ -48,6 +48,15 @@ impl Density {
         }
     }
 
+    /// Tile height for a pad key, on the 4px grid.
+    pub fn tile(self) -> u32 {
+        match self.name {
+            DensityName::Compact => 40,
+            DensityName::Default => 48,
+            DensityName::Comfortable => 56,
+        }
+    }
+
     /// Snap a pixel value up to the 4px grid.
     pub fn snap(px: u32) -> u32 {
         let rem = px % 4;
@@ -81,6 +90,9 @@ mod tests {
             assert_eq!(d.name, name);
         }
         assert_eq!(Density::default().space, 8);
+        assert_eq!(Density::named(DensityName::Compact).tile(), 40);
+        assert_eq!(Density::named(DensityName::Default).tile(), 48);
+        assert_eq!(Density::named(DensityName::Comfortable).tile(), 56);
         assert_eq!(Density::snap(0), 0);
         assert_eq!(Density::snap(4), 4);
         assert_eq!(Density::snap(5), 8);

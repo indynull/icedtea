@@ -127,12 +127,13 @@ impl A11y {
         )
     }
 
-    /// Visible name: explicit [`Self::name`] or the constructor fallback.
-    pub fn apply_name(&self, fallback: impl Into<String>) -> String {
-        if self.name.is_empty() {
-            fallback.into()
-        } else {
+    /// Visible caption. Constructor title wins; [`Self::name`] is for the reader.
+    pub fn apply_name(&self, caption: impl Into<String>) -> String {
+        let caption = caption.into();
+        if caption.is_empty() {
             self.name.clone()
+        } else {
+            caption
         }
     }
 
@@ -204,8 +205,10 @@ mod tests {
         let disabled = A11y::button("Save").with_disabled(true).with_value("idle");
         assert_eq!(disabled.node_id(), "button|Save|idle|1|");
         assert!(disabled.apply_message(Some(1u8)).is_none());
-        assert_eq!(disabled.apply_name("other"), "Save");
+        assert_eq!(disabled.apply_name("other"), "other");
         assert_eq!(A11y::button("").apply_name("Save"), "Save");
+        assert_eq!(A11y::button("Backspace").apply_name("⌫"), "⌫");
+        assert_eq!(A11y::button("Backspace").name, "Backspace");
         assert!(A11y::new("c", Role::Checkbox)
             .with_checked(true)
             .apply_checked(false));

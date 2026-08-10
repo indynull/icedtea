@@ -9,4 +9,3 @@ description = "Living catalog of every icedtea widget and pattern"
 
 [dependencies]
 icedtea = { path = ".." }
-iced = { version = "0.14", features = ["tokio", "markdown"] }

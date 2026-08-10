@@ -1,10 +1,11 @@
-//! Type scale. UI copy uses the platform sans; code uses bundled JetBrains Mono.
+//! Type scale. UI is the platform sans; code is the platform mono.
+//! icedtea does not ship a font file. Applications that want a named
+//! family load it on the iced application themselves.
 
 use iced::font::{Style, Weight};
 use iced::Font;
 
-/// Platform sans (`Family::SansSerif`). Applications may load their own face
-/// and pass it to iced; icedtea does not ship a UI family.
+/// Platform sans (`Family::SansSerif`).
 pub const UI: Font = Font::DEFAULT;
 
 /// Titles and selected labels.
@@ -19,12 +20,11 @@ pub const UI_ITALIC: Font = Font {
     ..Font::DEFAULT
 };
 
-/// JetBrains Mono — ids, paths, code.
-pub const MONO: Font = Font::with_name("JetBrains Mono");
+/// Platform monospace — ids, paths, code.
+pub const MONO: Font = Font::MONOSPACE;
 
-/// Bundled JetBrains Mono Regular.
-pub const MONO_BYTES: &[u8] = include_bytes!("../assets/fonts/JetBrainsMono-Regular.ttf");
-
+/// Large reading (a tool's current value). On the 4px grid.
+pub const DISPLAY: u32 = 36;
 /// Page title.
 pub const PAGE: u32 = 18;
 /// Section / card title.
@@ -39,6 +39,7 @@ pub const CODE: u32 = 13;
 /// Named step on the type scale.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TypeRole {
+    Display,
     Page,
     Title,
     Body,
@@ -54,6 +55,7 @@ impl TypeRole {
     /// ```
     pub fn size(self) -> u32 {
         match self {
+            Self::Display => DISPLAY,
             Self::Page => PAGE,
             Self::Title => TITLE,
             Self::Body => BODY,
@@ -65,7 +67,7 @@ impl TypeRole {
     pub fn font(self) -> Font {
         match self {
             Self::Code => MONO,
-            Self::Title | Self::Page => UI_BOLD,
+            Self::Display | Self::Title | Self::Page => UI_BOLD,
             Self::Body | Self::Meta => UI,
         }
     }
@@ -77,12 +79,16 @@ mod tests {
 
     #[test]
     fn scale_is_ordered() {
+        assert!(TypeRole::Display.size() > TypeRole::Page.size());
         assert!(TypeRole::Page.size() > TypeRole::Title.size());
         assert!(TypeRole::Title.size() > TypeRole::Body.size());
         assert!(TypeRole::Body.size() > TypeRole::Meta.size());
         assert!(TypeRole::Code.size() >= TypeRole::Meta.size());
         assert_eq!(UI, Font::DEFAULT);
-        assert!(MONO_BYTES.len() > 1000);
+        assert_eq!(MONO, Font::MONOSPACE);
+        assert_eq!(TypeRole::Display.size(), DISPLAY);
+        assert_eq!(TypeRole::Display.font(), UI_BOLD);
+        assert_eq!(DISPLAY % 4, 0);
         assert_eq!(TypeRole::Page.size(), PAGE);
         assert_eq!(TypeRole::Title.size(), TITLE);
         assert_eq!(TypeRole::Body.size(), BODY);

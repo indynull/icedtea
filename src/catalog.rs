@@ -110,6 +110,11 @@ pub const ENTRIES: &[Entry] = &[
         group: "text",
     },
     Entry {
+        id: "display",
+        title: "Display reading",
+        group: "text",
+    },
+    Entry {
         id: "markdown",
         title: "Markdown",
         group: "text",
@@ -202,6 +207,11 @@ pub const ENTRIES: &[Entry] = &[
     Entry {
         id: "wrap",
         title: "Wrap",
+        group: "chrome",
+    },
+    Entry {
+        id: "pad",
+        title: "Pad",
         group: "chrome",
     },
     Entry {
@@ -340,7 +350,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn catalog_covers_goal_surfaces() {
+    fn catalog_covers_public_surfaces() {
         assert!(get("button").is_some());
         assert!(get("about").is_some());
         assert!(get("missing").is_none());
@@ -356,6 +366,8 @@ mod tests {
             "command-bar",
             "context-menu",
             "scrollbar",
+            "display",
+            "pad",
         ] {
             assert!(get(id).is_some(), "catalog missing {id}");
         }
@@ -368,6 +380,7 @@ mod tests {
             "architecture.md",
             "navigation.md",
             "overlay-windows.md",
+            "compact-tools.md",
         ] {
             let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("book/src")

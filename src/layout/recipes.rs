@@ -3,6 +3,29 @@
 use iced::widget::{column, container, mouse_area, row, scrollable, stack, Space};
 use iced::{Alignment, Element, Length, Padding};
 
+/// Fill the parent on this axis.
+///
+/// ```
+/// assert_eq!(icedtea::layout::FILL, icedtea::iced::Length::Fill);
+/// assert_eq!(icedtea::layout::SHRINK, icedtea::iced::Length::Shrink);
+/// ```
+pub const FILL: Length = Length::Fill;
+/// Hug content on this axis.
+pub const SHRINK: Length = Length::Shrink;
+
+/// Fixed length in pixels.
+///
+/// ```
+/// assert_eq!(icedtea::layout::fixed(260.0), icedtea::iced::Length::Fixed(260.0));
+/// ```
+pub fn fixed(px: f32) -> Length {
+    Length::Fixed(px)
+}
+
+fn stretches(len: Length) -> bool {
+    matches!(len, Length::Fill | Length::FillPortion(_))
+}
+
 use super::breakpoint::Breakpoint;
 use super::size::{distribute, SizePolicy};
 use super::span::{cell_geometry, grid_extent, GridCell};
@@ -155,13 +178,20 @@ pub fn sidebar_mode(width: f32) -> &'static str {
 }
 
 /// Dock a header, optional side panes, center, and footer.
-pub fn dock<'a, M: 'a>(
-    header: Option<Element<'a, M>>,
-    footer: Option<Element<'a, M>>,
-    left: Option<Element<'a, M>>,
-    right: Option<Element<'a, M>>,
-    center: Element<'a, M>,
-) -> Element<'a, M> {
+///
+/// The outer column fills its parent so a [`Length::Fill`] center
+/// receives leftover height after header and footer.
+pub fn dock<'a, Message: 'a, Theme, Renderer>(
+    header: Option<iced::Element<'a, Message, Theme, Renderer>>,
+    footer: Option<iced::Element<'a, Message, Theme, Renderer>>,
+    left: Option<iced::Element<'a, Message, Theme, Renderer>>,
+    right: Option<iced::Element<'a, Message, Theme, Renderer>>,
+    center: iced::Element<'a, Message, Theme, Renderer>,
+) -> iced::Element<'a, Message, Theme, Renderer>
+where
+    Theme: 'a,
+    Renderer: iced::advanced::Renderer + 'a,
+{
     let mut mid = row![];
     if let Some(l) = left {
         mid = mid.push(l);
@@ -170,7 +200,7 @@ pub fn dock<'a, M: 'a>(
     if let Some(r) = right {
         mid = mid.push(r);
     }
-    let mid = mid.height(Length::Fill);
+    let mid = mid.width(Length::Fill).height(Length::Fill);
     let mut col = column![];
     if let Some(h) = header {
         col = col.push(h);
@@ -179,7 +209,7 @@ pub fn dock<'a, M: 'a>(
     if let Some(f) = footer {
         col = col.push(f);
     }
-    col.into()
+    col.width(Length::Fill).height(Length::Fill).into()
 }
 
 /// Center a child with optional dim overlay fill.
@@ -201,27 +231,61 @@ pub fn scroll_y<'a, M: 'a>(child: Element<'a, M>) -> Element<'a, M> {
 }
 
 /// Horizontal box. RTL reverses child order.
+///
+/// When `width` fills, children share the row. When `height` fills,
+/// each child stretches to the row height.
 pub fn row_box<'a, M: 'a>(
     children: impl IntoIterator<Item = Element<'a, M>>,
     spacing: u32,
     pad: u32,
+    width: Length,
+    height: Length,
     dir: Direction,
 ) -> Element<'a, M> {
     let kids = crate::i18n::order(dir, children);
-    row(kids)
+    // Equal-share columns only when the row is a filling pane, not a chrome strip.
+    let kids: Vec<Element<'a, M>> = if stretches(width) && stretches(height) {
+        kids.into_iter()
+            .map(|c| container(c).width(FILL).height(height).into())
+            .collect()
+    } else {
+        kids
+    };
+    let mut r = row(kids)
         .spacing(spacing)
         .padding(pad as f32)
-        .align_y(Alignment::Center)
-        .into()
+        .width(width)
+        .height(height);
+    if !stretches(height) {
+        r = r.align_y(Alignment::Center);
+    }
+    r.into()
 }
 
-/// Vertical box.
+/// Vertical box. Fill-height children take leftover space after shrink
+/// siblings (a caption above a filling editor).
 pub fn column_box<'a, M: 'a>(
     children: impl IntoIterator<Item = Element<'a, M>>,
     spacing: u32,
     pad: u32,
+    width: Length,
+    height: Length,
 ) -> Element<'a, M> {
-    column(children).spacing(spacing).padding(pad as f32).into()
+    column(children)
+        .spacing(spacing)
+        .padding(pad as f32)
+        .width(width)
+        .height(height)
+        .into()
+}
+
+/// Equal-fill tile pad: each cell shares the row width.
+pub fn pad<'a, M: 'a>(cells: Vec<Element<'a, M>>, columns: usize, spacing: u32) -> Element<'a, M> {
+    let filled: Vec<Element<'a, M>> = cells
+        .into_iter()
+        .map(|c| container(c).width(Length::Fill).into())
+        .collect();
+    grid(filled, columns, spacing)
 }
 
 /// Grid as wrapped rows of `columns` cells.
@@ -352,8 +416,8 @@ pub fn clamp<'a, M: 'a>(child: Element<'a, M>, max: f32) -> Element<'a, M> {
         .into()
 }
 
-/// Padding helper.
-pub fn pad(all: u32) -> Padding {
+/// Uniform padding.
+pub fn padding(all: u32) -> Padding {
     Padding::new(all as f32)
 }
 
@@ -390,8 +454,15 @@ mod tests {
         let st = SplitState::new(Axis::Horizontal, 0.4);
         let (a, sash, b) = split_sizes(st, 206.0);
         assert!((a + sash + b - 206.0).abs() < 0.01);
-        let _ = pad(8);
+        let _ = padding(8);
         let _ = DockSpec::default();
+        assert_eq!(FILL, Length::Fill);
+        assert_eq!(SHRINK, Length::Shrink);
+        assert_eq!(fixed(260.0), Length::Fixed(260.0));
+        assert!(stretches(FILL));
+        assert!(stretches(Length::FillPortion(1)));
+        assert!(!stretches(SHRINK));
+        assert!(!stretches(fixed(16.0)));
     }
 
     #[test]
@@ -407,12 +478,35 @@ mod tests {
         let _: Element<'_, ()> = dock(None, None, None, None, t().into());
         let _: Element<'_, ()> = overlay_center(t().into(), t().into());
         let _: Element<'_, ()> = scroll_y(t().into());
-        let _: Element<'_, ()> =
-            row_box([t().into(), t().into()], 8, 8, crate::i18n::Direction::Ltr);
-        let _: Element<'_, ()> =
-            row_box([t().into(), t().into()], 8, 8, crate::i18n::Direction::Rtl);
-        let _: Element<'_, ()> = column_box([t().into()], 8, 8);
+        let _: Element<'_, ()> = row_box(
+            [t().into(), t().into()],
+            8,
+            8,
+            FILL,
+            SHRINK,
+            crate::i18n::Direction::Ltr,
+        );
+        let _: Element<'_, ()> = row_box(
+            [t().into(), t().into()],
+            8,
+            8,
+            FILL,
+            FILL,
+            crate::i18n::Direction::Rtl,
+        );
+        let _: Element<'_, ()> = row_box(
+            [t().into()],
+            8,
+            8,
+            fixed(120.0),
+            SHRINK,
+            crate::i18n::Direction::Ltr,
+        );
+        let _: Element<'_, ()> = column_box([t().into()], 8, 8, FILL, FILL);
+        let _: Element<'_, ()> = column_box([t().into()], 8, 8, SHRINK, SHRINK);
         let _: Element<'_, ()> = grid(vec![t().into(), t().into(), t().into()], 2, 8);
+        let _: Element<'_, ()> = pad(vec![t().into(), t().into(), t().into(), t().into()], 4, 8);
+        let _: Element<'_, ()> = pad(vec![], 4, 8);
         let _: Element<'_, ()> = wrap(vec![t().into(), t().into(), t().into()], 40.0, 8.0, 100.0);
         let _: Element<'_, ()> = grid(vec![], 2, 8);
         let _: Element<'_, ()> = form([(t().into(), t().into())], 8, crate::i18n::Direction::Ltr);
@@ -444,5 +538,103 @@ mod tests {
         );
         let _: Element<'_, ()> = grid_spanned(vec![], 40.0, 20.0, 4.0);
         let _: Element<'_, ()> = clamp(t().into(), 480.0);
+    }
+
+    #[test]
+    fn dock_center_takes_leftover_height() {
+        use iced::advanced::layout::Limits;
+        use iced::advanced::widget::{Tree, Widget};
+        use iced::widget::{container, text, Space};
+        use iced::{Font, Pixels, Size, Theme};
+
+        type El<'a> = iced::Element<'a, (), Theme, iced_tiny_skia::Renderer>;
+        let header: El<'_> = text("H").into();
+        let footer: El<'_> = text("F").into();
+        let center: El<'_> = container(Space::new()).width(FILL).height(FILL).into();
+        let mut docked: El<'_> = dock(Some(header), Some(footer), None, None, center);
+        let mut tree = Tree::new(docked.as_widget());
+        let renderer = iced_tiny_skia::Renderer::new(Font::DEFAULT, Pixels::from(16u32));
+        let max = Size::new(400.0, 300.0);
+        let node = Widget::<(), Theme, iced_tiny_skia::Renderer>::layout(
+            docked.as_widget_mut(),
+            &mut tree,
+            &renderer,
+            &Limits::new(Size::ZERO, max),
+        );
+        assert!((node.size().width - 400.0).abs() < 0.5);
+        assert!((node.size().height - 300.0).abs() < 0.5);
+        let kids = node.children();
+        assert_eq!(kids.len(), 3);
+        let header_h = kids[0].size().height;
+        let mid_h = kids[1].size().height;
+        let footer_h = kids[2].size().height;
+        assert!(header_h > 0.0 && header_h < 80.0);
+        assert!(footer_h > 0.0 && footer_h < 80.0);
+        assert!((header_h + mid_h + footer_h - 300.0).abs() < 1.0);
+        assert!(mid_h > 200.0);
+
+        let header: El<'_> = text("H").into();
+        let footer: El<'_> = text("F").into();
+        let left: El<'_> = text("L").into();
+        let right: El<'_> = text("R").into();
+        let center: El<'_> = container(Space::new()).width(FILL).height(FILL).into();
+        let mut sided: El<'_> = dock(Some(header), Some(footer), Some(left), Some(right), center);
+        let mut tree = Tree::new(sided.as_widget());
+        let node = Widget::<(), Theme, iced_tiny_skia::Renderer>::layout(
+            sided.as_widget_mut(),
+            &mut tree,
+            &renderer,
+            &Limits::new(Size::ZERO, max),
+        );
+        assert!((node.size().height - 300.0).abs() < 0.5);
+        assert!(node.children()[1].children().len() >= 3);
+    }
+
+    #[test]
+    fn fill_editor_in_dock_takes_leftover_height() {
+        use iced::advanced::layout::Limits;
+        use iced::advanced::widget::{Tree, Widget};
+        use iced::widget::text_editor::Content;
+        use iced::widget::{column, container, text};
+        use iced::{Font, Pixels, Size, Theme};
+
+        type El<'a> = iced::Element<'a, (), Theme, iced_tiny_skia::Renderer>;
+        let content = Content::<iced_tiny_skia::Renderer>::with_text("# hi\n\nbody\n");
+        let editor: El<'_> = {
+            let e = iced::widget::text_editor(&content).height(FILL);
+            container(e).width(FILL).height(FILL).into()
+        };
+        let source: El<'_> = column![text("Source"), editor]
+            .spacing(4)
+            .padding(8)
+            .width(FILL)
+            .height(FILL)
+            .into();
+        let mut docked: El<'_> = dock(
+            Some(text("menu").into()),
+            Some(text("status").into()),
+            None,
+            None,
+            source,
+        );
+        let mut tree = Tree::new(docked.as_widget());
+        let renderer = iced_tiny_skia::Renderer::new(Font::DEFAULT, Pixels::from(16u32));
+        let max = Size::new(400.0, 300.0);
+        let node = Widget::<(), Theme, iced_tiny_skia::Renderer>::layout(
+            docked.as_widget_mut(),
+            &mut tree,
+            &renderer,
+            &Limits::new(Size::ZERO, max),
+        );
+        assert!((node.size().height - 300.0).abs() < 0.5);
+        let kids = node.children();
+        assert_eq!(kids.len(), 3);
+        let mid = &kids[1];
+        assert!(mid.size().height > 200.0);
+        let col_kids = mid.children();
+        assert!(!col_kids.is_empty());
+        let source_kids = col_kids[0].children();
+        assert!(source_kids.len() >= 2);
+        assert!(source_kids[1].size().height > 150.0);
     }
 }

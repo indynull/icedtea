@@ -75,17 +75,78 @@ pub fn listen() -> Subscription<KeyEvent> {
     iced::keyboard::listen()
 }
 
+/// What the user typed (`*` from Shift+8). `None` for chords and named keys.
+pub fn typed(event: &KeyEvent) -> Option<String> {
+    let KeyEvent::KeyPressed {
+        key,
+        modified_key,
+        modifiers,
+        text,
+        ..
+    } = event
+    else {
+        return None;
+    };
+    if modifiers.control() || modifiers.alt() || modifiers.logo() {
+        return None;
+    }
+    if let Some(t) = text {
+        if !t.is_empty() && !t.chars().all(char::is_control) {
+            return Some(t.to_string());
+        }
+    }
+    match modified_key {
+        iced::keyboard::Key::Character(c) if !c.is_empty() => Some(c.to_string()),
+        _ => match key {
+            iced::keyboard::Key::Character(c) if !c.is_empty() => Some(c.to_string()),
+            _ => None,
+        },
+    }
+}
+
+/// Named pad keys that are not characters (Enter, Escape, Backspace, Delete, F9).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Press {
+    Character(String),
+    Enter,
+    Escape,
+    Backspace,
+    Delete,
+    Function(u8),
+}
+
+/// Typed character or a named pad key. Control/alt/logo chords are `None`
+/// so [`handle`] can match the logical shortcut.
+pub fn press(event: &KeyEvent) -> Option<Press> {
+    let KeyEvent::KeyPressed { key, modifiers, .. } = event else {
+        return None;
+    };
+    if modifiers.control() || modifiers.alt() || modifiers.logo() {
+        return None;
+    }
+    match key {
+        iced::keyboard::Key::Named(iced::keyboard::key::Named::Enter) => Some(Press::Enter),
+        iced::keyboard::Key::Named(iced::keyboard::key::Named::Escape) => Some(Press::Escape),
+        iced::keyboard::Key::Named(iced::keyboard::key::Named::Backspace) => Some(Press::Backspace),
+        iced::keyboard::Key::Named(iced::keyboard::key::Named::Delete) => Some(Press::Delete),
+        iced::keyboard::Key::Named(iced::keyboard::key::Named::F9) => Some(Press::Function(9)),
+        _ => typed(event).map(Press::Character),
+    }
+}
+
 /// Resolve a key event against an action table using [`dispatch`] order.
 ///
-/// Focused text input swallows the event. Otherwise the first matching
-/// shortcut in `table` is invoked.
+/// Focused text still owns unmodified typing. Modifier chords
+/// (Ctrl/Cmd/Alt) match `table` so Save stays live while the caret is
+/// in an editor.
 pub fn handle<M: Clone>(ctx: KeyContext, table: &ActionTable<M>, event: &KeyEvent) -> Option<M> {
     let KeyEvent::KeyPressed { key, modifiers, .. } = event else {
         return None;
     };
+    let chord = modifiers.control() || modifiers.alt() || modifiers.logo();
     match ctx.capturing_layer()? {
-        KeyLayer::TextInput => None,
-        KeyLayer::Modal | KeyLayer::Window | KeyLayer::Application => {
+        KeyLayer::TextInput if !chord => None,
+        KeyLayer::TextInput | KeyLayer::Modal | KeyLayer::Window | KeyLayer::Application => {
             let sc = Shortcut {
                 modifiers: *modifiers,
                 key: key.clone(),
@@ -160,8 +221,10 @@ mod tests {
             text_input_focused: true,
             modal_open: false,
         };
-        assert_eq!(handle(focused, &table, &ev), None);
+        assert_eq!(handle(focused, &table, &ev), Some(1));
         assert_eq!(focused.capturing_layer(), Some(KeyLayer::TextInput));
+        let typing = press(Key::Character("s".into()), Modifiers::empty());
+        assert_eq!(handle(focused, &table, &typing), None);
         let idle = KeyContext::default();
         assert_eq!(handle(idle, &table, &ev), Some(1));
         let rel = KeyEvent::KeyReleased {
@@ -179,5 +242,145 @@ mod tests {
             modal_open: true,
         };
         assert_eq!(handle(modal, &table, &ev), Some(1));
+    }
+
+    fn typed_event(key: Key, modified: Key, modifiers: Modifiers, text: Option<&str>) -> KeyEvent {
+        KeyEvent::KeyPressed {
+            key,
+            modified_key: modified,
+            physical_key: iced::keyboard::key::Physical::Unidentified(
+                iced::keyboard::key::NativeCode::Unidentified,
+            ),
+            location: iced::keyboard::Location::Standard,
+            modifiers,
+            text: text.map(Into::into),
+            repeat: false,
+        }
+    }
+
+    #[test]
+    fn typed_reads_shift_eight_as_star_and_leaves_ctrl_to_handle() {
+        let star = typed_event(
+            Key::Character("8".into()),
+            Key::Character("*".into()),
+            Modifiers::SHIFT,
+            Some("*"),
+        );
+        assert_eq!(typed(&star).as_deref(), Some("*"));
+        assert_eq!(super::press(&star), Some(Press::Character("*".into())));
+        let eight = typed_event(
+            Key::Character("8".into()),
+            Key::Character("8".into()),
+            Modifiers::empty(),
+            Some("8"),
+        );
+        assert_eq!(typed(&eight).as_deref(), Some("8"));
+        assert_eq!(super::press(&eight), Some(Press::Character("8".into())));
+        let enter = press(
+            Key::Named(iced::keyboard::key::Named::Enter),
+            Modifiers::empty(),
+        );
+        assert_eq!(super::press(&enter), Some(Press::Enter));
+        let mut table = ActionTable::new();
+        table.insert(
+            Action::new("file.save", "Save", 1u8).with_shortcut(Shortcut::parse("ctrl+s").unwrap()),
+        );
+        let chord = press(Key::Character("s".into()), Modifiers::CTRL);
+        assert_eq!(typed(&chord), None);
+        assert_eq!(super::press(&chord), None);
+        assert_eq!(handle(KeyContext::default(), &table, &chord), Some(1));
+        let f9 = press(
+            Key::Named(iced::keyboard::key::Named::F9),
+            Modifiers::empty(),
+        );
+        assert_eq!(super::press(&f9), Some(Press::Function(9)));
+        let esc = press(
+            Key::Named(iced::keyboard::key::Named::Escape),
+            Modifiers::empty(),
+        );
+        assert_eq!(super::press(&esc), Some(Press::Escape));
+        let bs = press(
+            Key::Named(iced::keyboard::key::Named::Backspace),
+            Modifiers::empty(),
+        );
+        assert_eq!(super::press(&bs), Some(Press::Backspace));
+        let del = press(
+            Key::Named(iced::keyboard::key::Named::Delete),
+            Modifiers::empty(),
+        );
+        assert_eq!(super::press(&del), Some(Press::Delete));
+        let via_modified = typed_event(
+            Key::Character("8".into()),
+            Key::Character("*".into()),
+            Modifiers::SHIFT,
+            None,
+        );
+        assert_eq!(typed(&via_modified).as_deref(), Some("*"));
+        let via_key = typed_event(
+            Key::Character("+".into()),
+            Key::Named(iced::keyboard::key::Named::Enter),
+            Modifiers::empty(),
+            Some(""),
+        );
+        assert_eq!(typed(&via_key).as_deref(), Some("+"));
+        let released = KeyEvent::KeyReleased {
+            key: Key::Character("8".into()),
+            modified_key: Key::Character("8".into()),
+            physical_key: iced::keyboard::key::Physical::Unidentified(
+                iced::keyboard::key::NativeCode::Unidentified,
+            ),
+            location: iced::keyboard::Location::Standard,
+            modifiers: Modifiers::empty(),
+        };
+        assert_eq!(super::press(&released), None);
+        assert_eq!(
+            typed(&KeyEvent::KeyReleased {
+                key: Key::Character("8".into()),
+                modified_key: Key::Character("8".into()),
+                physical_key: iced::keyboard::key::Physical::Unidentified(
+                    iced::keyboard::key::NativeCode::Unidentified,
+                ),
+                location: iced::keyboard::Location::Standard,
+                modifiers: Modifiers::empty(),
+            }),
+            None
+        );
+    }
+
+    #[test]
+    fn press_named_keys_win_over_control_text() {
+        use iced::keyboard::key::Named;
+        let enter = typed_event(
+            Key::Named(Named::Enter),
+            Key::Named(Named::Enter),
+            Modifiers::empty(),
+            Some("\r"),
+        );
+        assert_eq!(typed(&enter), None);
+        assert_eq!(super::press(&enter), Some(Press::Enter));
+        let backspace = typed_event(
+            Key::Named(Named::Backspace),
+            Key::Named(Named::Backspace),
+            Modifiers::empty(),
+            Some("\u{8}"),
+        );
+        assert_eq!(typed(&backspace), None);
+        assert_eq!(super::press(&backspace), Some(Press::Backspace));
+        let escape = typed_event(
+            Key::Named(Named::Escape),
+            Key::Named(Named::Escape),
+            Modifiers::empty(),
+            Some("\u{1b}"),
+        );
+        assert_eq!(typed(&escape), None);
+        assert_eq!(super::press(&escape), Some(Press::Escape));
+        let delete = typed_event(
+            Key::Named(Named::Delete),
+            Key::Named(Named::Delete),
+            Modifiers::empty(),
+            Some("\u{7f}"),
+        );
+        assert_eq!(typed(&delete), None);
+        assert_eq!(super::press(&delete), Some(Press::Delete));
     }
 }

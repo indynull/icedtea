@@ -1,6 +1,6 @@
-//! Bootstrap: fonts, theme, locale, window settings for iced's application builder.
+//! Bootstrap: theme, locale, window settings for iced's application builder.
 
-use iced::{Font, Pixels, Settings};
+use iced::{Font, Pixels, Settings, Size};
 
 use crate::density::{Density, DensityName};
 use crate::i18n::{Catalog, Locale};
@@ -14,7 +14,7 @@ use crate::window::{self, WindowKind};
 /// let boot = icedtea::app::Boot::new("demo", "dev.icedtea.demo");
 /// let prep = icedtea::app::bootstrap(&boot);
 /// assert_eq!(prep.tokens.canvas, icedtea::theme::named("dark").tokens.canvas);
-/// assert!(!prep.iced_settings.fonts.is_empty());
+/// assert!(prep.iced_settings.fonts.is_empty());
 /// ```
 #[derive(Debug, Clone)]
 pub struct Boot {
@@ -24,6 +24,9 @@ pub struct Boot {
     pub theme_name: String,
     pub locale: Locale,
     pub density: DensityName,
+    pub size: Option<Size>,
+    pub min_size: Option<Size>,
+    pub max_size: Option<Size>,
 }
 
 impl Boot {
@@ -35,6 +38,9 @@ impl Boot {
             theme_name: "dark".into(),
             locale: Locale::default(),
             density: DensityName::Default,
+            size: None,
+            min_size: None,
+            max_size: None,
         }
     }
 
@@ -62,6 +68,24 @@ impl Boot {
         self.density = density;
         self
     }
+
+    /// Inner window size in pixels.
+    pub fn size(mut self, width: f32, height: f32) -> Self {
+        self.size = Some(Size::new(width, height));
+        self
+    }
+
+    /// Minimum inner window size in pixels.
+    pub fn min_size(mut self, width: f32, height: f32) -> Self {
+        self.min_size = Some(Size::new(width, height));
+        self
+    }
+
+    /// Maximum inner window size in pixels.
+    pub fn max_size(mut self, width: f32, height: f32) -> Self {
+        self.max_size = Some(Size::new(width, height));
+        self
+    }
 }
 
 /// Resolved boot data used by `run`.
@@ -78,7 +102,7 @@ pub struct Prepared {
     pub iced_theme: iced::Theme,
 }
 
-/// Load fonts, theme, and window settings. Does not open a window.
+/// Load theme and window settings. Does not open a window.
 pub fn bootstrap(boot: &Boot) -> Prepared {
     bootstrap_with_catalog(boot, &ThemeCatalog::new())
 }
@@ -92,7 +116,7 @@ pub fn bootstrap_with_catalog(boot: &Boot, themes: &ThemeCatalog) -> Prepared {
     let iced_theme = theme::iced_theme(&named.name, tokens);
     let iced_settings = Settings {
         id: Some(boot.application_id.clone()),
-        fonts: vec![std::borrow::Cow::Borrowed(typo::MONO_BYTES)],
+        fonts: vec![],
         default_font: typo::UI,
         default_text_size: Pixels(typo::BODY as f32),
         antialiasing: true,
@@ -106,7 +130,19 @@ pub fn bootstrap_with_catalog(boot: &Boot, themes: &ThemeCatalog) -> Prepared {
         locale: boot.locale.clone(),
         catalog: Catalog::for_locale(&boot.locale),
         iced_settings,
-        window: window::settings(boot.window, &boot.application_id),
+        window: {
+            let mut win = window::settings(boot.window, &boot.application_id);
+            if let Some(size) = boot.size {
+                win.size = size;
+            }
+            if let Some(min) = boot.min_size {
+                win.min_size = Some(min);
+            }
+            if let Some(max) = boot.max_size {
+                win.max_size = Some(max);
+            }
+            win
+        },
         iced_theme,
     }
 }
@@ -144,7 +180,7 @@ mod tests {
     use crate::i18n::Locale;
 
     #[test]
-    fn bootstrap_loads_fonts_and_window_kinds() {
+    fn bootstrap_loads_theme_and_window_kinds() {
         let mut boot = Boot::new("App", "dev.icedtea.app")
             .theme("nord")
             .density(DensityName::Compact);
@@ -155,7 +191,7 @@ mod tests {
         assert_eq!(prep.locale.direction, crate::i18n::Direction::Rtl);
         assert_eq!(prep.direction(), crate::i18n::Direction::Rtl);
         assert_eq!(prep.catalog.t("direction"), "rtl");
-        assert_eq!(prep.iced_settings.fonts.len(), 1);
+        assert!(prep.iced_settings.fonts.is_empty());
         assert_eq!(default_font(), typo::UI);
         let ov = bootstrap(&Boot::new("p", "dev.x").overlay());
         assert!(!ov.window.decorations);
@@ -167,6 +203,17 @@ mod tests {
         assert_eq!(prep.theme_name, "brand");
         let missing = bootstrap(&Boot::new("a", "dev.x").theme("nope"));
         assert_eq!(missing.theme_name, "dark");
+        let sized = bootstrap(
+            &Boot::new("tool", "dev.tool")
+                .size(380.0, 640.0)
+                .min_size(360.0, 560.0)
+                .max_size(420.0, 720.0),
+        );
+        assert_eq!(sized.window.size.width, 380.0);
+        assert_eq!(sized.window.size.height, 640.0);
+        assert_eq!(sized.window.min_size.unwrap().width, 360.0);
+        assert_eq!(sized.window.min_size.unwrap().height, 560.0);
+        assert_eq!(sized.window.max_size.unwrap().width, 420.0);
         let t = WindowTitle("demo".into());
         assert_eq!(
             <WindowTitle as iced::application::TitleFn<()>>::title(&t, &()),

@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "icedtea-gallery", "examples/consumer"]
+members = [".", "icedtea-gallery"]
 resolver = "2"
 
 [workspace.package]
@@ -46,7 +46,6 @@ thiserror = "2"
 
 [dev-dependencies]
 iced_tiny_skia = "0.14"
-serde_json = "1"
 
 [package.metadata.docs.rs]
 all-features = true

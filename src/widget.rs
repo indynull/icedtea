@@ -6,7 +6,7 @@ use iced::widget::markdown;
 use iced::widget::text_editor::Content;
 use iced::widget::{
     button, checkbox, column, container, mouse_area, pick_list, progress_bar, radio, row, rule,
-    scrollable, slider, svg, text, text_editor, text_input, toggler, tooltip, Space,
+    scrollable, slider, svg, text, text_editor, text_input, toggler, tooltip, Id, Space,
 };
 use iced::{Alignment, Element, Length, Padding};
 
@@ -57,6 +57,36 @@ pub fn label<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Elemen
     )
 }
 
+/// Large reading on the type scale, end-aligned (a tool's current value).
+pub fn display_reading<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
+    let s = a11y.apply_name(s);
+    a11y::attach(
+        text(s)
+            .size(typo::DISPLAY)
+            .color(tok.text)
+            .font(typo::UI_BOLD)
+            .width(Length::Fill)
+            .align_x(Alignment::End)
+            .into(),
+        &a11y,
+    )
+}
+
+/// Muted end-aligned line above a display reading.
+pub fn display_line<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
+    let s = a11y.apply_name(s);
+    a11y::attach(
+        text(s)
+            .size(typo::META)
+            .color(tok.muted)
+            .font(typo::UI)
+            .width(Length::Fill)
+            .align_x(Alignment::End)
+            .into(),
+        &a11y,
+    )
+}
+
 pub fn meta<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
     let s = a11y.apply_name(s);
     a11y::attach(text(s).size(typo::META).color(tok.muted).into(), &a11y)
@@ -96,25 +126,42 @@ pub fn themed_button<'a, M: Clone + 'a>(
     variant: Variant,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let label = a11y.apply_name(title);
-    let mut b = button(text(label).size(typo::BODY))
-        .padding(pad())
-        .style(style::button_style(tok, variant));
-    if let Some(m) = a11y.apply_message(msg) {
-        b = b.on_press(m);
-    }
-    a11y::attach(b.into(), &a11y)
+    themed_button_sized(
+        title,
+        msg,
+        tok,
+        variant,
+        Length::Shrink,
+        Length::Shrink,
+        a11y,
+    )
 }
 
-/// Button that applies [`A11y`] name and disabled to the iced constructor.
-pub fn themed_button_a11y<'a, M: Clone + 'a>(
+/// Themed button that fills a pad cell.
+pub fn themed_button_sized<'a, M: Clone + 'a>(
     title: impl Into<String>,
     msg: Option<M>,
     tok: Tokens,
     variant: Variant,
+    width: Length,
+    height: Length,
     a11y: A11y,
 ) -> Element<'a, M> {
-    themed_button(title, msg, tok, variant, a11y)
+    let label = a11y.apply_name(title);
+    let mut b = button(
+        text(label)
+            .size(typo::BODY)
+            .width(Length::Fill)
+            .align_x(Alignment::Center),
+    )
+    .padding(pad())
+    .width(width)
+    .height(height)
+    .style(style::button_style(tok, variant));
+    if let Some(m) = a11y.apply_message(msg) {
+        b = b.on_press(m);
+    }
+    a11y::attach(b.into(), &a11y)
 }
 
 pub fn split_button<'a, M: Clone + 'a>(
@@ -176,17 +223,6 @@ pub fn toggle_button<'a, M: Clone + 'a>(
 }
 
 pub fn themed_checkbox<'a, M: Clone + 'a>(
-    label_s: impl Into<String>,
-    checked: bool,
-    msg: impl Fn(bool) -> M + 'a,
-    tok: Tokens,
-    a11y: A11y,
-) -> Element<'a, M> {
-    themed_checkbox_a11y(label_s, checked, msg, tok, a11y)
-}
-
-/// Checkbox that applies [`A11y`] name, checked, and disabled.
-pub fn themed_checkbox_a11y<'a, M: Clone + 'a>(
     label_s: impl Into<String>,
     checked: bool,
     msg: impl Fn(bool) -> M + 'a,
@@ -317,20 +353,17 @@ pub fn spinner<'a, M: 'a>(tok: Tokens, phase: f32, a11y: A11y) -> Element<'a, M>
     )
 }
 
-/// 1×1 PNG used when an app has no bitmap yet.
-pub const PIXEL_PNG: &[u8] = &[
-    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
-    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
-    0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54, 0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00,
-    0x00, 0x03, 0x01, 0x01, 0x00, 0x18, 0xDD, 0x8D, 0xB0, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,
-    0x44, 0xAE, 0x42, 0x60, 0x82,
-];
-
-pub fn pixel_image<'a, M: 'a>(a11y: A11y) -> Element<'a, M> {
+/// Bitmap the application owns (`Handle::from_bytes` / path).
+pub fn image<'a, M: 'a>(
+    handle: iced::widget::image::Handle,
+    width: impl Into<Length>,
+    height: impl Into<Length>,
+    a11y: A11y,
+) -> Element<'a, M> {
     a11y::attach(
-        iced::widget::image(iced::widget::image::Handle::from_bytes(PIXEL_PNG))
-            .width(48.0)
-            .height(48.0)
+        iced::widget::image(handle)
+            .width(width)
+            .height(height)
             .into(),
         &a11y,
     )
@@ -392,35 +425,48 @@ pub fn password_input<'a, M: Clone + 'a>(
     a11y::attach(i.into(), &a11y)
 }
 
+/// Multiline editor. `height` is icedtea size language ([`crate::layout::FILL`]
+/// or [`crate::layout::fixed`]).
 pub fn textarea<'a, M: Clone + 'a>(
     content: &'a Content,
     on_action: impl Fn(text_editor::Action) -> M + 'a,
     tok: Tokens,
+    height: Length,
     a11y: A11y,
 ) -> Element<'a, M> {
     let mut e = text_editor(content)
-        .height(120)
+        .height(height)
         .padding(8)
         .style(editor_style(tok));
     if !a11y.disabled {
         e = e.on_action(on_action);
     }
-    a11y::attach(e.into(), &a11y)
+    // Id on this fill container. a11y::attach would wrap in Shrink and
+    // compress Length::Fill to the intrinsic editor height.
+    container(e)
+        .width(Length::Fill)
+        .height(height)
+        .style(move |_| editor_frame(tok))
+        .id(Id::from(a11y.node_id()))
+        .into()
 }
 
 /// Syntax-highlighted code. `syntax` is an iced highlighter token (`rs`, `py`, …).
 /// `theme_name` picks a highlighter face that fits the UI colorway.
+/// `height` is icedtea size language ([`crate::layout::FILL`] or
+/// [`crate::layout::fixed`]).
 pub fn highlighted_code<'a, M: Clone + 'a>(
     content: &'a Content,
     syntax: &str,
     on_action: impl Fn(text_editor::Action) -> M + 'a,
     tok: Tokens,
     theme_name: &str,
+    height: Length,
     a11y: A11y,
 ) -> Element<'a, M> {
     let theme = crate::theme::code_highlight(theme_name);
     let mut e = text_editor(content)
-        .height(280)
+        .height(height)
         .padding(8)
         .style(editor_style(tok))
         .highlight(syntax, theme)
@@ -428,7 +474,24 @@ pub fn highlighted_code<'a, M: Clone + 'a>(
     if !a11y.disabled {
         e = e.on_action(on_action);
     }
-    a11y::attach(e.into(), &a11y)
+    container(e)
+        .width(Length::Fill)
+        .height(height)
+        .style(move |_| editor_frame(tok))
+        .id(Id::from(a11y.node_id()))
+        .into()
+}
+
+fn editor_frame(tok: Tokens) -> iced::widget::container::Style {
+    iced::widget::container::Style {
+        background: Some(iced::Background::Color(tok.panel)),
+        border: iced::Border {
+            color: tok.border,
+            width: 1.0,
+            radius: crate::chrome::Corner::Tight.radius(),
+        },
+        ..iced::widget::container::Style::default()
+    }
 }
 
 pub fn editor_style(
@@ -469,16 +532,6 @@ pub fn search_input<'a, M: Clone + 'a>(
         .into(),
         &a11y,
     )
-}
-
-pub fn suggest_list<'a>(query: &str, corpus: &'a [String], limit: usize) -> Vec<&'a str> {
-    let q = query.to_ascii_lowercase();
-    corpus
-        .iter()
-        .filter(|s| s.to_ascii_lowercase().contains(&q) || q.is_empty())
-        .take(limit.max(1))
-        .map(String::as_str)
-        .collect()
 }
 
 pub fn themed_pick_list<'a, T, M: Clone + 'a>(
@@ -1046,32 +1099,50 @@ pub fn data_table<'a, M: Clone + 'a>(
     )
 }
 
+/// Heading or file tree. The disclosure control emits `on_toggle`; the
+/// row label emits `on_select`. `selected` is the app-owned id.
 pub fn tree_view<'a, M: Clone + 'a>(
     root: &TreeNode,
+    selected: Option<u64>,
     on_toggle: impl Fn(u64) -> M + Copy + 'a,
+    on_select: impl Fn(u64) -> M + Copy + 'a,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
     let mut col = column![].spacing(2);
     for (depth, id, label_s, expanded, has_children) in root.flatten() {
-        let prefix = if has_children {
-            if expanded {
-                "▾ "
-            } else {
-                "▸ "
-            }
+        let is_sel = selected == Some(id);
+        let mut line = row![].spacing(4).align_y(Alignment::Center);
+        line = line.push(Space::new().width(Length::Fixed(depth as f32 * 16.0)));
+        if has_children {
+            let mark = if expanded { "▾" } else { "▸" };
+            line = line.push(themed_button(
+                mark,
+                Some(on_toggle(id)),
+                tok,
+                Variant::Ghost,
+                A11y::button(format!("toggle {label_s}")).with_checked(expanded),
+            ));
         } else {
-            "  "
-        };
-        let indent = "  ".repeat(depth as usize);
-        let title = format!("{indent}{prefix}{label_s}");
-        col = col.push(themed_button(
-            title.clone(),
-            Some(on_toggle(id)),
+            line = line.push(Space::new().width(28.0));
+        }
+        let title = container(label(
+            label_s.clone(),
             tok,
-            Variant::Ghost,
-            A11y::new(title, Role::Tree).with_checked(expanded),
+            A11y::new(label_s.clone(), Role::Tree).with_checked(is_sel),
+        ))
+        .width(Length::Fill)
+        .padding([6, 8]);
+        let title: Element<'a, M> = if is_sel {
+            title.style(move |_| style::list_row(tok, true)).into()
+        } else {
+            title.into()
+        };
+        line = line.push(a11y::attach(
+            mouse_area(title).on_press(on_select(id)).into(),
+            &A11y::new(label_s, Role::Tree).with_checked(is_sel),
         ));
+        col = col.push(line);
     }
     a11y::attach(
         themed_scroll(col.into(), tok, A11y::new("tree-scroll", Role::Group)),
@@ -1170,19 +1241,20 @@ pub fn pagination<'a, M: Clone + 'a>(
     )
 }
 
-pub fn a11y_button(name: &str, disabled: bool) -> A11y {
-    A11y::button(name).with_disabled(disabled)
-}
-
-pub fn a11y_checkbox(name: &str, checked: bool) -> A11y {
-    A11y::new(name, Role::Checkbox).with_checked(checked)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::collection::{Selection as Sel, VecList};
+    use crate::density::Density;
     use crate::theme::named;
+
+    const TEST_PNG: &[u8] = &[
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
+        0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00, 0x00, 0x90,
+        0x77, 0x53, 0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54, 0x08, 0xD7, 0x63, 0xF8,
+        0xCF, 0xC0, 0x00, 0x00, 0x03, 0x01, 0x01, 0x00, 0x18, 0xDD, 0x8D, 0xB0, 0x00, 0x00, 0x00,
+        0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+    ];
 
     #[test]
     fn date_time_step_and_suggest() {
@@ -1209,11 +1281,11 @@ mod tests {
         assert_eq!(t.minute, 59);
         assert_eq!(step_number(5.0, 1.0, 0.0, 10.0, 1), 6.0);
         assert_eq!(step_number(0.0, 1.0, 0.0, 10.0, -1), 0.0);
-        let corpus = vec!["Apple".into(), "Apricot".into(), "Banana".into()];
-        assert_eq!(suggest_list("ap", &corpus, 10).len(), 2);
-        assert_eq!(suggest_list("", &corpus, 1).len(), 1);
-        let _ = a11y_button("x", true);
-        let _ = a11y_checkbox("y", false);
+        assert!(A11y::button("x").with_disabled(true).disabled);
+        assert_eq!(
+            A11y::new("y", Role::Checkbox).with_checked(false).checked,
+            Some(false)
+        );
     }
 
     #[test]
@@ -1227,6 +1299,27 @@ mod tests {
         let _: Element<'_, ()> = code_block("fn", tok, role("fn", Role::Group));
         let _: Element<'_, ()> = hyperlink("l", (), tok, role("l", Role::Link));
         let _: Element<'_, ()> = themed_button("B", Some(()), tok, Variant::Primary, btn("B"));
+        let _: Element<'_, ()> = themed_button_sized(
+            "7",
+            Some(()),
+            tok,
+            Variant::Quiet,
+            Length::Fill,
+            Length::Fixed(Density::default().tile() as f32),
+            btn("7"),
+        );
+        let _: Element<'_, ()> = display_reading("24", tok, role("24", Role::Status));
+        let _: Element<'_, ()> = display_line("6 × 4 =", tok, role("expr", Role::Status));
+        let glyph = A11y::button("Backspace");
+        let _: Element<'_, ()> = themed_button_sized(
+            "⌫",
+            Some(()),
+            tok,
+            Variant::Quiet,
+            Length::Fill,
+            Length::Fixed(48.0),
+            glyph,
+        );
         let _: Element<'_, ()> = themed_button(
             "D",
             None,
@@ -1278,7 +1371,12 @@ mod tests {
         let _: Element<'_, ()> = progress(0.2, tok, role("p", Role::Progress).with_value("0.2"));
         let _: Element<'_, ()> =
             progress_ring(0.4, tok, role("pr", Role::Progress).with_value("0.4"));
-        let _: Element<'_, ()> = pixel_image(role("px", Role::Image));
+        let _: Element<'_, ()> = image(
+            iced::widget::image::Handle::from_bytes(TEST_PNG),
+            48.0,
+            48.0,
+            role("px", Role::Image),
+        );
         let _: Element<'_, ()> = spinner(tok, 0.25, role("spin", Role::Progress));
         assert!(ring_angles(1.0).1 > ring_angles(0.2).1);
         assert!(
@@ -1288,16 +1386,15 @@ mod tests {
         assert!(ring_should_stroke(0.0, 1.0));
         assert!(!ring_should_stroke(0.0, 0.0));
         let a11y = A11y::button("Nope").with_disabled(true);
-        let _: Element<'_, ()> = themed_button_a11y("Nope", Some(()), tok, Variant::Primary, a11y);
+        let _: Element<'_, ()> = themed_button("Nope", Some(()), tok, Variant::Primary, a11y);
         let unnamed = A11y::button("");
-        let _: Element<'_, ()> =
-            themed_button_a11y("Shown", Some(()), tok, Variant::Primary, unnamed);
+        let _: Element<'_, ()> = themed_button("Shown", Some(()), tok, Variant::Primary, unnamed);
         let unnamed_c = A11y::new("", Role::Checkbox);
-        let _: Element<'_, ()> = themed_checkbox_a11y("box", true, |_| (), tok, unnamed_c);
+        let _: Element<'_, ()> = themed_checkbox("box", true, |_| (), tok, unnamed_c);
         let ca = A11y::new("off", Role::Checkbox)
             .with_checked(true)
             .with_disabled(true);
-        let _: Element<'_, ()> = themed_checkbox_a11y("off", false, |_| (), tok, ca);
+        let _: Element<'_, ()> = themed_checkbox("off", false, |_| (), tok, ca);
         let _: Element<'_, ()> = number_input(
             3.0,
             |_| (),
@@ -1314,7 +1411,20 @@ mod tests {
         );
         let _: Element<'_, ()> = password_input("p", "v", |_| (), tok, role("pw2", Role::TextBox));
         let content = Content::new();
-        let _: Element<'_, ()> = textarea(&content, |_| (), tok, role("ta", Role::TextBox));
+        let _: Element<'_, ()> = textarea(
+            &content,
+            |_| (),
+            tok,
+            crate::layout::FILL,
+            role("ta", Role::TextBox),
+        );
+        let _: Element<'_, ()> = textarea(
+            &content,
+            |_| (),
+            tok,
+            crate::layout::fixed(120.0),
+            role("ta", Role::TextBox),
+        );
         let _: Element<'_, ()> = search_input("q", |_| (), tok, role("q", Role::TextBox));
         let opts = ["a".to_string(), "b".to_string()];
         let _: Element<'_, ()> = themed_pick_list(
@@ -1346,16 +1456,14 @@ mod tests {
         let items = markdown::parse("# Hi");
         let items: Vec<_> = items.collect();
         let _: Element<'_, ()> = markdown_view(&items, tok, |_| (), role("md", Role::Group));
-        let full: Vec<_> = markdown::parse(crate::samples::MARKDOWN).collect();
-        let _: Element<'_, ()> = markdown_view(&full, tok, |_| (), role("md", Role::Group));
-        let rust = crate::samples::CodeLang::named("Rust").unwrap();
-        let code = Content::with_text(rust.source);
+        let code = Content::with_text("fn main() {}\n");
         let _: Element<'_, ()> = highlighted_code(
             &code,
-            rust.syntax,
+            "rs",
             |_| (),
             tok,
             "dark",
+            crate::layout::FILL,
             role("code", Role::Group),
         );
         let light = named("light").tokens;
@@ -1365,15 +1473,17 @@ mod tests {
             |_| (),
             light,
             "solarized-light",
+            crate::layout::fixed(280.0),
             role("code", Role::Group),
         );
         let mocha = named("catppuccin-mocha").tokens;
         let _: Element<'_, ()> = highlighted_code(
             &code,
-            rust.syntax,
+            "rs",
             |_| (),
             mocha,
             "catppuccin-mocha",
+            crate::layout::FILL,
             role("code", Role::Group),
         );
         let _: Element<'_, ()> = tooltip_wrap(
@@ -1485,7 +1595,14 @@ mod tests {
             role("table", Role::Table),
         );
         let tree = TreeNode::branch(1, "r", vec![TreeNode::leaf(2, "c")]);
-        let _: Element<'_, ()> = tree_view(&tree, |_| (), tok, role("tree", Role::Tree));
+        let _: Element<'_, ()> = tree_view(
+            &tree,
+            Some(2),
+            |_| (),
+            |_| (),
+            tok,
+            role("tree", Role::Tree),
+        );
         let mut tabs = Tabs::new(["A", "B"]);
         tabs.closable = true;
         let _: Element<'_, ()> = tab_bar(&tabs, |_| (), |_| (), tok, role("tabs", Role::Tab));
@@ -1512,14 +1629,110 @@ mod tests {
             iced::widget::text_editor::Status::Focused { is_hovered: true },
         );
         let _ = editor_style(tok)(&theme, iced::widget::text_editor::Status::Disabled);
+        let _ = editor_frame(tok);
         let collapsed = TreeNode::branch(1, "r", vec![TreeNode::leaf(2, "c")]);
         let mut collapsed = collapsed;
         assert!(crate::collection::tree_toggle(&mut collapsed, 1));
-        let _: Element<'_, ()> = tree_view(&collapsed, |_| (), tok, role("tree", Role::Tree));
+        assert!(!collapsed.expanded);
+        let selected = Some(1u64);
+        assert_eq!(selected, Some(1));
+        let _: Element<'_, ()> = tree_view(
+            &collapsed,
+            selected,
+            |_| (),
+            |_| (),
+            tok,
+            role("tree", Role::Tree),
+        );
+        let src = include_str!("widget.rs");
+        let product = src.split("#[cfg(test)]").next().unwrap();
+        assert!(!product.contains(".height(120)"));
+        assert!(!product.contains(".height(280)"));
+        assert!(product.contains(".id(Id::from(a11y.node_id()))"));
         assert!(btn("Save")
             .with_value("idle")
             .with_disabled(true)
             .node_id()
             .contains("button|Save|idle|1|"));
+    }
+
+    #[test]
+    fn tree_toggle_expands_and_select_is_a_distinct_id() {
+        let mut tree = TreeNode::branch(
+            1,
+            "root",
+            vec![TreeNode::leaf(2, "child"), TreeNode::leaf(3, "other")],
+        );
+        assert_eq!(tree.children[0].label, "child");
+        assert_eq!(tree.children[1].label, "other");
+        assert!(crate::collection::tree_toggle(&mut tree, 1));
+        assert!(!tree.expanded);
+        let visible: Vec<u64> = tree
+            .flatten()
+            .into_iter()
+            .map(|(_, id, _, _, _)| id)
+            .collect();
+        assert_eq!(visible, vec![1]);
+        assert!(crate::collection::tree_toggle(&mut tree, 1));
+        assert!(tree.expanded);
+        let child = tree.children[0].id;
+        let other = tree.children[1].id;
+        assert_ne!(child, other);
+        let selected = Some(other);
+        assert_eq!(selected, Some(3));
+        assert!(tree.expanded);
+        let tok = named("dark").tokens;
+        let _: Element<'_, u64> = tree_view(
+            &tree,
+            selected,
+            |id| id,
+            |id| id,
+            tok,
+            A11y::new("tree", Role::Tree),
+        );
+        let _: Element<'_, u64> = tree_view(
+            &tree,
+            None,
+            |id| id,
+            |id| id,
+            tok,
+            A11y::new("tree", Role::Tree),
+        );
+    }
+
+    #[test]
+    fn fill_editors_publish_fill_size() {
+        let content = Content::with_text("# hi\n");
+        let tok = named("dark").tokens;
+        let code = highlighted_code(
+            &content,
+            "md",
+            |_| (),
+            tok,
+            "dark",
+            crate::layout::FILL,
+            A11y::new("source", Role::TextBox),
+        );
+        let size = code.as_widget().size();
+        assert_eq!(size.width, Length::Fill);
+        assert_eq!(size.height, Length::Fill);
+        let area = textarea(
+            &content,
+            |_| (),
+            tok,
+            crate::layout::FILL,
+            A11y::new("body", Role::TextBox),
+        );
+        let size = area.as_widget().size();
+        assert_eq!(size.width, Length::Fill);
+        assert_eq!(size.height, Length::Fill);
+        let fixed = textarea(
+            &content,
+            |_| (),
+            tok,
+            crate::layout::fixed(120.0),
+            A11y::new("body", Role::TextBox),
+        );
+        assert_eq!(fixed.as_widget().size().height, Length::Fixed(120.0));
     }
 }

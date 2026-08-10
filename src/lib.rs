@@ -1,6 +1,6 @@
 //! Reusable widgets and chrome for [iced](https://iced.rs/) applications.
 //!
-//! [`run!`] boots fonts and theme and starts the window. Constructors
+//! [`run!`] boots theme and starts the window. Constructors
 //! return [`Element`]s and emit the application's messages.
 //!
 //! ```
@@ -33,13 +33,11 @@ pub mod nav;
 pub mod palette;
 pub mod pattern;
 pub mod persist;
-pub mod samples;
 pub mod shortcut;
 pub mod style;
 pub mod theme;
 pub mod toast;
 pub mod typo;
-pub mod undo;
 pub mod variant;
 pub mod widget;
 pub mod window;
@@ -48,7 +46,7 @@ pub use app::{bootstrap, Boot, Prepared};
 pub use host::{copy_text, native_dialog, paste_text};
 pub use iced::{self, Element, Task};
 
-/// Boot fonts, theme, and window settings, then start iced's application builder.
+/// Boot theme and window settings, then start iced's application builder.
 ///
 /// ```ignore
 /// icedtea::run!(
@@ -81,7 +79,6 @@ macro_rules! run {
             .settings(__prep.iced_settings)
             .window(__prep.window)
             .default_font($crate::typo::UI)
-            .font($crate::typo::MONO_BYTES)
             .run()
     }};
 }
@@ -117,6 +114,6 @@ mod tests {
         assert!(src.contains("$crate::iced::application($new, $update, $view)"));
         let prep = bootstrap(&Boot::new("tea", "dev.icedtea.tea"));
         assert!(!prep.title.is_empty());
-        assert!(!prep.iced_settings.fonts.is_empty());
+        assert!(prep.iced_settings.fonts.is_empty());
     }
 }

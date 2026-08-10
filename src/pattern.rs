@@ -328,22 +328,32 @@ pub fn preferences_page<'a, M: Clone + 'a>(
     .into()
 }
 
-/// List + detail split.
+/// List + detail split. `sidebar` is icedtea size language
+/// ([`crate::layout::fixed`] or [`crate::layout::FILL`]). Children fill
+/// their panes.
 pub fn list_detail<'a, M: 'a>(
     list: Element<'a, M>,
     detail: Element<'a, M>,
+    sidebar: Length,
     tok: Tokens,
 ) -> Element<'a, M> {
     row![
         container(list)
-            .width(Length::Fixed(260.0))
+            .width(sidebar)
             .height(Length::Fill)
             .style(move |_| style::panel(tok)),
         container(detail)
             .width(Length::Fill)
             .height(Length::Fill)
-            .padding(16),
+            .padding(iced::Padding {
+                top: 8.0,
+                right: 16.0,
+                bottom: 0.0,
+                left: 16.0,
+            }),
     ]
+    .width(Length::Fill)
+    .height(Length::Fill)
     .into()
 }
 
@@ -358,7 +368,7 @@ pub fn navigation_view<'a, M: Clone + 'a>(
     cat: &Catalog,
 ) -> Element<'a, M> {
     if crate::layout::Breakpoint::from_width(width).sidebar_beside() {
-        list_detail(sidebar, content, tok)
+        list_detail(sidebar, content, crate::layout::fixed(260.0), tok)
     } else {
         let top = if nav.can_back() {
             themed_button(
@@ -560,7 +570,8 @@ mod tests {
         let _: Element<'_, ()> = preferences_page(&prefs, "", |_| (), tok, &cat);
         let _: Element<'_, ()> = preferences_page(&prefs, "nope", |_| (), tok, &cat);
         let lab = |s: &str| crate::widget::label::<()>(s, tok, A11y::new(s, Role::Header));
-        let _: Element<'_, ()> = list_detail(lab("l"), lab("d"), tok);
+        let _: Element<'_, ()> = list_detail(lab("l"), lab("d"), crate::layout::fixed(260.0), tok);
+        let _: Element<'_, ()> = list_detail(lab("l"), lab("d"), crate::layout::FILL, tok);
         let nav = NavStack::new("home");
         let mut deep = nav.clone();
         deep.push("x");

@@ -1,5 +1,7 @@
 //! Living catalog: one page per `icedtea::catalog` entry.
 
+mod samples;
+
 use icedtea::a11y::{A11y, Role};
 use icedtea::action::{Action, ActionTable};
 use icedtea::catalog::{self, Entry};
@@ -12,10 +14,9 @@ use icedtea::iced::widget::{button, column, container, row, text, Space};
 use icedtea::iced::{Alignment, Length, Padding, Subscription, Theme};
 use icedtea::key::KeyContext;
 use icedtea::layout;
-use icedtea::layout::{SashDrag, SashEvent, SplitState};
+
 use icedtea::nav::NavStack;
 use icedtea::pattern::{self, PrefGroup};
-use icedtea::samples::{self, CodeLang};
 use icedtea::shortcut::Shortcut;
 use icedtea::theme::{self, Tokens};
 use icedtea::toast::{ToastKind, ToastQueue};
@@ -23,6 +24,7 @@ use icedtea::variant::Variant;
 use icedtea::widget;
 use icedtea::widget::{DateValue, TimeValue};
 use icedtea::{Boot, Element, Task};
+use samples::CodeLang;
 
 fn btn(name: &str) -> A11y {
     A11y::button(name)
@@ -91,10 +93,9 @@ enum Message {
     Page(usize),
     Sort(usize),
     Tree(u64),
+    TreeSelect(u64),
     ListScroll(f32),
     TableScroll(f32),
-    Sash(SashEvent),
-    SashPointer(icedtea::layout::PointerDrive),
     Key(icedtea::iced::keyboard::Event),
     Drop(icedtea::dnd::DragPayload),
     CatalogQuery(String),
@@ -127,6 +128,7 @@ struct Gallery {
     page_i: usize,
     table: TableModel,
     tree: TreeNode,
+    tree_sel: Option<u64>,
     list: VecList,
     sel: Selection,
     actions: ActionTable<Message>,
@@ -136,8 +138,6 @@ struct Gallery {
     md: Vec<markdown::Item>,
     list_scroll: f32,
     table_scroll: f32,
-    split: SplitState,
-    sash: SashDrag,
     direction: Direction,
     catalog_query: String,
     code_lang: String,
@@ -202,6 +202,7 @@ impl Gallery {
                         TreeNode::branch(3, "book", vec![TreeNode::leaf(4, "install")]),
                     ],
                 ),
+                tree_sel: None,
                 list: VecList {
                     items: (0..80).map(|i| format!("Item {i}")).collect(),
                 },
@@ -219,8 +220,6 @@ impl Gallery {
                 list_scroll: 0.0,
                 table_scroll: 0.0,
                 direction,
-                split: SplitState::new(icedtea::layout::Axis::Horizontal, 0.35),
-                sash: SashDrag::default(),
                 catalog_query: String::new(),
                 code_lang: "Rust".into(),
                 code_editor: Content::with_text(CodeLang::named("Rust").unwrap().source),
@@ -267,15 +266,9 @@ impl Gallery {
             Message::Tree(id) => {
                 let _ = icedtea::collection::tree_toggle(&mut self.tree, id);
             }
+            Message::TreeSelect(id) => self.tree_sel = Some(id),
             Message::ListScroll(y) => self.list_scroll = y,
             Message::TableScroll(y) => self.table_scroll = y,
-            Message::Sash(ev) => {
-                let _ = self.sash.apply(&mut self.split, ev, 400.0);
-            }
-            Message::SashPointer(drive) => {
-                let ev = drive.into_event(self.split.axis);
-                let _ = self.sash.apply(&mut self.split, ev, 400.0);
-            }
             Message::Key(ev) => {
                 let ctx = KeyContext {
                     text_input_focused: !self.query.is_empty() && self.page == "search",
@@ -329,7 +322,6 @@ impl Gallery {
         Subscription::batch([
             icedtea::key::listen().map(Message::Key),
             icedtea::dnd::listen_files().map(Message::Drop),
-            layout::listen_sash().map(Message::SashPointer),
         ])
     }
 
@@ -393,14 +385,15 @@ impl Gallery {
             hairline(tok),
         ]
         .height(Length::Fill);
-        let body = widget::themed_scroll(
-            container(self.page_view())
-                .padding(24)
-                .width(Length::Fill)
-                .into(),
-            tok,
-            named("page", Role::Group),
-        );
+        let page = container(self.page_view())
+            .padding(24)
+            .width(Length::Fill)
+            .height(Length::Fill);
+        let body = if matches!(self.page, "textarea" | "code" | "tree" | "list-detail") {
+            page.into()
+        } else {
+            widget::themed_scroll(page.into(), tok, named("page", Role::Group))
+        };
         let themes = container(
             row![
                 widget::meta("Theme", tok, named("theme", Role::Status)),
@@ -698,6 +691,7 @@ impl Gallery {
                 &self.editor,
                 |_| Message::Nop,
                 tok,
+                layout::FILL,
                 named("body", Role::TextBox),
             ),
             "search" => widget::search_input(
@@ -742,6 +736,17 @@ impl Gallery {
             ]
             .spacing(8)
             .into(),
+            "display" => column![
+                widget::meta(
+                    "Display reading and expression line on the type scale.",
+                    tok,
+                    named("display-hint", Role::Status),
+                ),
+                widget::display_line("6 × 4 =", tok, named("expr", Role::Status)),
+                widget::display_reading("24", tok, named("value", Role::Status)),
+            ]
+            .spacing(8)
+            .into(),
             "markdown" => widget::themed_scroll(
                 widget::markdown_view(&self.md, tok, |_| Message::Nop, named("md", Role::Group)),
                 tok,
@@ -772,6 +777,7 @@ impl Gallery {
                         Message::CodeEdit,
                         tok,
                         &self.theme,
+                        layout::FILL,
                         named(lang.name, Role::Group),
                     ),
                 ]
@@ -864,7 +870,12 @@ impl Gallery {
                 .spacing(12)
                 .into()
             }
-            "image" => widget::pixel_image(named("pixel", Role::Image)),
+            "image" => widget::image(
+                icedtea::iced::widget::image::Handle::from_bytes(samples::PIXEL_PNG),
+                48.0,
+                48.0,
+                named("pixel", Role::Image),
+            ),
             "tooltip" => widget::tooltip_wrap(
                 widget::label("Hover", tok, named("Hover", Role::Header)),
                 "Tip",
@@ -924,7 +935,25 @@ impl Gallery {
                 tok,
                 named("table", Role::Table),
             ),
-            "tree" => widget::tree_view(&self.tree, Message::Tree, tok, named("tree", Role::Tree)),
+            "tree" => {
+                let picked = self
+                    .tree_sel
+                    .map(|id| format!("Selected id {id}"))
+                    .unwrap_or_else(|| "Select a row; the chevron expands.".into());
+                column![
+                    widget::meta(picked, tok, named("tree-sel", Role::Status)),
+                    widget::tree_view(
+                        &self.tree,
+                        self.tree_sel,
+                        Message::Tree,
+                        Message::TreeSelect,
+                        tok,
+                        named("tree", Role::Tree),
+                    ),
+                ]
+                .spacing(8)
+                .into()
+            }
             "tabs" => widget::tab_bar(
                 &self.tabs,
                 Message::Tab,
@@ -1024,6 +1053,42 @@ impl Gallery {
                 .map(|t| widget::chip(t, Message::Nop, tok, btn(t)))
                 .collect();
                 layout::wrap(chips, 120.0, 8.0, 480.0)
+            }
+            "pad" => {
+                let h = Length::Fixed(icedtea::density::Density::default().tile() as f32);
+                let tile = |title: &str, v: Variant| {
+                    widget::themed_button_sized(
+                        title,
+                        Some(Message::Nop),
+                        tok,
+                        v,
+                        Length::Fill,
+                        h,
+                        btn(title),
+                    )
+                };
+                layout::pad(
+                    vec![
+                        tile("7", Variant::Quiet),
+                        tile("8", Variant::Quiet),
+                        tile("9", Variant::Quiet),
+                        tile("×", Variant::Chip),
+                        tile("4", Variant::Quiet),
+                        tile("5", Variant::Quiet),
+                        tile("6", Variant::Quiet),
+                        tile("−", Variant::Chip),
+                        tile("1", Variant::Quiet),
+                        tile("2", Variant::Quiet),
+                        tile("3", Variant::Quiet),
+                        tile("+", Variant::Chip),
+                        tile("±", Variant::Quiet),
+                        tile("0", Variant::Quiet),
+                        tile(".", Variant::Quiet),
+                        tile("=", Variant::Primary),
+                    ],
+                    4,
+                    8,
+                )
             }
             "command-bar" => pattern::command_bar(self.actions.iter(), tok, self.direction),
             "context-menu" => pattern::context_menu(self.actions.iter(), tok),
@@ -1184,7 +1249,7 @@ impl Gallery {
             ]
             .spacing(12)
             .into(),
-            "list-detail" => layout::split_view(
+            "list-detail" => pattern::list_detail(
                 widget::list_view(
                     &self.list,
                     &self.sel,
@@ -1199,17 +1264,15 @@ impl Gallery {
                 column![
                     widget::label("Detail", tok, named("Detail", Role::Header)),
                     widget::meta(
-                        "Select a row in the list. The sash between panes is draggable.",
+                        "Select a row. The sidebar width is layout::fixed(260).",
                         tok,
                         named("detail-body", Role::Status),
                     ),
                 ]
                 .spacing(8)
-                .padding(12)
                 .into(),
-                self.split,
-                520.0,
-                Message::Sash,
+                layout::fixed(260.0),
+                tok,
             ),
             "navigation" => pattern::navigation_view(
                 widget::label("Sidebar", tok, named("Sidebar", Role::Header)),
@@ -1298,6 +1361,7 @@ fn handled_ids() -> &'static [&'static str] {
         "time",
         "color",
         "label",
+        "display",
         "markdown",
         "code",
         "icon",
@@ -1317,6 +1381,7 @@ fn handled_ids() -> &'static [&'static str] {
         "chip",
         "badge",
         "wrap",
+        "pad",
         "callout",
         "banner",
         "group-box",

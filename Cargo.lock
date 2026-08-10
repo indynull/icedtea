@@ -1756,17 +1756,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "icedtea-consumer"
-version = "0.1.0"
-dependencies = [
- "icedtea",
-]
-
-[[package]]
 name = "icedtea-gallery"
 version = "0.1.0"
 dependencies = [
- "iced",
  "icedtea",
 ]
 

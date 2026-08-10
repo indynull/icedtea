@@ -219,8 +219,8 @@ mod tests {
         assert_eq!(dlg.pick_color(9, 8, 7), DialogResult::Color(9, 8, 7));
         let mut dlg = InAppDialog::open(DialogSpec::font("x"));
         assert_eq!(
-            dlg.pick_font("JetBrains Mono"),
-            DialogResult::Font("JetBrains Mono".into())
+            dlg.pick_font("Example Mono"),
+            DialogResult::Font("Example Mono".into())
         );
         let _ = DialogResult::Cancel;
         let _ = DialogResult::Path(PathBuf::from("/"));
