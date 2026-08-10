@@ -32,6 +32,11 @@ impl Corner {
     }
 }
 
+/// Minimum scrollbar handle on the 4px grid. Iced's scroller floors at 2px.
+pub const SCROLL_HANDLE_MIN: f32 = 24.0;
+/// Rail and handle width.
+pub const SCROLL_RAIL_WIDTH: f32 = 12.0;
+
 /// Shadow / lift.
 ///
 /// ```
@@ -70,5 +75,7 @@ mod tests {
         assert_eq!(Corner::Tight.radius().top_left, 4.0);
         assert_eq!(Elevation::default().shadow().blur_radius, 0.0);
         assert!(Elevation::Raised.shadow().blur_radius > 0.0);
+        assert_eq!(SCROLL_HANDLE_MIN, 24.0);
+        assert_eq!(SCROLL_RAIL_WIDTH, 12.0);
     }
 }

@@ -33,6 +33,7 @@ pub mod nav;
 pub mod palette;
 pub mod pattern;
 pub mod persist;
+mod scroll;
 pub mod shortcut;
 pub mod style;
 pub mod theme;

@@ -38,6 +38,51 @@ pub fn virtual_pads(
     (top, vis, bot)
 }
 
+/// Thumb offset and length on a rail. `min_handle` keeps the grab usable
+/// when `content` is much taller than `viewport` (iced's own scroller
+/// floors at 2px).
+///
+/// ```
+/// let (y, h) = icedtea::collection::scroller_span(9000.0, 400.0, 0.0, 400.0, 24.0);
+/// assert_eq!(h, 24.0);
+/// assert_eq!(y, 0.0);
+/// let (end, _) = icedtea::collection::scroller_span(9000.0, 400.0, 8600.0, 400.0, 24.0);
+/// assert!((end - (400.0 - 24.0)).abs() < 0.01);
+/// ```
+pub fn scroller_span(
+    content: f32,
+    viewport: f32,
+    scroll: f32,
+    rail: f32,
+    min_handle: f32,
+) -> (f32, f32) {
+    if rail <= 0.0 {
+        return (0.0, 0.0);
+    }
+    if content <= viewport {
+        return (0.0, rail);
+    }
+    let handle = (rail * (viewport / content)).max(min_handle).min(rail);
+    let max_scroll = (content - viewport).max(1.0);
+    let usable = (rail - handle).max(0.0);
+    let t = (scroll.max(0.0) / max_scroll).clamp(0.0, 1.0);
+    (usable * t, handle)
+}
+
+/// Scroll offset that puts the thumb at `thumb_y` on the rail.
+pub fn scroll_from_rail(
+    content: f32,
+    viewport: f32,
+    thumb_y: f32,
+    rail: f32,
+    min_handle: f32,
+) -> f32 {
+    let (_, handle) = scroller_span(content, viewport, 0.0, rail, min_handle);
+    let max_scroll = (content - viewport).max(0.0);
+    let usable = (rail - handle).max(1.0);
+    (thumb_y.clamp(0.0, usable) / usable) * max_scroll
+}
+
 /// List model: length, identity, label.
 pub trait ListModel {
     fn len(&self) -> usize;
@@ -382,5 +427,22 @@ mod tests {
         assert_eq!(acc.open, Some(1));
         acc.toggle(1);
         assert_eq!(acc.open, None);
+    }
+
+    #[test]
+    fn scroller_keeps_a_usable_handle_on_tall_content() {
+        let (y, h) = scroller_span(900.0 * 60.0, 400.0, 0.0, 400.0, 24.0);
+        assert_eq!(h, 24.0);
+        assert_eq!(y, 0.0);
+        let max_scroll = 900.0 * 60.0 - 400.0;
+        let (end, h2) = scroller_span(900.0 * 60.0, 400.0, max_scroll, 400.0, 24.0);
+        assert_eq!(h2, 24.0);
+        assert!((end - 376.0).abs() < 0.01);
+        let mid = scroll_from_rail(900.0 * 60.0, 400.0, 188.0, 400.0, 24.0);
+        assert!(mid > 0.0 && mid < max_scroll);
+        let (y0, full) = scroller_span(100.0, 400.0, 0.0, 400.0, 24.0);
+        assert_eq!((y0, full), (0.0, 400.0));
+        assert_eq!(scroller_span(100.0, 50.0, 0.0, 0.0, 24.0), (0.0, 0.0));
+        assert_eq!(scroll_from_rail(100.0, 400.0, 10.0, 400.0, 24.0), 0.0);
     }
 }

@@ -188,7 +188,7 @@ impl Gallery {
                 page_i: 0,
                 table: TableModel {
                     headers: vec!["Name".into(), "Role".into()],
-                    rows: (0..60)
+                    rows: (0..400)
                         .map(|i| vec![format!("Row {i}"), format!("r{i}")])
                         .collect(),
                     sort_col: None,
@@ -204,7 +204,7 @@ impl Gallery {
                 ),
                 tree_sel: None,
                 list: VecList {
-                    items: (0..80).map(|i| format!("Item {i}")).collect(),
+                    items: (0..900).map(|i| format!("Item {i}")).collect(),
                 },
                 sel: Selection::Single(0),
                 actions,

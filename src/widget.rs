@@ -3,6 +3,7 @@
 
 use iced::widget::canvas::Canvas;
 use iced::widget::markdown;
+use iced::widget::scrollable::{Direction as ScrollDir, Scrollbar};
 use iced::widget::text_editor::Content;
 use iced::widget::{
     button, checkbox, column, container, mouse_area, pick_list, progress_bar, radio, row, rule,
@@ -10,7 +11,9 @@ use iced::widget::{
 };
 use iced::{Alignment, Element, Length, Padding};
 
+use crate::chrome::SCROLL_RAIL_WIDTH;
 use crate::host_canvas::ArcRing;
+use crate::scroll::ScrollRail;
 
 use crate::a11y::{self, A11y, Role};
 use crate::collection::{page_range, Accordion, ListModel, Selection, TableModel, Tabs, TreeNode};
@@ -955,10 +958,46 @@ pub fn themed_scroll<'a, M: 'a>(child: Element<'a, M>, tok: Tokens, a11y: A11y) 
     a11y::attach(
         scrollable(child)
             .height(Length::Fill)
+            .direction(ScrollDir::Vertical(
+                Scrollbar::new()
+                    .width(SCROLL_RAIL_WIDTH)
+                    .scroller_width(SCROLL_RAIL_WIDTH),
+            ))
             .style(style::scroll_style(tok))
             .into(),
         &a11y,
     )
+}
+
+pub(crate) fn wheel_scroll(
+    delta: iced::mouse::ScrollDelta,
+    scroll: f32,
+    row_h: f32,
+    max: f32,
+) -> f32 {
+    let dy = match delta {
+        iced::mouse::ScrollDelta::Lines { y, .. } => -y * row_h,
+        iced::mouse::ScrollDelta::Pixels { y, .. } => -y,
+    };
+    (scroll + dy).clamp(0.0, max)
+}
+
+fn list_body_and_rail<'a, M: Clone + 'a>(
+    body: Element<'a, M>,
+    content: f32,
+    viewport: f32,
+    scroll: f32,
+    row_h: f32,
+    on_scroll: impl Fn(f32) -> M + Copy + 'a,
+    tok: Tokens,
+) -> Element<'a, M> {
+    let max = (content - viewport).max(0.0);
+    row![
+        mouse_area(body).on_scroll(move |d| on_scroll(wheel_scroll(d, scroll, row_h, max))),
+        Element::from(ScrollRail::new(content, viewport, scroll, on_scroll, tok)),
+    ]
+    .height(viewport)
+    .into()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -970,19 +1009,18 @@ pub fn list_view<'a, M, L>(
     scroll: f32,
     row_h: f32,
     viewport: f32,
-    on_scroll: impl Fn(f32) -> M + 'a,
+    on_scroll: impl Fn(f32) -> M + Copy + 'a,
     a11y: A11y,
 ) -> Element<'a, M>
 where
     M: Clone + 'a,
     L: ListModel,
 {
-    let (top, vis, bot) = crate::collection::virtual_pads(model.len(), row_h, scroll, viewport);
+    let vis = crate::collection::visible_range(scroll, viewport, row_h, model.len());
     let mut col = column![].spacing(0);
     if model.is_empty() {
         col = col.push(meta("Empty", tok, A11y::new("Empty", Role::Status)));
     } else {
-        col = col.push(Space::new().height(top));
         for i in vis {
             let selected = selection.contains(i);
             let name = model.label(i);
@@ -1003,14 +1041,10 @@ where
                 &A11y::new(name, Role::ListItem).with_checked(selected),
             ));
         }
-        col = col.push(Space::new().height(bot));
     }
+    let content = model.len() as f32 * row_h.max(0.0);
     a11y::attach(
-        scrollable(col)
-            .height(viewport)
-            .on_scroll(move |vp| on_scroll(vp.absolute_offset().y))
-            .style(style::scroll_style(tok))
-            .into(),
+        list_body_and_rail(col.into(), content, viewport, scroll, row_h, on_scroll, tok),
         &a11y,
     )
 }
@@ -1046,12 +1080,11 @@ pub fn data_table<'a, M: Clone + 'a>(
     viewport: f32,
     on_select: impl Fn(usize) -> M + Copy + 'a,
     on_sort: impl Fn(usize) -> M + Copy + 'a,
-    on_scroll: impl Fn(f32) -> M + 'a,
+    on_scroll: impl Fn(f32) -> M + Copy + 'a,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let (top, vis, bot) =
-        crate::collection::virtual_pads(model.rows.len(), row_h, scroll, viewport);
+    let vis = crate::collection::visible_range(scroll, viewport, row_h, model.rows.len());
     let mut header = row![].spacing(8);
     for (i, h) in model.headers.iter().enumerate() {
         header = header.push(themed_button(
@@ -1063,7 +1096,6 @@ pub fn data_table<'a, M: Clone + 'a>(
         ));
     }
     let mut body = column![].spacing(0);
-    body = body.push(Space::new().height(top));
     for i in vis {
         let selected = selection.contains(i);
         let line = model.rows.get(i).cloned().unwrap_or_default().join("  ");
@@ -1084,14 +1116,19 @@ pub fn data_table<'a, M: Clone + 'a>(
             &A11y::new(line, Role::ListItem).with_checked(selected),
         ));
     }
-    body = body.push(Space::new().height(bot));
+    let content = model.rows.len() as f32 * row_h.max(0.0);
     a11y::attach(
         column![
             header,
-            scrollable(body)
-                .height(viewport)
-                .on_scroll(move |vp| on_scroll(vp.absolute_offset().y))
-                .style(style::scroll_style(tok))
+            list_body_and_rail(
+                body.into(),
+                content,
+                viewport,
+                scroll,
+                row_h,
+                on_scroll,
+                tok
+            ),
         ]
         .spacing(4)
         .into(),
@@ -1281,6 +1318,24 @@ mod tests {
         assert_eq!(t.minute, 59);
         assert_eq!(step_number(5.0, 1.0, 0.0, 10.0, 1), 6.0);
         assert_eq!(step_number(0.0, 1.0, 0.0, 10.0, -1), 0.0);
+        assert_eq!(
+            wheel_scroll(
+                iced::mouse::ScrollDelta::Lines { x: 0.0, y: -1.0 },
+                0.0,
+                20.0,
+                100.0
+            ),
+            20.0
+        );
+        assert_eq!(
+            wheel_scroll(
+                iced::mouse::ScrollDelta::Pixels { x: 0.0, y: 8.0 },
+                10.0,
+                20.0,
+                100.0
+            ),
+            2.0
+        );
         assert!(A11y::button("x").with_disabled(true).disabled);
         assert_eq!(
             A11y::new("y", Role::Checkbox).with_checked(false).checked,

@@ -55,7 +55,9 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   `a11y::attach` (name, role, value, disabled, checked). iced 0.14 has
   no accesskit slot; the widget id carries the node id.
 - Lists and tables virtualize when row counts leave the hundreds
-  (`collection::virtual_pads` + scroll offset).
+  (`collection::visible_range` + scroll offset). Their rail uses
+  `collection::scroller_span` with a 24px minimum handle. `themed_scroll`
+  still uses iced's scroller (2px floor).
 - Split sash: grip emits `SashEvent::Press` only. Move and release come
   from `layout::listen_sash` (window-space pointer) into
   `SashDrag::apply`. `mouse_area::on_move` is local hover on the 6px

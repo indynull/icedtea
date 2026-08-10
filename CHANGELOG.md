@@ -34,6 +34,8 @@
   fixtures (markdown document, highlighted languages) live in
   `icedtea-gallery`, not the library. Document undo is not a library
   type.
+- List and table use an icedtea scroll rail with a 24px minimum handle.
+  iced's own scroller still floors at 2px on `themed_scroll`.
 - Gallery markdown page is a full document; code page highlights many
   languages behind a language select. Catalog search sits on the sidebar.
 - Compact-tool seams: `Boot::size` / `min_size`, `themed_button_sized`,
