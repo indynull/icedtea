@@ -1,8 +1,8 @@
 # icedtea
 
-[![Documentation](https://docs.rs/icedtea/badge.svg)][documentation]
+[![Documentation](https://img.shields.io/docsrs/icedtea/latest)][documentation]
 [![Crates.io](https://img.shields.io/crates/v/icedtea.svg)][crates-io]
-[![License](https://img.shields.io/crates/l/icedtea.svg)][license]
+[![License](https://img.shields.io/crates/l/icedtea)][license]
 [![check](https://github.com/indynull/icedtea/actions/workflows/ci.yml/badge.svg)][actions]
 
 Reusable widgets and chrome for [iced](https://iced.rs/) desktop
