@@ -18,6 +18,7 @@ use icedtea::key::KeyContext;
 use icedtea::layout;
 
 use icedtea::nav::NavStack;
+use icedtea::palette::CommandPalette;
 use icedtea::pattern::{self, PrefGroup};
 use icedtea::shortcut::Shortcut;
 use icedtea::theme::{self, Appearance, ThemeCatalog, Tokens};
@@ -25,6 +26,7 @@ use icedtea::toast::{ToastKind, ToastQueue};
 use icedtea::variant::Variant;
 use icedtea::widget;
 use icedtea::widget::{DateValue, MarkdownDoc, TimeValue};
+use icedtea::window::{self, DisplayBounds, HideEvent, HidePolicy};
 use icedtea::{Boot, Element, Task};
 use samples::CodeLang;
 
@@ -116,6 +118,10 @@ enum Message {
     Folder,
     ConfirmSave,
     ConfirmCancel,
+    PaletteQuery(String),
+    PalettePick(usize),
+    OverlayPointer(f32, f32),
+    PaletteOutside,
     Nop,
 }
 
@@ -158,6 +164,10 @@ struct Gallery {
     code_lang: String,
     code_editor: Content,
     dialog_note: String,
+    palette: CommandPalette,
+    palette_focus: bool,
+    overlay_pointer: (f32, f32),
+    overlay_note: String,
 }
 
 impl Gallery {
@@ -176,6 +186,9 @@ impl Gallery {
         actions.insert(Action::new("edit.redo", "Redo", Message::Nop));
         actions.insert(Action::new("view.palette", "Command palette", Message::Nop));
         actions.insert(Action::new("help.about", "About", Message::Select("about")));
+        let mut palette = CommandPalette::new();
+        palette.open();
+        palette.set_query(&actions, "");
         (
             Self {
                 page: catalog::ENTRIES[0].id,
@@ -254,6 +267,10 @@ impl Gallery {
                 code_lang: "Rust".into(),
                 code_editor: Content::with_text(CodeLang::named("Rust").unwrap().source),
                 dialog_note: String::new(),
+                palette,
+                palette_focus: true,
+                overlay_pointer: (100.0, 80.0),
+                overlay_note: String::new(),
             },
             icedtea::iced::system::theme().map(Message::OsMode),
         )
@@ -350,20 +367,40 @@ impl Gallery {
             }
             Message::Key(ev) => {
                 let ctx = KeyContext {
-                    text_input_focused: !self.query.is_empty() && self.page == "search",
+                    text_input_focused: self.page == "search"
+                        || (self.page == "palette" && self.palette_focus),
                     modal_open: self.page == "dialogs",
                 };
                 if let Some(msg) = icedtea::key::handle(ctx, &self.actions, &ev) {
                     return self.update(msg);
                 }
                 if let Some(press) = icedtea::key::press(&ev) {
-                    if matches!(self.page, "list" | "table" | "palette") {
+                    if self.page == "palette" {
+                        match press {
+                            icedtea::key::Press::Escape => {
+                                let hide = window::should_hide(
+                                    HidePolicy::EscapeOrFocusLoss,
+                                    HideEvent::Escape,
+                                    self.palette_focus,
+                                );
+                                self.overlay_note = if hide {
+                                    "Escape would hide the overlay.".into()
+                                } else {
+                                    "Escape ignored (focus is in the palette).".into()
+                                };
+                            }
+                            icedtea::key::Press::Enter => {
+                                if let Some(msg) = self.palette.invoke_selected(&self.actions) {
+                                    return self.update(msg);
+                                }
+                            }
+                            _ => self.palette.apply_press(&press, 5),
+                        }
+                    } else if matches!(self.page, "list" | "table") {
                         let len = if self.page == "table" {
                             self.table.rows.len()
-                        } else if self.page == "list" {
-                            self.list.len()
                         } else {
-                            self.actions.iter().count()
+                            self.list.len()
                         };
                         let next = press.step_index(self.sel.primary().unwrap_or(0), len, 10);
                         self.sel.select_single(next);
@@ -404,6 +441,32 @@ impl Gallery {
             }
             Message::ConfirmCancel => {
                 self.dialog_note = "Save cancelled".into();
+            }
+            Message::PaletteQuery(q) => {
+                self.palette.set_query(&self.actions, q);
+                self.palette_focus = true;
+            }
+            Message::PalettePick(i) => {
+                self.palette_focus = true;
+                if let Some(action) = self.palette.results(&self.actions).get(i) {
+                    if let Some(msg) = action.invoke() {
+                        return self.update(msg);
+                    }
+                }
+            }
+            Message::OverlayPointer(x, y) => self.overlay_pointer = (x, y),
+            Message::PaletteOutside => {
+                self.palette_focus = false;
+                let hide = window::should_hide(
+                    HidePolicy::EscapeOrFocusLoss,
+                    HideEvent::FocusLoss,
+                    self.palette_focus,
+                );
+                self.overlay_note = if hide {
+                    "Focus left the palette; the overlay would hide.".into()
+                } else {
+                    "Focus loss ignored (still in the palette).".into()
+                };
             }
             Message::Nop => {}
         }
@@ -1553,15 +1616,84 @@ impl Gallery {
                 tok,
             ),
             "palette" => {
-                let res: Vec<_> = self.actions.iter().collect();
-                pattern::command_palette_view(
-                    &self.query,
-                    &res,
-                    0,
-                    Message::Query,
-                    |_| Message::Nop,
-                    tok,
-                )
+                let res = self.palette.results(&self.actions);
+                let displays = [
+                    DisplayBounds {
+                        x: 0.0,
+                        y: 0.0,
+                        width: 1920.0,
+                        height: 1080.0,
+                    },
+                    DisplayBounds {
+                        x: 1920.0,
+                        y: 0.0,
+                        width: 1280.0,
+                        height: 800.0,
+                    },
+                ];
+                let inner = icedtea::iced::Size::new(480.0, 320.0);
+                let origin = window::place(self.overlay_pointer, inner, &displays);
+                column![
+                    widget::meta(
+                        "Command palette overlay. Boot::overlay().size is the inner size; place uses the display under the pointer. Escape and focus loss ignore in-palette controls.",
+                        tok,
+                        named("pal-hint", Role::Status),
+                    ),
+                    widget::meta(
+                        format!(
+                            "inner 480x320; pointer ({:.0}, {:.0}); origin ({:.0}, {:.0})",
+                            self.overlay_pointer.0,
+                            self.overlay_pointer.1,
+                            origin.x,
+                            origin.y
+                        ),
+                        tok,
+                        named("pal-place", Role::Status),
+                    ),
+                    row![
+                        widget::themed_button(
+                            "Pointer on display 1",
+                            Some(Message::OverlayPointer(100.0, 80.0)),
+                            tok,
+                            Variant::Quiet,
+                            btn("Pointer on display 1"),
+                        ),
+                        widget::themed_button(
+                            "Pointer on display 2 edge",
+                            Some(Message::OverlayPointer(3100.0, 20.0)),
+                            tok,
+                            Variant::Quiet,
+                            btn("Pointer on display 2 edge"),
+                        ),
+                        widget::themed_button(
+                            "Click outside",
+                            Some(Message::PaletteOutside),
+                            tok,
+                            Variant::Quiet,
+                            btn("Click outside"),
+                        ),
+                    ]
+                    .spacing(8),
+                    widget::meta(
+                        if self.overlay_note.is_empty() {
+                            "Type in the card, then Escape. Or click outside.".into()
+                        } else {
+                            self.overlay_note.clone()
+                        },
+                        tok,
+                        named("pal-hide", Role::Status),
+                    ),
+                    pattern::command_palette_view(
+                        self.palette.query(),
+                        &res,
+                        self.palette.selected(),
+                        Message::PaletteQuery,
+                        Message::PalettePick,
+                        tok,
+                    ),
+                ]
+                .spacing(12)
+                .into()
             }
             "main-window" => pattern::main_window(
                 pattern::menu_bar(&self.actions, tok, self.direction, &self.catalog),
