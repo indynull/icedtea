@@ -43,7 +43,8 @@
   Tokyo Night, Dracula, Everforest, Kanagawa, Ayu). Gallery theme page
   and header select switch chrome and code highlighting together.
 - Book covers install, `run!`, actions, layout, theming, navigation,
-  and overlay windows.
+  and overlay windows. The guide is built with mdBook and published
+  from `master` to <https://indynull.github.io/icedtea/>.
 
 - Initial public crate: design system, layouts, actions, command palette,
   window kinds, widget catalog, persistence, internationalization,

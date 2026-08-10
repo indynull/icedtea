@@ -1,0 +1,14 @@
+[book]
+title = "icedtea"
+authors = ["Ali-Akber Saifee"]
+description = "Guide for icedtea, reusable widgets and chrome for iced"
+language = "en"
+src = "book/src"
+
+[build]
+build-dir = "book/book"
+
+[output.html]
+git-repository-url = "https://github.com/indynull/icedtea"
+edit-url-template = "https://github.com/indynull/icedtea/edit/master/book/src/{path}"
+site-url = "/icedtea/"

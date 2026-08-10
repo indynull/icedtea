@@ -1,7 +1,8 @@
 # Install
 
 icedtea is a Rust library. Add it to a desktop app and take widgets,
-tokens, and chrome from it.
+tokens, and chrome from it. This guide is also at
+<https://indynull.github.io/icedtea/>.
 
 Toolchain: Rust 1.89 or newer. `rust-toolchain.toml` pins that and
 installs rustfmt, clippy, and llvm-tools.
@@ -57,5 +58,7 @@ Home: <https://github.com/indynull/icedtea>.
    `cargo publish -p icedtea --locked`. No repository secret.
 
 The gallery crate sets `publish = false`; only `icedtea` goes to
-crates.io. Docs build on [docs.rs](https://docs.rs/icedtea) from that
-publish.
+crates.io. API docs build on [docs.rs](https://docs.rs/icedtea) from
+that publish. This guide builds on every `master` push
+(`.github/workflows/book.yml`) and is served at
+<https://indynull.github.io/icedtea/>.

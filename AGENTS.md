@@ -25,11 +25,12 @@ cargo run -p icedtea-gallery
 | --- | --- |
 | `src/` | Public library `icedtea` |
 | `icedtea-gallery/` | Shipping gallery; every `catalog::ENTRIES` id has a page |
-| `book/` | Install, architecture, first window, actions, layout, theming, navigation, overlay windows |
+| `book/` | Guide (mdBook). Published from `master` to GitHub Pages |
 | `TODO.md` | Remaining work |
 | `assets/icons/` | Chrome SVGs |
 | `.github/workflows/ci.yml` | Linux, macOS, Windows run `just check` |
 | `.github/workflows/publish.yml` | Tag `vX.Y.Z` publishes `icedtea` to crates.io |
+| `.github/workflows/book.yml` | `mdbook build`; deploys the guide on `master` |
 
 Workspace members: `icedtea`, `icedtea-gallery`.
 Rust 1.89, edition 2021, iced 0.14. License MIT.

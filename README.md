@@ -14,7 +14,7 @@ chrome are Rust values.
 
 You may be looking for:
 
-- [The guide](book/src/SUMMARY.md)
+- [The guide](https://indynull.github.io/icedtea/)
 - [API documentation][documentation]
 - [The gallery](icedtea-gallery/)
 - [Release notes](CHANGELOG.md)

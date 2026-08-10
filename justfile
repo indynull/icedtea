@@ -27,3 +27,10 @@ check: fmt-check clippy test doc cov
 # Dry-run the published package (needs network for registry).
 publish-dry:
     cargo publish -p icedtea --dry-run --locked
+
+# HTML guide (needs mdbook).
+book:
+    mdbook build
+
+book-serve:
+    mdbook serve
