@@ -46,11 +46,15 @@ Home: <https://github.com/indynull/icedtea>.
 1. Set `version` in `Cargo.toml` and add a `CHANGELOG.md` section.
 2. Push `master`. GitHub Actions runs `just check` on Linux, macOS, and
    Windows, and the test suite on Ubuntu `stable` and `beta`.
-3. Store `CARGO_REGISTRY_TOKEN` as a repository secret (crates.io API
-   token).
-4. Tag `vX.Y.Z` (same numbers as `version`) and push the tag.
-5. GitHub Actions job `crates-io` checks the tag, runs `just check`, and
-   `cargo publish -p icedtea --locked`.
+3. First version: `cargo publish -p icedtea --locked` on your machine
+   (`cargo login`). Then on the crate: Settings, Trusted Publishing,
+   GitHub. Owner `indynull`, repository `icedtea`, workflow
+   `publish.yml`. No environment name.
+4. Later versions: tag `vX.Y.Z` (same numbers as `version`) and push
+   the tag.
+5. GitHub Actions job `crates-io` checks the tag, runs `just check`,
+   exchanges an identity token for a short-lived crates.io token, and
+   `cargo publish -p icedtea --locked`. No repository secret.
 
 The gallery crate sets `publish = false`; only `icedtea` goes to
 crates.io. Docs build on [docs.rs](https://docs.rs/icedtea) from that

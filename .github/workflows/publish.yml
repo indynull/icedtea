@@ -14,6 +14,9 @@ defaults:
 jobs:
   crates-io:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
@@ -33,6 +36,8 @@ jobs:
           test -n "$tag"
           test "$tag" = "$ver"
       - run: just check
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
       - run: cargo publish -p icedtea --locked
         env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
