@@ -4,8 +4,8 @@ icedtea is reusable widgets and chrome for native desktop applications
 on [iced](https://iced.rs/). Design system, layouts, window chrome,
 actions mapped to messages, widgets, and patterns.
 
-Product contract: this file's Product section, `catalog::ENTRIES`, and
-the book. Work list: [`TODO.md`](TODO.md) (internal; do not package or
+Contract: this file's Library section, `catalog::ENTRIES`, and the
+book. Work list: [`TODO.md`](TODO.md) (internal; do not package or
 link from README). This file is how to work in the repo. It wins over
 visitor home rules when they conflict.
 
@@ -35,7 +35,7 @@ cargo run -p icedtea-gallery
 Workspace members: `icedtea`, `icedtea-gallery`.
 Rust 1.89, edition 2021, iced 0.14. License MIT.
 
-## Product
+## Library
 
 - Track iced. Do not fork it or add a second renderer. `run!` /
   `bootstrap` start the window.
@@ -77,7 +77,7 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   `catalog::ENTRIES` with a gallery page. Unfinished surfaces are not
   exported.
 - One path per feature. Pick it and delete the other. Fallbacks re-grow.
-- Always keep `TODO.md` current with shipped product and real
+- Always keep `TODO.md` current with shipped library and real
   consumer requests. Sort them into Do / Consider / discard in the
   same change. Never leave Order or Do pointing at finished work.
 - Coverage fail-under is 99 on `just check` (llvm-cov const/macro
@@ -96,8 +96,9 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
 - Extract a second crate only after a second in-tree consumer needs it.
   Experiments live in `icedtea` or `icedtea-gallery`.
 - Never grow `CHANGELOG.md` Unreleased into a session diary. 0.1.0 on
-  crates.io was a publish check. The first product cut is Unreleased
-  until it is tagged.
+  crates.io was a publish check. 0.2 stays Unreleased until it is
+  tagged. Never call icedtea a product in user-facing copy; it is a
+  UI library.
 - Gallery fixtures (sample documents, language snippets, bitmaps) live
   in `icedtea-gallery`. Never export them from `icedtea`.
 - Never ship a document undo stack. The application owns document
@@ -149,10 +150,10 @@ workspace `-D warnings`, `cargo test --workspace --all-features`,
   not add ignore prefixes.
 - Tests are named after production behavior, never leftover line counts
   or coverage percentages. Drive shipped entry points. No `*_for_test`
-  product hooks, no `#[cfg(test)]` product paths.
-- `just check` green is necessary, not product proof. Report the exact
-  command and result. Product proof for a widget is the gallery page
-  plus tests that call the shipped constructor.
+  library hooks, no `#[cfg(test)]` library paths.
+- `just check` green is necessary, not proof a widget works. Report
+  the exact command and result. Proof for a widget is the gallery
+  page plus tests that call the shipped constructor.
 - Gallery launch: if a display is present, start
   `cargo run -p icedtea-gallery` and confirm iced starts without panic.
   A timeout after a clean start is a successful smoke. Compile + unit
@@ -207,8 +208,8 @@ Working code only. Plausibility is not correctness.
 - Minimum code that solves the stated problem. No features beyond the
   ask. No single-use abstractions. No hooks that were not requested.
 - Handle failures that can actually happen. Prefer visible failure on
-  product paths that must succeed. Narrow catches only where absence is
-  the design (optional chrome, missing widgets).
+  paths that must succeed. Narrow catches only where absence is the
+  design (optional chrome, missing widgets).
 - If the solution is ~200 lines and could be ~50, rewrite before
   presenting it. Bias toward deleting code.
 
@@ -276,9 +277,9 @@ continuous integration is not authorization.
 - Plain professional English. No slang metaphors (door, spine, theater,
   folklore, junk drawer, “gate”, “wire”, “hygiene”). Prefer entrypoint,
   interface, implementation, optional, required; name the check or file.
-- No stacked naming taxonomy tables in README or product docs. Ordinary
+- No stacked naming taxonomy tables in README or crate docs. Ordinary
   sentences. Avoid lab voice (“surface”, “minted”, “first-class”).
-- User-facing copy uses the product noun **icedtea** consistently.
+- User-facing copy uses the name **icedtea** consistently.
 
 **Chat with the human**
 
@@ -348,8 +349,8 @@ tables or essays in discussion notes.
   book page (or a short glue paragraph) in the same change. Update
   README install or the first-window example when that path changes.
   Documentation is part of the change, not a follow-up.
-- `CHANGELOG.md` describes the product for a version. Fold work into
-  the first-release Unreleased section until that version is tagged.
+- `CHANGELOG.md` describes the crate for a version. Fold work into
+  the Unreleased section until that version is tagged.
 - A third-party app still needs only icedtea for chrome, actions,
   layout, and theme.
 - `git status` clean for the work you reported, or an explicit park.

@@ -2,9 +2,9 @@
 
 ## Unreleased
 
-First product release. Widgets and chrome for iced 0.14 desktop
-applications. `icedtea::run!` boots theme and starts the window.
-Constructors return `Element`s and emit the application's messages.
+Widgets and chrome for iced 0.14 desktop applications.
+`icedtea::run!` boots theme and starts the window. Constructors
+return `Element`s and emit the application's messages.
 
 - One `Action` for menus, toolbars, shortcuts, the command palette, and
   footer hints. `ctrl+s` is Command on macOS and Control on Linux and

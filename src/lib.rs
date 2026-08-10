@@ -85,7 +85,7 @@ mod tests {
     }
 
     #[test]
-    fn product_docs_describe_icedtea() {
+    fn docs_describe_icedtea() {
         let readme = include_str!("../README.md");
         let arch = include_str!("../book/src/architecture.md");
         let first = include_str!("../book/src/first-window.md");
@@ -100,7 +100,7 @@ mod tests {
                 .expect("install story names the crate");
             assert!(
                 src[at..].starts_with("icedtea = { git ="),
-                "first icedtea line must be git until the product tag"
+                "first icedtea line must be git until the 0.2 tag"
             );
         }
         assert!(arch.contains("Action"));

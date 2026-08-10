@@ -14,7 +14,7 @@ icedtea = { git = "https://github.com/indynull/icedtea" }
 ```
 
 `0.1` on crates.io is the publish check. This tree is `0.2`. Use git
-until the product tag. After that tag: `icedtea = "0.2"`.
+until the 0.2 tag. After that tag: `icedtea = "0.2"`.
 
 ## Host libraries
 
