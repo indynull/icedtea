@@ -5,10 +5,9 @@
 //! shortcuts, and the command palette. Constructors return iced
 //! [`Element`]s and emit your messages.
 //!
-//! # First window
+//! # First compose
 //!
-//! One `Action` feeds the toolbar. The same message increments the count
-//! when the row is pressed:
+//! One `Action` feeds the toolbar. The same message is Save:
 //!
 //! ```
 //! use icedtea::action::{Action, ActionTable};
@@ -17,29 +16,141 @@
 //! use icedtea::shortcut::Shortcut;
 //! use icedtea::theme;
 //! let tok = theme::named("dark").tokens;
+//! let save = ();
 //! let mut table = ActionTable::new();
 //! table.insert(
-//!     Action::new("count.inc", "Count", ())
-//!         .with_shortcut(Shortcut::parse("ctrl+i").unwrap()),
+//!     Action::new("file.save", "Save", save)
+//!         .with_shortcut(Shortcut::parse("ctrl+s").unwrap()),
 //! );
 //! let chrome: icedtea::Element<'_, ()> =
 //!     pattern::toolbar(table.iter(), tok, Direction::Ltr);
 //! let _ = chrome;
-//! assert_eq!(table.invoke("count.inc"), Some(()));
+//! assert_eq!(table.invoke("file.save"), Some(save));
 //! ```
+//!
+//! # Boot
 //!
 //! [`run!`] opens that window. The same program is
 //! [`examples/hello.rs`](https://github.com/indynull/icedtea/blob/master/examples/hello.rs).
 //!
-//! # Nouns
+//! ```ignore
+//! icedtea::run!(
+//!     icedtea::Boot::new("Notes", "dev.example.hello"),
+//!     Hello::new,
+//!     Hello::update,
+//!     Hello::view,
+//!     Hello::theme,
+//!     Hello::subscription
+//! )
+//! ```
 //!
-//! * [`app::Boot`] — title, application id, theme, locale, window kind.
-//! * [`theme::Tokens`] — canvas, text, primary; washes from [`theme::mix`].
-//! * [`action::Action`] — one command for every chrome row.
-//! * Constructors in [`widget`] — themed controls that take tokens and
-//!   [`a11y::A11y`].
-//! * [`pattern`] — list/detail, palette, main window, and other composed
-//!   chrome.
+//! # Keys
+//!
+//! Subscribe with [`key::listen`]. [`key::handle`] matches the table
+//! after an open modal and after focused text:
+//!
+//! ```
+//! use icedtea::action::{Action, ActionTable};
+//! use icedtea::key::{handle, KeyContext};
+//! use icedtea::shortcut::Shortcut;
+//! let save = ();
+//! let mut table = ActionTable::new();
+//! table.insert(
+//!     Action::new("file.save", "Save", save)
+//!         .with_shortcut(Shortcut::parse("ctrl+s").unwrap()),
+//! );
+//! let ev = iced::keyboard::Event::KeyPressed {
+//!     key: iced::keyboard::Key::Character("s".into()),
+//!     modified_key: iced::keyboard::Key::Character("s".into()),
+//!     physical_key: iced::keyboard::key::Physical::Unidentified(
+//!         iced::keyboard::key::NativeCode::Unidentified,
+//!     ),
+//!     location: iced::keyboard::Location::Standard,
+//!     modifiers: icedtea::shortcut::primary(),
+//!     text: None,
+//!     repeat: false,
+//! };
+//! assert_eq!(handle(KeyContext::default(), &table, &ev), Some(save));
+//! ```
+//!
+//! # Tokens
+//!
+//! [`theme::named`] picks a colorway. [`theme::mix`] builds washes:
+//!
+//! ```
+//! use icedtea::theme;
+//! let tok = theme::named("dark").tokens;
+//! let wash = theme::mix(tok.primary, tok.canvas, 0.28);
+//! assert_eq!(wash, tok.selection);
+//! ```
+//!
+//! # A widget
+//!
+//! The hello editor is [`widget::textarea`]. The application owns the
+//! buffer:
+//!
+//! ```
+//! use icedtea::a11y::{A11y, Role};
+//! use icedtea::theme;
+//! use icedtea::widget;
+//! #[derive(Clone)]
+//! enum Message {
+//!     Edit(icedtea::iced::widget::text_editor::Action),
+//! }
+//! let tok = theme::named("dark").tokens;
+//! let content = icedtea::iced::widget::text_editor::Content::new();
+//! let editor: icedtea::Element<'_, Message> = widget::textarea(
+//!     &content,
+//!     Message::Edit,
+//!     tok,
+//!     icedtea::layout::FILL,
+//!     A11y::new("notes", Role::TextBox),
+//! );
+//! let _ = editor;
+//! ```
+//!
+//! # A pattern
+//!
+//! [`pattern::toolbar`] paints the same `file.save` row:
+//!
+//! ```
+//! use icedtea::action::{Action, ActionTable};
+//! use icedtea::i18n::Direction;
+//! use icedtea::pattern;
+//! use icedtea::theme;
+//! let tok = theme::named("dark").tokens;
+//! let save = ();
+//! let mut table = ActionTable::new();
+//! table.insert(Action::new("file.save", "Save", save));
+//! let bar: icedtea::Element<'_, ()> =
+//!     pattern::toolbar(table.iter(), tok, Direction::Ltr);
+//! let _ = bar;
+//! ```
+//!
+//! # Scope
+//!
+//! icedtea is chrome, actions, layout, and theme for iced desktop
+//! applications. Constructors return [`Element`]s and emit the
+//! application's messages.
+//!
+//! ## Non-goals
+//!
+//! - A new renderer or a fork of iced. icedtea tracks iced releases.
+//! - A stylesheet or markup language. Authors write Rust.
+//! - Mobile, web, or embedded targets.
+//! - A visual form designer.
+//! - An in-process web view, print pipeline, or multimedia stack.
+//! - Multiple-document-interface window mosaics.
+//! - Binding the look to one desktop shell. Themes may follow system
+//!   light/dark; chrome stays icedtea’s.
+//! - Domain widgets for a specific product (session timelines, containers,
+//!   editors' language services). Applications own those.
+//! - Document undo/redo. Applications own history.
+//! - Sample documents and bitmaps as library API.
+//! - A second collection widget for variable-height cards. Extend list.
+//! - Library-owned parse caches or live-update daemons.
+//! - System-wide hotkeys, host focus steal, or baking another toolkit’s
+//!   theme files.
 //!
 //! # Modules
 //!
@@ -50,10 +161,9 @@
 //! | [`theme`] / [`variant`] / [`typo`] | Color, variant, type |
 //! | [`widget`] / [`collection`] | Controls, lists, tables |
 //! | [`layout`] / [`pattern`] / [`window`] | Recipes and chrome |
-//! | [`catalog`] | Closed list of public ids |
 //!
 //! The [guide](https://indynull.github.io/icedtea/) walks composition
-//! and lists every catalog id.
+//! and lists every public constructor.
 //! [crates.io](https://crates.io/crates/icedtea) ·
 //! [source](https://github.com/indynull/icedtea).
 
@@ -161,15 +271,18 @@ mod tests {
         assert!(tour.contains("Boot"));
         assert!(tour.contains("Tokens"));
         assert!(tour.contains("pattern"));
-        assert!(tour.contains("count.inc"));
+        assert!(tour.contains("file.save"));
         assert!(readme.contains("icedtea::run!"));
         assert!(readme.contains("example hello"));
-        assert!(readme.contains("count.inc"));
-        assert!(readme.contains("pattern::toolbar"));
-        assert!(hello.contains("count.inc"));
+        assert!(readme.contains("examples/hello.rs"));
+        assert!(!readme.contains("struct Hello"));
+        assert!(!readme.contains("count.inc"));
+        assert!(hello.contains("file.save"));
         assert!(hello.contains("pattern::toolbar"));
         assert!(hello.contains("Action::new"));
-        assert!(first.contains("examples/hello.rs") || first.contains("count.inc"));
+        assert!(!hello.contains("count.inc"));
+        assert!(!hello.contains("n: i32"));
+        assert!(first.contains("examples/hello.rs"));
         let install = include_str!("../book/src/install.md");
         for src in [readme, install] {
             let at = src

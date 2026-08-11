@@ -52,7 +52,6 @@ pub struct NamedTheme {
 ///
 /// Hover, pressed, and selection washes use this.
 ///
-/// See also catalog id `colors`.
 ///
 /// ```
 /// use iced::Color;
@@ -371,7 +370,6 @@ pub fn code_highlight(name: &str) -> iced::highlighter::Theme {
 
 /// Look up a built-in colorway by name. Unknown names resolve to `dark`.
 ///
-/// See also catalog id `theme`.
 ///
 /// ```
 /// let t = icedtea::theme::named("nope");

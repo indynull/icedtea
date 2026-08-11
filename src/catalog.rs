@@ -393,6 +393,10 @@ mod tests {
             "book/src/reference/collections.md",
             "book/src/reference/chrome.md",
             "book/src/reference/patterns.md",
+            "book/src/cookbook/save.md",
+            "book/src/cookbook/list-detail.md",
+            "book/src/cookbook/table.md",
+            "book/src/cookbook/palette.md",
         ];
         for rel in files {
             let text = std::fs::read_to_string(root.join(rel)).unwrap();
@@ -402,6 +406,8 @@ mod tests {
                 "llvm-cov",
                 "fail-under",
                 "identity token",
+                "catalog id",
+                "see also catalog",
             ] {
                 assert!(
                     !text.to_ascii_lowercase().contains(needle),
@@ -425,6 +431,7 @@ mod tests {
             "llvm-cov",
             "fail-under",
             "gallery",
+            "catalog id",
         ] {
             assert!(
                 !tour.contains(needle),
@@ -534,6 +541,12 @@ mod tests {
                 e.id,
                 name
             );
+            let rustdoc = rustdoc_block_above(&src[..at]);
+            assert!(
+                !rustdoc.contains("catalog id") && !rustdoc.contains("Catalog `"),
+                "{} rustdoc must not teach catalog id",
+                e.id
+            );
         }
     }
 
@@ -549,6 +562,25 @@ mod tests {
             start = at + pat.len();
         }
         None
+    }
+
+    fn rustdoc_block_above(before: &str) -> String {
+        let mut docs = Vec::new();
+        for line in before.lines().rev() {
+            let t = line.trim_start();
+            if t.is_empty() {
+                if docs.is_empty() {
+                    continue;
+                }
+                break;
+            }
+            if t.starts_with("///") || t.starts_with("#[") {
+                docs.push(t);
+                continue;
+            }
+            break;
+        }
+        docs.join("\n")
     }
 
     fn rustdoc_example_immediately_above(before: &str) -> bool {
@@ -580,6 +612,77 @@ mod tests {
         assert_eq!(find_pub_fn("pub fn progress<T>()", "progress"), Some(0));
         assert_eq!(find_pub_fn("pub fn foo", "foo"), None);
         assert_eq!(find_pub_fn("fn foo()", "foo"), None);
+    }
+
+    #[test]
+    fn hello_is_a_tool() {
+        let hello = include_str!("../examples/hello.rs");
+        assert!(hello.contains("file.save"));
+        assert!(hello.contains("ctrl+s"));
+        assert!(hello.contains("pattern::toolbar") || hello.contains("main_window"));
+        assert!(hello.contains("textarea") || hello.contains("themed_text_input"));
+        assert!(!hello.contains("count.inc"));
+        assert!(!hello.contains("n: i32"));
+    }
+
+    #[test]
+    fn readme_points_at_hello() {
+        let readme = include_str!("../README.md");
+        assert!(readme.contains("examples/hello.rs"));
+        assert!(readme.contains("icedtea::run!"));
+        assert!(!readme.contains("struct Hello"));
+    }
+
+    #[test]
+    fn crate_root_walks() {
+        let root = include_str!("lib.rs");
+        let tour = root.split("#![cfg_attr").next().unwrap_or(root);
+        for heading in ["First compose", "Boot", "Keys", "Tokens", "Scope"] {
+            assert!(tour.contains(heading), "tour missing {heading}");
+        }
+        assert!(tour.contains("file.save"));
+        assert!(!tour.contains("catalog id"));
+        assert!(!tour.contains("closed list"));
+    }
+
+    #[test]
+    fn cookbook_exists() {
+        let summary = include_str!("../book/src/SUMMARY.md");
+        assert!(summary.contains("# Cookbook"));
+        let pages: [(&str, &[&str]); 4] = [
+            (
+                include_str!("../book/src/cookbook/save.md"),
+                &["file.save", "toolbar", "key::handle", "textarea"],
+            ),
+            (
+                include_str!("../book/src/cookbook/list-detail.md"),
+                &["list_detail", "list_view", "layout::fixed"],
+            ),
+            (
+                include_str!("../book/src/cookbook/table.md"),
+                &["data_table", "TableModel", "ColumnLayout", "VisibleWindow"],
+            ),
+            (
+                include_str!("../book/src/cookbook/palette.md"),
+                &["CommandPalette", "command_palette_view"],
+            ),
+        ];
+        for (text, needles) in pages {
+            for n in needles.iter().copied() {
+                assert!(text.contains(n), "cookbook missing {n}");
+            }
+            assert!(!text.to_ascii_lowercase().contains("gallery"));
+            assert!(!text.contains("Nop"));
+        }
+    }
+
+    #[test]
+    fn constructor_rustdoc_has_no_catalog_title() {
+        let widget = include_str!("widget.rs");
+        assert!(
+            !rustdoc_block_above(&widget[..find_pub_fn(widget, "themed_button").unwrap()])
+                .contains("catalog id")
+        );
     }
 
     #[test]

@@ -70,7 +70,6 @@ pub fn wrap_rows(n: usize, child_w: f32, gap: f32, width: f32) -> usize {
 /// Pass child width, gap, and available width. Empty children yield an
 /// empty column.
 ///
-/// See also catalog id `wrap`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -285,7 +284,6 @@ pub fn column_box<'a, M: 'a>(
 ///
 /// `columns` is the row length.
 ///
-/// See also catalog id `pad`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};

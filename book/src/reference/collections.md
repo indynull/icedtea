@@ -17,8 +17,7 @@ the wheel write it. Variable-height rows use `row_offsets` /
 Constructor: [`widget::list_view`](https://docs.rs/icedtea/latest/icedtea/widget/fn.list_view.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 `empty` is the copy when the model has no rows. Selection stays on
 indices. Disabled drops row messages. `on_scroll` reports the window
@@ -31,8 +30,7 @@ after a wheel or rail move.
 Constructor: [`widget::log_view`](https://docs.rs/icedtea/latest/icedtea/widget/fn.log_view.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Virtualizes long logs. Iced's end anchor reports offset 0, so the log
 reads the reversed offset and mounts the tail. Empty lines show
@@ -45,8 +43,7 @@ reads the reversed offset and mounts the tail. Empty lines show
 Constructor: [`widget::item_grid`](https://docs.rs/icedtea/latest/icedtea/widget/fn.item_grid.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Pass titles. Click sends the index. Empty grid is an empty column.
 
@@ -57,8 +54,7 @@ Pass titles. Click sends the index. Empty grid is an empty column.
 Constructor: [`widget::data_table`](https://docs.rs/icedtea/latest/icedtea/widget/fn.data_table.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 `TableModel` holds headers and rows. `on_cell` is (row, column).
 `on_sort` is the header click. `ColumnLayout` orders, freezes, and
@@ -71,8 +67,7 @@ resizes columns. Empty rows still paint headers.
 Constructor: [`widget::tree_view`](https://docs.rs/icedtea/latest/icedtea/widget/fn.tree_view.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 The application owns expand state. Leaf rows have no twisty. Empty
 tree is an empty column.
@@ -84,8 +79,7 @@ tree is an empty column.
 Constructor: [`pattern::document_tabs`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.document_tabs.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Close confirm is the application's. `DocumentTabs` holds titles and
 dirty flags.
@@ -97,8 +91,7 @@ dirty flags.
 Constructor: [`widget::tab_bar`](https://docs.rs/icedtea/latest/icedtea/widget/fn.tab_bar.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 `Tabs { closable: false }` is pinned sections. Select sends the
 index. See also [`pattern::tab_view`](patterns.md#tab-view).
@@ -110,8 +103,7 @@ index. See also [`pattern::tab_view`](patterns.md#tab-view).
 Constructor: [`widget::accordion_view`](https://docs.rs/icedtea/latest/icedtea/widget/fn.accordion_view.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 The application owns which row is open. Closed rows are headers
 only. The chevron sits on the trailing edge.
@@ -123,8 +115,7 @@ only. The chevron sits on the trailing edge.
 Constructor: [`widget::expander`](https://docs.rs/icedtea/latest/icedtea/widget/fn.expander.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 The application owns `open`. Closed shows a `Peek` of the child
 (pixels, or whole body lines with room for the last descent) and
@@ -139,8 +130,7 @@ this is one card.
 Constructor: [`widget::pagination`](https://docs.rs/icedtea/latest/icedtea/widget/fn.pagination.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Pass page count and the current page. Messages are previous, next,
 and jump. One page hides the control or disables the arrows.

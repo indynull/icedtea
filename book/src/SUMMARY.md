@@ -11,6 +11,13 @@
 - [Overlay windows](overlay-windows.md)
 - [Compact tools](compact-tools.md)
 
+# Cookbook
+
+- [Save a buffer](cookbook/save.md)
+- [List and detail](cookbook/list-detail.md)
+- [Sortable table](cookbook/table.md)
+- [Command palette](cookbook/palette.md)
+
 # Reference
 
 - [Widgets](widgets.md)

@@ -13,8 +13,7 @@ Theme, marks, rows, and feedback.
 Constructor: [`theme::named`](https://docs.rs/icedtea/latest/icedtea/theme/fn.named.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/theme.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Unknown names resolve to `dark`. Register more on `ThemeCatalog`.
 See [Theming](../theming.md).
@@ -26,8 +25,7 @@ See [Theming](../theming.md).
 Constructor: [`theme::mix`](https://docs.rs/icedtea/latest/icedtea/theme/fn.mix.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/theme.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 `amount` 0 is the background, 1 is the foreground. Hover, pressed,
 and selection washes use this.
@@ -39,8 +37,7 @@ and selection washes use this.
 Constructor: [`key::handle`](https://docs.rs/icedtea/latest/icedtea/key/fn.handle.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/key.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Subscribe with [`key::listen`](https://docs.rs/icedtea/latest/icedtea/key/fn.listen.html).
 An open modal consumes. Focused text owns unmodified typing.
@@ -53,8 +50,7 @@ Otherwise chords match the table. See [Actions](../actions.md).
 Constructor: [`pattern::cheatsheet`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.cheatsheet.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Empty query lists every enabled action. Disabled actions stay out.
 
@@ -65,8 +61,7 @@ Empty query lists every enabled action. Disabled actions stay out.
 Constructor: [`widget::group_box`](https://docs.rs/icedtea/latest/icedtea/widget/fn.group_box.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Same constructor as group-box. Empty title is a border only.
 
@@ -89,8 +84,7 @@ Constructor: [`widget::rule_h`](https://docs.rs/icedtea/latest/icedtea/widget/fn
 Constructor: [`widget::chip`](https://docs.rs/icedtea/latest/icedtea/widget/fn.chip.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Optional press message. Disabled keeps the face.
 
@@ -101,8 +95,7 @@ Optional press message. Disabled keeps the face.
 Constructor: [`widget::badge`](https://docs.rs/icedtea/latest/icedtea/widget/fn.badge.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Short text. Empty string is an empty pill.
 
@@ -113,8 +106,7 @@ Short text. Empty string is an empty pill.
 Constructor: [`layout::wrap`](https://docs.rs/icedtea/latest/icedtea/layout/fn.wrap.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/layout/recipes.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Pass child width, gap, and available width. Empty children yield an
 empty column.
@@ -126,8 +118,7 @@ empty column.
 Constructor: [`layout::pad`](https://docs.rs/icedtea/latest/icedtea/layout/fn.pad.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/layout/recipes.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Pair with `themed_button_sized` for a key pad. `columns` is the row
 length.
@@ -139,8 +130,7 @@ length.
 Constructor: [`widget::info_bar`](https://docs.rs/icedtea/latest/icedtea/widget/fn.info_bar.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Tone comes from `Variant`. Empty body is title only.
 
@@ -151,8 +141,7 @@ Tone comes from `Variant`. Empty body is title only.
 Constructor: [`widget::banner`](https://docs.rs/icedtea/latest/icedtea/widget/fn.banner.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Use for “offline” or “update available”. Optional button message.
 
@@ -163,8 +152,7 @@ Use for “offline” or “update available”. Optional button message.
 Constructor: [`widget::group_box`](https://docs.rs/icedtea/latest/icedtea/widget/fn.group_box.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Same constructor as card. Prefer this name for form sections.
 
@@ -175,8 +163,7 @@ Same constructor as card. Prefer this name for form sections.
 Constructor: [`widget::placeholder_skeleton`](https://docs.rs/icedtea/latest/icedtea/widget/fn.placeholder_skeleton.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Size the box. No message.
 
@@ -187,8 +174,7 @@ Size the box. No message.
 Constructor: [`widget::teaching_tip`](https://docs.rs/icedtea/latest/icedtea/widget/fn.teaching_tip.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 The application owns dismissed state. Empty body hides the tip.
 
@@ -199,8 +185,7 @@ The application owns dismissed state. Empty body hides the tip.
 Constructor: [`pattern::command_bar`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.command_bar.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Same `Action` iterator as `toolbar`. Disabled actions paint muted.
 
@@ -211,8 +196,7 @@ Same `Action` iterator as `toolbar`. Disabled actions paint muted.
 Constructor: [`pattern::context_menu`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.context_menu.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Stack on the window with the click point. Click-away dismisses.
 Empty table still paints a card.
@@ -224,8 +208,7 @@ Empty table still paints a card.
 Constructor: [`widget::breadcrumb`](https://docs.rs/icedtea/latest/icedtea/widget/fn.breadcrumb.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Crumbs before the last send a message. The last crumb is the current
 page. Empty path is empty.
@@ -237,8 +220,7 @@ page. Empty path is empty.
 Constructor: [`pattern::menu_bar`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.menu_bar.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Groups by the id prefix before `.` (`file.save` → File). Disabled
 actions stay out of the pick list.
@@ -250,10 +232,9 @@ actions stay out of the pick list.
 Constructor: [`pattern::toolbar`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.toolbar.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
-[First window](../first-window.md) uses this with `count.inc`.
+[First window](../first-window.md) uses this with `file.save`.
 Direction comes from `Boot`.
 
 ### Status bar
@@ -263,8 +244,7 @@ Direction comes from `Boot`.
 Constructor: [`pattern::status_bar`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.status_bar.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Left is status copy. Right is `table.footer_hints()`.
 
@@ -275,8 +255,7 @@ Left is status copy. Right is `table.footer_hints()`.
 Constructor: [`pattern::job_strip`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.job_strip.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 The application owns job titles and fractions. Empty strip hides.
 
@@ -313,8 +292,7 @@ paints nothing.
 Constructor: [`widget::busy_overlay`](https://docs.rs/icedtea/latest/icedtea/widget/fn.busy_overlay.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 When `busy` is false the child is unmodified. Advance spinner
 `phase` while true.

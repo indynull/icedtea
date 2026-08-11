@@ -265,7 +265,6 @@ pub fn press(event: &KeyEvent) -> Option<Press> {
 /// is focused. Focused text owns unmodified typing. Otherwise chords
 /// and named keys match `table`.
 ///
-/// See also catalog id `keys`.
 ///
 /// ```
 /// use icedtea::action::{Action, ActionTable};

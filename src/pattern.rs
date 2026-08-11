@@ -88,7 +88,6 @@ fn bind_menu_pick<M: Clone>(entries: Vec<(String, M)>) -> impl Fn(String) -> M {
 /// Groups by the id prefix before `.`. Disabled actions stay out of
 /// the pick list.
 ///
-/// See also catalog id `menu`.
 ///
 /// ```
 /// use icedtea::action::{Action, ActionTable};
@@ -141,7 +140,6 @@ pub fn menu_bar<'a, M: Clone + 'a>(
 ///
 /// Disabled actions paint muted.
 ///
-/// See also catalog id `toolbar`.
 ///
 /// ```
 /// use icedtea::action::{Action, ActionTable};
@@ -185,7 +183,6 @@ pub fn toolbar<'a, M: Clone + 'a>(
 /// A light rail marks the group off the rest of the card.
 /// For a card footer or a tight chrome strip.
 ///
-/// See also catalog id `command-bar`.
 ///
 /// ```
 /// use icedtea::action::{Action, ActionTable};
@@ -236,7 +233,6 @@ pub fn command_bar<'a, M: Clone + 'a>(
 
 /// Footer text plus shortcut hints from the same table.
 ///
-/// See also catalog id `status-bar`.
 ///
 /// ```
 /// use icedtea::action::{Action, ActionTable};
@@ -282,7 +278,6 @@ pub fn status_bar<'a, M: Clone + 'a>(
 /// Pass `CommandPalette::results`. An empty query lists favorites,
 /// then recent, then the rest.
 ///
-/// See also catalog id `palette`.
 ///
 /// ```
 /// use icedtea::action::{Action, ActionTable};
@@ -290,14 +285,17 @@ pub fn status_bar<'a, M: Clone + 'a>(
 /// use icedtea::theme;
 /// let tok = theme::named("dark").tokens;
 /// let mut table = ActionTable::new();
-/// table.insert(Action::new("file.save", "Save", ()));
+/// let save = ();
+/// table.insert(Action::new("file.save", "Save", save));
 /// let hits: Vec<_> = table.iter().collect();
+/// let on_query = |_q: String| ();
+/// let on_pick = |_i: usize| ();
 /// let _: icedtea::Element<'_, ()> = pattern::command_palette_view(
 ///     "",
 ///     &hits,
 ///     0,
-///     |_| (),
-///     |_| (),
+///     on_query,
+///     on_pick,
 ///     tok,
 /// );
 /// ```
@@ -357,7 +355,6 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
 ///
 /// Title, body, and an optional action. Use when a list has no rows.
 ///
-/// See also catalog id `status-page`.
 ///
 /// ```
 /// use icedtea::pattern;
@@ -404,7 +401,6 @@ pub fn status_page<'a, M: Clone + 'a>(
 
 /// Name, version, license, and credits.
 ///
-/// See also catalog id `about`.
 ///
 /// ```
 /// use icedtea::i18n::Catalog;
@@ -466,7 +462,6 @@ pub fn filter_prefs<'a>(groups: &'a [PrefGroup], query: &str) -> Vec<&'a PrefGro
 /// `PrefGroup` is a title plus key/value rows. Empty query shows every
 /// group.
 ///
-/// See also catalog id `preferences`.
 ///
 /// ```
 /// use icedtea::i18n::Catalog;
@@ -538,7 +533,6 @@ pub fn preferences_page<'a, M: Clone + 'a>(
 /// `sidebar` is [`crate::layout::fixed`] or [`crate::layout::FILL`].
 /// Children fill their panes.
 ///
-/// See also catalog id `list-detail`.
 ///
 /// ```
 /// use icedtea::a11y::A11y;
@@ -585,7 +579,6 @@ pub fn list_detail<'a, M: 'a>(
 /// `iced::window::resize_events` and a non-capturing
 /// `Subscription::map`; store the width in `update`.
 ///
-/// See also catalog id `navigation`.
 ///
 /// ```
 /// use icedtea::a11y::A11y;
@@ -597,12 +590,13 @@ pub fn list_detail<'a, M: 'a>(
 /// let tok = theme::named("dark").tokens;
 /// let nav = NavStack::new("home");
 /// let cat = Catalog::builtin();
+/// let on_back = ();
 /// let _: icedtea::Element<'_, ()> = pattern::navigation_view(
 ///     widget::label("Mail", tok, A11y::new("Mail", icedtea::a11y::Role::Header)),
 ///     widget::label("Inbox", tok, A11y::new("Inbox", icedtea::a11y::Role::Header)),
 ///     &nav,
 ///     1600.0,
-///     (),
+///     on_back,
 ///     tok,
 ///     &cat,
 /// );
@@ -639,7 +633,6 @@ pub fn navigation_view<'a, M: Clone + 'a>(
 /// Select and close messages. The application paints the body for the
 /// active tab.
 ///
-/// See also catalog id `tab-view`.
 ///
 /// ```
 /// use icedtea::a11y::A11y;
@@ -676,7 +669,6 @@ pub fn tab_view<'a, M: Clone + 'a>(
 ///
 /// Pass the four regions as `Element`s.
 ///
-/// See also catalog id `main-window`.
 ///
 /// ```
 /// use icedtea::a11y::A11y;
@@ -687,13 +679,18 @@ pub fn tab_view<'a, M: Clone + 'a>(
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let mut table = ActionTable::new();
-/// table.insert(Action::new("file.save", "Save", ()));
+/// let save = ();
+/// table.insert(Action::new("file.save", "Save", save));
 /// let cat = Catalog::builtin();
+/// let menu = pattern::menu_bar(&table, tok, Direction::Ltr, &cat);
+/// let tools = pattern::toolbar(table.iter(), tok, Direction::Ltr);
+/// let center = widget::label("notes.txt", tok, A11y::new("doc", icedtea::a11y::Role::Header));
+/// let status = pattern::status_bar("ok", &table, tok, Direction::Ltr);
 /// let _: icedtea::Element<'_, ()> = pattern::main_window(
-///     pattern::menu_bar(&table, tok, Direction::Ltr, &cat),
-///     pattern::toolbar(table.iter(), tok, Direction::Ltr),
-///     widget::label("notes.txt", tok, A11y::new("doc", icedtea::a11y::Role::Header)),
-///     pattern::status_bar("ok", &table, tok, Direction::Ltr),
+///     menu,
+///     tools,
+///     center,
+///     status,
 ///     tok,
 /// );
 /// ```
@@ -738,7 +735,6 @@ pub fn modal_card<'a, M: 'a>(backdrop: Element<'a, M>, card: Element<'a, M>) -> 
 ///
 /// Primary and optional cancel messages.
 ///
-/// See also catalog id `dialogs`.
 ///
 /// ```
 /// use icedtea::pattern;
@@ -820,7 +816,6 @@ pub fn context_origin(origin: Point, size: Size, viewport: Size) -> Point {
 /// Right-click is the application's (`listen_cursor`). Empty `actions`
 /// still paints a card. `viewport` clamps the card to its real size.
 ///
-/// See also catalog id `context-menu`.
 ///
 /// ```
 /// use icedtea::action::{Action, ActionTable};
@@ -898,7 +893,6 @@ pub fn context_menu<'a, M: Clone + 'a>(
 ///
 /// Close confirm is the application's.
 ///
-/// See also catalog id `document-tabs`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -934,7 +928,6 @@ pub fn document_tabs<'a, M: Clone + 'a>(
 ///
 /// The application owns selection in the list.
 ///
-/// See also catalog id `inspector`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -980,7 +973,6 @@ pub fn inspector<'a, M: 'a>(
 /// is the depth-first tab-group index, then the selected tab
 /// (`DockNode::select_tab_group`).
 ///
-/// See also catalog id `workspace`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -1146,7 +1138,6 @@ where
 ///
 /// Title plus body. `on_dock` is the Dock button message.
 ///
-/// See also catalog id `tool-panel`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -1192,7 +1183,6 @@ pub fn tool_panel<'a, M: Clone + 'a>(
 ///
 /// `open` is `list_detail` with a fixed pane. Closed paints `content` only.
 ///
-/// See also catalog id `drawer`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -1224,7 +1214,6 @@ pub fn drawer<'a, M: 'a>(
 ///
 /// Empty query lists every enabled action. Disabled actions stay out.
 ///
-/// See also catalog id `cheatsheet`.
 ///
 /// ```
 /// use icedtea::action::{Action, ActionTable};
@@ -1282,7 +1271,6 @@ pub fn cheatsheet<'a, M: Clone + 'a>(
 ///
 /// The application owns job titles and fractions. Empty strip hides.
 ///
-/// See also catalog id `jobs`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};

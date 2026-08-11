@@ -125,8 +125,8 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   window, and links. Never `include_str!` the README as the crate-root
   body.
 - Always write constructor rustdoc as a job: when to call it, the
-  arguments that matter, disabled/empty, a compiling call. Catalog id
-  is a see-also, not the title.
+  arguments that matter, disabled/empty, a compiling call that names
+  the message. Do not title rustdoc with a catalog id.
 - Always keep the guide catalog-complete: every `ENTRIES` id appears
   under its catalog group with rustdoc, source, and crates.io (or
   docs.rs) links. Composition chapters teach how to put pieces
@@ -134,9 +134,10 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   the gallery from README, the guide, or crate-root rustdoc. The
   gallery is a demo. Those pages reference shipped constructors,
   rustdoc, and source only.
-- Always use one first-path program (`examples/hello.rs`) that shows
-  Action plus chrome. README, crate-root, and First window include that
-  program. Never lead with a lone increment button.
+- Always use one first-path program (`examples/hello.rs`) that is a
+  tiny Save tool: `file.save`, toolbar, filling editor, status.
+  README, crate-root, and First window include that program. Never
+  lead with a counter.
 - Never put maintainer process (coverage fail-under, publish pipeline,
   “one catalog id / one constructor”) on the reader path (README,
   introduction, first-window, widget reference). That contract lives

@@ -1,19 +1,19 @@
-//! First window: one Action feeds the toolbar and increments the count.
+//! First window: Save writes the buffer into the status line.
 
-use icedtea::a11y::A11y;
+use icedtea::a11y::{A11y, Role};
 use icedtea::action::{Action, ActionTable};
 use icedtea::i18n::Direction;
+use icedtea::iced::widget::text_editor::Content;
 use icedtea::key::{self, KeyContext};
 use icedtea::pattern;
 use icedtea::shortcut::Shortcut;
 use icedtea::theme;
-use icedtea::variant::Variant;
 use icedtea::widget;
 use icedtea::{Boot, Element, Task};
 
 fn main() -> icedtea::iced::Result {
     icedtea::run!(
-        Boot::new("Hello", "dev.example.hello"),
+        Boot::new("Notes", "dev.example.hello"),
         Hello::new,
         Hello::update,
         Hello::view,
@@ -23,13 +23,15 @@ fn main() -> icedtea::iced::Result {
 }
 
 struct Hello {
-    n: i32,
+    doc: Content,
+    status: String,
     table: ActionTable<Message>,
 }
 
 #[derive(Clone)]
 enum Message {
-    Inc,
+    Edit(icedtea::iced::widget::text_editor::Action),
+    Save,
     Key(icedtea::iced::keyboard::Event),
 }
 
@@ -37,15 +39,25 @@ impl Hello {
     fn new() -> (Self, Task<Message>) {
         let mut table = ActionTable::new();
         table.insert(
-            Action::new("count.inc", "Count", Message::Inc)
-                .with_shortcut(Shortcut::parse("ctrl+i").unwrap()),
+            Action::new("file.save", "Save", Message::Save)
+                .with_shortcut(Shortcut::parse("ctrl+s").unwrap()),
         );
-        (Self { n: 0, table }, Task::none())
+        (
+            Self {
+                doc: Content::with_text("Notes"),
+                status: "Ready".into(),
+                table,
+            },
+            Task::none(),
+        )
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::Inc => self.n += 1,
+            Message::Edit(action) => self.doc.perform(action),
+            Message::Save => {
+                self.status = format!("Saved ({} chars)", self.doc.text().chars().count());
+            }
             Message::Key(ev) => {
                 if let Some(next) = key::handle(KeyContext::default(), &self.table, &ev) {
                     return self.update(next);
@@ -59,16 +71,19 @@ impl Hello {
         let tok = theme::named("dark").tokens;
         icedtea::iced::widget::column![
             pattern::toolbar(self.table.iter(), tok, Direction::Ltr),
-            widget::themed_button(
-                format!("Count {}", self.n),
-                Some(Message::Inc),
+            widget::textarea(
+                &self.doc,
+                Message::Edit,
                 tok,
-                Variant::Primary,
-                A11y::button("inc"),
+                icedtea::layout::FILL,
+                A11y::new("notes", Role::TextBox),
             ),
+            pattern::status_bar(&self.status, &self.table, tok, Direction::Ltr),
         ]
-        .spacing(12)
-        .padding(16)
+        .spacing(8)
+        .padding(12)
+        .width(icedtea::layout::FILL)
+        .height(icedtea::layout::FILL)
         .into()
     }
 

@@ -38,8 +38,7 @@ Same fraction contract as the bar, drawn as a ring.
 Constructor: [`widget::sparkline`](https://docs.rs/icedtea/latest/icedtea/widget/fn.sparkline.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Pass a slice of numbers. Empty data paints an empty box.
 
@@ -63,8 +62,7 @@ frame while work is running.
 Constructor: [`widget::display_reading`](https://docs.rs/icedtea/latest/icedtea/widget/fn.display_reading.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Use on a calculator or meter. Empty string is a blank reading.
 `display_line` is the smaller caption above it.

@@ -39,8 +39,7 @@ drops edit.
 Constructor: [`widget::secret_field`](https://docs.rs/icedtea/latest/icedtea/widget/fn.secret_field.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Reveal toggles the mask. Copy is an `Action` whose message the
 application handles with `icedtea::copy_text`.
@@ -77,8 +76,7 @@ Use for palette and list filters. Empty query means “show all”.
 Constructor: [`widget::suggest_field`](https://docs.rs/icedtea/latest/icedtea/widget/fn.suggest_field.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 The application owns the query and the suggestion list. Picking a
 row writes that string.
@@ -103,8 +101,7 @@ current face.
 Constructor: [`widget::number_input`](https://docs.rs/icedtea/latest/icedtea/widget/fn.number_input.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 The application owns the number. Step messages bump it. Disabled
 freezes the value.
@@ -116,8 +113,7 @@ freezes the value.
 Constructor: [`widget::masked_input`](https://docs.rs/icedtea/latest/icedtea/widget/fn.masked_input.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Non-digit template characters stay put. Empty slots are blanks.
 
@@ -128,8 +124,7 @@ Non-digit template characters stay put. Empty slots are blanks.
 Constructor: [`widget::date_picker`](https://docs.rs/icedtea/latest/icedtea/widget/fn.date_picker.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 The application owns the selected day. Disabled ignores picks.
 
@@ -140,8 +135,7 @@ The application owns the selected day. Disabled ignores picks.
 Constructor: [`widget::time_picker`](https://docs.rs/icedtea/latest/icedtea/widget/fn.time_picker.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 `TimeValue` is hour, minute, second. `TimeClock` is display only
 (12-hour or 24-hour, optional seconds). `TimeField` is the unit that
@@ -154,8 +148,7 @@ steps. Disabled freezes the fields.
 Constructor: [`widget::color_swatch`](https://docs.rs/icedtea/latest/icedtea/widget/fn.color_swatch.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 The application owns the `Color`. The message is the new color.
 Disabled keeps the swatch and drops the pick.

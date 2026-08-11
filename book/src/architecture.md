@@ -28,6 +28,6 @@ composes recipes (`dock`, `split`, `clamp`, `form`) with widgets:
 list/detail, navigation, preferences, about, the main window.
 
 [First window](first-window.md) uses Boot, tokens, one Action, a
-toolbar, and a button. The [reference](widgets.md) names every public
-constructor. [Crate docs](https://docs.rs/icedtea) ·
+toolbar, and a notes editor. The [reference](widgets.md) names every
+public constructor. [Crate docs](https://docs.rs/icedtea) ·
 [source](https://github.com/indynull/icedtea).

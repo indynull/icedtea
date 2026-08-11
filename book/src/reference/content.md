@@ -13,8 +13,7 @@ Type, icons, documents, and images.
 Constructor: [`widget::label`](https://docs.rs/icedtea/latest/icedtea/widget/fn.label.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Platform sans. Empty string is an empty node; still pass `A11y`.
 
@@ -25,8 +24,7 @@ Platform sans. Empty string is an empty node; still pass `A11y`.
 Constructor: [`widget::rich_cell`](https://docs.rs/icedtea/latest/icedtea/widget/fn.rich_cell.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Not a markup parser. `RichCell::Link` takes an optional message.
 `MarkdownDoc` stays documents.
@@ -38,8 +36,7 @@ Not a markup parser. `RichCell::Link` takes an optional message.
 Constructor: [`widget::icon_svg`](https://docs.rs/icedtea/latest/icedtea/widget/fn.icon_svg.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 Chrome set only (`Icon::Search`, `Close`, and the rest). Tokens tint
 the fill.
@@ -63,8 +60,7 @@ Empty tip text is a no-op wrap. The child keeps its own `A11y`.
 Constructor: [`widget::hyperlink`](https://docs.rs/icedtea/latest/icedtea/widget/fn.hyperlink.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
+[icedtea](https://crates.io/crates/icedtea)
 
 The application opens the URL or navigates. Disabled paints muted
 text and drops the press.

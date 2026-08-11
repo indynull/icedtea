@@ -1,7 +1,7 @@
 # First window
 
 `icedtea::run!` starts the window. One `Action` feeds the toolbar.
-`ctrl+i` or the Count row increments the same counter.
+`ctrl+s` or the Save row writes the buffer into the status line.
 
 The program is [`examples/hello.rs`](https://github.com/indynull/icedtea/blob/master/examples/hello.rs)
 in the repository. `cargo run --example hello`.

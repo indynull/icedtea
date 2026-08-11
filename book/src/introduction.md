@@ -9,9 +9,9 @@ messages. Color, layout, and chrome are Rust values.
 ![A themed icedtea window](gallery.gif)
 
 [First window](first-window.md) is the shortest path: one `Action`, a
-toolbar, and a button. [Install](install.md) has the crate line and
-host libraries. The [reference](widgets.md) lists every public
-constructor.
+toolbar, and a notes editor. [Install](install.md) has the crate line
+and host libraries. The [cookbook](cookbook/save.md) walks four jobs.
+The [reference](widgets.md) lists every public constructor.
 
 - [Crate docs](https://docs.rs/icedtea)
 - [crates.io](https://crates.io/crates/icedtea)
