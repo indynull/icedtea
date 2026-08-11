@@ -620,6 +620,17 @@ mod tests {
     }
 
     #[test]
+    fn workspace_center_fills_first_leaf() {
+        let pattern = include_str!("pattern.rs");
+        let at = find_pub_fn(pattern, "workspace").expect("workspace constructor");
+        let rustdoc = rustdoc_block_above(&pattern[..at]);
+        assert!(
+            rustdoc.contains("first leaf"),
+            "workspace rustdoc must name the first-leaf content limit"
+        );
+    }
+
+    #[test]
     fn hello_is_a_tool() {
         let hello = include_str!("../examples/hello.rs");
         assert!(hello.contains("file.save"));

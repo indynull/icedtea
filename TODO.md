@@ -2,10 +2,15 @@
 
 ## Do
 
-- `list_view` from `visible_range_var` (variable row heights).
+- `pattern::workspace` paints application content only in the first
+  leaf (depth-first). Other leaves show their title. A 1.0.0beta1
+  workspace constructor takes content per leaf.
 
 ## Consider
 
+- `list_view` from `visible_range_var` (variable row heights). Fixed
+  `row_h` is the shipped contract; extend list, do not add a second
+  collection widget.
 - Frozen leading columns on `data_table` (`ColumnLayout` order stays
   the scroll order; pin the first *n* so they stay in view).
 - A parameter field on the command palette (go to line, rename) that
