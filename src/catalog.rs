@@ -547,6 +547,11 @@ mod tests {
                 "{} rustdoc must not teach catalog id",
                 e.id
             );
+            assert!(
+                !rustdoc.contains("|_| ()") && !rustdoc.contains("|_, _| ()"),
+                "{} rustdoc must name the message, not a dummy closure",
+                e.id
+            );
         }
     }
 

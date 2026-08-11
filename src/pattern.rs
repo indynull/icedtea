@@ -473,8 +473,9 @@ pub fn filter_prefs<'a>(groups: &'a [PrefGroup], query: &str) -> Vec<&'a PrefGro
 ///     title: "Editor".into(),
 ///     keys: vec![("tab width".into(), "4".into())],
 /// }];
-/// let _: icedtea::Element<'_, ()> =
-///     pattern::preferences_page(&groups, "", |_| (), tok, &cat);
+/// let on_query = |q| q;
+/// let _: icedtea::Element<'_, String> =
+///     pattern::preferences_page(&groups, "", on_query, tok, &cat);
 /// ```
 pub fn preferences_page<'a, M: Clone + 'a>(
     groups: &'a [PrefGroup],
@@ -642,11 +643,18 @@ pub fn navigation_view<'a, M: Clone + 'a>(
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let tabs = Tabs::new(["Notes", "Guide"]);
-/// let _: icedtea::Element<'_, ()> = pattern::tab_view(
+/// #[derive(Clone, Copy)]
+/// enum Msg {
+///     Select(usize),
+///     Close(usize),
+/// }
+/// let on_select = Msg::Select;
+/// let on_close = Msg::Close;
+/// let _: icedtea::Element<'_, Msg> = pattern::tab_view(
 ///     &tabs,
 ///     widget::label("Notes", tok, A11y::new("Notes", icedtea::a11y::Role::Header)),
-///     |_| (),
-///     |_| (),
+///     on_select,
+///     on_close,
 ///     tok,
 /// );
 /// ```
@@ -903,11 +911,18 @@ pub fn context_menu<'a, M: Clone + 'a>(
 /// let tok = theme::named("dark").tokens;
 /// let mut docs = DocumentTabs::new(["lib.rs"]);
 /// docs.tabs.closable = true;
-/// let _: icedtea::Element<'_, ()> = pattern::document_tabs(
+/// #[derive(Clone, Copy)]
+/// enum Msg {
+///     Select(usize),
+///     Close(usize),
+/// }
+/// let on_select = Msg::Select;
+/// let on_close = Msg::Close;
+/// let _: icedtea::Element<'_, Msg> = pattern::document_tabs(
 ///     &docs,
 ///     widget::label("src", tok, A11y::new("src", Role::Status)),
-///     |_| (),
-///     |_| (),
+///     on_select,
+///     on_close,
 ///     tok,
 /// );
 /// ```
@@ -982,12 +997,19 @@ pub fn inspector<'a, M: 'a>(
 /// use icedtea::workspace::DockNode;
 /// let tok = theme::named("dark").tokens;
 /// let root = DockNode::leaf("edit", "Edit");
-/// let _: icedtea::Element<'_, ()> = pattern::workspace(
+/// #[derive(Clone, Copy)]
+/// enum Msg {
+///     Sash(usize, icedtea::layout::SashEvent),
+///     Tab(usize, usize),
+/// }
+/// let on_sash = Msg::Sash;
+/// let on_tab = Msg::Tab;
+/// let _: icedtea::Element<'_, Msg> = pattern::workspace(
 ///     &root,
 ///     widget::label("src", tok, A11y::new("src", Role::Status)),
 ///     icedtea::iced::Size::new(400.0, 240.0),
-///     |_, _| (),
-///     |_, _| (),
+///     on_sash,
+///     on_tab,
 ///     tok,
 ///     A11y::new("workspace", Role::Group),
 /// );
@@ -1145,10 +1167,11 @@ where
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
+/// let dock = ();
 /// let _: icedtea::Element<'_, ()> = pattern::tool_panel(
 ///     "Outline",
 ///     widget::label("files", tok, A11y::new("files", Role::Status)),
-///     Some(()),
+///     Some(dock),
 ///     tok,
 ///     A11y::new("Outline", Role::Group),
 /// );

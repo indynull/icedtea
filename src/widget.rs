@@ -451,10 +451,11 @@ pub fn toggle_button<'a, M: Clone + 'a>(
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let _: icedtea::Element<'_, ()> = widget::themed_checkbox(
+/// let on_toggle = |on| on;
+/// let _: icedtea::Element<'_, bool> = widget::themed_checkbox(
 ///     "Accept",
 ///     true,
-///     |_| (),
+///     on_toggle,
 ///     tok,
 ///     A11y::new("Accept", Role::Checkbox).with_checked(true),
 /// );
@@ -488,8 +489,13 @@ pub fn themed_checkbox<'a, M: Clone + 'a>(
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let _: icedtea::Element<'_, ()> = widget::themed_switch(
-///     "Sounds", false, |_| (), tok, A11y::new("Sounds", Role::Switch),
+/// let on_toggle = |on| on;
+/// let _: icedtea::Element<'_, bool> = widget::themed_switch(
+///     "Sounds",
+///     false,
+///     on_toggle,
+///     tok,
+///     A11y::new("Sounds", Role::Switch),
 /// );
 /// ```
 pub fn themed_switch<'a, M: Clone + 'a>(
@@ -519,11 +525,12 @@ pub fn themed_switch<'a, M: Clone + 'a>(
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let _: icedtea::Element<'_, ()> = widget::themed_radio(
+/// let on_pick = |v| v;
+/// let _: icedtea::Element<'_, u8> = widget::themed_radio(
 ///     "A",
 ///     0u8,
 ///     Some(0),
-///     |_| (),
+///     on_pick,
 ///     tok,
 ///     A11y::new("A", Role::Radio).with_checked(true),
 /// );
@@ -601,8 +608,13 @@ pub fn scroll_delta_pixels(delta: iced::mouse::ScrollDelta, row_h: f32) -> f32 {
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let _: icedtea::Element<'_, ()> = widget::themed_slider(
-///     0.0..=1.0, 0.4, |_| (), tok, A11y::new("vol", Role::Slider).with_value("0.4"),
+/// let on_change = |v| v;
+/// let _: icedtea::Element<'_, f32> = widget::themed_slider(
+///     0.0..=1.0,
+///     0.4,
+///     on_change,
+///     tok,
+///     A11y::new("vol", Role::Slider).with_value("0.4"),
 /// );
 /// ```
 pub fn themed_slider<'a, M: Clone + 'a>(
@@ -938,8 +950,12 @@ pub fn image_slot<'a, M: Clone + 'a>(
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let _: icedtea::Element<'_, ()> = widget::number_input(
-///     3.0, |_| (), tok, A11y::new("n", Role::SpinButton),
+/// let on_change = |s| s;
+/// let _: icedtea::Element<'_, String> = widget::number_input(
+///     3.0,
+///     on_change,
+///     tok,
+///     A11y::new("n", Role::SpinButton),
 /// );
 /// ```
 pub fn number_input<'a, M: Clone + 'a>(
@@ -1001,8 +1017,13 @@ fn mask_handler<'a, M: 'a>(
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let _: icedtea::Element<'_, ()> = widget::masked_input(
-///     "000-00-0000", "", |_| (), tok, A11y::new("ssn", Role::TextBox),
+/// let on_input = |s| s;
+/// let _: icedtea::Element<'_, String> = widget::masked_input(
+///     "000-00-0000",
+///     "",
+///     on_input,
+///     tok,
+///     A11y::new("ssn", Role::TextBox),
 /// );
 /// ```
 pub fn masked_input<'a, M: Clone + 'a>(
@@ -1037,8 +1058,15 @@ pub fn masked_input<'a, M: Clone + 'a>(
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let _: icedtea::Element<'_, ()> = widget::themed_text_input(
-///     "Name", "", |_| (), None, tok, A11y::new("Name", Role::TextBox), None,
+/// let on_input = |s| s;
+/// let _: icedtea::Element<'_, String> = widget::themed_text_input(
+///     "Name",
+///     "",
+///     on_input,
+///     None,
+///     tok,
+///     A11y::new("Name", Role::TextBox),
+///     None,
 /// );
 /// ```
 pub fn themed_text_input<'a, M: Clone + 'a>(
@@ -1079,8 +1107,16 @@ pub fn themed_text_input<'a, M: Clone + 'a>(
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let opts = ["save".into(), "open".into()];
+/// let on_input = |_s: String| ();
+/// let on_pick = |_i: usize| ();
 /// let _: icedtea::Element<'_, ()> = widget::suggest_field(
-///     "Type", "", |_| (), &opts, |_| (), tok, A11y::new("cmd", Role::ComboBox),
+///     "Type",
+///     "",
+///     on_input,
+///     &opts,
+///     on_pick,
+///     tok,
+///     A11y::new("cmd", Role::ComboBox),
 /// );
 /// ```
 pub fn suggest_field<'a, M: Clone + 'a>(
@@ -1125,8 +1161,14 @@ pub fn suggest_field<'a, M: Clone + 'a>(
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let _: icedtea::Element<'_, ()> = widget::password_input(
-///     "Secret", "", |_| (), tok, A11y::new("Secret", Role::TextBox), true,
+/// let on_input = |s| s;
+/// let _: icedtea::Element<'_, String> = widget::password_input(
+///     "Secret",
+///     "",
+///     on_input,
+///     tok,
+///     A11y::new("Secret", Role::TextBox),
+///     true,
 /// );
 /// ```
 pub fn password_input<'a, M: Clone + 'a>(
@@ -1281,8 +1323,14 @@ pub fn textarea<'a, M: Clone + 'a>(
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let content = icedtea::iced::widget::text_editor::Content::with_text("fn main() {}");
-/// let _: icedtea::Element<'_, ()> = widget::highlighted_code(
-///     &content, "rs", |_| (), tok, "dark", icedtea::layout::FILL,
+/// let on_edit = |action| action;
+/// let _: icedtea::Element<'_, _> = widget::highlighted_code(
+///     &content,
+///     "rs",
+///     on_edit,
+///     tok,
+///     "dark",
+///     icedtea::layout::FILL,
 ///     A11y::new("src", Role::TextBox),
 /// );
 /// ```
@@ -1351,8 +1399,9 @@ pub fn editor_style(
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let _: icedtea::Element<'_, ()> =
-///     widget::search_input("", |_| (), tok, A11y::new("Search", Role::TextBox));
+/// let on_input = |s| s;
+/// let _: icedtea::Element<'_, String> =
+///     widget::search_input("", on_input, tok, A11y::new("Search", Role::TextBox));
 /// ```
 pub fn search_input<'a, M: Clone + 'a>(
     value: &str,
@@ -1392,10 +1441,11 @@ pub fn search_input<'a, M: Clone + 'a>(
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let opts = ["nord", "dark"];
-/// let _: icedtea::Element<'_, ()> = widget::themed_pick_list(
+/// let on_select = |name| name;
+/// let _: icedtea::Element<'_, &str> = widget::themed_pick_list(
 ///     opts,
 ///     Some("nord"),
-///     |_| (),
+///     on_select,
 ///     tok,
 ///     A11y::new("theme", Role::ComboBox),
 /// );
@@ -1997,8 +2047,9 @@ pub fn parse(source: &str) -> MarkdownDoc {
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let doc = widget::parse("# Hi");
-/// let _: icedtea::Element<'_, ()> =
-///     widget::markdown_view(&doc.items, tok, |_| (), A11y::new("md", Role::Group));
+/// let on_link = |uri| uri;
+/// let _: icedtea::Element<'_, _> =
+///     widget::markdown_view(&doc.items, tok, on_link, A11y::new("md", Role::Group));
 /// ```
 pub fn markdown_view<'a, M: Clone + 'a>(
     items: &'a [markdown::Item],
@@ -2194,7 +2245,7 @@ pub fn badge<'a, M: 'a>(
 
 /// A titled panel around children.
 ///
-/// Empty title is a border only. Catalog ids `card` and `group-box`.
+/// Empty title is a border only. Same constructor paints a card.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -2321,7 +2372,8 @@ pub fn info_bar<'a, M: Clone + 'a>(
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let crumbs = [("Home".into(), Some(())), ("Gallery".into(), None)];
+/// let home = ();
+/// let crumbs = [("Home".into(), Some(home)), ("Notes".into(), None)];
 /// let _: icedtea::Element<'_, ()> = widget::breadcrumb(
 ///     &crumbs,
 ///     tok,
@@ -2835,8 +2887,9 @@ where
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let labels = vec!["Inbox".into(), "Mail".into()];
-/// let _: icedtea::Element<'_, ()> =
-///     widget::item_grid(&labels, |_| (), tok, A11y::new("grid", Role::List));
+/// let on_select = |i| i;
+/// let _: icedtea::Element<'_, usize> =
+///     widget::item_grid(&labels, on_select, tok, A11y::new("grid", Role::List));
 /// ```
 pub fn item_grid<'a, M: Clone + 'a>(
     labels: &[String],
@@ -3059,8 +3112,20 @@ where
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let tree = TreeNode::leaf(1, "lib.rs");
-/// let _: icedtea::Element<'_, ()> = widget::tree_view(
-///     &tree, None, |_| (), |_| (), tok, A11y::new("tree", Role::Tree),
+/// #[derive(Clone, Copy)]
+/// enum Msg {
+///     Toggle(u64),
+///     Select(u64),
+/// }
+/// let on_toggle = Msg::Toggle;
+/// let on_select = Msg::Select;
+/// let _: icedtea::Element<'_, Msg> = widget::tree_view(
+///     &tree,
+///     None,
+///     on_toggle,
+///     on_select,
+///     tok,
+///     A11y::new("tree", Role::Tree),
 /// );
 /// ```
 pub fn tree_view<'a, M: Clone + 'a>(
@@ -3142,8 +3207,19 @@ pub fn tree_view<'a, M: Clone + 'a>(
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let tabs = Tabs::new(["One", "Two"]);
-/// let _: icedtea::Element<'_, ()> = widget::tab_bar(
-///     &tabs, |_| (), |_| (), tok, A11y::new("tabs", Role::Tab),
+/// #[derive(Clone, Copy)]
+/// enum Msg {
+///     Select(usize),
+///     Close(usize),
+/// }
+/// let on_select = Msg::Select;
+/// let on_close = Msg::Close;
+/// let _: icedtea::Element<'_, Msg> = widget::tab_bar(
+///     &tabs,
+///     on_select,
+///     on_close,
+///     tok,
+///     A11y::new("tabs", Role::Tab),
 /// );
 /// ```
 pub fn tab_bar<'a, M: Clone + 'a>(
@@ -3227,11 +3303,12 @@ fn disclosure_header<'a, M: Clone + 'a>(
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let titles = ["Files".into()];
-/// let _: icedtea::Element<'_, ()> = widget::accordion_view(
+/// let on_toggle = |i| i;
+/// let _: icedtea::Element<'_, usize> = widget::accordion_view(
 ///     &titles,
 ///     vec![widget::label("New", tok, A11y::new("New", Role::Status))],
 ///     &Accordion { open: Some(0) },
-///     |_| (),
+///     on_toggle,
 ///     tok,
 ///     A11y::new("acc", Role::Group),
 /// );
@@ -3402,8 +3479,9 @@ pub fn expander<'a, M: Clone + 'a>(
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let _: icedtea::Element<'_, ()> =
-///     widget::pagination(40, 0, 10, |_| (), tok, A11y::new("pages", Role::Group));
+/// let on_page = |i| i;
+/// let _: icedtea::Element<'_, usize> =
+///     widget::pagination(40, 0, 10, on_page, tok, A11y::new("pages", Role::Group));
 /// ```
 pub fn pagination<'a, M: Clone + 'a>(
     len: usize,
