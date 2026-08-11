@@ -165,6 +165,8 @@ mod tests {
         );
         let idx = DragPayload::index("inbox", 3);
         assert_eq!(idx.as_index(), Some(("inbox", 3)));
+        assert!(t.as_index().is_none());
+        assert!(f.as_index().is_none());
         assert!(idx.as_text().is_none());
         assert!(idx.as_files().is_empty());
         assert!(!DropAccept::Text.accepts(&idx));

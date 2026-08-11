@@ -1115,13 +1115,8 @@ where
                 meta(title.clone(), tok, A11y::new(&title, Role::Status))
             };
             let on_tab = paint.on_tab;
-            tab_view(
-                &tabs,
-                body,
-                move |i| on_tab(gi, i),
-                move |i| on_tab(gi, i),
-                tok,
-            )
+            let pick = move |i| on_tab(gi, i);
+            tab_view(&tabs, body, pick, pick, tok)
         }
         crate::workspace::DockNode::Split {
             axis,
@@ -1431,6 +1426,7 @@ mod tests {
         let _: Element<'_, ()> = toolbar(acts.iter().copied(), tok, ltr);
         let _: Element<'_, ()> = toolbar(acts.iter().copied(), tok, rtl);
         let _: Element<'_, ()> = command_bar(table.iter(), tok, rtl);
+        let _: Element<'_, ()> = command_bar(std::iter::empty::<Action<()>>(), tok, ltr);
         let _: Element<'_, ()> = status_bar("ready", &table, tok, ltr);
         let _: Element<'_, ()> = status_bar("ready", &table, tok, rtl);
         let ltr_ids: Vec<_> = order(ltr, table.iter().map(|a| a.id.as_str()));

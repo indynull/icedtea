@@ -4118,18 +4118,12 @@ mod tests {
             None,
             role("list", Role::List),
         );
-        let scrolled = VisibleWindow {
-            start: 0,
-            end: 0,
-            scroll: 24.0,
-            viewport: 100.0,
-        };
-        let _: Element<'_, ()> = list_view(
+        let mut striped: Element<'_, ()> = list_view(
             &list,
             &Sel::Single(0),
             |_| (),
             tok,
-            scrolled,
+            win,
             24.0,
             4,
             |_| (),
@@ -4144,6 +4138,7 @@ mod tests {
             None,
             role("list", Role::List),
         );
+        draw_once(&mut striped);
         let _: Element<'_, ()> = list_view(
             &with_sep,
             &Sel::Single(0),

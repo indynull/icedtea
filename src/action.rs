@@ -308,6 +308,9 @@ mod tests {
         assert!(!same_seq.conflicts().is_empty());
         same_seq.get_mut("a").unwrap().enabled = false;
         assert!(same_seq.conflicts().is_empty());
+        same_seq.get_mut("a").unwrap().enabled = true;
+        same_seq.get_mut("b").unwrap().enabled = false;
+        assert!(same_seq.conflicts().is_empty());
         assert!(same_seq
             .match_shortcut_in(&Shortcut::parse("ctrl+s").unwrap(), None)
             .is_none());

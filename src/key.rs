@@ -679,6 +679,8 @@ mod tests {
             let ev = press(Key::Named(named), Modifiers::empty());
             assert_eq!(super::press(&ev), Some(want));
         }
+        let other = press(Key::Named(Named::Insert), Modifiers::empty());
+        assert_eq!(super::press(&other), typed(&other).map(Press::Character));
         assert_eq!(Press::ArrowDown.step_index(0, 10, 5), 1);
         assert_eq!(Press::ArrowUp.step_index(0, 10, 5), 0);
         assert_eq!(Press::PageDown.step_index(0, 10, 5), 5);

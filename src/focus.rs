@@ -110,6 +110,7 @@ mod tests {
         let boxes = [(0.0, 0.0), (200.0, 0.0), (0.0, 120.0)];
         assert_eq!(spatial_next(0, Press::ArrowRight, &boxes), Some(1));
         assert_eq!(spatial_next(0, Press::ArrowDown, &boxes), Some(2));
+        assert_eq!(spatial_next(2, Press::ArrowUp, &boxes), Some(0));
         assert_eq!(spatial_next(0, Press::ArrowLeft, &boxes), None);
         assert_eq!(spatial_next(9, Press::ArrowRight, &boxes), None);
         assert_eq!(spatial_next(0, Press::Enter, &boxes), None);
