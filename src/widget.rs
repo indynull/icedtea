@@ -20,6 +20,7 @@
 //! );
 //! ```
 
+use iced::gradient::Linear;
 use iced::widget::canvas::Canvas;
 use iced::widget::markdown;
 use iced::widget::scrollable::{Direction as ScrollDir, Scrollbar};
@@ -29,7 +30,7 @@ use iced::widget::{
     scrollable, slider, stack, svg, text, text_editor, text_input, toggler, tooltip, Column, Id,
     Row, Space,
 };
-use iced::{Alignment, Color, Element, Length, Padding};
+use iced::{Alignment, Background, Color, Element, Length, Padding, Radians};
 
 use crate::chrome::SCROLL_RAIL_WIDTH;
 use crate::host_canvas::ArcRing;
@@ -3270,24 +3271,89 @@ pub fn accordion_view<'a, M: Clone + 'a>(
     a11y::attach(col.into(), &a11y)
 }
 
-/// A card that clips its child to `collapsed` until opened.
+/// How much of the child a closed [`expander`] shows.
 ///
-/// The application owns `open`. The header toggles. Closed clips the
-/// child to `collapsed` (snapped to the 4px grid). Open paints the
-/// full child. Title starts; the chevron sits on the trailing edge.
+/// `Pixels` is a raw height, snapped up to the 4px grid. `Lines` is
+/// whole body lines plus room for the last line's descent, so the
+/// clip does not cut through glyphs.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Peek {
+    Pixels(f32),
+    Lines(u16),
+}
+
+impl Peek {
+    /// iced's default body line box (`typo::BODY` × 1.3).
+    pub fn body_line() -> f32 {
+        typo::BODY as f32 * 1.3
+    }
+
+    /// Extra pixels under the last line so descenders stay inside.
+    pub const DESCENT: f32 = 6.0;
+
+    /// Snapped height of this peek.
+    pub fn height(self) -> f32 {
+        let raw = match self {
+            Self::Pixels(px) => px.max(0.0),
+            Self::Lines(n) => {
+                let n = u32::from(n.max(1));
+                n as f32 * Self::body_line() + Self::DESCENT
+            }
+        };
+        crate::density::Density::snap(raw.ceil() as u32).max(4) as f32
+    }
+}
+
+impl From<f32> for Peek {
+    fn from(px: f32) -> Self {
+        Self::Pixels(px)
+    }
+}
+
+fn peek_clip<'a, M: 'a>(child: Element<'a, M>, h: f32, tok: Tokens) -> Element<'a, M> {
+    let fade_h = 12.0_f32.min(h * 0.4).max(4.0);
+    let mut clear = tok.surface;
+    clear.a = 0.0;
+    let grad = Linear::new(Radians(std::f32::consts::FRAC_PI_2))
+        .add_stop(0.0, clear)
+        .add_stop(1.0, tok.surface);
+    let fade = container(Space::new().width(Length::Fill).height(fade_h))
+        .width(Length::Fill)
+        .height(fade_h)
+        .style(move |_| container::Style {
+            background: Some(Background::from(grad)),
+            snap: false,
+            ..container::Style::default()
+        });
+    stack![
+        container(child)
+            .width(Length::Fill)
+            .height(Length::Fixed(h))
+            .clip(true),
+        column![Space::new().height(Length::Fill), fade].height(Length::Fixed(h)),
+    ]
+    .into()
+}
+
+/// A card that clips its child until opened.
+///
+/// The application owns `open`. The header toggles. Closed shows a
+/// [`Peek`] of the child (pixels or whole body lines) and fades the
+/// cut. Open paints the full child. Title starts; the chevron sits on
+/// the trailing edge.
 ///
 /// See also catalog id `expander`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
 /// use icedtea::theme;
-/// use icedtea::widget;
+/// use icedtea::widget::{self, Peek};
 /// let tok = theme::named("dark").tokens;
 /// let body = widget::label("more", tok, A11y::new("more", Role::Status));
 /// let _: icedtea::Element<'_, bool> = widget::expander(
 ///     "Notes",
 ///     body,
-///     48.0,
+///     Peek::Lines(2),
 ///     false,
 ///     |open| open,
 ///     tok,
@@ -3297,7 +3363,7 @@ pub fn accordion_view<'a, M: Clone + 'a>(
 pub fn expander<'a, M: Clone + 'a>(
     title: impl Into<String>,
     child: Element<'a, M>,
-    collapsed: f32,
+    collapsed: impl Into<Peek>,
     open: bool,
     on_toggle: impl Fn(bool) -> M + Copy + 'a,
     tok: Tokens,
@@ -3313,15 +3379,11 @@ pub fn expander<'a, M: Clone + 'a>(
             .with_checked(open)
             .with_disabled(a11y.disabled),
     );
-    let h = crate::density::Density::snap(collapsed.max(0.0).ceil() as u32).max(4) as f32;
+    let h = collapsed.into().height();
     let body: Element<'a, M> = if open {
         child
     } else {
-        container(child)
-            .width(Length::Fill)
-            .height(Length::Fixed(h))
-            .clip(true)
-            .into()
+        peek_clip(child, h, tok)
     };
     a11y::attach(
         container(column![header, body].spacing(8))
@@ -5347,6 +5409,32 @@ mod tests {
         assert!(head.contains("Icon::Chevron"));
         assert!(head.contains("Length::Fill"));
         assert!(!head.contains("▾"));
+    }
+
+    #[test]
+    fn peek_lines_keeps_the_last_line_inside_the_clip() {
+        let one = Peek::Lines(1).height();
+        let two = Peek::Lines(2).height();
+        assert!(two > one);
+        let raw = 2.0 * Peek::body_line() + Peek::DESCENT;
+        assert!(two >= raw);
+        assert_eq!(Peek::Pixels(48.0).height(), 48.0);
+        assert_eq!(Peek::Pixels(45.0).height(), 48.0);
+        let mut lined: Element<'_, bool> = expander(
+            "Notes",
+            label(
+                "more",
+                named("dark").tokens,
+                A11y::new("more", Role::Status),
+            ),
+            Peek::Lines(2),
+            false,
+            |open| open,
+            named("dark").tokens,
+            A11y::new("exp", Role::Group),
+        );
+        let h = layout_size(&mut lined, iced::Size::new(320.0, 800.0)).height;
+        assert!(h >= Peek::Lines(2).height());
     }
 
     fn layout_size<M: Clone>(el: &mut Element<'_, M>, max: iced::Size) -> iced::Size {

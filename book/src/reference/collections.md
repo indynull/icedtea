@@ -126,9 +126,11 @@ Constructor: [`widget::expander`](https://docs.rs/icedtea/latest/icedtea/widget/
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
-The application owns `open`. Closed clips the child to `collapsed`.
-Open paints the full child. Title starts; the chevron sits on the
-trailing edge. Accordion is many headers; this is one card.
+The application owns `open`. Closed shows a `Peek` of the child
+(pixels, or whole body lines with room for the last descent) and
+fades the cut. Open paints the full child. Title starts; the
+chevron sits on the trailing edge. Accordion is many headers;
+this is one card.
 
 ### Pagination
 

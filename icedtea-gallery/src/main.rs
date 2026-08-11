@@ -2803,7 +2803,7 @@ impl Gallery {
                 widget::expander(
                     "Release notes",
                     body,
-                    48.0,
+                    widget::Peek::Lines(2),
                     self.expander_open,
                     Message::Expand,
                     tok,
