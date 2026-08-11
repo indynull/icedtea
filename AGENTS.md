@@ -86,9 +86,10 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
 - One path per feature. Pick it and delete the other. Fallbacks re-grow.
 - Always drop `target/llvm-cov-target` after a passing coverage run.
   `just clean` is `cargo clean`. Check recipes set `CARGO_INCREMENTAL=0`.
-- Always keep `TODO.md` current with shipped library and real
-  consumer requests. Sort them into Do / Consider / discard in the
-  same change. Never leave Order or Do pointing at finished work.
+- Always keep `TODO.md` current with the shipped library. Sort items
+  into Do / Consider / discard in the same change. Never leave Order
+  or Do pointing at finished work. Never park or discard a job because
+  no application has asked for it.
 - Coverage fail-under is 99 on `just check` (llvm-cov const/macro
   mapping). Never claim 100 while the tool reports less.
 - `catalog::ENTRIES` is the gallery checklist. Adding an export means
@@ -104,8 +105,7 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   `density`, `typo`, `chrome`, and tokens — not one-off magic in widgets.
 - Never leave a process-global `OnceLock` or env mutation that freezes
   the first workspace, locale, or theme for the process lifetime.
-- Extract a second crate only after a second in-tree consumer needs it.
-  Experiments live in `icedtea` or `icedtea-gallery`. Never add a
+- Experiments live in `icedtea` or `icedtea-gallery`. Never add a
   proof-of-work app as a workspace member or document it in README,
   the book, or this file.
 - Never grow `CHANGELOG.md` Unreleased into a session diary. 0.1.0 on
