@@ -13,7 +13,7 @@ your messages.
 ```toml
 [dependencies]
 iced = "0.14"
-icedtea = "0.2"
+icedtea = "0.3"
 ```
 
 The program is [`examples/hello.rs`](examples/hello.rs): a notes buffer,
@@ -46,4 +46,4 @@ Xcode command-line tools. Windows needs the MSVC build tools.
 
 | iced | icedtea |
 | --- | --- |
-| 0.14 | 0.2 |
+| 0.14 | 0.3 |

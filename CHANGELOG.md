@@ -2,19 +2,21 @@
 
 ## Unreleased
 
+## 0.3.0 — 2026-08-11
+
 The first window is a Save tool (`examples/hello.rs`). Crate-root
 rustdoc walks compose, boot, keys, tokens, a widget, a pattern, and
 scope. The guide has a four-job cookbook. Constructor rustdoc names
 the message. The reference lists every public constructor by group.
 
 `pattern::workspace` paints a `DockNode` (splits, sash, tabs).
-`move_panel` takes a leaf out of a split by collapsing onto the
-sibling. `data_table` follows `ColumnLayout` order. Empty-query
-palette lists favorites, then recent.
-`context_menu` clamps to the card size. `DropAccept::Text` is text
-only. `widget::expander` is a card that clips its child until
-opened. Closed peek is pixels or whole body lines, and the cut
-fades into the card. `pattern::command_bar` is the dense action
+`center` fills the first leaf. `move_panel` takes a leaf out of a
+split by collapsing onto the sibling. `data_table` follows
+`ColumnLayout` order. Empty-query palette lists favorites, then
+recent. `context_menu` clamps to the card size. `DropAccept::Text`
+is text only. `widget::expander` is a card that clips its child
+until opened. Closed peek is pixels or whole body lines, and the
+cut fades into the card. `pattern::command_bar` is the dense action
 row (ghost, meta type, no panel) with a light leading rail.
 Gallery demos handle the messages their widgets emit.
 

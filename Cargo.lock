@@ -1745,7 +1745,7 @@ dependencies = [
 
 [[package]]
 name = "icedtea"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "iced",
  "iced_tiny_skia",
@@ -1757,7 +1757,7 @@ dependencies = [
 
 [[package]]
 name = "icedtea-gallery"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "icedtea",
 ]
