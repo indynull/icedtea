@@ -13,8 +13,9 @@ palette lists favorites, then recent.
 `context_menu` clamps to the card size. `DropAccept::Text` is text
 only. `widget::expander` is a card that clips its child until
 opened. Closed peek is pixels or whole body lines, and the cut
-fades into the card. Gallery demos handle the messages their
-widgets emit.
+fades into the card. `pattern::command_bar` is the dense action
+row (ghost, meta type, no panel). Gallery demos handle the
+messages their widgets emit.
 
 ## 0.2.0 — 2026-08-11
 

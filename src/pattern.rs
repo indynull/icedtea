@@ -17,8 +17,8 @@
 //! let _ = cat;
 //! ```
 
-use iced::widget::{column, container, mouse_area, row, text, Column, Row, Space, Stack};
-use iced::{Element, Length, Padding, Point, Size};
+use iced::widget::{button, column, container, mouse_area, row, text, Column, Row, Space, Stack};
+use iced::{Alignment, Element, Length, Padding, Point, Size};
 
 use crate::a11y::{A11y, Role};
 use crate::action::{Action, ActionTable};
@@ -181,7 +181,8 @@ pub fn toolbar<'a, M: Clone + 'a>(
 
 /// The toolbar row, denser.
 ///
-/// Same `Action` iterator as [`toolbar`].
+/// Same `Action` iterator as [`toolbar`]. Ghost, meta type, no panel.
+/// For a card footer or a tight chrome strip.
 ///
 /// See also catalog id `command-bar`.
 ///
@@ -197,11 +198,27 @@ pub fn toolbar<'a, M: Clone + 'a>(
 ///     pattern::command_bar(table.iter(), tok, Direction::Ltr);
 /// ```
 pub fn command_bar<'a, M: Clone + 'a>(
-    actions: impl IntoIterator<Item = &'a Action<M>>,
+    actions: impl IntoIterator<Item = impl std::borrow::Borrow<Action<M>>>,
     tok: Tokens,
     dir: Direction,
 ) -> Element<'a, M> {
-    toolbar(actions, tok, dir)
+    let owned: Vec<Action<M>> = actions.into_iter().map(|a| a.borrow().clone()).collect();
+    let actions = order(dir, owned);
+    let mut r = Row::new().spacing(2).align_y(Alignment::Center);
+    for a in actions {
+        let face = text(a.title.clone()).size(typo::META).color(tok.muted);
+        let mut b = button(face)
+            .padding([2, 6])
+            .style(style::button_style(tok, Variant::Ghost));
+        if let Some(m) = a.invoke() {
+            b = b.on_press(m);
+        }
+        r = r.push(crate::a11y::attach(
+            b.into(),
+            &A11y::button(a.title.clone()).with_disabled(!a.enabled),
+        ));
+    }
+    crate::a11y::attach(r.into(), &A11y::new("commands", Role::Group))
 }
 
 /// Footer text plus shortcut hints from the same table.
