@@ -3,9 +3,7 @@
 /// Full markdown document: every construct icedtea's markdown view must show.
 pub const MARKDOWN: &str = r#"# Markdown
 
-A document control, not a one-line stub. The gallery parses this
-source with `MarkdownDoc::parse` in `update` and `markdown_view`
-borrows the items. Acceptance content: headings, emphasis, lists,
+A document control, not a one-line stub. Headings, emphasis, lists,
 quotes, tables, rules, tasks, links, and fenced code.
 
 ## Headings
@@ -172,14 +170,30 @@ impl CodeLang {
     }
 }
 
-/// 1×1 PNG for the image catalog page.
-pub const PIXEL_PNG: &[u8] = &[
-    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
-    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53,
-    0xDE, 0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54, 0x08, 0xD7, 0x63, 0xF8, 0xCF, 0xC0, 0x00,
-    0x00, 0x03, 0x01, 0x01, 0x00, 0x18, 0xDD, 0x8D, 0xB0, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E,
-    0x44, 0xAE, 0x42, 0x60, 0x82,
-];
+/// Decoded 48×48 checker. `Handle::from_bytes` paints on a worker and
+/// the first frames of a tour beat are empty.
+pub fn sample_handle() -> icedtea::iced::widget::image::Handle {
+    const W: u32 = 48;
+    const H: u32 = 48;
+    let mut px = vec![0u8; (W * H * 4) as usize];
+    for y in 0..H {
+        for x in 0..W {
+            let on = ((x / 8) + (y / 8)) % 2 == 1;
+            let i = ((y * W + x) * 4) as usize;
+            if on {
+                px[i] = 0x1a;
+                px[i + 1] = 0x73;
+                px[i + 2] = 0xe8;
+            } else {
+                px[i] = 0xf4;
+                px[i + 1] = 0xc4;
+                px[i + 2] = 0x30;
+            }
+            px[i + 3] = 255;
+        }
+    }
+    icedtea::iced::widget::image::Handle::from_rgba(W, H, px)
+}
 
 /// Which markdown item kinds `MARKDOWN` must produce after parse.
 #[cfg(test)]

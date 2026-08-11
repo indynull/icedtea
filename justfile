@@ -34,3 +34,9 @@ book:
 
 book-serve:
     mdbook serve
+
+# Record the gallery tour into assets/gallery.gif and book/src/gallery.gif.
+# Needs a display, ffmpeg, xwininfo, wmctrl, import, python3.
+# Floats a tiled window and places it before capture.
+gallery-gif:
+    bash scripts/gallery-gif.sh

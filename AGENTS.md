@@ -24,7 +24,7 @@ cargo run -p icedtea-gallery
 | Path | Role |
 | --- | --- |
 | `src/` | Public library `icedtea` |
-| `icedtea-gallery/` | Shipping gallery; every `catalog::ENTRIES` id has a page |
+| `icedtea-gallery/` | Shipping gallery; every `catalog::ENTRIES` id appears on a page |
 | `book/` | Guide (mdBook). Published from `master` to GitHub Pages |
 | `TODO.md` | Remaining work |
 | `assets/icons/` | Chrome SVGs |
@@ -74,8 +74,8 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   reports the same three states `handle` uses.
 - A widget or pattern is public only when it is themed (all visual
   states), keyboard-complete, tested, documented, and listed in
-  `catalog::ENTRIES` with a gallery page. Unfinished surfaces are not
-  exported.
+  `catalog::ENTRIES` and shown on a gallery page. Small related
+  widgets share a page. Unfinished surfaces are not exported.
 - One path per feature. Pick it and delete the other. Fallbacks re-grow.
 - Always keep `TODO.md` current with shipped library and real
   consumer requests. Sort them into Do / Consider / discard in the
@@ -83,7 +83,8 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
 - Coverage fail-under is 99 on `just check` (llvm-cov const/macro
   mapping). Never claim 100 while the tool reports less.
 - `catalog::ENTRIES` is the gallery checklist. Adding an export means
-  adding an entry and a gallery page in the same change. Gallery pages
+  adding an entry and showing it on a gallery page in the same change.
+  Related atoms share a page. Gallery pages
   use representative content (full markdown document, multi-language
   highlighted code, variants and disabled). A one-line stub is not a
   page. Live samples update application state. Never demo a usable
@@ -157,7 +158,12 @@ workspace `-D warnings`, `cargo test --workspace --all-features`,
 - Gallery launch: if a display is present, start
   `cargo run -p icedtea-gallery` and confirm iced starts without panic.
   A timeout after a clean start is a successful smoke. Compile + unit
-  tests if there is no display.
+  tests if there is no display. `just gallery-gif` records the tour
+  into `assets/gallery.gif` and `book/src/gallery.gif`. Run it when
+  the gallery shell changes. Do not hand-edit those files. A tiling
+  window manager must float and place the window on-screen before
+  capture; `import` only sees the visible region. Read the stills,
+  not the animation.
 - Continuous integration runs `just check` on Linux, macOS, and Windows
   at Rust 1.89, plus `cargo test --workspace --all-features` on Ubuntu
   `stable` and `beta`. This environment proves Linux; do not invent

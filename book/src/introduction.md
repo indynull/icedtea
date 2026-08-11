@@ -5,10 +5,10 @@ Native desktop widgets and chrome for [iced](https://iced.rs/).
 `icedtea::run!` starts a themed window. Constructors return `Element`s
 and emit your messages. Color, layout, and chrome are Rust values.
 
-![The icedtea gallery](gallery.png)
+![The icedtea gallery](gallery.gif)
 
 The [gallery](https://github.com/indynull/icedtea/tree/master/icedtea-gallery)
-pages every `catalog::ENTRIES` id:
+shows every `catalog::ENTRIES` id. Related controls share a page:
 
 ```bash
 cargo run -p icedtea-gallery

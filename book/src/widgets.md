@@ -8,7 +8,8 @@ drops handlers. Composite fields use `A11y::child` so the inner editor
 keeps that name and disabled flag.
 
 The gallery (`cargo run -p icedtea-gallery`) pages every
-`catalog::ENTRIES` id. Rustdoc on `icedtea::widget` is the reference.
+`catalog::ENTRIES` id. Related controls share a page. Rustdoc on
+`icedtea::widget` is the reference.
 
 ## Time
 

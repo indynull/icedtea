@@ -31,5 +31,6 @@ columns. Patterns (`list_detail`, `navigation_view`, `preferences`,
 
 ## Catalog
 
-`catalog::ENTRIES` is the public surface. Each id has a gallery page.
+`catalog::ENTRIES` is the public surface. Each id appears on a
+gallery page. Related atoms share a page.
 Constructors, time, and virtual lists are in [Widgets](widgets.md).

@@ -6,7 +6,7 @@ use std::collections::HashSet;
 
 use icedtea::a11y::{A11y, Role};
 use icedtea::action::{Action, ActionTable};
-use icedtea::catalog::{self, Entry};
+use icedtea::catalog;
 use icedtea::collection::{
     Accordion, ListModel, ListRow, Selection, TableModel, Tabs, TreeNode, VecList, VisibleWindow,
     OVERSCAN,
@@ -29,7 +29,6 @@ use icedtea::toast::{ToastKind, ToastQueue};
 use icedtea::variant::Variant;
 use icedtea::widget;
 use icedtea::widget::{DateValue, MarkdownDoc, TimeClock, TimeField, TimeValue};
-use icedtea::window::{self, DisplayBounds, HideEvent, HidePolicy};
 use icedtea::{Boot, Element, Task};
 use samples::CodeLang;
 
@@ -93,6 +92,63 @@ fn nav_item<'a>(
         .into()
 }
 
+const NAV_ITEM_H: f32 = 26.0;
+const NAV_GAP: f32 = 2.0;
+
+fn nav_group_h(first: bool) -> f32 {
+    if first {
+        29.0
+    } else {
+        35.0
+    }
+}
+
+/// Pixel offset of `page` inside the nav scroller. Matches `view` order.
+fn nav_offset(page: &str, query: &str, collapsed: &HashSet<&'static str>) -> f32 {
+    let q = query.to_ascii_lowercase();
+    let mut y = 0.0;
+    let mut first = true;
+    for g in catalog::groups() {
+        let mut page_ids: Vec<&'static str> = Vec::new();
+        for e in catalog::ENTRIES {
+            if e.group != g {
+                continue;
+            }
+            if !q.is_empty()
+                && !e.title.to_ascii_lowercase().contains(&q)
+                && !e.id.contains(q.as_str())
+            {
+                continue;
+            }
+            if !page_ids.contains(&e.page) {
+                page_ids.push(e.page);
+            }
+        }
+        if page_ids.is_empty() {
+            continue;
+        }
+        let expanded = !collapsed.contains(g) || !q.is_empty();
+        if page_ids.len() == 1 {
+            if page_ids[0] == page {
+                return y;
+            }
+            y += NAV_ITEM_H + NAV_GAP;
+            continue;
+        }
+        y += nav_group_h(first) + NAV_GAP;
+        first = false;
+        if expanded {
+            for p in page_ids {
+                if p == page {
+                    return y;
+                }
+                y += NAV_ITEM_H + NAV_GAP;
+            }
+        }
+    }
+    y
+}
+
 fn group_header<'a>(
     name: &'static str,
     expanded: bool,
@@ -145,14 +201,152 @@ fn state_caption<'a>(label: &str, tok: Tokens) -> Element<'a, Message> {
 
 fn scene_card<'a>(child: Element<'a, Message>, tok: Tokens) -> Element<'a, Message> {
     container(child)
-        .padding(20)
+        .padding(Padding {
+            top: 20.0,
+            right: 20.0,
+            bottom: 48.0,
+            left: 20.0,
+        })
         .width(Length::Fill)
         .style(move |_| icedtea::style::card(tok, false))
         .into()
 }
 
+fn page_fills(page: &str) -> bool {
+    matches!(
+        page,
+        "code"
+            | "tree"
+            | "list-detail"
+            | "list"
+            | "table"
+            | "log"
+            | "grid"
+            | "navigation"
+            | "tab-view"
+            | "status-page"
+            | "main-window"
+            | "preferences"
+            | "dialogs"
+            | "about"
+            | "palette"
+            | "keys"
+            | "image"
+    )
+}
+
+fn sample_mail(i: usize) -> ListRow {
+    const TITLES: &[&str] = &[
+        "Quarterly notes",
+        "Lisbon itinerary",
+        "Design review",
+        "Release checklist",
+        "Team standup",
+        "Invoice March",
+    ];
+    ListRow::new(TITLES[i % TITLES.len()]).with_meta(match i % 3 {
+        0 => "This morning",
+        1 => "Yesterday",
+        _ => "Last week",
+    })
+}
+
+/// One README beat. The walk is every `catalog::ENTRIES` page, plus
+/// one Light flip on the Theme page.
+struct TourBeat {
+    page: &'static str,
+    theme: &'static str,
+    appearance: Appearance,
+    caption: &'static str,
+}
+
+fn tour_len() -> usize {
+    catalog::pages().len() + 1
+}
+
+fn theme_page_index() -> usize {
+    catalog::pages()
+        .iter()
+        .position(|p| *p == "theme")
+        .expect("theme is a gallery page")
+}
+
+fn tour_beat(index: usize) -> TourBeat {
+    let pages = catalog::pages();
+    let light_at = theme_page_index() + 1;
+    if index == light_at {
+        return TourBeat {
+            page: "theme",
+            theme: "light",
+            appearance: Appearance::Light,
+            caption: "Light — window chrome",
+        };
+    }
+    let page = if index < light_at {
+        pages[index]
+    } else {
+        pages[index - 1]
+    };
+    TourBeat {
+        page,
+        theme: "dark",
+        appearance: Appearance::Dark,
+        caption: catalog::page_title(page),
+    }
+}
+
+fn tour_wanted() -> bool {
+    std::env::var_os("ICEDTEA_GALLERY_TOUR").is_some()
+}
+
+fn tour_cmd_path() -> Option<std::path::PathBuf> {
+    std::env::var_os("ICEDTEA_GALLERY_TOUR_CMD").map(std::path::PathBuf::from)
+}
+
+fn tour_ack_path() -> Option<std::path::PathBuf> {
+    std::env::var_os("ICEDTEA_GALLERY_TOUR_ACK").map(std::path::PathBuf::from)
+}
+
+fn parse_tour_beat(text: &str, len: usize) -> Option<usize> {
+    let n: usize = text.trim().parse().ok()?;
+    (n < len).then_some(n)
+}
+
+fn read_tour_cmd() -> Option<usize> {
+    let path = tour_cmd_path()?;
+    let text = std::fs::read_to_string(path).ok()?;
+    parse_tour_beat(&text, tour_len())
+}
+
+fn write_tour_ack(beat: usize) {
+    if let Some(path) = tour_ack_path() {
+        let _ = std::fs::write(&path, beat.to_string());
+        let mut face = path;
+        face.set_extension("face");
+        let _ = std::fs::write(face, tour_beat(beat).theme);
+    }
+}
+
+fn tour_window() -> Task<Message> {
+    icedtea::iced::window::oldest().then(|id| {
+        let Some(id) = id else {
+            return Task::none();
+        };
+        Task::batch([
+            icedtea::iced::window::resize(id, icedtea::iced::Size::new(1600.0, 900.0)),
+            icedtea::iced::window::move_to(id, icedtea::iced::Point::new(40.0, 40.0)),
+        ])
+    })
+}
+
 fn main() -> icedtea::iced::Result {
-    let boot = Boot::new("icedtea gallery", "dev.icedtea.gallery");
+    let mut boot = Boot::new("icedtea gallery", "dev.icedtea.gallery");
+    if tour_wanted() {
+        boot = boot.size(1600.0, 900.0).min_size(1600.0, 900.0);
+        if let Some(path) = std::env::var_os("ICEDTEA_GALLERY_TOUR_LEN_FILE") {
+            let _ = std::fs::write(path, tour_len().to_string());
+        }
+    }
     let direction = icedtea::bootstrap(&boot).direction();
     icedtea::run!(
         boot,
@@ -209,15 +403,11 @@ enum Message {
     ConfirmCancel,
     PaletteQuery(String),
     PalettePick(usize),
-    OverlayPointer(f32, f32),
-    PaletteOutside,
-    OverlayRetarget,
     FocusName,
     Secret(String),
     RevealSecret,
     CopySecret,
     WindowSize(f32),
-    ScrollY(f32),
     TimeStep(TimeClock, TimeField),
     Slide(f32),
     Check(bool),
@@ -228,6 +418,9 @@ enum Message {
     Editor(icedtea::iced::widget::text_editor::Action),
     ToggleGroup(&'static str),
     Sash(SashEvent),
+    #[allow(dead_code)]
+    Tour,
+    TourPoll,
     Nop,
 }
 
@@ -274,7 +467,7 @@ struct Gallery {
     list_window: VisibleWindow,
     table_window: VisibleWindow,
     table_cursor: (usize, usize),
-    table_widths: [f32; 2],
+    table_widths: [f32; 4],
     log_lines: Vec<String>,
     log_window: VisibleWindow,
     mask: String,
@@ -295,21 +488,19 @@ struct Gallery {
     dialog_note: String,
     palette: CommandPalette,
     palette_focus: bool,
-    overlay_pointer: (f32, f32),
-    overlay_note: String,
-    scroll_y: f32,
     window_width: f32,
     last_press: Option<String>,
     press_log: Vec<String>,
     nav_split: SplitState,
     nav_drag: SashDrag,
     collapsed: HashSet<&'static str>,
+    tour_at: usize,
 }
 
 impl Gallery {
     fn new(direction: Direction) -> (Self, Task<Message>) {
         let tokens = theme::named("dark").tokens;
-        let mut tabs = Tabs::new(["One", "Two", "Three"]);
+        let mut tabs = Tabs::new(["Notes", "Guide", "Changelog"]);
         tabs.closable = true;
         let mut actions = ActionTable::new();
         actions.insert(Action::new("file.new", "New", Message::Nop));
@@ -328,7 +519,7 @@ impl Gallery {
         let md = MarkdownDoc::parse(samples::MARKDOWN);
         let md_heads = md.headings();
         let mut gallery = Self {
-            page: catalog::ENTRIES[0].id,
+            page: catalog::pages()[0],
             theme: "dark".into(),
             tokens,
             catalog: Catalog::builtin(),
@@ -337,7 +528,7 @@ impl Gallery {
             secret_revealed: false,
             checked: true,
             optional: false,
-            on: false,
+            on: true,
             sounds: false,
             radio: 0,
             value: 0.4,
@@ -349,40 +540,85 @@ impl Gallery {
             },
             time: TimeValue::hm(9, 30),
             pick: "nord".into(),
-            toasts: ToastQueue::new(),
+            toasts: {
+                let mut q = ToastQueue::new();
+                q.push_success("Saved notes.txt");
+                q
+            },
             tabs,
             accordion: Accordion { open: Some(0) },
             page_i: 0,
             table: TableModel {
-                headers: vec!["Name".into(), "Role".into()],
+                headers: vec!["Name".into(), "Role".into(), "Status".into(), "Path".into()],
                 rows: (0..1_000)
-                    .map(|i| vec![format!("Row {i}"), format!("r{i}")])
+                    .map(|i| {
+                        let files = ["lib.rs", "catalog.rs", "widget.rs", "theme.rs", "app.rs"];
+                        vec![
+                            files[i % files.len()].into(),
+                            ["Library", "Catalog", "Widget", "Theme", "App"][i % 5].into(),
+                            if i % 3 == 0 { "ready" } else { "idle" }.into(),
+                            format!("src/{}", files[i % files.len()]),
+                        ]
+                    })
                     .collect(),
                 sort_col: None,
                 sort_asc: true,
             },
             tree: TreeNode::branch(
                 1,
-                "root",
+                "icedtea",
                 vec![
-                    TreeNode::leaf(2, "src"),
-                    TreeNode::branch(3, "book", vec![TreeNode::leaf(4, "install")]),
-                    TreeNode::folder(5, "lazy"),
+                    TreeNode::branch(
+                        2,
+                        "src",
+                        vec![
+                            TreeNode::leaf(3, "lib.rs"),
+                            TreeNode::leaf(4, "catalog.rs"),
+                            TreeNode::leaf(5, "widget.rs"),
+                        ],
+                    ),
+                    TreeNode::branch(
+                        6,
+                        "book",
+                        vec![
+                            TreeNode::leaf(7, "install.md"),
+                            TreeNode::leaf(8, "introduction.md"),
+                        ],
+                    ),
+                    TreeNode::folder(9, "assets"),
                 ],
             ),
             tree_sel: None,
             list: VecList {
-                items: (0..1_000)
-                    .map(|i| ListRow::new(format!("Item {i}")).with_meta(format!("row {i}")))
-                    .collect(),
+                items: (0..1_000).map(sample_mail).collect(),
             },
             sel: Selection::Single(0),
             actions,
             nav: NavStack::new("home"),
-            prefs: vec![PrefGroup {
-                title: "Appearance".into(),
-                keys: vec![("theme".into(), "dark".into())],
-            }],
+            prefs: vec![
+                PrefGroup {
+                    title: "Appearance".into(),
+                    keys: vec![
+                        ("theme".into(), "dark".into()),
+                        ("density".into(), "default".into()),
+                        ("follow OS".into(), "off".into()),
+                    ],
+                },
+                PrefGroup {
+                    title: "Editor".into(),
+                    keys: vec![
+                        ("tab width".into(), "4".into()),
+                        ("word wrap".into(), "on".into()),
+                    ],
+                },
+                PrefGroup {
+                    title: "Files".into(),
+                    keys: vec![
+                        ("autosave".into(), "on".into()),
+                        ("default folder".into(), "~/Documents".into()),
+                    ],
+                },
+            ],
             editor: Content::with_text(
                 "A longer textarea so the page is not an empty box.\nSecond line.\nThird line.\n",
             ),
@@ -390,8 +626,13 @@ impl Gallery {
             list_window: VisibleWindow::new(400.0),
             table_window: VisibleWindow::new(360.0),
             table_cursor: (0, 0),
-            table_widths: [140.0, 140.0],
-            log_lines: (0..200).map(|i| format!("line {i} ready")).collect(),
+            table_widths: [220.0, 140.0, 120.0, 280.0],
+            log_lines: (0..200)
+                .map(|i| {
+                    let lvl = ["info", "warn", "error"][i % 3];
+                    format!("12:{:02}  {lvl:<5}  worker {i} accepted job", i % 60)
+                })
+                .collect(),
             log_window: VisibleWindow::new(240.0),
             mask: String::new(),
             options: {
@@ -427,18 +668,24 @@ impl Gallery {
             dialog_note: String::new(),
             palette,
             palette_focus: true,
-            overlay_pointer: (100.0, 80.0),
-            overlay_note: String::new(),
-            scroll_y: 0.0,
             window_width: 900.0,
             last_press: None,
             press_log: Vec::new(),
             nav_split: SplitState::new(Axis::Horizontal, 280.0 / 900.0),
             nav_drag: SashDrag::default(),
             collapsed: HashSet::new(),
+            tour_at: 0,
         };
         gallery.clamp_nav();
-        (gallery, icedtea::iced::system::theme().map(Message::OsMode))
+        if tour_wanted() {
+            gallery.apply_tour_beat(&tour_beat(0));
+            write_tour_ack(0);
+        }
+        let mut tasks = vec![icedtea::iced::system::theme().map(Message::OsMode)];
+        if tour_wanted() {
+            tasks.push(tour_window());
+        }
+        (gallery, Task::batch(tasks))
     }
 
     fn apply_theme_pref(&mut self) {
@@ -476,7 +723,6 @@ impl Gallery {
 
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::Select(id) => self.page = id,
             Message::Theme(name) => {
                 self.theme = name.clone();
                 self.follow_os = false;
@@ -608,18 +854,6 @@ impl Gallery {
                 if let Some(press) = icedtea::key::press(&ev) {
                     if self.page == "palette" {
                         match press {
-                            icedtea::key::Press::Escape => {
-                                let hide = window::should_hide(
-                                    HidePolicy::EscapeOrFocusLoss,
-                                    HideEvent::Escape,
-                                    self.palette_focus,
-                                );
-                                self.overlay_note = if hide {
-                                    "Escape would hide the overlay.".into()
-                                } else {
-                                    "Escape did not match the hide policy.".into()
-                                };
-                            }
                             icedtea::key::Press::Enter => {
                                 if let Some(msg) = self.palette.invoke_selected(&self.actions) {
                                     return self.update(msg);
@@ -692,29 +926,6 @@ impl Gallery {
                     }
                 }
             }
-            Message::OverlayPointer(x, y) => self.overlay_pointer = (x, y),
-            Message::ScrollY(y) => self.scroll_y = y,
-            Message::PaletteOutside => {
-                self.palette_focus = false;
-                let hide = window::should_hide(
-                    HidePolicy::EscapeOrFocusLoss,
-                    HideEvent::FocusLoss,
-                    self.palette_focus,
-                );
-                self.overlay_note = if hide {
-                    "Focus left the palette; the overlay would hide.".into()
-                } else {
-                    "Focus loss ignored (still in the palette).".into()
-                };
-            }
-            Message::OverlayRetarget => {
-                let mut s = window::settings(window::WindowKind::Overlay, "dev.icedtea.gallery");
-                window::retarget(&mut s, "dev.icedtea.gallery");
-                self.overlay_note = format!(
-                    "retarget: decorations={} resizable={} level={:?}",
-                    s.decorations, s.resizable, s.level
-                );
-            }
             Message::FocusName => {
                 return icedtea::iced::widget::operation::focus(icedtea::iced::widget::Id::new(
                     "gallery-name",
@@ -739,20 +950,92 @@ impl Gallery {
                     .apply(&mut self.nav_split, ev, self.window_width);
                 self.clamp_nav();
             }
+            Message::Select(id) => {
+                self.page = id;
+                if let Some(e) = catalog::page_entries(id).next() {
+                    self.collapsed.remove(e.group);
+                }
+                return self.reveal_nav();
+            }
+            Message::Tour => {
+                self.advance_tour();
+                write_tour_ack(self.tour_at);
+                return self.reveal_nav();
+            }
+            Message::TourPoll => {
+                if let Some(n) = read_tour_cmd() {
+                    if n != self.tour_at {
+                        self.tour_at = n;
+                        self.apply_tour_beat(&tour_beat(n));
+                        write_tour_ack(n);
+                        return self.reveal_nav();
+                    }
+                    write_tour_ack(n);
+                }
+            }
             Message::Nop => {}
         }
         Task::none()
     }
 
+    fn advance_tour(&mut self) {
+        self.tour_at = (self.tour_at + 1) % tour_len();
+        self.apply_tour_beat(&tour_beat(self.tour_at));
+    }
+
+    fn apply_tour_beat(&mut self, beat: &TourBeat) {
+        self.page = beat.page;
+        if let Some(e) = catalog::page_entries(beat.page).next() {
+            self.collapsed.remove(e.group);
+        }
+        let _ = self.update(Message::Theme(beat.theme.to_string()));
+        let _ = self.update(Message::Follow(false));
+        let _ = self.update(Message::Appearance(beat.appearance));
+    }
+
+    fn reveal_nav(&self) -> Task<Message> {
+        let y = (nav_offset(self.page, &self.catalog_query, &self.collapsed) - 8.0).max(0.0);
+        icedtea::iced::widget::operation::scroll_to(
+            icedtea::iced::widget::Id::new("gallery-nav"),
+            icedtea::iced::widget::scrollable::AbsoluteOffset { x: 0.0, y },
+        )
+    }
+
+    fn tour_caption<'a>(&self, tok: Tokens) -> Element<'a, Message> {
+        let line = tour_beat(self.tour_at).caption;
+        container(
+            row![
+                text("Showing").size(icedtea::typo::META).color(tok.muted),
+                text(line)
+                    .size(icedtea::typo::PAGE)
+                    .font(icedtea::typo::UI_BOLD)
+                    .color(tok.text),
+            ]
+            .spacing(10)
+            .align_y(Alignment::Center),
+        )
+        .width(Length::Fill)
+        .padding([14, 24])
+        .style(move |_| icedtea::style::fill(icedtea::theme::selection_fill(tok), tok.text))
+        .into()
+    }
+
     fn subscription(&self) -> Subscription<Message> {
-        Subscription::batch([
+        let mut subs = vec![
             icedtea::key::listen_raw().map(Message::Key),
             icedtea::dnd::listen_files().map(Message::Drop),
             icedtea::iced::time::every(std::time::Duration::from_secs(1)).map(|_| Message::Tick),
             icedtea::iced::system::theme_changes().map(Message::OsMode),
             icedtea::iced::window::resize_events().map(window_width),
             layout::listen_sash().map(nav_sash),
-        ])
+        ];
+        if tour_cmd_path().is_some() {
+            subs.push(
+                icedtea::iced::time::every(std::time::Duration::from_millis(50))
+                    .map(|_| Message::TourPoll),
+            );
+        }
+        Subscription::batch(subs)
     }
 
     fn view(&self) -> Element<'_, Message> {
@@ -787,24 +1070,39 @@ impl Gallery {
             });
         let mut first_group = true;
         for g in catalog::groups() {
-            let entries: Vec<_> = catalog::ENTRIES
-                .iter()
-                .filter(|e| {
-                    e.group == g
-                        && (q.is_empty()
-                            || e.title.to_ascii_lowercase().contains(&q)
-                            || e.id.contains(q.as_str()))
-                })
-                .collect();
-            if entries.is_empty() {
+            let mut page_ids: Vec<&'static str> = Vec::new();
+            for e in catalog::ENTRIES {
+                if e.group != g {
+                    continue;
+                }
+                if !q.is_empty()
+                    && !e.title.to_ascii_lowercase().contains(&q)
+                    && !e.id.contains(q.as_str())
+                {
+                    continue;
+                }
+                if !page_ids.contains(&e.page) {
+                    page_ids.push(e.page);
+                }
+            }
+            if page_ids.is_empty() {
                 continue;
             }
             let expanded = !self.collapsed.contains(g) || !q.is_empty();
+            if page_ids.len() == 1 {
+                nav = nav.push(nav_item(page_ids[0], g, self.page == page_ids[0], tok));
+                continue;
+            }
             nav = nav.push(group_header(g, expanded, tok, first_group));
             first_group = false;
             if expanded {
-                for e in entries {
-                    nav = nav.push(nav_item(e.id, e.title, self.page == e.id, tok));
+                for page in page_ids {
+                    nav = nav.push(nav_item(
+                        page,
+                        catalog::page_title(page),
+                        self.page == page,
+                        tok,
+                    ));
                 }
             }
         }
@@ -815,7 +1113,7 @@ impl Gallery {
                 tok,
                 named("nav", Role::List),
                 false,
-                None,
+                Some(icedtea::iced::widget::Id::new("gallery-nav")),
                 None::<fn(_) -> Message>,
             ),
         ]
@@ -833,10 +1131,7 @@ impl Gallery {
             })
             .width(Length::Fill)
             .height(Length::Fill);
-        let body = if matches!(
-            self.page,
-            "textarea" | "code" | "tree" | "list-detail" | "list" | "table" | "log" | "scrollbar"
-        ) {
+        let body = if page_fills(self.page) {
             page.into()
         } else {
             widget::themed_scroll(
@@ -882,13 +1177,16 @@ impl Gallery {
         .width(Length::Fill)
         .style(move |_| icedtea::style::panel(tok));
         container(layout::dock(
-            Some(
-                column![
+            Some({
+                let mut top = column![
                     pattern::menu_bar(&self.actions, tok, self.direction, &self.catalog),
                     themes,
-                ]
-                .into(),
-            ),
+                ];
+                if tour_wanted() {
+                    top = top.push(self.tour_caption(tok));
+                }
+                top.into()
+            }),
             Some(pattern::status_bar(
                 self.page,
                 &self.actions,
@@ -907,12 +1205,9 @@ impl Gallery {
 
     fn page_view(&self) -> Element<'_, Message> {
         let tok = self.tokens;
-        let entry = catalog::get(self.page).unwrap_or(&catalog::ENTRIES[0]);
-        let demo = self.demo(entry);
-        let fill = matches!(
-            entry.id,
-            "textarea" | "code" | "tree" | "list-detail" | "list" | "table" | "log" | "scrollbar"
-        );
+        let title = catalog::page_title(self.page);
+        let demo = self.demo(self.page);
+        let fill = page_fills(self.page);
         let card = if fill {
             container(demo)
                 .padding(20)
@@ -924,21 +1219,25 @@ impl Gallery {
             scene_card(demo, tok)
         };
         let mut col = column![
-            text(entry.title)
+            text(title)
                 .size(icedtea::typo::PAGE)
                 .font(icedtea::typo::UI_BOLD)
                 .color(tok.text),
-            widget::meta(entry.group, tok, named(entry.group, Role::Status)),
+            widget::meta(
+                catalog::page_entries(self.page)
+                    .next()
+                    .map(|e| e.group)
+                    .unwrap_or(""),
+                tok,
+                named("page-group", Role::Status),
+            ),
             card,
         ]
         .spacing(12);
         if fill {
             col = col.height(Length::Fill);
         }
-        let clamped = container(col)
-            .width(Length::Fill)
-            .max_width(800.0)
-            .center_x(Length::Fill);
+        let clamped = container(col).width(Length::Fill);
         if fill {
             clamped.height(Length::Fill).into()
         } else {
@@ -946,9 +1245,28 @@ impl Gallery {
         }
     }
 
-    fn demo(&self, entry: &Entry) -> Element<'_, Message> {
+    fn demo(&self, page: &str) -> Element<'_, Message> {
+        let hosted: Vec<_> = catalog::page_entries(page).collect();
+        if hosted.len() == 1 {
+            return self.demo_widget(hosted[0].id);
+        }
         let tok = self.tokens;
-        match entry.id {
+        let mut col = icedtea::iced::widget::Column::new().spacing(28);
+        for e in hosted {
+            col = col.push(
+                text(e.title)
+                    .size(icedtea::typo::TITLE)
+                    .font(icedtea::typo::UI_BOLD)
+                    .color(tok.text),
+            );
+            col = col.push(self.demo_widget(e.id));
+        }
+        col.into()
+    }
+
+    fn demo_widget(&self, id: &str) -> Element<'_, Message> {
+        let tok = self.tokens;
+        match id {
             "button" => {
                 let mut col = column![].spacing(8);
                 col = col.push(widget::meta(
@@ -1222,7 +1540,7 @@ impl Gallery {
                 ),
                 widget::meta(
                     if self.dialog_note.is_empty() {
-                        "Enter submits. Focus field uses the input id.".into()
+                        "Enter submits. Focus field moves into the name.".into()
                     } else {
                         self.dialog_note.clone()
                     },
@@ -1242,7 +1560,7 @@ impl Gallery {
             ),
             "secret" => column![
                 widget::meta(
-                    "password_input is the editor. Reveal and a copy Action sit on the row.",
+                    "Reveal the token, then copy it.",
                     tok,
                     named("secret-hint", Role::Status),
                 ),
@@ -1437,10 +1755,7 @@ impl Gallery {
             .into(),
             "markdown" => column![
                 widget::meta(
-                    format!(
-                        "MarkdownDoc hash {:#x}. Outline jump {:?}. The application owns history.",
-                        self.md.hash, self.md_jump
-                    ),
+                    "Headings, lists, and fenced code. The application owns history.",
                     tok,
                     named("md-hash", Role::Status),
                 ),
@@ -1554,7 +1869,7 @@ impl Gallery {
                     theme::FAMILIES.iter().map(|f| f.id.to_string()).collect();
                 column![
                     widget::meta(
-                        "ThemeCatalog::register adds gallery-brand. Family + follow-OS picks the pair member. Follow-OS fills primary from the desktop accent; canvas and text stay.",
+                        "gallery-brand is a registered colorway. Family plus follow-OS picks the pair member.",
                         tok,
                         named("theme-hint", Role::Status),
                     ),
@@ -1654,7 +1969,7 @@ impl Gallery {
                 ];
                 column![
                     widget::meta(
-                        "Tokens.faces() derives washes, text-on, scrollbar, input, link, and focus from mix. Named colorways stay the input.",
+                        "Washes and text-on colors from the active colorway.",
                         tok,
                         named("colors-hint", Role::Status),
                     ),
@@ -1674,26 +1989,18 @@ impl Gallery {
                     ));
                 }
                 column![
+                    widget::display_reading(last, tok, named("last-key", Role::Status)),
                     widget::meta(
-                        "key::press reports a typed character or a named pad key. Control, alt, and logo chords are none so handle can match the shortcut.",
+                        "Type a letter, or Enter, Escape, an arrow, or a function key.",
                         tok,
                         named("keys-hint", Role::Status),
-                    ),
-                    widget::display_reading(last, tok, named("last-key", Role::Status)),
-                    widget::code_block(
-                        "press(&event) -> Option<Press>\nCharacter | Enter | Escape | Backspace | Delete\nArrow* | Page* | Home | End | Function(1..=24)",
-                        tok,
-                        named("keys-enum", Role::Group),
-                    ),
-                    widget::meta(
-                        "Named: Enter, Escape, Backspace, Delete, arrows, Page Up/Down, Home, End, F1-F24.",
-                        tok,
-                        named("keys-named", Role::Status),
                     ),
                     widget::label("Recent", tok, named("keys-recent", Role::Header)),
                     recent,
                 ]
                 .spacing(8)
+                .width(Length::Fill)
+                .height(Length::Fill)
                 .into()
             }
             "icon" => {
@@ -1727,56 +2034,50 @@ impl Gallery {
                 .spacing(12)
                 .into()
             }
-            "image" => column![
-                widget::meta(
-                    "Contain, cover, loading, and error. The application owns the bytes.",
-                    tok,
-                    named("img-hint", Role::Status),
-                ),
-                row![
-                    widget::image_slot(
-                        widget::ImageSlot::Ready {
-                            handle: icedtea::iced::widget::image::Handle::from_bytes(
-                                samples::PIXEL_PNG
-                            ),
-                            fit: icedtea::iced::ContentFit::Contain,
-                        },
-                        64.0,
-                        64.0,
+            "image" => {
+                let slot = |face: widget::ImageSlot, name: &str| {
+                    column![
+                        widget::image_slot(
+                            face,
+                            Length::Fill,
+                            Length::Fill,
+                            tok,
+                            named(name, Role::Image),
+                        ),
+                        state_caption(name, tok),
+                    ]
+                    .spacing(6)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                };
+                let ready = |fit| widget::ImageSlot::Ready {
+                    handle: samples::sample_handle(),
+                    fit,
+                };
+                column![
+                    widget::meta(
+                        "Contain, cover, loading, and error. The application owns the bytes.",
                         tok,
-                        named("contain", Role::Image),
+                        named("img-hint", Role::Status),
                     ),
-                    widget::image_slot(
-                        widget::ImageSlot::Ready {
-                            handle: icedtea::iced::widget::image::Handle::from_bytes(
-                                samples::PIXEL_PNG
-                            ),
-                            fit: icedtea::iced::ContentFit::Cover,
-                        },
-                        64.0,
-                        64.0,
-                        tok,
-                        named("cover", Role::Image),
-                    ),
-                    widget::image_slot(
-                        widget::ImageSlot::Loading,
-                        64.0,
-                        64.0,
-                        tok,
-                        named("loading", Role::Image),
-                    ),
-                    widget::image_slot(
-                        widget::ImageSlot::Error("missing".into()),
-                        64.0,
-                        64.0,
-                        tok,
-                        named("error", Role::Image),
-                    ),
+                    row![
+                        slot(ready(icedtea::iced::ContentFit::Contain), "Contain"),
+                        slot(ready(icedtea::iced::ContentFit::Cover), "Cover"),
+                    ]
+                    .spacing(16)
+                    .height(Length::Fill),
+                    row![
+                        slot(widget::ImageSlot::Loading, "Loading"),
+                        slot(widget::ImageSlot::Error("missing".into()), "Missing"),
+                    ]
+                    .spacing(16)
+                    .height(Length::Fill),
                 ]
-                .spacing(12),
-            ]
-            .spacing(8)
-            .into(),
+                .spacing(12)
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .into()
+            }
             "tooltip" => widget::tooltip_wrap(
                 widget::label("Hover", tok, named("Hover", Role::Header)),
                 "Tip",
@@ -1784,177 +2085,89 @@ impl Gallery {
                 named("Tip", Role::Tooltip),
             ),
             "link" => widget::hyperlink("docs", Message::Nop, tok, named("docs", Role::Link)),
-            "list" => {
-                let (_, win, _) = icedtea::collection::virtual_pads(
-                    self.list.len(),
+            "list" => column![
+                widget::list_view(
+                    &self.list,
+                    &self.sel,
+                    Message::ListSel,
+                    tok,
+                    self.list_window,
                     48.0,
-                    self.list_window.scroll,
-                    self.list_window.viewport,
                     OVERSCAN,
-                    self.sel.primary(),
-                );
-                column![
-                    widget::meta(
-                        format!(
-                            "tick={} mounted={} rows={} range={start}..{end} scroll={:.0}",
-                            self.tick,
-                            win.mounted(),
-                            self.list.len(),
-                            self.list_window.scroll,
-                            start = win.start,
-                            end = win.end
-                        ),
-                        tok,
-                        named("list-status", Role::Status),
-                    ),
-                    widget::list_view(
-                        &self.list,
-                        &self.sel,
-                        Message::ListSel,
-                        tok,
-                        self.list_window,
-                        48.0,
-                        OVERSCAN,
-                        Message::ListScroll,
-                        "No rows",
-                        move |i| match i % 4 {
-                            1 => tok.success,
-                            2 => tok.warning,
-                            3 => tok.danger,
-                            _ => tok.muted,
-                        },
-                        Some(icedtea::iced::widget::Id::from("gallery-list")),
-                        named("list", Role::List),
-                    ),
-                    widget::meta(
-                        "Option list: separator plus multi-select.",
-                        tok,
-                        named("opt-hint", Role::Status),
-                    ),
-                    container(widget::list_view(
-                        &self.options,
-                        &self.opt_sel,
-                        Message::OptSel,
-                        tok,
-                        VisibleWindow::new(140.0),
-                        36.0,
-                        1,
-                        |_| Message::Nop,
-                        "No options",
-                        move |_| tok.muted,
-                        None,
-                        named("options", Role::List),
-                    ))
-                    .height(140),
-                ]
-                .spacing(8)
-                .height(Length::Fill)
-                .into()
-            }
-            "log" => column![
-                widget::meta(
-                    format!(
-                        "{} lines; stick-to-end; scroll={:.0}",
-                        self.log_lines.len(),
-                        self.log_window.scroll
-                    ),
-                    tok,
-                    named("log-status", Role::Status),
+                    Message::ListScroll,
+                    "No rows",
+                    move |_| tok.muted,
+                    Some(icedtea::iced::widget::Id::from("gallery-list")),
+                    named("list", Role::List),
                 ),
-                widget::log_view(
-                    &self.log_lines,
-                    self.log_window,
-                    20.0,
-                    OVERSCAN,
-                    Message::LogScroll,
-                    Some(icedtea::iced::widget::Id::from("gallery-log")),
+                widget::meta("Filter", tok, named("opt-hint", Role::Status),),
+                container(widget::list_view(
+                    &self.options,
+                    &self.opt_sel,
+                    Message::OptSel,
                     tok,
-                    named("log", Role::List),
-                ),
+                    VisibleWindow::new(140.0),
+                    36.0,
+                    1,
+                    |_| Message::Nop,
+                    "No options",
+                    move |_| tok.muted,
+                    None,
+                    named("options", Role::List),
+                ))
+                .height(140),
             ]
             .spacing(8)
             .height(Length::Fill)
             .into(),
-            "grid" => column![
-                widget::item_grid(
-                    &(0..12).map(|i| format!("Cell {i}")).collect::<Vec<_>>(),
-                    |_| Message::Nop,
-                    tok,
-                    named("grid", Role::List),
-                ),
-                layout::grid_spanned(
-                    vec![
-                        (
-                            icedtea::layout::GridCell::new(0, 0).span(2, 1),
-                            widget::label("span 2", tok, named("span 2", Role::Header))
-                        ),
-                        (
-                            icedtea::layout::GridCell::new(0, 1),
-                            widget::label("a", tok, named("a", Role::Header))
-                        ),
-                        (
-                            icedtea::layout::GridCell::new(1, 1),
-                            widget::label("b", tok, named("b", Role::Header))
-                        ),
-                    ],
-                    80.0,
-                    28.0,
-                    6.0,
-                ),
-            ]
-            .spacing(12)
+            "log" => column![widget::log_view(
+                &self.log_lines,
+                self.log_window,
+                20.0,
+                OVERSCAN,
+                Message::LogScroll,
+                Some(icedtea::iced::widget::Id::from("gallery-log")),
+                tok,
+                named("log", Role::List),
+            ),]
+            .spacing(8)
+            .height(Length::Fill)
             .into(),
-            "table" => {
-                let (_, win, _) = icedtea::collection::virtual_pads(
-                    self.table.rows.len(),
-                    48.0,
-                    self.table_window.scroll,
-                    self.table_window.viewport,
-                    OVERSCAN,
-                    self.sel.primary(),
-                );
-                column![
-                    widget::meta(
-                        format!(
-                            "tick={} mounted={} rows={} range={start}..{end} cell={},{}",
-                            self.tick,
-                            win.mounted(),
-                            self.table.rows.len(),
-                            self.table_cursor.0,
-                            self.table_cursor.1,
-                            start = win.start,
-                            end = win.end
-                        ),
-                        tok,
-                        named("table-status", Role::Status),
-                    ),
-                    widget::data_table(
-                        &self.table,
-                        &self.sel,
-                        Some(self.table_cursor),
-                        &self.table_widths,
-                        true,
-                        self.table_window,
-                        48.0,
-                        OVERSCAN,
-                        Message::TableCell,
-                        Message::Sort,
-                        Message::TableScroll,
-                        tok,
-                        named("table", Role::Table),
-                    ),
+            "grid" => widget::item_grid(
+                &[
+                    "Inbox", "Calendar", "Mail", "Files", "Photos", "Music", "Chat", "Maps",
+                    "Notes", "Terminal", "Settings", "Help",
                 ]
-                .spacing(8)
-                .height(Length::Fill)
-                .into()
-            }
+                .iter()
+                .map(|s| (*s).to_string())
+                .collect::<Vec<_>>(),
+                |_| Message::Nop,
+                tok,
+                named("grid", Role::List),
+            ),
+            "table" => column![widget::data_table(
+                &self.table,
+                &self.sel,
+                Some(self.table_cursor),
+                &self.table_widths,
+                true,
+                self.table_window,
+                48.0,
+                OVERSCAN,
+                Message::TableCell,
+                Message::Sort,
+                Message::TableScroll,
+                tok,
+                named("table", Role::Table),
+            ),]
+            .spacing(8)
+            .height(Length::Fill)
+            .into(),
             "tree" => {
-                let picked = self
-                    .tree_sel
-                    .map(|id| format!("Selected id {id}"))
-                    .unwrap_or_else(|| {
-                        "Select a row; the chevron expands. lazy is an empty folder.".into()
-                    });
+                let picked = self.tree_sel.map_or_else(
+                    || "assets is an empty folder.".into(),
+                    |id| format!("Selected {id}"),
+                );
                 column![
                     widget::meta(picked, tok, named("tree-sel", Role::Status)),
                     widget::tree_view(
@@ -1972,11 +2185,7 @@ impl Gallery {
             "tabs" => {
                 let pinned = Tabs::new(["Read", "Write"]);
                 column![
-                    widget::meta(
-                        "Tabs::new starts with closable: false (pinned).",
-                        tok,
-                        named("tabs-pinned-hint", Role::Status),
-                    ),
+                    widget::meta("Pinned", tok, named("tabs-pinned-hint", Role::Status),),
                     widget::tab_bar(
                         &pinned,
                         |_| Message::Nop,
@@ -1984,11 +2193,7 @@ impl Gallery {
                         tok,
                         named("tabs-pinned", Role::Tab),
                     ),
-                    widget::meta(
-                        "Closable strip below (closable: true).",
-                        tok,
-                        named("tabs-close-hint", Role::Status),
-                    ),
+                    widget::meta("Closable", tok, named("tabs-close-hint", Role::Status),),
                     widget::tab_bar(
                         &self.tabs,
                         Message::Tab,
@@ -2034,7 +2239,7 @@ impl Gallery {
             ),
             "card" => column![
                 widget::meta(
-                    "group_box plus chips for tags and meta. Exclusive choice is Tabs or radio.",
+                    "A document card with tags, and an empty neighbour.",
                     tok,
                     named("card-hint", Role::Status),
                 ),
@@ -2164,32 +2369,37 @@ impl Gallery {
             "command-bar" => pattern::command_bar(self.actions.iter(), tok, self.direction),
             "context-menu" => pattern::context_menu(self.actions.iter(), tok),
             "scrollbar" => {
+                const LINES: &[&str] = &[
+                    "Booted the gallery window",
+                    "Loaded the catalog",
+                    "Applied the dark colorway",
+                    "Opened notes.txt",
+                    "Saved notes.txt",
+                    "Installed the available update",
+                    "Copied the secret field",
+                    "Hid the command palette",
+                    "Restored the previous split",
+                    "Jumped to the Files heading",
+                    "Closed the save sheet",
+                    "Ready for the next command",
+                ];
                 let mut lines = icedtea::iced::widget::Column::new().spacing(8);
-                for i in 1..=48 {
-                    let copy = format!("Line {i}");
-                    lines =
-                        lines.push(widget::label(copy.clone(), tok, named(&copy, Role::Header)));
+                for (i, copy) in LINES.iter().cycle().take(8).enumerate() {
+                    let label = (*copy).to_string();
+                    lines = lines.push(widget::label(
+                        label.clone(),
+                        tok,
+                        named(&format!("scroll-{i}"), Role::Header),
+                    ));
                 }
-                column![
-                    widget::meta(
-                        format!("offset y = {:.0} · 48 lines", self.scroll_y),
-                        tok,
-                        named("scroll-y", Role::Status),
-                    ),
-                    widget::themed_scroll(
-                        lines.into(),
-                        tok,
-                        named("scroll", Role::Group),
-                        false,
-                        Some(icedtea::iced::widget::Id::from("gallery-scroll")),
-                        Some(|vp: icedtea::iced::widget::scrollable::Viewport| {
-                            Message::ScrollY(vp.absolute_offset().y)
-                        }),
-                    ),
-                ]
-                .spacing(8)
-                .height(Length::Fill)
-                .into()
+                widget::themed_scroll(
+                    lines.into(),
+                    tok,
+                    named("scroll", Role::Group),
+                    false,
+                    Some(icedtea::iced::widget::Id::from("gallery-scroll")),
+                    None::<fn(_) -> Message>,
+                )
             }
             "callout" => widget::info_bar(
                 ToastKind::Warning,
@@ -2313,58 +2523,63 @@ impl Gallery {
                 tok,
                 named("Hint", Role::Tooltip),
             ),
-            "dialogs" => column![
-                widget::meta(
-                    "Native file dialogs (Open / Save / Folder) and an in-app save sheet.",
-                    tok,
-                    named("dlg-hint", Role::Status),
-                ),
-                row![
-                    widget::themed_button(
-                        "Open…",
-                        Some(Message::FileOpen),
-                        tok,
-                        Variant::Quiet,
-                        btn("Open"),
-                    ),
-                    widget::themed_button(
-                        "Save…",
-                        Some(Message::FileSave),
-                        tok,
-                        Variant::Primary,
-                        btn("Save"),
-                    ),
-                    widget::themed_button(
-                        "Folder…",
-                        Some(Message::Folder),
-                        tok,
-                        Variant::Quiet,
-                        btn("Folder"),
-                    ),
-                ]
-                .spacing(8),
-                widget::meta(
-                    if self.dialog_note.is_empty() {
-                        "No dialog result yet".into()
-                    } else {
-                        self.dialog_note.clone()
-                    },
-                    tok,
-                    named("dlg-result", Role::Status),
-                ),
+            "dialogs" => {
+                let backdrop = container(
+                    column![
+                        widget::label("notes.txt", tok, named("dlg-doc", Role::Header)),
+                        widget::meta(
+                            if self.dialog_note.is_empty() {
+                                "Last saved just now.".into()
+                            } else {
+                                self.dialog_note.clone()
+                            },
+                            tok,
+                            named("dlg-result", Role::Status),
+                        ),
+                        row![
+                            widget::themed_button(
+                                "Open…",
+                                Some(Message::FileOpen),
+                                tok,
+                                Variant::Quiet,
+                                btn("Open"),
+                            ),
+                            widget::themed_button(
+                                "Save…",
+                                Some(Message::FileSave),
+                                tok,
+                                Variant::Primary,
+                                btn("Save"),
+                            ),
+                            widget::themed_button(
+                                "Folder…",
+                                Some(Message::Folder),
+                                tok,
+                                Variant::Quiet,
+                                btn("Folder"),
+                            ),
+                        ]
+                        .spacing(8),
+                    ]
+                    .spacing(8)
+                    .padding(16),
+                )
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .style(move |_| icedtea::style::panel(tok));
                 pattern::modal_card(
-                    widget::label(" ", tok, named("dim", Role::Status)),
-                    pattern::dialog_sheet(
+                    backdrop.into(),
+                    container(pattern::dialog_sheet(
                         "Save",
                         "Overwrite notes.txt?",
                         ("Save".into(), Message::ConfirmSave),
                         Some(("Cancel".into(), Message::ConfirmCancel)),
                         tok,
-                    ),
-                ),
-            ]
-            .spacing(12)
-            .into(),
+                    ))
+                    .width(Length::Fixed(420.0))
+                    .into(),
+                )
+            }
             "list-detail" => pattern::list_detail(
                 widget::list_view(
                     &self.list,
@@ -2380,48 +2595,116 @@ impl Gallery {
                     Some(icedtea::iced::widget::Id::from("gallery-list-detail")),
                     named("list", Role::List),
                 ),
-                column![
-                    widget::label("Detail", tok, named("Detail", Role::Header)),
-                    widget::meta(
-                        "Select a row. The sidebar width is layout::fixed(260).",
-                        tok,
-                        named("detail-body", Role::Status),
-                    ),
-                ]
-                .spacing(8)
-                .into(),
+                {
+                    let title = self
+                        .sel
+                        .primary()
+                        .and_then(|i| self.list.items.get(i))
+                        .map(|row| row.title.as_str())
+                        .unwrap_or("Select a message");
+                    column![
+                        widget::label(title, tok, named("Detail", Role::Header)),
+                        widget::meta(
+                            "Received this morning.",
+                            tok,
+                            named("detail-when", Role::Status),
+                        ),
+                        widget::meta(
+                            "Thanks for the notes. I will follow up after lunch.",
+                            tok,
+                            named("detail-body", Role::Status),
+                        ),
+                    ]
+                    .spacing(8)
+                    .padding(8)
+                    .into()
+                },
                 layout::fixed(260.0),
                 tok,
             ),
-            "navigation" => column![
-                widget::meta(
-                    format!(
-                        "width {:.0} ({:?}); resize_events → WindowSize in update",
-                        self.window_width,
-                        layout::Breakpoint::from_width(self.window_width)
-                    ),
-                    tok,
-                    named("nav-width", Role::Status),
-                ),
+            "navigation" => {
+                let here = self.nav.current();
+                let place = |id: &'static str, title: &'static str| {
+                    widget::themed_button_sized(
+                        title,
+                        Some(Message::Nop),
+                        tok,
+                        if here == id {
+                            Variant::Primary
+                        } else {
+                            Variant::Quiet
+                        },
+                        Length::Fill,
+                        Length::Shrink,
+                        btn(title),
+                    )
+                };
                 pattern::navigation_view(
-                    widget::label("Sidebar", tok, named("Sidebar", Role::Header)),
-                    widget::label("Content", tok, named("Content", Role::Header)),
+                    column![
+                        widget::label("Places", tok, named("Places", Role::Header)),
+                        place("home", "Mail"),
+                        place("files", "Files"),
+                        place("settings", "Settings"),
+                    ]
+                    .spacing(8)
+                    .padding(12)
+                    .into(),
+                    column![
+                        widget::label("Mail", tok, named("Mail", Role::Header)),
+                        widget::meta(
+                            "Inbox, drafts, and sent.",
+                            tok,
+                            named("nav-places", Role::Status),
+                        ),
+                        widget::meta(
+                            "Quarterly notes arrived this morning.",
+                            tok,
+                            named("nav-body", Role::Status),
+                        ),
+                    ]
+                    .spacing(8)
+                    .padding(16)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .into(),
                     &self.nav,
                     self.window_width,
                     Message::Nop,
                     tok,
                     &self.catalog,
-                ),
-            ]
-            .spacing(8)
-            .into(),
-            "tab-view" => pattern::tab_view(
-                &self.tabs,
-                widget::label("Document", tok, named("Document", Role::Header)),
-                Message::Tab,
-                |_| Message::Nop,
-                tok,
-            ),
+                )
+            }
+            "tab-view" => {
+                let (title, body) = match self.tabs.active {
+                    1 => (
+                        "Guide",
+                        "Install the crate, then start a window with run!. Chrome, actions, and theme come from icedtea.",
+                    ),
+                    2 => (
+                        "Changelog",
+                        "Unreleased work lands here until the next tag.",
+                    ),
+                    _ => (
+                        "Notes",
+                        "Draft the weekly recap in this tab. File / Edit / View stay in the window chrome.",
+                    ),
+                };
+                pattern::tab_view(
+                    &self.tabs,
+                    column![
+                        widget::label(title, tok, named(title, Role::Header)),
+                        widget::meta(body, tok, named("tab-body", Role::Status)),
+                    ]
+                    .spacing(8)
+                    .padding(16)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .into(),
+                    Message::Tab,
+                    |_| Message::Nop,
+                    tok,
+                )
+            }
             "preferences" => pattern::preferences_page(
                 &self.prefs,
                 &self.query,
@@ -2430,7 +2713,25 @@ impl Gallery {
                 &self.catalog,
             ),
             "about" => {
-                pattern::about_page("icedtea", "0.1.0", "MIT", "Gallery", tok, &self.catalog)
+                let backdrop = container(Space::new().width(Length::Fill).height(Length::Fill))
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .style(move |_| {
+                        icedtea::style::fill(theme::mix(tok.text, tok.canvas, 0.14), tok.text)
+                    });
+                pattern::modal_card(
+                    backdrop.into(),
+                    container(pattern::about_page(
+                        "icedtea",
+                        "0.2.0",
+                        "MIT",
+                        "Gallery",
+                        tok,
+                        &self.catalog,
+                    ))
+                    .width(Length::Fixed(420.0))
+                    .into(),
+                )
             }
             "status-page" => pattern::status_page(
                 "Nothing here",
@@ -2440,107 +2741,35 @@ impl Gallery {
             ),
             "palette" => {
                 let res = self.palette.results(&self.actions);
-                let displays = [
-                    DisplayBounds {
-                        x: 0.0,
-                        y: 0.0,
-                        width: 1920.0,
-                        height: 1080.0,
-                    },
-                    DisplayBounds {
-                        x: 1920.0,
-                        y: 0.0,
-                        width: 1280.0,
-                        height: 800.0,
-                    },
-                ];
-                let inner = icedtea::iced::Size::new(480.0, 320.0);
-                let origin = window::place(self.overlay_pointer, inner, &displays);
-                let centered = window::place_centered(self.overlay_pointer, inner, &displays);
-                column![
-                    widget::meta(
-                        "Command palette overlay. Boot::overlay().size is the inner size. place is pointer-origin; place_centered is the middle of the display under the pointer. Escape hides even when the field is focused (listen_raw forwards the captured key). Focus loss is ignored while the card has focus.",
-                        tok,
-                        named("pal-hint", Role::Status),
-                    ),
-                    widget::meta(
-                        format!(
-                            "inner 480x320; pointer ({:.0}, {:.0}); place ({:.0}, {:.0}); centered ({:.0}, {:.0})",
-                            self.overlay_pointer.0,
-                            self.overlay_pointer.1,
-                            origin.x,
-                            origin.y,
-                            centered.x,
-                            centered.y
-                        ),
-                        tok,
-                        named("pal-place", Role::Status),
-                    ),
-                    row![
-                        widget::themed_button(
-                            "Pointer on display 1",
-                            Some(Message::OverlayPointer(100.0, 80.0)),
-                            tok,
-                            Variant::Quiet,
-                            btn("Pointer on display 1"),
-                        ),
-                        widget::themed_button(
-                            "Pointer on display 2 edge",
-                            Some(Message::OverlayPointer(3100.0, 20.0)),
-                            tok,
-                            Variant::Quiet,
-                            btn("Pointer on display 2 edge"),
-                        ),
-                        widget::themed_button(
-                            "Click outside",
-                            Some(Message::PaletteOutside),
-                            tok,
-                            Variant::Quiet,
-                            btn("Click outside"),
-                        ),
-                        widget::themed_button(
-                            "Retarget to application",
-                            Some(Message::OverlayRetarget),
-                            tok,
-                            Variant::Quiet,
-                            btn("Retarget to application"),
-                        ),
-                    ]
-                    .spacing(8),
-                    widget::meta(
-                        if self.overlay_note.is_empty() {
-                            "Type in the card, then Escape. Or click outside.".into()
-                        } else {
-                            self.overlay_note.clone()
-                        },
-                        tok,
-                        named("pal-hide", Role::Status),
-                    ),
-                    pattern::command_palette_view(
-                        self.palette.query(),
-                        &res,
-                        self.palette.selected(),
-                        Message::PaletteQuery,
-                        Message::PalettePick,
-                        tok,
-                    ),
-                ]
-                .spacing(12)
+                container(pattern::command_palette_view(
+                    self.palette.query(),
+                    &res,
+                    self.palette.selected(),
+                    Message::PaletteQuery,
+                    Message::PalettePick,
+                    tok,
+                ))
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .center_x(Length::Fill)
+                .center_y(Length::Fill)
                 .into()
             }
             "main-window" => pattern::main_window(
                 pattern::menu_bar(&self.actions, tok, self.direction, &self.catalog),
                 pattern::toolbar(self.actions.iter(), tok, self.direction),
                 column![
-                    widget::label("Document", tok, named("Center", Role::Header)),
+                    widget::label("notes.txt", tok, named("Center", Role::Header)),
                     widget::meta(
-                        "File / Edit / View live in this window. Open a menu, then Save…",
+                        "File, Edit, and View live in this window. Open a menu, then Save.",
                         tok,
                         named("center-body", Role::Status),
                     ),
                 ]
                 .spacing(8)
                 .padding(16)
+                .width(Length::Fill)
+                .height(Length::Fill)
                 .into(),
                 pattern::status_bar("ok", &self.actions, tok, self.direction),
                 tok,
@@ -2647,10 +2876,70 @@ mod tests {
     }
 
     #[test]
+    fn parse_tour_beat_rejects_wrap_and_junk() {
+        assert_eq!(super::parse_tour_beat("0", 29), Some(0));
+        assert_eq!(super::parse_tour_beat("28\n", 29), Some(28));
+        assert_eq!(super::parse_tour_beat("29", 29), None);
+        assert_eq!(super::parse_tour_beat("x", 29), None);
+    }
+
+    #[test]
+    fn nav_offset_puts_later_pages_further_down() {
+        let empty = std::collections::HashSet::new();
+        let top = super::nav_offset("controls", "", &empty);
+        let mid = super::nav_offset("list", "", &empty);
+        let end = super::nav_offset("main-window", "", &empty);
+        assert!(top < 40.0, "controls should sit near the top, got {top}");
+        assert!(mid > top);
+        assert!(end > mid);
+        assert!(end > 200.0, "patterns should require a scroll, got {end}");
+    }
+
+    #[test]
+    fn tour_visits_catalog_pages() {
+        let pages = icedtea::catalog::pages();
+        assert_eq!(super::tour_len(), pages.len() + 1);
+        assert!(pages.len() < icedtea::catalog::ENTRIES.len());
+        let mut seen = std::collections::HashSet::new();
+        for i in 0..super::tour_len() {
+            let beat = super::tour_beat(i);
+            assert!(
+                pages.contains(&beat.page),
+                "tour page {} is not a gallery page",
+                beat.page
+            );
+            assert_eq!(icedtea::theme::named(beat.theme).name, beat.theme);
+            assert!(!beat.caption.is_empty());
+            if !beat.caption.starts_with("Light") {
+                seen.insert(beat.page);
+            }
+        }
+        assert_eq!(seen.len(), pages.len());
+        let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
+        g.apply_tour_beat(&super::tour_beat(0));
+        assert_eq!(g.page, pages[0]);
+        let light_at = super::theme_page_index() + 1;
+        for _ in 0..light_at {
+            let _ = g.update(super::Message::Tour);
+        }
+        assert_eq!(g.page, "theme");
+        assert_eq!(g.theme, "light");
+        let _ = g.update(super::Message::Tour);
+        assert_eq!(g.theme, "dark");
+        assert_ne!(g.page, "theme");
+    }
+
+    #[test]
     fn gallery_pages_every_catalog_entry() {
         let handled: std::collections::HashSet<_> = super::handled_ids().iter().copied().collect();
         for e in icedtea::catalog::ENTRIES {
-            assert!(handled.contains(e.id), "gallery has no page for {}", e.id);
+            assert!(handled.contains(e.id), "gallery has no demo for {}", e.id);
+            assert!(
+                icedtea::catalog::pages().contains(&e.page),
+                "entry {} has unknown page {}",
+                e.id,
+                e.page
+            );
         }
         assert_eq!(handled.len(), icedtea::catalog::ENTRIES.len());
     }

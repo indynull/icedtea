@@ -11,11 +11,11 @@ Native desktop widgets and chrome for [iced](https://iced.rs/).
 `Element`s and emit your messages. Color, layout, and chrome are Rust
 values.
 
-![The icedtea gallery](https://github.com/indynull/icedtea/raw/master/assets/gallery.png)
+![The icedtea gallery](https://github.com/indynull/icedtea/raw/master/assets/gallery.gif)
 
 The [gallery](https://github.com/indynull/icedtea/tree/master/icedtea-gallery)
-is a running catalog: every [`catalog::ENTRIES`][catalog] id has a
-page. Run it from a checkout:
+is a running catalog: every [`catalog::ENTRIES`][catalog] id appears
+on a page. Related controls share a page. Run it from a checkout:
 
 ```bash
 cargo run -p icedtea-gallery

@@ -16,7 +16,10 @@ return `Element`s and emit the application's messages.
 - Application, dialog, and overlay windows. Overlay placement uses the
   display under the pointer.
 - Every public widget takes `A11y`. Lists, tables, and logs virtualize.
-- Gallery pages every `catalog::ENTRIES` id. Guide:
+- Image slots keep their box. Item-grid tiles share the row. An open
+  accordion shows a body under its header.
+- Gallery pages host every `catalog::ENTRIES` id. Related controls
+  share a page. `just gallery-gif` records the README tour. Guide:
   <https://indynull.github.io/icedtea/>. API docs:
   <https://docs.rs/icedtea>.
 
