@@ -10,11 +10,8 @@ installs rustfmt, clippy, and llvm-tools.
 ```toml
 [dependencies]
 iced = "0.14"
-icedtea = { git = "https://github.com/indynull/icedtea" }
+icedtea = "0.2"
 ```
-
-`0.1` on crates.io is the publish check. This tree is `0.2`. Use git
-until the 0.2 tag. After that tag: `icedtea = "0.2"`.
 
 ## Host libraries
 
@@ -46,16 +43,12 @@ coverage run deletes the instrumented `target/llvm-cov-target` tree.
 
 Home: <https://github.com/indynull/icedtea>.
 
-1. Set `version` in `Cargo.toml` and add a `CHANGELOG.md` section.
+1. Set `version` in `Cargo.toml` and move `CHANGELOG.md` Unreleased
+   into a version section.
 2. Push `master`. GitHub Actions runs `just check` on Linux, macOS, and
    Windows, and the test suite on Ubuntu `stable` and `beta`.
-3. First version: `cargo publish -p icedtea --locked` on your machine
-   (`cargo login`). Then on the crate: Settings, Trusted Publishing,
-   GitHub. Owner `indynull`, repository `icedtea`, workflow
-   `publish.yml`. No environment name.
-4. Later versions: tag `vX.Y.Z` (same numbers as `version`) and push
-   the tag.
-5. GitHub Actions job `crates-io` checks the tag, runs `just check`,
+3. Tag `vX.Y.Z` (same numbers as `version`) and push the tag.
+4. GitHub Actions job `crates-io` checks the tag, runs `just check`,
    exchanges an identity token for a short-lived crates.io token, and
    `cargo publish -p icedtea --locked`. No repository secret.
 

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.0 — 2026-08-11
+
 Widgets and chrome for iced 0.14 desktop applications.
 `icedtea::run!` boots theme and starts the window. Constructors
 return `Element`s and emit the application's messages.

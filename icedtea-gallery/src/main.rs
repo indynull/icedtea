@@ -2682,7 +2682,7 @@ impl Gallery {
                     ),
                     2 => (
                         "Changelog",
-                        "Unreleased work lands here until the next tag.",
+                        "0.2 is the first library cut on crates.io.",
                     ),
                     _ => (
                         "Notes",

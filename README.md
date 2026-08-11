@@ -27,11 +27,8 @@ cargo run -p icedtea-gallery
 ```toml
 [dependencies]
 iced = "0.14"
-icedtea = { git = "https://github.com/indynull/icedtea" }
+icedtea = "0.2"
 ```
-
-`0.1` on crates.io is the publish check. This tree is `0.2`. Use git
-until the 0.2 tag. After that tag: `icedtea = "0.2"`.
 
 ```rust,ignore
 use icedtea::a11y::A11y;

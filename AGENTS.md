@@ -107,9 +107,8 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
 - Extract a second crate only after a second in-tree consumer needs it.
   Experiments live in `icedtea` or `icedtea-gallery`.
 - Never grow `CHANGELOG.md` Unreleased into a session diary. 0.1.0 on
-  crates.io was a publish check. 0.2 stays Unreleased until it is
-  tagged. Never call icedtea a product in user-facing copy; it is a
-  UI library.
+  crates.io was a publish check. 0.2 is the first library cut. Never
+  call icedtea a product in user-facing copy; it is a UI library.
 - Gallery fixtures (sample documents, language snippets, bitmaps) live
   in `icedtea-gallery`. Never export them from `icedtea`.
 - Never ship a document undo stack. The application owns document

@@ -99,8 +99,8 @@ mod tests {
                 .find("icedtea =")
                 .expect("install story names the crate");
             assert!(
-                src[at..].starts_with("icedtea = { git ="),
-                "first icedtea line must be git until the 0.2 tag"
+                src[at..].starts_with("icedtea = \"0.2\""),
+                "first icedtea line is the crates.io version"
             );
         }
         assert!(arch.contains("Action"));
