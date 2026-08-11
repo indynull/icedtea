@@ -1,6 +1,6 @@
 # Collections
 
-Lists, tables, trees, tabs, and pages.
+Lists, tables, trees, tabs, expanders, and pages.
 [rustdoc](https://docs.rs/icedtea/latest/icedtea/widget/index.html) ·
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
@@ -114,7 +114,21 @@ Constructor: [`widget::accordion_view`](https://docs.rs/icedtea/latest/icedtea/w
 [iced](https://crates.io/crates/iced)
 
 The application owns which row is open. Closed rows are headers
-only.
+only. The chevron sits on the trailing edge.
+
+### Expander
+
+**`expander`** — A card that clips its child until the header opens it.
+
+Constructor: [`widget::expander`](https://docs.rs/icedtea/latest/icedtea/widget/fn.expander.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea) ·
+[iced](https://crates.io/crates/iced)
+
+The application owns `open`. Closed clips the child to `collapsed`.
+Open paints the full child. Title starts; the chevron sits on the
+trailing edge. Accordion is many headers; this is one card.
 
 ### Pagination
 

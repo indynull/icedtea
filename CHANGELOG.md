@@ -11,7 +11,8 @@ window uses one `Action` and a toolbar (`examples/hello.rs`).
 sibling. `data_table` follows `ColumnLayout` order. Empty-query
 palette lists favorites, then recent.
 `context_menu` clamps to the card size. `DropAccept::Text` is text
-only. Gallery demos handle the messages their widgets emit.
+only. `widget::expander` is a card that clips its child until
+opened. Gallery demos handle the messages their widgets emit.
 
 ## 0.2.0 — 2026-08-11
 

@@ -382,6 +382,7 @@ enum Message {
     WsPress(usize),
     WsTab(usize, usize),
     Acc(usize),
+    Expand(bool),
     Page(usize),
     Sort(usize),
     Tree(u64),
@@ -507,6 +508,7 @@ struct Gallery {
     toasts: ToastQueue,
     tabs: Tabs,
     accordion: Accordion,
+    expander_open: bool,
     page_i: usize,
     table: TableModel,
     tree: TreeNode,
@@ -643,6 +645,7 @@ impl Gallery {
             },
             tabs,
             accordion: Accordion { open: Some(0) },
+            expander_open: false,
             page_i: 0,
             table: TableModel {
                 headers: vec!["Name".into(), "Role".into(), "Status".into(), "Path".into()],
@@ -1074,6 +1077,7 @@ impl Gallery {
                 }
             }
             Message::Acc(i) => self.accordion.toggle(i),
+            Message::Expand(open) => self.expander_open = open,
             Message::Page(i) => self.page_i = i,
             Message::Sort(c) => self.table.sort(c),
             Message::Tree(id) => {
@@ -2766,6 +2770,46 @@ impl Gallery {
                 tok,
                 named("accordion", Role::Group),
             ),
+            "expander" => {
+                let body = column![
+                    widget::label(
+                        "Closed, this card keeps a short face and clips the rest.",
+                        tok,
+                        named("exp-1", Role::Status),
+                    ),
+                    widget::label(
+                        "The header chevron opens the full notes.",
+                        tok,
+                        named("exp-2", Role::Status),
+                    ),
+                    widget::label(
+                        "Save still lives on the File action.",
+                        tok,
+                        named("exp-3", Role::Status),
+                    ),
+                    widget::label(
+                        "Theme, density, and high-contrast stay on the tokens.",
+                        tok,
+                        named("exp-4", Role::Status),
+                    ),
+                    widget::label(
+                        "Open is the application's. This page toggles it.",
+                        tok,
+                        named("exp-5", Role::Status),
+                    ),
+                ]
+                .spacing(8)
+                .into();
+                widget::expander(
+                    "Release notes",
+                    body,
+                    48.0,
+                    self.expander_open,
+                    Message::Expand,
+                    tok,
+                    named("expander", Role::Group),
+                )
+            }
             "pagination" => widget::pagination(
                 40,
                 self.page_i,
@@ -3661,6 +3705,7 @@ fn handled_ids() -> &'static [&'static str] {
         "tree",
         "tabs",
         "accordion",
+        "expander",
         "pagination",
         "document-tabs",
         "theme",
@@ -3829,6 +3874,9 @@ mod tests {
         assert_eq!(g.pinned.active, 1);
         let _ = g.update(super::Message::StatusNew);
         assert_eq!(g.status_n, 1);
+        assert!(!g.expander_open);
+        let _ = g.update(super::Message::Expand(true));
+        assert!(g.expander_open);
         let _ = g.update(super::Message::Swatch);
         assert!(g.swatch);
         let _ = g.view();

@@ -387,13 +387,18 @@ pub fn split_button<'a, M: Clone + 'a>(
                 Variant::Primary,
                 A11y::button(&title).with_disabled(a11y.disabled),
             ),
-            themed_button(
-                "▾",
-                more_msg,
-                tok,
-                Variant::Quiet,
-                A11y::button("more").with_disabled(a11y.disabled),
-            ),
+            {
+                let mut more = button(icon_svg(Icon::Chevron, tok, A11y::new("more", Role::Image)))
+                    .padding(pad())
+                    .style(style::button_style(tok, Variant::Quiet));
+                if let Some(m) = a11y.apply_message(more_msg) {
+                    more = more.on_press(m);
+                }
+                a11y::attach(
+                    more.into(),
+                    &A11y::button("more").with_disabled(a11y.disabled),
+                )
+            },
         ]
         .spacing(2)
         .into(),
@@ -3173,10 +3178,47 @@ pub fn tab_bar<'a, M: Clone + 'a>(
     a11y::attach(r.into(), &a11y)
 }
 
+/// Title on the start edge, `Icon::Chevron` on the end. Open rotates
+/// the chevron 180° (dropdown face).
+fn disclosure_header<'a, M: Clone + 'a>(
+    title: impl Into<String>,
+    open: bool,
+    msg: Option<M>,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let title = title.into();
+    let angle = if open { std::f32::consts::PI } else { 0.0 };
+    let handle = svg::Handle::from_memory(Icon::Chevron.bytes());
+    let chevron = svg(handle)
+        .width(16.0)
+        .height(16.0)
+        .rotation(angle)
+        .style(icon_style(tok));
+    let face = row![
+        text(title.clone())
+            .size(typo::BODY)
+            .color(tok.text)
+            .width(Length::Fill),
+        chevron,
+    ]
+    .spacing(8)
+    .align_y(Alignment::Center)
+    .width(Length::Fill);
+    let mut b = button(face)
+        .padding(pad())
+        .width(Length::Fill)
+        .style(style::button_style(tok, Variant::Ghost));
+    if let Some(m) = a11y.apply_message(msg) {
+        b = b.on_press(m);
+    }
+    a11y::attach(b.into(), &a11y)
+}
+
 /// An open row shows a body under the header.
 ///
 /// The application owns which row is open. Closed rows are headers
-/// only.
+/// only. The chevron sits on the trailing edge.
 ///
 /// See also catalog id `accordion`.
 ///
@@ -3207,15 +3249,11 @@ pub fn accordion_view<'a, M: Clone + 'a>(
     let mut col = Column::new().spacing(0).width(Length::Fill);
     for (i, (title, body)) in titles.iter().zip(bodies).enumerate() {
         let open = state.open == Some(i);
-        let mark = if open { "▾" } else { "▸" };
-        let head = format!("{mark}  {title}");
-        col = col.push(themed_button_sized(
-            head,
+        col = col.push(disclosure_header(
+            title.clone(),
+            open,
             a11y.apply_message(Some(on_toggle(i))),
             tok,
-            Variant::Quiet,
-            Length::Fill,
-            Length::Shrink,
             A11y::button(title.clone())
                 .with_checked(open)
                 .with_disabled(a11y.disabled),
@@ -3230,6 +3268,69 @@ pub fn accordion_view<'a, M: Clone + 'a>(
         }
     }
     a11y::attach(col.into(), &a11y)
+}
+
+/// A card that clips its child to `collapsed` until opened.
+///
+/// The application owns `open`. The header toggles. Closed clips the
+/// child to `collapsed` (snapped to the 4px grid). Open paints the
+/// full child. Title starts; the chevron sits on the trailing edge.
+///
+/// See also catalog id `expander`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let body = widget::label("more", tok, A11y::new("more", Role::Status));
+/// let _: icedtea::Element<'_, bool> = widget::expander(
+///     "Notes",
+///     body,
+///     48.0,
+///     false,
+///     |open| open,
+///     tok,
+///     A11y::new("Notes", Role::Group),
+/// );
+/// ```
+pub fn expander<'a, M: Clone + 'a>(
+    title: impl Into<String>,
+    child: Element<'a, M>,
+    collapsed: f32,
+    open: bool,
+    on_toggle: impl Fn(bool) -> M + Copy + 'a,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let title = a11y.apply_name(title);
+    let header = disclosure_header(
+        title.clone(),
+        open,
+        a11y.apply_message(Some(on_toggle(!open))),
+        tok,
+        A11y::button(title.clone())
+            .with_checked(open)
+            .with_disabled(a11y.disabled),
+    );
+    let h = crate::density::Density::snap(collapsed.max(0.0).ceil() as u32).max(4) as f32;
+    let body: Element<'a, M> = if open {
+        child
+    } else {
+        container(child)
+            .width(Length::Fill)
+            .height(Length::Fixed(h))
+            .clip(true)
+            .into()
+    };
+    a11y::attach(
+        container(column![header, body].spacing(8))
+            .padding(12)
+            .width(Length::Fill)
+            .style(move |_| style::card(tok, false))
+            .into(),
+        &a11y,
+    )
 }
 
 /// Page through a long list.
@@ -4033,6 +4134,26 @@ mod tests {
             tok,
             role("acc", Role::Group),
         );
+        let note = label("more", tok, role("more", Role::Status));
+        let _: Element<'_, bool> = expander(
+            "Notes",
+            note,
+            48.0,
+            false,
+            |open| open,
+            tok,
+            role("exp", Role::Group),
+        );
+        let note = label("more", tok, role("more", Role::Status));
+        let _: Element<'_, bool> = expander(
+            "Notes",
+            note,
+            48.0,
+            true,
+            |open| open,
+            tok,
+            role("exp", Role::Group).with_disabled(true),
+        );
         let _: Element<'_, ()> = pagination(100, 1, 10, |_| (), tok, role("page", Role::Group));
         let _: Element<'_, ()> = pagination(10, 0, 10, |_| (), tok, role("page", Role::Group));
         let theme = crate::theme::iced_theme("dark", tok);
@@ -4435,6 +4556,36 @@ mod tests {
             role("acc", Role::Group),
         );
         draw_once(&mut closed);
+        let mut exp_shut = expander(
+            "Notes",
+            label("more", tok, role("more", Role::Status)),
+            48.0,
+            false,
+            |_| (),
+            tok,
+            role("exp", Role::Group),
+        );
+        draw_once(&mut exp_shut);
+        let mut exp_open = expander(
+            "Notes",
+            label("more", tok, role("more", Role::Status)),
+            48.0,
+            true,
+            |_| (),
+            tok,
+            role("exp", Role::Group),
+        );
+        draw_once(&mut exp_open);
+        let mut exp_off = expander(
+            "Notes",
+            label("more", tok, role("more", Role::Status)),
+            48.0,
+            false,
+            |_| (),
+            tok,
+            role("exp", Role::Group).with_disabled(true),
+        );
+        draw_once(&mut exp_off);
     }
 
     #[test]
@@ -5145,6 +5296,57 @@ mod tests {
                 "painted y {y} is not k*{row_h} - {scroll}"
             );
         }
+    }
+
+    #[test]
+    fn expander_closed_clips_to_collapsed_height() {
+        let tok = named("dark").tokens;
+        let a11y = |n: &str| A11y::new(n, Role::Status);
+        let tall = || {
+            Column::new()
+                .spacing(8)
+                .push(label("one", tok, a11y("one")))
+                .push(label("two", tok, a11y("two")))
+                .push(label("three", tok, a11y("three")))
+                .push(label("four", tok, a11y("four")))
+                .push(label("five", tok, a11y("five")))
+                .push(label("six", tok, a11y("six")))
+                .into()
+        };
+        let mut shut: Element<'_, bool> = expander(
+            "Notes",
+            tall(),
+            48.0,
+            false,
+            |open| open,
+            tok,
+            A11y::new("exp", Role::Group),
+        );
+        let mut open: Element<'_, bool> = expander(
+            "Notes",
+            tall(),
+            48.0,
+            true,
+            |open| open,
+            tok,
+            A11y::new("exp", Role::Group),
+        );
+        let max = iced::Size::new(320.0, 800.0);
+        let closed_h = layout_size(&mut shut, max).height;
+        let open_h = layout_size(&mut open, max).height;
+        assert!(open_h > closed_h + 8.0);
+        assert!(closed_h >= 48.0 + 12.0);
+        let src = include_str!("widget.rs");
+        let head = src
+            .split("fn disclosure_header")
+            .nth(1)
+            .unwrap()
+            .split("pub fn accordion_view")
+            .next()
+            .unwrap();
+        assert!(head.contains("Icon::Chevron"));
+        assert!(head.contains("Length::Fill"));
+        assert!(!head.contains("▾"));
     }
 
     fn layout_size<M: Clone>(el: &mut Element<'_, M>, max: iced::Size) -> iced::Size {

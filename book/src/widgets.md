@@ -37,4 +37,5 @@ See [`time`](reference/fields.md#time).
 the wheel write it. Variable-height rows use `row_offsets` /
 `visible_range_var`. `Selection::select_range` and `move_primary` stay
 on indices. `ColumnLayout` orders, freezes, and resizes table columns.
+`expander` clips a card body until the header opens it.
 See [Collections](reference/collections.md).
