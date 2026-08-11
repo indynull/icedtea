@@ -11,6 +11,7 @@ pub mod collection;
 pub mod density;
 pub mod dialog;
 pub mod dnd;
+pub mod focus;
 pub mod fuzzy;
 pub mod host;
 mod host_canvas;
@@ -32,6 +33,7 @@ pub mod typo;
 pub mod variant;
 pub mod widget;
 pub mod window;
+pub mod workspace;
 
 pub use app::{bootstrap, Boot, Prepared};
 pub use host::{copy_text, native_dialog, paste_text};

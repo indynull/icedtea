@@ -65,6 +65,16 @@ pub struct UiState {
     #[serde(default)]
     pub follow_os: bool,
     pub density: DensityName,
+    #[serde(default = "default_scale")]
+    pub font_scale: f32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accent: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace: Option<String>,
+}
+
+fn default_scale() -> f32 {
+    1.0
 }
 
 impl Default for UiState {
@@ -77,6 +87,9 @@ impl Default for UiState {
             family: None,
             follow_os: false,
             density: DensityName::Default,
+            font_scale: 1.0,
+            accent: None,
+            workspace: None,
         }
     }
 }
@@ -172,6 +185,9 @@ mod tests {
         ui.family = Some("github".into());
         ui.follow_os = true;
         ui.density = DensityName::Compact;
+        ui.font_scale = 1.125;
+        ui.accent = Some("#88c0d0".into());
+        ui.workspace = Some(r#"{"Leaf":{"id":"e","title":"E","min":80.0,"max":10000.0}}"#.into());
         ui.window.x = 12.0;
         let json = ui.to_json().unwrap();
         let back = UiState::from_json(&json).unwrap();
@@ -192,6 +208,11 @@ mod tests {
         assert_eq!(named_only.theme, "nord");
         assert!(named_only.family.is_none());
         assert!(!named_only.follow_os);
+        assert!((named_only.font_scale - 1.0).abs() < f32::EPSILON);
+        assert!(named_only.accent.is_none());
+        assert!(named_only.workspace.is_none());
+        assert!((back.font_scale - 1.125).abs() < f32::EPSILON);
+        assert_eq!(back.accent.as_deref(), Some("#88c0d0"));
         assert!(UiState::load_file(Path::new("/no/such/icedtea.json")).is_err());
         let blocker = std::env::temp_dir().join("icedtea-persist-not-a-dir");
         std::fs::write(&blocker, b"x").unwrap();

@@ -67,8 +67,11 @@ A compact tool sets size on `Boot` (`.size(380.0, 560.0).min_size(...)`)
 instead of calling iced window resize. See [Compact tools](compact-tools.md).
 
 `icedtea-gallery` is the living catalog: markdown shows a full
-document; the code page picks a language and highlights it. Each
-catalog id has one constructor; rustdoc on that function is the call.
+document and the outline jumps to that heading; the code page picks a
+language and highlights it. Each catalog id has one constructor;
+rustdoc on that function is the call. The application handles the
+messages.
+
 Widget constructors, time, and virtual lists are in [Widgets](widgets.md).
 `bootstrap(&boot)` is the same path without opening a window — use it
 in tests. Compact tools are in [Compact tools](compact-tools.md).

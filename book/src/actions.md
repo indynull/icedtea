@@ -19,6 +19,12 @@ assert_eq!(table.invoke("file.save"), Some(Message::Save));
 Write `ctrl+s` once. icedtea stores Command on macOS and Control on
 Linux and Windows; menus print that host form.
 
+`ActionTable::conflicts` reports duplicate shortcuts in the same
+context. `with_sequence` plus `key::SequenceBuffer` is `ctrl+k` then
+`g`. `handle_in` takes a keymap context. The palette keeps recent and
+favorites and can open a `Prompt`. `pattern::cheatsheet` lists the
+table.
+
 `key::handle` uses `KeyContext`: an open modal consumes (even if a
 field is focused); otherwise focused text owns unmodified typing;
 otherwise chords hit the action table, so Save works while the caret

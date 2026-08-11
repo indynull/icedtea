@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+Workspace docks, drawers, and tool panels. Variable-height lists,
+frozen columns, range selection, command contexts and sequences,
+palette prompts, cheatsheet, inspector, document tabs, and a job
+strip. `MarkdownDoc::item_offset` drives outline jump. Gallery demos
+handle the messages their widgets emit.
+
 ## 0.2.0 — 2026-08-11
 
 Widgets and chrome for iced 0.14 desktop applications.

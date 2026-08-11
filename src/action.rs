@@ -56,6 +56,8 @@ pub struct Action<M> {
     pub enabled: bool,
     pub checked: Option<bool>,
     pub message: M,
+    pub context: Option<String>,
+    pub sequence: Option<Vec<Shortcut>>,
 }
 
 impl<M: Clone> Action<M> {
@@ -69,6 +71,26 @@ impl<M: Clone> Action<M> {
             enabled: true,
             checked: None,
             message,
+            context: None,
+            sequence: None,
+        }
+    }
+
+    pub fn with_context(mut self, context: impl Into<String>) -> Self {
+        self.context = Some(context.into());
+        self
+    }
+
+    pub fn with_sequence(mut self, sequence: Vec<Shortcut>) -> Self {
+        self.sequence = Some(sequence);
+        self
+    }
+
+    pub fn in_context(&self, context: Option<&str>) -> bool {
+        match (&self.context, context) {
+            (None, _) => true,
+            (Some(need), Some(have)) => need == have,
+            (Some(_), None) => false,
         }
     }
 
@@ -147,10 +169,44 @@ impl<M: Clone> ActionTable<M> {
     }
 
     pub fn match_shortcut(&self, shortcut: &Shortcut) -> Option<&Action<M>> {
+        self.match_shortcut_in(shortcut, None)
+    }
+
+    pub fn match_shortcut_in(
+        &self,
+        shortcut: &Shortcut,
+        context: Option<&str>,
+    ) -> Option<&Action<M>> {
         self.actions.iter().find(|a| {
-            a.shortcut
-                .as_ref()
-                .is_some_and(|s| s == shortcut && a.enabled)
+            a.enabled && a.in_context(context) && a.shortcut.as_ref().is_some_and(|s| s == shortcut)
+        })
+    }
+
+    /// Ids of enabled actions that share a shortcut or sequence.
+    pub fn conflicts(&self) -> Vec<(String, String)> {
+        let mut out = Vec::new();
+        for (i, a) in self.actions.iter().enumerate() {
+            if !a.enabled {
+                continue;
+            }
+            for b in self.actions.iter().skip(i + 1) {
+                if !b.enabled {
+                    continue;
+                }
+                let same_ctx = a.context == b.context;
+                let same_chord = matches!((&a.shortcut, &b.shortcut), (Some(x), Some(y)) if x == y);
+                let same_seq = matches!((&a.sequence, &b.sequence), (Some(x), Some(y)) if x == y);
+                if same_ctx && (same_chord || same_seq) {
+                    out.push((a.id.0.clone(), b.id.0.clone()));
+                }
+            }
+        }
+        out
+    }
+
+    pub fn match_sequence(&self, parts: &[Shortcut], context: Option<&str>) -> Option<&Action<M>> {
+        self.actions.iter().find(|a| {
+            a.enabled && a.in_context(context) && a.sequence.as_deref().is_some_and(|s| s == parts)
         })
     }
 
@@ -196,5 +252,65 @@ mod tests {
         assert!(table.match_shortcut(&sc).is_some());
         assert!(!table.footer_hints().is_empty());
         assert_eq!(ActionId::new("x").as_str(), "x");
+    }
+
+    #[test]
+    fn context_sequence_and_conflicts() {
+        let mut table = ActionTable::new();
+        let seq = vec![
+            Shortcut::parse("ctrl+k").unwrap(),
+            Shortcut::parse("s").unwrap(),
+        ];
+        table.insert(
+            Action::new("editor.save", "Save", 1u8)
+                .with_shortcut(Shortcut::parse("ctrl+s").unwrap())
+                .with_context("editor")
+                .with_sequence(seq.clone()),
+        );
+        table.insert(
+            Action::new("global.save", "Save all", 2u8)
+                .with_shortcut(Shortcut::parse("ctrl+s").unwrap()),
+        );
+        table.insert(
+            Action::new("editor.dup", "Dup", 3u8)
+                .with_shortcut(Shortcut::parse("ctrl+s").unwrap())
+                .with_context("editor"),
+        );
+        assert!(table
+            .conflicts()
+            .iter()
+            .any(|(a, b)| a == "editor.save" && b == "editor.dup"));
+        let sc = Shortcut::parse("ctrl+s").unwrap();
+        assert_eq!(
+            table
+                .match_shortcut_in(&sc, Some("editor"))
+                .unwrap()
+                .id
+                .as_str(),
+            "editor.save"
+        );
+        assert_eq!(
+            table
+                .match_sequence(&seq, Some("editor"))
+                .unwrap()
+                .id
+                .as_str(),
+            "editor.save"
+        );
+        assert!(table.match_sequence(&seq, Some("other")).is_none());
+        assert!(Action::new("x", "X", ()).in_context(None));
+        assert!(!Action::new("x", "X", ())
+            .with_context("ed")
+            .in_context(None));
+        let mut same_seq = ActionTable::new();
+        let one = vec![Shortcut::parse("ctrl+k").unwrap()];
+        same_seq.insert(Action::new("a", "A", 1u8).with_sequence(one.clone()));
+        same_seq.insert(Action::new("b", "B", 2u8).with_sequence(one));
+        assert!(!same_seq.conflicts().is_empty());
+        same_seq.get_mut("a").unwrap().enabled = false;
+        assert!(same_seq.conflicts().is_empty());
+        assert!(same_seq
+            .match_shortcut_in(&Shortcut::parse("ctrl+s").unwrap(), None)
+            .is_none());
     }
 }

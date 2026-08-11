@@ -16,7 +16,8 @@ values.
 The [gallery](https://github.com/indynull/icedtea/tree/master/icedtea-gallery)
 is a running catalog: every [`catalog::ENTRIES`][catalog] id appears
 on a page. Each id has one constructor; rustdoc on that function is
-the intended call. Related controls share a page. Run it from a checkout:
+the intended call. Related controls share a page. Clicks update
+gallery state (outline jump, dismiss, places). Run it from a checkout:
 
 ```bash
 cargo run -p icedtea-gallery

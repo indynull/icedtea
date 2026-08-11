@@ -105,7 +105,9 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
 - Never leave a process-global `OnceLock` or env mutation that freezes
   the first workspace, locale, or theme for the process lifetime.
 - Extract a second crate only after a second in-tree consumer needs it.
-  Experiments live in `icedtea` or `icedtea-gallery`.
+  Experiments live in `icedtea` or `icedtea-gallery`. Never add a
+  proof-of-work app as a workspace member or document it in README,
+  the book, or this file.
 - Never grow `CHANGELOG.md` Unreleased into a session diary. 0.1.0 on
   crates.io was a publish check. 0.2 is the first library cut. Never
   call icedtea a product in user-facing copy; it is a UI library.

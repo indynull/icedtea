@@ -41,3 +41,10 @@ let mode = Breakpoint::from_width(width);
 Split ratios persist through `UiState::set_split`. The sash grip emits
 press; while pressed, `listen_sash` feeds window-space pointer move and
 release into `SashDrag::apply`.
+
+`workspace::DockNode` is a nested leaf / split / tab tree with JSON
+save and restore, ratio clamps, and `move_panel` between docks.
+`pattern::workspace` draws that tree. `pattern::drawer` collapses a
+side pane at compact width. `pattern::tool_panel` is overlay chrome
+for a float-or-dock tool window. Perspectives are named `DockNode`
+snapshots.

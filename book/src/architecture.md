@@ -26,13 +26,15 @@ Windows.
 ## Layout and chrome
 
 Recipes (`dock`, `split`, `clamp`, `form`, `overlay`) compose rows and
-columns. Patterns (`list_detail`, `navigation_view`, `preferences`,
-`about`) combine recipes with widgets.
+columns. Patterns (`list_detail`, `inspector`, `workspace`, `drawer`,
+`document_tabs`, `navigation_view`, `preferences`, `about`) combine
+recipes with widgets. `workspace::DockNode` is the nested dock tree.
 
 ## Catalog
 
 `catalog::ENTRIES` is the public surface. Each id has one constructor
 and appears on a gallery page. Related atoms share a page. The
 constructor takes `A11y` and tokens; rustdoc on that function is the
-intended call. Constructors, time, and virtual lists are in
-[Widgets](widgets.md).
+intended call. Constructors emit the application's messages; the
+application owns `update`. Constructors, time, and virtual lists are
+in [Widgets](widgets.md).

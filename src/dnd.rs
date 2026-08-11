@@ -16,6 +16,11 @@ use iced::{Element, Event};
 pub enum DragPayload {
     Text(String),
     Files(Vec<PathBuf>),
+    /// Row index in a named virtualized list.
+    Index {
+        list: String,
+        index: usize,
+    },
 }
 
 impl DragPayload {
@@ -30,14 +35,28 @@ impl DragPayload {
     pub fn as_text(&self) -> Option<&str> {
         match self {
             Self::Text(s) => Some(s),
-            Self::Files(_) => None,
+            Self::Files(_) | Self::Index { .. } => None,
         }
     }
 
     pub fn as_files(&self) -> &[PathBuf] {
         match self {
             Self::Files(p) => p,
-            Self::Text(_) => &[],
+            Self::Text(_) | Self::Index { .. } => &[],
+        }
+    }
+
+    pub fn as_index(&self) -> Option<(&str, usize)> {
+        match self {
+            Self::Index { list, index } => Some((list, *index)),
+            _ => None,
+        }
+    }
+
+    pub fn index(list: impl Into<String>, index: usize) -> Self {
+        Self::Index {
+            list: list.into(),
+            index,
         }
     }
 }
@@ -54,7 +73,7 @@ impl DropAccept {
     pub fn accepts(self, payload: &DragPayload) -> bool {
         matches!(
             (self, payload),
-            (Self::Text, DragPayload::Text(_))
+            (Self::Text, DragPayload::Text(_) | DragPayload::Index { .. })
                 | (Self::Files, DragPayload::Files(_))
                 | (Self::Both, _)
         )
@@ -144,6 +163,11 @@ mod tests {
             None,
             |_| (),
         );
+        let idx = DragPayload::index("inbox", 3);
+        assert_eq!(idx.as_index(), Some(("inbox", 3)));
+        assert!(idx.as_text().is_none());
+        assert!(idx.as_files().is_empty());
+        assert!(DropAccept::Text.accepts(&idx));
         let _ = listen_files();
         assert!(
             files_from_event(ev, iced::event::Status::Ignored, iced::window::Id::unique(),)

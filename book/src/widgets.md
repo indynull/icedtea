@@ -13,7 +13,13 @@ example sits on that function and is the intended call. Image is
 `key::listen`.
 
 The gallery (`cargo run -p icedtea-gallery`) pages every catalog id.
-Related controls share a page.
+Related controls share a page. Each clickable demo updates gallery
+state: outline jumps scroll the markdown document, chips dismiss,
+places push the navigation stack.
+
+`markdown_outline` emits the heading's item index. The application
+calls `MarkdownDoc::item_offset` and `scroll_to` on the document
+scroller id. Links emit the URI.
 
 ## Time
 
@@ -38,7 +44,11 @@ let _ = widget::time_picker(
 ## Lists, tables, and logs
 
 `VisibleWindow.scroll` is the only list and table offset. The rail and
-the wheel write it. `list_view` and `data_table` paint row `i` at
+the wheel write it. Variable-height rows use `row_offsets` /
+`visible_range_var`. `Selection::select_range` and `move_primary` stay
+on indices. `ColumnLayout` orders, freezes, and resizes table columns.
+`transfer_index` moves a row id between lists. `row_is_mounted` is the
+lazy-row check. `list_view` and `data_table` paint row `i` at
 `i * row_h - scroll` (list separator rows occupy `row_h`). The pane
 height comes from layout; `on_scroll` reports that height after a wheel
 or rail move. `scroll_id` names the list clip pane. `log_view` sticks

@@ -22,7 +22,7 @@ use iced::{Element, Length};
 
 use crate::a11y::{A11y, Role};
 use crate::action::{Action, ActionTable};
-use crate::collection::Tabs;
+use crate::collection::{DocumentTabs, Tabs};
 use crate::i18n::{order, Catalog, Direction};
 use crate::icon::Icon;
 use crate::layout;
@@ -741,6 +741,276 @@ pub fn context_menu<'a, M: Clone + 'a>(
         .into()
 }
 
+/// Catalog `document-tabs`. Dirty titles get a bullet; close confirm is the app's.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::collection::DocumentTabs;
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let mut docs = DocumentTabs::new(["lib.rs"]);
+/// docs.tabs.closable = true;
+/// let _: icedtea::Element<'_, ()> = pattern::document_tabs(
+///     &docs,
+///     widget::label("src", tok, A11y::new("src", Role::Status)),
+///     |_| (),
+///     |_| (),
+///     tok,
+/// );
+/// ```
+pub fn document_tabs<'a, M: Clone + 'a>(
+    docs: &DocumentTabs,
+    body: Element<'a, M>,
+    on_select: impl Fn(usize) -> M + Copy + 'a,
+    on_close: impl Fn(usize) -> M + Copy + 'a,
+    tok: Tokens,
+) -> Element<'a, M> {
+    let titles: Vec<String> = (0..docs.tabs.titles.len()).map(|i| docs.title(i)).collect();
+    let mut shown = docs.tabs.clone();
+    shown.titles = titles;
+    tab_view(&shown, body, on_select, on_close, tok)
+}
+
+/// Catalog `inspector`. Master, detail, and a side inspector stay in one row.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let lab = |s| widget::label(s, tok, A11y::new(s, Role::Status));
+/// let _: icedtea::Element<'_, ()> = pattern::inspector(
+///     lab("List"),
+///     lab("Body"),
+///     lab("Props"),
+///     tok,
+/// );
+/// ```
+pub fn inspector<'a, M: 'a>(
+    list: Element<'a, M>,
+    detail: Element<'a, M>,
+    props: Element<'a, M>,
+    tok: Tokens,
+) -> Element<'a, M> {
+    row![
+        container(list)
+            .width(layout::fixed(200.0))
+            .height(Length::Fill)
+            .style(move |_| style::panel(tok)),
+        container(detail).width(Length::Fill).height(Length::Fill),
+        container(props)
+            .width(layout::fixed(280.0))
+            .height(Length::Fill)
+            .padding(12)
+            .style(move |_| style::panel(tok)),
+    ]
+    .width(Length::Fill)
+    .height(Length::Fill)
+    .into()
+}
+
+/// Catalog `workspace`. Nested dock slots as a labeled strip plus `center`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// use icedtea::workspace::DockNode;
+/// let tok = theme::named("dark").tokens;
+/// let root = DockNode::leaf("edit", "Edit");
+/// let _: icedtea::Element<'_, ()> = pattern::workspace(
+///     &root,
+///     widget::label("src", tok, A11y::new("src", Role::Status)),
+///     tok,
+///     A11y::new("workspace", Role::Group),
+/// );
+/// ```
+pub fn workspace<'a, M: Clone + 'a>(
+    root: &crate::workspace::DockNode,
+    center: Element<'a, M>,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let mut side = Column::new().spacing(4).padding(8);
+    for (id, title, active) in root.slots() {
+        let face = if active {
+            Variant::Primary
+        } else {
+            Variant::Quiet
+        };
+        side = side.push(label(
+            title.clone(),
+            tok,
+            A11y::new(id, Role::Status).with_checked(active),
+        ));
+        let _ = face;
+    }
+    crate::a11y::attach(
+        list_detail(side.into(), center, layout::fixed(200.0), tok),
+        &a11y,
+    )
+}
+
+/// Catalog `tool-panel`. Overlay chrome for a floatable tool window.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = pattern::tool_panel(
+///     "Outline",
+///     widget::label("files", tok, A11y::new("files", Role::Status)),
+///     Some(()),
+///     tok,
+///     A11y::new("Outline", Role::Group),
+/// );
+/// ```
+pub fn tool_panel<'a, M: Clone + 'a>(
+    title: impl Into<String>,
+    body: Element<'a, M>,
+    on_dock: Option<M>,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let title = title.into();
+    let head = row![
+        iced::widget::Space::new().width(Length::Fill),
+        themed_button(
+            "Dock",
+            a11y.apply_message(on_dock),
+            tok,
+            Variant::Ghost,
+            A11y::button("Dock").with_disabled(a11y.disabled),
+        ),
+    ]
+    .spacing(8)
+    .padding([4, 8]);
+    crate::a11y::attach(
+        group_box(title, column![head, body].into(), tok, a11y.clone()),
+        &a11y,
+    )
+}
+
+/// Catalog `drawer`. Compact-width slide-over for a collapsed dock.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = pattern::drawer(
+///     true,
+///     widget::label("nav", tok, A11y::new("nav", Role::Group)),
+///     widget::label("main", tok, A11y::new("main", Role::Status)),
+///     tok,
+/// );
+/// ```
+pub fn drawer<'a, M: 'a>(
+    open: bool,
+    pane: Element<'a, M>,
+    content: Element<'a, M>,
+    tok: Tokens,
+) -> Element<'a, M> {
+    if open {
+        list_detail(pane, content, layout::fixed(220.0), tok)
+    } else {
+        content
+    }
+}
+
+/// Catalog `cheatsheet`. Searchable shortcut list from the action table.
+///
+/// ```
+/// use icedtea::action::{Action, ActionTable};
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// let tok = theme::named("dark").tokens;
+/// let mut table = ActionTable::new();
+/// table.insert(Action::new("file.save", "Save", ()));
+/// let _: icedtea::Element<'_, ()> = pattern::cheatsheet(&table, "", tok);
+/// ```
+pub fn cheatsheet<'a, M: Clone + 'a>(
+    table: &ActionTable<M>,
+    query: &str,
+    tok: Tokens,
+) -> Element<'a, M> {
+    let q = query.trim().to_ascii_lowercase();
+    let mut col = Column::new().spacing(4).padding(8);
+    for a in table.iter() {
+        if !a.enabled {
+            continue;
+        }
+        let blob = a.search_blob().to_ascii_lowercase();
+        if !q.is_empty() && !blob.contains(&q) {
+            continue;
+        }
+        let keys = a
+            .shortcut
+            .as_ref()
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "—".into());
+        col = col.push(row![
+            label(
+                a.title.clone(),
+                tok,
+                A11y::new(a.title.clone(), Role::Status)
+            ),
+            iced::widget::Space::new().width(Length::Fill),
+            meta(keys.clone(), tok, A11y::new(keys, Role::Status)),
+        ]);
+    }
+    crate::a11y::attach(
+        themed_scroll(
+            col.into(),
+            tok,
+            A11y::new("cheatsheet", Role::Group),
+            false,
+            None,
+            None::<fn(_) -> M>,
+        ),
+        &A11y::new("cheatsheet", Role::Group),
+    )
+}
+
+/// Catalog `jobs`. Progress rows for background work.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::collection::Job;
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// let tok = theme::named("dark").tokens;
+/// let jobs = [Job { id: 1, title: "Index".into(), progress: Some(0.4) }];
+/// let _: icedtea::Element<'_, ()> = pattern::job_strip(&jobs, tok, A11y::new("jobs", Role::Status));
+/// ```
+pub fn job_strip<'a, M: Clone + 'a>(
+    jobs: &[crate::collection::Job],
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let mut row = Row::new().spacing(12).padding([4, 8]);
+    for j in jobs {
+        let label_s = if let Some(p) = j.progress {
+            format!("{} {:>3.0}%", j.title, p * 100.0)
+        } else {
+            j.title.clone()
+        };
+        row = row.push(meta(
+            label_s.clone(),
+            tok,
+            A11y::new(j.title.clone(), Role::Status).with_value(label_s),
+        ));
+    }
+    crate::a11y::attach(row.into(), &a11y)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -839,6 +1109,18 @@ mod tests {
             .next()
             .unwrap();
         assert!(!pref_src.contains("A11y::new(query"));
+        let tool_src = src
+            .split("pub fn tool_panel")
+            .nth(1)
+            .unwrap()
+            .split("pub fn drawer")
+            .next()
+            .unwrap();
+        assert!(
+            !tool_src.contains("label(title.clone()"),
+            "group_box already paints the title; the head row is Dock only"
+        );
+        assert!(tool_src.contains("\"Dock\""));
         let _: Element<'_, ()> = toolbar(acts.iter().copied(), tok, ltr);
         let _: Element<'_, ()> = toolbar(acts.iter().copied(), tok, rtl);
         let _: Element<'_, ()> = command_bar(table.iter(), tok, rtl);
@@ -928,5 +1210,36 @@ mod tests {
         paint(&mut cb);
         let mut dlg = dialog_sheet("Note", "Hello", ("OK".into(), ()), None, tok);
         paint(&mut dlg);
+        let mut docs = crate::collection::DocumentTabs::new(["a.rs"]);
+        docs.tabs.closable = true;
+        docs.mark_dirty(0, true);
+        let mut dt = document_tabs(&docs, lab("b"), |_| (), |_| (), tok);
+        paint(&mut dt);
+        let mut insp = inspector(lab("l"), lab("d"), lab("p"), tok);
+        paint(&mut insp);
+        let root = crate::workspace::DockNode::leaf("edit", "Edit");
+        let mut ws = workspace(&root, lab("c"), tok, A11y::new("ws", Role::Group));
+        paint(&mut ws);
+        let mut tp = tool_panel(
+            "Outline",
+            lab("b"),
+            Some(()),
+            tok,
+            A11y::new("tp", Role::Group),
+        );
+        paint(&mut tp);
+        let mut dr = drawer(true, lab("n"), lab("c"), tok);
+        paint(&mut dr);
+        let mut shut = drawer(false, lab("n"), lab("c"), tok);
+        paint(&mut shut);
+        let mut sheet = cheatsheet(&table, "sa", tok);
+        paint(&mut sheet);
+        let jobs = [crate::collection::Job {
+            id: 1,
+            title: "Index".into(),
+            progress: Some(0.4),
+        }];
+        let mut js = job_strip(&jobs, tok, A11y::new("jobs", Role::Status));
+        paint(&mut js);
     }
 }

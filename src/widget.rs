@@ -1680,14 +1680,7 @@ impl MarkdownDoc {
 
     /// Headings in document order. The application owns jump history.
     pub fn headings(&self) -> Vec<MdHeading> {
-        let style = markdown::Style::from_palette(iced::theme::Palette {
-            background: iced::Color::BLACK,
-            text: iced::Color::WHITE,
-            primary: iced::Color::WHITE,
-            success: iced::Color::WHITE,
-            warning: iced::Color::WHITE,
-            danger: iced::Color::WHITE,
-        });
+        let style = markdown_measure_style();
         self.items
             .iter()
             .enumerate()
@@ -1712,11 +1705,103 @@ impl MarkdownDoc {
             })
             .collect()
     }
+
+    /// Estimated Y of item `index` in the default markdown column.
+    /// Pass to `scroll_to` on the document scroller after an outline jump.
+    pub fn item_offset(&self, index: usize) -> f32 {
+        self.items
+            .iter()
+            .take(index)
+            .map(markdown_item_extent)
+            .sum()
+    }
 }
 
-/// Jump list of headings. The application owns history.
+fn markdown_measure_style() -> markdown::Style {
+    markdown::Style::from_palette(iced::theme::Palette {
+        background: iced::Color::BLACK,
+        text: iced::Color::WHITE,
+        primary: iced::Color::WHITE,
+        success: iced::Color::WHITE,
+        warning: iced::Color::WHITE,
+        danger: iced::Color::WHITE,
+    })
+}
+
+fn markdown_text_len(text: &markdown::Text) -> usize {
+    text.spans(markdown_measure_style())
+        .iter()
+        .map(|s| s.text.len())
+        .sum()
+}
+
+fn markdown_item_extent(item: &markdown::Item) -> f32 {
+    const TEXT: f32 = 16.0;
+    const SPACING: f32 = 16.0 * 0.875;
+    const COL: f32 = 64.0;
+    match item {
+        markdown::Item::Heading(level, text) => {
+            let size = match level {
+                markdown::HeadingLevel::H1 => TEXT * 2.0,
+                markdown::HeadingLevel::H2 => TEXT * 1.75,
+                markdown::HeadingLevel::H3 => TEXT * 1.5,
+                markdown::HeadingLevel::H4 => TEXT * 1.25,
+                markdown::HeadingLevel::H5 | markdown::HeadingLevel::H6 => TEXT,
+            };
+            let lines = ((markdown_text_len(text) as f32) / COL).ceil().max(1.0);
+            size * 1.3 * lines + TEXT * 0.5 + SPACING
+        }
+        markdown::Item::Paragraph(text) => {
+            let lines = ((markdown_text_len(text) as f32) / COL).ceil().max(1.0);
+            lines * TEXT * 1.4 + SPACING
+        }
+        markdown::Item::CodeBlock { code, lines, .. } => {
+            let n = lines.len().max(code.lines().count()).max(1) as f32;
+            n * TEXT * 0.75 * 1.5 + 24.0 + SPACING
+        }
+        markdown::Item::List { bullets, .. } => {
+            bullets
+                .iter()
+                .map(|b| {
+                    let kids = match b {
+                        markdown::Bullet::Point { items }
+                        | markdown::Bullet::Task { items, .. } => items,
+                    };
+                    TEXT + kids.iter().map(markdown_item_extent).sum::<f32>()
+                })
+                .sum::<f32>()
+                + SPACING
+        }
+        markdown::Item::Image { .. } => 160.0 + SPACING,
+        markdown::Item::Quote(items) => {
+            items.iter().map(markdown_item_extent).sum::<f32>() + 16.0 + SPACING
+        }
+        markdown::Item::Rule => 24.0 + SPACING,
+        markdown::Item::Table { rows, .. } => (1 + rows.len()) as f32 * TEXT * 1.8 + SPACING,
+    }
+}
+
+/// Jump list of headings. The application owns history. `selected` is
+/// the heading's item index from [`MdHeading::index`].
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let doc = widget::parse("# Hi\n\n## Next");
+/// let heads = doc.headings();
+/// let _: icedtea::Element<'_, usize> = widget::markdown_outline(
+///     &heads,
+///     Some(heads[0].index),
+///     |i| i,
+///     tok,
+///     A11y::new("outline", Role::List),
+/// );
+/// ```
 pub fn markdown_outline<'a, M: Clone + 'a>(
     headings: &'a [MdHeading],
+    selected: Option<usize>,
     on_jump: impl Fn(usize) -> M + Copy + 'a,
     tok: Tokens,
     a11y: A11y,
@@ -1724,13 +1809,16 @@ pub fn markdown_outline<'a, M: Clone + 'a>(
     let mut col = Column::new().spacing(2);
     for h in headings {
         let pad = 8 + u16::from(h.level.saturating_sub(1)) * 8;
+        let on = selected == Some(h.index);
         col = col.push(
             container(themed_button(
                 h.title.clone(),
                 a11y.apply_message(Some(on_jump(h.index))),
                 tok,
-                Variant::Ghost,
-                A11y::button(h.title.clone()).with_disabled(a11y.disabled),
+                if on { Variant::Quiet } else { Variant::Ghost },
+                A11y::button(h.title.clone())
+                    .with_checked(on)
+                    .with_disabled(a11y.disabled),
             ))
             .padding(Padding {
                 top: 0.0,
@@ -3809,10 +3897,25 @@ mod tests {
         let deep = parse("# A\n\n## B\n\n### C\n\n#### D\n\n##### E\n\n###### F\n");
         let levels: Vec<u8> = deep.headings().iter().map(|h| h.level).collect();
         assert_eq!(levels, vec![1, 2, 3, 4, 5, 6]);
-        let _: Element<'_, ()> = markdown_outline(&heads, |_| (), tok, role("outline", Role::List));
+        let _: Element<'_, ()> = markdown_outline(
+            &heads,
+            Some(heads[0].index),
+            |_| (),
+            tok,
+            role("outline", Role::List),
+        );
         let none: [MdHeading; 0] = [];
         let _: Element<'_, ()> =
-            markdown_outline(&none, |_| (), tok, role("outline-empty", Role::List));
+            markdown_outline(&none, None, |_| (), tok, role("outline-empty", Role::List));
+        assert!(outlined.item_offset(heads[1].index) > outlined.item_offset(heads[0].index));
+        assert_eq!(outlined.item_offset(0), 0.0);
+        assert!(outlined.item_offset(outlined.items.len()) > outlined.item_offset(heads[1].index));
+        let _ = deep.item_offset(deep.items.len());
+        let rich = parse(
+            "# T\n\nA paragraph with [link](https://example.com).\n\n- bullet\n  - nested\n\n1. one\n\n- [x] done\n- [ ] todo\n\n> quoted\n>\n> still quoted\n\n---\n\n```rust\nfn x() {}\n```\n\n| Name | Ready |\n| --- | --- |\n| A | yes |\n\n![Logo](pixel.png)\n",
+        );
+        assert!(rich.items.len() >= 8);
+        assert!(rich.item_offset(rich.items.len()) > 100.0);
     }
 
     #[test]

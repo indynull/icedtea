@@ -289,6 +289,17 @@ pub fn press(event: &KeyEvent) -> Option<Press> {
 /// assert_eq!(handle(KeyContext::default(), &table, &ev), Some(1));
 /// ```
 pub fn handle<M: Clone>(ctx: KeyContext, table: &ActionTable<M>, event: &KeyEvent) -> Option<M> {
+    handle_in(ctx, table, event, None, None)
+}
+
+/// Resolve a key in a named keymap context. `seq` collects sequential chords.
+pub fn handle_in<M: Clone>(
+    ctx: KeyContext,
+    table: &ActionTable<M>,
+    event: &KeyEvent,
+    context: Option<&str>,
+    seq: Option<&mut SequenceBuffer>,
+) -> Option<M> {
     let KeyEvent::KeyPressed { key, modifiers, .. } = event else {
         return None;
     };
@@ -303,7 +314,59 @@ pub fn handle<M: Clone>(ctx: KeyContext, table: &ActionTable<M>, event: &KeyEven
         modifiers: *modifiers,
         key: key.clone(),
     };
-    table.match_shortcut(&sc).and_then(|a| a.invoke())
+    if let Some(buf) = seq {
+        if let Some(msg) = buf.push(sc.clone(), table, context) {
+            return Some(msg);
+        }
+    }
+    table
+        .match_shortcut_in(&sc, context)
+        .and_then(|a| a.invoke())
+}
+
+/// Sequential key chords (`ctrl+k` then `s`).
+#[derive(Debug, Clone, Default)]
+pub struct SequenceBuffer {
+    parts: Vec<Shortcut>,
+}
+
+impl SequenceBuffer {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn clear(&mut self) {
+        self.parts.clear();
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.parts.is_empty()
+    }
+
+    pub fn push<M: Clone>(
+        &mut self,
+        next: Shortcut,
+        table: &ActionTable<M>,
+        context: Option<&str>,
+    ) -> Option<M> {
+        self.parts.push(next);
+        if let Some(a) = table.match_sequence(&self.parts, context) {
+            let msg = a.invoke();
+            self.clear();
+            return msg;
+        }
+        let prefix = table.iter().any(|a| {
+            a.enabled
+                && a.in_context(context)
+                && a.sequence
+                    .as_ref()
+                    .is_some_and(|s| s.starts_with(&self.parts))
+        });
+        if !prefix {
+            self.clear();
+        }
+        None
+    }
 }
 
 #[cfg(test)]
@@ -636,5 +699,34 @@ mod tests {
         assert_eq!(Press::ArrowLeft.step_cell(1, 2, 4, 3, 2), (1, 1));
         assert_eq!(Press::PageUp.step_cell(3, 1, 4, 3, 2), (1, 1));
         assert_eq!(Press::Enter.step_cell(1, 1, 4, 3, 2), (1, 1));
+    }
+
+    #[test]
+    fn sequence_resolves_after_prefix() {
+        let mut table = ActionTable::new();
+        table.insert(
+            Action::new("go.line", "Go to line", 7u8).with_sequence(vec![
+                Shortcut::parse("ctrl+k").unwrap(),
+                Shortcut::parse("g").unwrap(),
+            ]),
+        );
+        let mut buf = SequenceBuffer::new();
+        let k = press(Key::Character("k".into()), crate::shortcut::primary());
+        assert_eq!(
+            handle_in(KeyContext::default(), &table, &k, None, Some(&mut buf)),
+            None
+        );
+        let g = press(Key::Character("g".into()), Modifiers::empty());
+        assert_eq!(
+            handle_in(KeyContext::default(), &table, &g, None, Some(&mut buf)),
+            Some(7)
+        );
+        let miss = press(Key::Character("x".into()), Modifiers::empty());
+        assert_eq!(
+            handle_in(KeyContext::default(), &table, &miss, None, Some(&mut buf)),
+            None
+        );
+        buf.clear();
+        assert!(buf.is_empty());
     }
 }

@@ -22,6 +22,17 @@ pub struct CommandPalette {
     query: String,
     selected: usize,
     hits: Vec<String>,
+    pub recent: Vec<String>,
+    pub favorites: Vec<String>,
+    pub prompt: Option<Prompt>,
+}
+
+/// Parameter prompt opened from the palette (Go to line, rename).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Prompt {
+    pub action: String,
+    pub label: String,
+    pub value: String,
 }
 
 impl Default for CommandPalette {
@@ -37,7 +48,36 @@ impl CommandPalette {
             query: String::new(),
             selected: 0,
             hits: Vec::new(),
+            recent: Vec::new(),
+            favorites: Vec::new(),
+            prompt: None,
         }
+    }
+
+    pub fn pin_favorite(&mut self, id: impl Into<String>) {
+        let id = id.into();
+        if !self.favorites.iter().any(|f| f == &id) {
+            self.favorites.push(id);
+        }
+    }
+
+    pub fn remember(&mut self, id: impl Into<String>) {
+        let id = id.into();
+        self.recent.retain(|r| r != &id);
+        self.recent.insert(0, id);
+        self.recent.truncate(12);
+    }
+
+    pub fn ask(&mut self, action: impl Into<String>, label: impl Into<String>) {
+        self.prompt = Some(Prompt {
+            action: action.into(),
+            label: label.into(),
+            value: String::new(),
+        });
+    }
+
+    pub fn answer(&mut self) -> Option<Prompt> {
+        self.prompt.take()
     }
 
     pub fn query(&self) -> &str {
@@ -162,5 +202,18 @@ mod tests {
         assert_eq!(pal.selected(), 1);
         pal.close();
         assert!(!pal.open);
+        pal.remember("file.save");
+        pal.remember("file.quit");
+        pal.remember("file.save");
+        assert_eq!(pal.recent[0], "file.save");
+        pal.pin_favorite("file.save");
+        pal.pin_favorite("file.save");
+        assert_eq!(pal.favorites.len(), 1);
+        pal.ask("go.line", "Line");
+        pal.prompt.as_mut().unwrap().value = "12".into();
+        let p = pal.answer().unwrap();
+        assert_eq!(p.action, "go.line");
+        assert_eq!(p.value, "12");
+        assert!(pal.answer().is_none());
     }
 }
