@@ -6,6 +6,10 @@
 
 ## Consider
 
+- Frozen leading columns on `data_table` (`ColumnLayout` order stays
+  the scroll order; pin the first *n* so they stay in view).
+- A parameter field on the command palette (go to line, rename) that
+  `command_palette_view` paints.
 - Plugin surfaces and extension host chrome.
 - Multi-monitor overlay pin beyond `window::place` / `Boot::displays`.
 - Estimated-height virtualization from a measure callback (today the
