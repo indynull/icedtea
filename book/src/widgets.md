@@ -7,9 +7,13 @@ node identity; live values go in `with_value`, not the name. Disabled
 drops handlers. Composite fields use `A11y::child` so the inner editor
 keeps that name and disabled flag.
 
-The gallery (`cargo run -p icedtea-gallery`) pages every
-`catalog::ENTRIES` id. Related controls share a page. Rustdoc on
-`icedtea::widget` is the reference.
+Each `catalog::ENTRIES` id has one constructor. Rustdoc with a working
+example sits on that function and is the intended call. Image is
+`image_slot`. Scroll is `themed_scroll`. Keys subscribe with
+`key::listen`.
+
+The gallery (`cargo run -p icedtea-gallery`) pages every catalog id.
+Related controls share a page.
 
 ## Time
 

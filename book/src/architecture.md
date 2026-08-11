@@ -31,6 +31,8 @@ columns. Patterns (`list_detail`, `navigation_view`, `preferences`,
 
 ## Catalog
 
-`catalog::ENTRIES` is the public surface. Each id appears on a
-gallery page. Related atoms share a page.
-Constructors, time, and virtual lists are in [Widgets](widgets.md).
+`catalog::ENTRIES` is the public surface. Each id has one constructor
+and appears on a gallery page. Related atoms share a page. The
+constructor takes `A11y` and tokens; rustdoc on that function is the
+intended call. Constructors, time, and virtual lists are in
+[Widgets](widgets.md).

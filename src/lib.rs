@@ -106,6 +106,8 @@ mod tests {
         assert!(arch.contains("Action"));
         assert!(arch.contains("Tokens"));
         assert!(arch.contains("catalog::ENTRIES"));
+        assert!(arch.contains("one constructor"));
+        assert!(readme.contains("one constructor"));
         assert!(!arch.contains("Rust is all you need"));
         assert!(!arch.contains("book.iced.rs/philosophy"));
         assert!(!readme.contains("The Elm Architecture"));

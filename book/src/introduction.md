@@ -8,7 +8,8 @@ and emit your messages. Color, layout, and chrome are Rust values.
 ![The icedtea gallery](gallery.gif)
 
 The [gallery](https://github.com/indynull/icedtea/tree/master/icedtea-gallery)
-shows every `catalog::ENTRIES` id. Related controls share a page:
+shows every `catalog::ENTRIES` id. Each id has one constructor.
+Related controls share a page:
 
 ```bash
 cargo run -p icedtea-gallery

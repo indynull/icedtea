@@ -7,7 +7,8 @@ policy and breakpoints.
 
 `layout::pad(cells, 4, density.space)` shares row width across cells.
 Pair it with `widget::themed_button_sized` and `Density::tile()` for a
-key pad.
+key pad. Scroll a pane with `widget::themed_scroll`.
+`Breakpoint::from_width` picks the stacked or beside sidebar recipe.
 
 `layout::FILL`, `layout::SHRINK`, and `layout::fixed(px)` are the size
 language for boxes and editors. `row_box` / `column_box` take width and

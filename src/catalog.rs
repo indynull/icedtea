@@ -1,7 +1,8 @@
 //! Public widget and pattern ids. The gallery must page every entry.
 //!
-//! Each id has one constructor. Widgets take [`crate::a11y::A11y`] and
-//! tokens. Chrome rows take an [`crate::action::ActionTable`].
+//! Each id has one constructor. That `pub fn` takes [`crate::a11y::A11y`]
+//! and tokens. Chrome rows take an [`crate::action::ActionTable`].
+//! Rustdoc with a working example sits immediately above the function.
 //!
 //! ```
 //! assert!(icedtea::catalog::get("button").is_some());
@@ -171,7 +172,12 @@ mod tests {
         assert_eq!(get("time").unwrap().group, "Fields");
         assert_eq!(get("button").unwrap().page, "controls");
         assert_eq!(get("checkbox").unwrap().page, "controls");
-        assert_eq!(page_title("controls"), "Controls");
+        for page in pages() {
+            let title = page_title(page);
+            assert!(!title.is_empty(), "{page}");
+            assert_ne!(title, "Page", "{page}");
+        }
+        assert_eq!(page_title("no-such-page"), "Page");
         assert!(pages().contains(&"controls"));
         assert!(page_entries("controls").count() > 1);
         assert!(pages().len() < ENTRIES.len());
@@ -219,98 +225,151 @@ mod tests {
         let key = include_str!("key.rs");
         let layout = include_str!("layout/recipes.rs");
         let map = [
-            ("button", "pub fn themed_button", widget),
-            ("split-button", "pub fn split_button", widget),
-            ("toggle-button", "pub fn toggle_button", widget),
-            ("checkbox", "pub fn themed_checkbox", widget),
-            ("radio", "pub fn themed_radio", widget),
-            ("switch", "pub fn themed_switch", widget),
-            ("slider", "pub fn themed_slider", widget),
-            ("text-input", "pub fn themed_text_input", widget),
-            ("password", "pub fn password_input", widget),
-            ("secret", "pub fn secret_field", widget),
-            ("textarea", "pub fn textarea", widget),
-            ("search", "pub fn search_input", widget),
-            ("suggest", "pub fn suggest_field", widget),
-            ("select", "pub fn themed_pick_list", widget),
-            ("number", "pub fn number_input", widget),
-            ("mask", "pub fn masked_input", widget),
-            ("date", "pub fn date_picker", widget),
-            ("time", "pub fn time_picker", widget),
-            ("color", "pub fn color_swatch", widget),
-            ("progress", "pub fn progress<", widget),
-            ("progress-ring", "pub fn progress_ring", widget),
-            ("sparkline", "pub fn sparkline", widget),
-            ("spinner", "pub fn spinner", widget),
-            ("display", "pub fn display_reading", widget),
-            ("label", "pub fn label", widget),
-            ("rich-cell", "pub fn rich_cell", widget),
-            ("icon", "pub fn icon_svg", widget),
-            ("tooltip", "pub fn tooltip_wrap", widget),
-            ("link", "pub fn hyperlink", widget),
-            ("markdown", "pub fn markdown_view", widget),
-            ("code", "pub fn highlighted_code", widget),
-            ("image", "pub fn image_slot", widget),
-            ("list", "pub fn list_view", widget),
-            ("log", "pub fn log_view", widget),
-            ("grid", "pub fn item_grid", widget),
-            ("table", "pub fn data_table", widget),
-            ("tree", "pub fn tree_view", widget),
-            ("tabs", "pub fn tab_bar", widget),
-            ("accordion", "pub fn accordion_view", widget),
-            ("pagination", "pub fn pagination", widget),
-            ("theme", "pub fn named", theme),
-            ("colors", "pub fn mix", theme),
-            ("keys", "pub fn handle", key),
-            ("card", "pub fn group_box", widget),
-            ("rule", "pub fn rule_h", widget),
-            ("chip", "pub fn chip", widget),
-            ("badge", "pub fn badge", widget),
-            ("wrap", "pub fn wrap", layout),
-            ("pad", "pub fn pad", layout),
-            ("callout", "pub fn info_bar", widget),
-            ("banner", "pub fn banner", widget),
-            ("group-box", "pub fn group_box", widget),
-            ("skeleton", "pub fn placeholder_skeleton", widget),
-            ("teaching-tip", "pub fn teaching_tip", widget),
-            ("command-bar", "pub fn command_bar", pattern),
-            ("context-menu", "pub fn context_menu", pattern),
-            ("breadcrumb", "pub fn breadcrumb", widget),
-            ("menu", "pub fn menu_bar", pattern),
-            ("toolbar", "pub fn toolbar", pattern),
-            ("status-bar", "pub fn status_bar", pattern),
-            ("scrollbar", "pub fn themed_scroll", widget),
-            ("toast", "pub fn toast_view", widget),
-            ("busy", "pub fn busy_overlay", widget),
-            ("dialogs", "pub fn dialog_sheet", pattern),
-            ("list-detail", "pub fn list_detail", pattern),
-            ("navigation", "pub fn navigation_view", pattern),
-            ("tab-view", "pub fn tab_view", pattern),
-            ("preferences", "pub fn preferences_page", pattern),
-            ("about", "pub fn about_page", pattern),
-            ("status-page", "pub fn status_page", pattern),
-            ("palette", "pub fn command_palette_view", pattern),
-            ("main-window", "pub fn main_window", pattern),
+            ("button", "themed_button", widget),
+            ("split-button", "split_button", widget),
+            ("toggle-button", "toggle_button", widget),
+            ("checkbox", "themed_checkbox", widget),
+            ("radio", "themed_radio", widget),
+            ("switch", "themed_switch", widget),
+            ("slider", "themed_slider", widget),
+            ("text-input", "themed_text_input", widget),
+            ("password", "password_input", widget),
+            ("secret", "secret_field", widget),
+            ("textarea", "textarea", widget),
+            ("search", "search_input", widget),
+            ("suggest", "suggest_field", widget),
+            ("select", "themed_pick_list", widget),
+            ("number", "number_input", widget),
+            ("mask", "masked_input", widget),
+            ("date", "date_picker", widget),
+            ("time", "time_picker", widget),
+            ("color", "color_swatch", widget),
+            ("progress", "progress", widget),
+            ("progress-ring", "progress_ring", widget),
+            ("sparkline", "sparkline", widget),
+            ("spinner", "spinner", widget),
+            ("display", "display_reading", widget),
+            ("label", "label", widget),
+            ("rich-cell", "rich_cell", widget),
+            ("icon", "icon_svg", widget),
+            ("tooltip", "tooltip_wrap", widget),
+            ("link", "hyperlink", widget),
+            ("markdown", "markdown_view", widget),
+            ("code", "highlighted_code", widget),
+            ("image", "image_slot", widget),
+            ("list", "list_view", widget),
+            ("log", "log_view", widget),
+            ("grid", "item_grid", widget),
+            ("table", "data_table", widget),
+            ("tree", "tree_view", widget),
+            ("tabs", "tab_bar", widget),
+            ("accordion", "accordion_view", widget),
+            ("pagination", "pagination", widget),
+            ("theme", "named", theme),
+            ("colors", "mix", theme),
+            ("keys", "handle", key),
+            ("card", "group_box", widget),
+            ("rule", "rule_h", widget),
+            ("chip", "chip", widget),
+            ("badge", "badge", widget),
+            ("wrap", "wrap", layout),
+            ("pad", "pad", layout),
+            ("callout", "info_bar", widget),
+            ("banner", "banner", widget),
+            ("group-box", "group_box", widget),
+            ("skeleton", "placeholder_skeleton", widget),
+            ("teaching-tip", "teaching_tip", widget),
+            ("command-bar", "command_bar", pattern),
+            ("context-menu", "context_menu", pattern),
+            ("breadcrumb", "breadcrumb", widget),
+            ("menu", "menu_bar", pattern),
+            ("toolbar", "toolbar", pattern),
+            ("status-bar", "status_bar", pattern),
+            ("scrollbar", "themed_scroll", widget),
+            ("toast", "toast_view", widget),
+            ("busy", "busy_overlay", widget),
+            ("dialogs", "dialog_sheet", pattern),
+            ("list-detail", "list_detail", pattern),
+            ("navigation", "navigation_view", pattern),
+            ("tab-view", "tab_view", pattern),
+            ("preferences", "preferences_page", pattern),
+            ("about", "about_page", pattern),
+            ("status-page", "status_page", pattern),
+            ("palette", "command_palette_view", pattern),
+            ("main-window", "main_window", pattern),
         ];
         assert_eq!(map.len(), ENTRIES.len());
         for e in ENTRIES {
             let hit = map.iter().find(|(id, _, _)| *id == e.id);
-            let (_, needle, src) = hit.expect(e.id);
+            let (_, name, src) = hit.expect(e.id);
+            let at = find_pub_fn(src, name)
+                .unwrap_or_else(|| panic!("{} missing constructor pub fn {}(", e.id, name));
             assert!(
-                src.contains(needle),
-                "{} missing constructor {}",
+                rustdoc_example_immediately_above(&src[..at]),
+                "{} constructor pub fn {} needs a rustdoc example immediately above it",
                 e.id,
-                needle
-            );
-            let at = src.find(needle).unwrap();
-            let window = &src[at.saturating_sub(700)..at];
-            assert!(
-                window.contains("```"),
-                "{} constructor {} needs a rustdoc example",
-                e.id,
-                needle
+                name
             );
         }
+    }
+
+    fn find_pub_fn(src: &str, name: &str) -> Option<usize> {
+        let pat = format!("pub fn {name}");
+        let mut start = 0;
+        while let Some(rel) = src[start..].find(&pat) {
+            let at = start + rel;
+            let after = src[at + pat.len()..].chars().next();
+            if matches!(after, Some('(') | Some('<')) {
+                return Some(at);
+            }
+            start = at + pat.len();
+        }
+        None
+    }
+
+    fn rustdoc_example_immediately_above(before: &str) -> bool {
+        let mut docs = Vec::new();
+        for line in before.lines().rev() {
+            let t = line.trim_start();
+            if t.is_empty() {
+                if docs.is_empty() {
+                    continue;
+                }
+                break;
+            }
+            if t.starts_with("///") || t.starts_with("#[") {
+                docs.push(t);
+                continue;
+            }
+            break;
+        }
+        docs.iter().any(|l| l.contains("```"))
+    }
+
+    #[test]
+    fn constructor_name_is_not_a_prefix_of_a_neighbor() {
+        assert_eq!(
+            find_pub_fn("pub fn spinner_angles()\npub fn spinner()", "spinner"),
+            Some("pub fn spinner_angles()\n".len())
+        );
+        assert_eq!(find_pub_fn("pub fn spinner_angles()", "spinner"), None);
+        assert_eq!(find_pub_fn("pub fn progress<T>()", "progress"), Some(0));
+        assert_eq!(find_pub_fn("pub fn foo", "foo"), None);
+        assert_eq!(find_pub_fn("fn foo()", "foo"), None);
+    }
+
+    #[test]
+    fn rustdoc_example_must_sit_on_the_constructor() {
+        assert!(rustdoc_example_immediately_above(
+            "/// ```\n/// x\n/// ```\n"
+        ));
+        assert!(rustdoc_example_immediately_above("/// ```\n#[must_use]\n"));
+        assert!(rustdoc_example_immediately_above("/// ```\n\n"));
+        assert!(!rustdoc_example_immediately_above("/// no fence\n"));
+        assert!(!rustdoc_example_immediately_above(
+            "/// ```\n/// neighbor\n/// ```\n\n/// this fn has no fence\n"
+        ));
+        assert!(!rustdoc_example_immediately_above("fn other() {}\n"));
     }
 
     #[test]

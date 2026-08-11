@@ -1,8 +1,9 @@
 //! Themed iced widget constructors for `view`.
 //!
 //! Every drawing constructor returns an [`iced::Element`], emits the
-//! application's messages, and takes [`A11y`] plus [`Tokens`]. Do not
-//! call iced `button` / `text_input` for a catalog control.
+//! application's messages, and takes [`A11y`] plus [`Tokens`]. One
+//! catalog id, one `pub fn`. Rustdoc on that function is the intended
+//! call. Do not call iced `button` / `text_input` for a catalog control.
 //!
 //! ```
 //! use icedtea::a11y::A11y;
@@ -96,6 +97,17 @@ pub enum RichCell {
     Link(String),
 }
 
+/// Catalog `rich-cell`. Not a markup parser.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget::{self, RichCell};
+/// let tok = theme::named("dark").tokens;
+/// let cell = RichCell::Code("len()".into());
+/// let _: icedtea::Element<'_, ()> =
+///     widget::rich_cell(&cell, None, tok, A11y::new("len", Role::Status));
+/// ```
 pub fn rich_cell<'a, M: Clone + 'a>(
     cell: &RichCell,
     on_link: Option<M>,
@@ -390,6 +402,21 @@ pub fn toggle_button<'a, M: Clone + 'a>(
     )
 }
 
+/// Catalog `checkbox`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = widget::themed_checkbox(
+///     "Accept",
+///     true,
+///     |_| (),
+///     tok,
+///     A11y::new("Accept", Role::Checkbox).with_checked(true),
+/// );
+/// ```
 pub fn themed_checkbox<'a, M: Clone + 'a>(
     label_s: impl Into<String>,
     checked: bool,
@@ -435,6 +462,22 @@ pub fn themed_switch<'a, M: Clone + 'a>(
     a11y::attach(t.into(), &a11y)
 }
 
+/// Catalog `radio`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = widget::themed_radio(
+///     "A",
+///     0u8,
+///     Some(0),
+///     |_| (),
+///     tok,
+///     A11y::new("A", Role::Radio).with_checked(true),
+/// );
+/// ```
 pub fn themed_radio<'a, V, M: Clone + 'a>(
     label_s: impl Into<String>,
     value: V,
@@ -579,16 +622,6 @@ pub fn ring_angles(value: f32) -> (f32, f32) {
 }
 
 /// Start/end radians for an indeterminate spinner (`phase` 0..=1).
-/// Catalog `spinner`.
-///
-/// ```
-/// use icedtea::a11y::{A11y, Role};
-/// use icedtea::theme;
-/// use icedtea::widget;
-/// let tok = theme::named("dark").tokens;
-/// let _: icedtea::Element<'_, ()> =
-///     widget::spinner(tok, 0.2, A11y::new("spin", Role::Progress));
-/// ```
 pub fn spinner_angles(phase: f32) -> (f32, f32) {
     let p = phase.rem_euclid(1.0);
     let start = p * std::f32::consts::TAU - std::f32::consts::FRAC_PI_2;
@@ -637,7 +670,21 @@ pub fn progress_ring<'a, M: 'a>(
     a11y::attach(el, &a11y)
 }
 
-/// Dim plus spinner over `child` when `busy`. The application owns the flag.
+/// Catalog `busy`. Dim plus spinner over `child` when `busy`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = widget::busy_overlay(
+///     widget::label("Doc", tok, A11y::new("Doc", Role::Status)),
+///     true,
+///     0.2,
+///     tok,
+///     A11y::new("busy", Role::Group),
+/// );
+/// ```
 pub fn busy_overlay<'a, M: Clone + 'a>(
     child: Element<'a, M>,
     busy: bool,
@@ -707,7 +754,16 @@ pub fn sparkline<'a, M: 'a>(values: &'a [f32], tok: Tokens, a11y: A11y) -> Eleme
     )
 }
 
-/// Indeterminate spinner: a quarter-arc at `phase` (0..=1).
+/// Catalog `spinner`. Indeterminate quarter-arc at `phase` (0..=1).
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> =
+///     widget::spinner(tok, 0.2, A11y::new("spin", Role::Progress));
+/// ```
 pub fn spinner<'a, M: 'a>(tok: Tokens, phase: f32, a11y: A11y) -> Element<'a, M> {
     let (start, end) = spinner_angles(phase);
     a11y::attach(
@@ -998,7 +1054,28 @@ pub fn password_input<'a, M: Clone + 'a>(
     a11y::attach(i.into(), &a11y)
 }
 
-/// Settings row: [`password_input`], reveal, and a copy [`crate::action::Action`].
+/// Catalog `secret`. Reveal plus a copy [`crate::action::Action`].
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::action::Action;
+/// use icedtea::i18n::Direction;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let copy = Action::new("secret.copy", "Copy", ());
+/// let _: icedtea::Element<'_, ()> = widget::secret_field(
+///     "Token",
+///     "",
+///     |_| (),
+///     false,
+///     (),
+///     &copy,
+///     tok,
+///     Direction::Ltr,
+///     A11y::new("Token", Role::Group),
+/// );
+/// ```
 #[allow(clippy::too_many_arguments)]
 pub fn secret_field<'a, M: Clone + 'a>(
     placeholder: &str,
@@ -1188,6 +1265,22 @@ pub fn search_input<'a, M: Clone + 'a>(
     )
 }
 
+/// Catalog `select`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let opts = ["nord", "dark"];
+/// let _: icedtea::Element<'_, ()> = widget::themed_pick_list(
+///     opts,
+///     Some("nord"),
+///     |_| (),
+///     tok,
+///     A11y::new("theme", Role::ComboBox),
+/// );
+/// ```
 pub fn themed_pick_list<'a, T, M: Clone + 'a>(
     options: impl std::borrow::Borrow<[T]> + 'a,
     selected: Option<T>,
@@ -1252,6 +1345,21 @@ pub fn days_in_month(year: i32, month: u32) -> u32 {
     }
 }
 
+/// Catalog `date`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget::{self, DateValue};
+/// let tok = theme::named("dark").tokens;
+/// let d = DateValue {
+///     year: 2026,
+///     month: 8,
+///     day: 10,
+/// };
+/// let _: icedtea::Element<'_, ()> =
+///     widget::date_picker(d, (), (), tok, A11y::new("date", Role::Group));
+/// ```
 pub fn date_picker<'a, M: Clone + 'a>(
     value: DateValue,
     on_prev: M,
@@ -1729,6 +1837,16 @@ pub fn tooltip_wrap<'a, M: 'a>(
     )
 }
 
+/// Catalog `rule`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> =
+///     widget::rule_h(tok, A11y::new("rule", Role::Separator));
+/// ```
 pub fn rule_h<'a, M: 'a>(tok: Tokens, a11y: A11y) -> Element<'a, M> {
     a11y::attach(
         rule::horizontal(1).style(style::rule_style(tok)).into(),
@@ -1872,6 +1990,20 @@ pub fn group_box<'a, M: 'a>(
     )
 }
 
+/// Catalog `banner`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = widget::banner(
+///     "Update available",
+///     Some(("Install".into(), ())),
+///     tok,
+///     A11y::new("Update available", Role::Status),
+/// );
+/// ```
 pub fn banner<'a, M: Clone + 'a>(
     text_s: impl Into<String>,
     action: Option<(String, M)>,
@@ -1930,6 +2062,22 @@ pub fn info_bar<'a, M: Clone + 'a>(
     )
 }
 
+/// Catalog `breadcrumb`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::i18n::Direction;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let crumbs = [("Home".into(), Some(())), ("Gallery".into(), None)];
+/// let _: icedtea::Element<'_, ()> = widget::breadcrumb(
+///     &crumbs,
+///     tok,
+///     Direction::Ltr,
+///     A11y::new("path", Role::Group),
+/// );
+/// ```
 pub fn breadcrumb<'a, M: Clone + 'a>(
     parts: &[(String, Option<M>)],
     tok: Tokens,

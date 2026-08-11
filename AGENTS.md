@@ -73,9 +73,15 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   and `Shortcut::parse` cover F1-F24. `KeyContext::capturing_layer`
   reports the same three states `handle` uses.
 - A widget or pattern is public only when it is themed (all visual
-  states), keyboard-complete, tested, documented, and listed in
-  `catalog::ENTRIES` and shown on a gallery page. Small related
+  states), keyboard-complete, tested, documented, listed in
+  `catalog::ENTRIES`, and shown on a gallery page. Small related
   widgets share a page. Unfinished surfaces are not exported.
+- One catalog id, one public constructor. That `pub fn` takes `A11y`
+  and tokens (chrome rows take an `ActionTable`). Rustdoc with a
+  working example sits immediately above it. The map in `catalog`
+  tests names that function. Image is `image_slot`, scroll is
+  `themed_scroll`, keys subscribe with `key::listen`, sidebar recipe
+  is `Breakpoint::from_width`.
 - One path per feature. Pick it and delete the other. Fallbacks re-grow.
 - Always keep `TODO.md` current with shipped library and real
   consumer requests. Sort them into Do / Consider / discard in the
@@ -83,13 +89,14 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
 - Coverage fail-under is 99 on `just check` (llvm-cov const/macro
   mapping). Never claim 100 while the tool reports less.
 - `catalog::ENTRIES` is the gallery checklist. Adding an export means
-  adding an entry and showing it on a gallery page in the same change.
-  Related atoms share a page. Gallery pages
-  use representative content (full markdown document, multi-language
-  highlighted code, variants and disabled). A one-line stub is not a
-  page. Live samples update application state. Never demo a usable
-  control with `Nop` or a hardcoded value. When a page looks broken,
-  read the widget (offset, stick, viewport) before blaming seed data.
+  adding an entry, a constructor rustdoc example, the catalog test
+  map row, and a gallery page in the same change. Related atoms share
+  a page. Gallery pages use representative content (full markdown
+  document, multi-language highlighted code, variants and disabled).
+  A one-line stub is not a page. Live samples update application
+  state. Never demo a usable control with `Nop` or a hardcoded value.
+  When a page looks broken, read the widget (offset, stick, viewport)
+  before blaming seed data.
 - 4px spacing grid (default density 8px). Design-system numbers live in
   `density`, `typo`, `chrome`, and tokens — not one-off magic in widgets.
 - Never leave a process-global `OnceLock` or env mutation that freezes
@@ -350,11 +357,12 @@ tables or essays in discussion notes.
 ## Done for a change
 
 - `just check` green (full check before claiming a feature complete).
-- New or changed public API: rustdoc example, gallery page if it is a
-  widget or pattern, `catalog::ENTRIES` updated, and the matching
-  book page (or a short glue paragraph) in the same change. Update
-  README install or the first-window example when that path changes.
-  Documentation is part of the change, not a follow-up.
+- New or changed public API: rustdoc example immediately above the
+  constructor, `catalog::ENTRIES` plus the constructor-name map in
+  `catalog` tests, a gallery page if it is a widget or pattern, and
+  the matching book page (or a short glue paragraph) in the same
+  change. Update README install or the first-window example when that
+  path changes. Documentation is part of the change, not a follow-up.
 - `CHANGELOG.md` describes the crate for a version. Fold work into
   the Unreleased section until that version is tagged.
 - A third-party app still needs only icedtea for chrome, actions,

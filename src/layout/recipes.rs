@@ -65,7 +65,17 @@ pub fn wrap_rows(n: usize, child_w: f32, gap: f32, width: f32) -> usize {
     n.div_ceil(wrap_per_row(child_w, gap, width))
 }
 
-/// Flow children to the next line from available `width` (not a fixed column count).
+/// Catalog `wrap`. Flow children to the next line from available `width`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::layout;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let chip = widget::label("New", tok, A11y::new("New", Role::Status));
+/// let _: icedtea::Element<'_, ()> = layout::wrap(vec![chip], 80.0, 8.0, 240.0);
+/// ```
 pub fn wrap<'a, M: 'a>(
     children: Vec<Element<'a, M>>,
     child_w: f32,

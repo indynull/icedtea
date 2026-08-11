@@ -36,7 +36,8 @@ cargo run -p icedtea-gallery
 
 `just check` runs format, clippy (`-D warnings`), tests, rustdoc, and
 line coverage fail-under 99 on the `icedtea` package (host glue
-ignored; llvm-cov maps some const/macro lines as missed).
+ignored; llvm-cov maps some const/macro lines as missed). The tests
+require a rustdoc example on each catalog constructor.
 
 ## Publish
 
