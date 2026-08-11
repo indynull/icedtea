@@ -109,6 +109,23 @@ mod tests {
         assert!(!arch.contains("Rust is all you need"));
         assert!(!arch.contains("book.iced.rs/philosophy"));
         assert!(!readme.contains("The Elm Architecture"));
+        for (name, src) in [
+            ("widget", include_str!("widget.rs")),
+            ("pattern", include_str!("pattern.rs")),
+            ("a11y", include_str!("a11y.rs")),
+            ("action", include_str!("action.rs")),
+            ("key", include_str!("key.rs")),
+            ("layout", include_str!("layout/mod.rs")),
+        ] {
+            let head = src.split("pub ").next().unwrap_or(src);
+            assert!(
+                head.contains("A11y")
+                    || head.contains("Action")
+                    || head.contains("listen_sash")
+                    || head.contains("handle"),
+                "{name} module docs must name the intended recipe"
+            );
+        }
     }
 
     #[test]

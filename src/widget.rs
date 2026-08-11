@@ -1,8 +1,8 @@
 //! Themed iced widget constructors for `view`.
 //!
-//! Every export returns an [`iced::Element`] and is keyboard-complete
-//! via iced. The gallery (`cargo run -p icedtea-gallery`) pages each
-//! `catalog::ENTRIES` id.
+//! Every drawing constructor returns an [`iced::Element`], emits the
+//! application's messages, and takes [`A11y`] plus [`Tokens`]. Do not
+//! call iced `button` / `text_input` for a catalog control.
 //!
 //! ```
 //! use icedtea::a11y::A11y;
@@ -58,6 +58,17 @@ pub fn icon_style(tok: Tokens) -> impl Fn(&iced::Theme, svg::Status) -> svg::Sty
     }
 }
 
+/// Catalog `icon`. Chrome set only.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::icon::Icon;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> =
+///     widget::icon_svg(Icon::Search, tok, A11y::new("search", Role::Image));
+/// ```
 pub fn icon_svg<'a, M: 'a>(icon: Icon, tok: Tokens, a11y: A11y) -> Element<'a, M> {
     let handle = svg::Handle::from_memory(icon.bytes());
     a11y::attach(
@@ -122,6 +133,16 @@ pub fn rich_cell<'a, M: Clone + 'a>(
     }
 }
 
+/// Body text. Catalog `label`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> =
+///     widget::label("Name", tok, A11y::new("Name", Role::Header));
+/// ```
 pub fn label<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
     let s = a11y.apply_name(s);
     a11y::attach(
@@ -134,7 +155,16 @@ pub fn label<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Elemen
     )
 }
 
-/// Large reading on the type scale, end-aligned (a tool's current value).
+/// Large reading on the type scale, end-aligned. Catalog `display`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> =
+///     widget::display_reading("24", tok, A11y::new("24", Role::Status));
+/// ```
 pub fn display_reading<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
     let s = a11y.apply_name(s);
     a11y::attach(
@@ -195,6 +225,16 @@ pub fn code_block<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> E
     )
 }
 
+/// Catalog `link`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> =
+///     widget::hyperlink("docs", (), tok, A11y::new("docs", Role::Link));
+/// ```
 pub fn hyperlink<'a, M: Clone + 'a>(
     title: impl Into<String>,
     msg: M,
@@ -211,6 +251,22 @@ pub fn hyperlink<'a, M: Clone + 'a>(
     a11y::attach(b.into(), &a11y)
 }
 
+/// Catalog `button`. Tokens, variant, and [`A11y::button`].
+///
+/// ```
+/// use icedtea::a11y::A11y;
+/// use icedtea::theme;
+/// use icedtea::variant::Variant;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = widget::themed_button(
+///     "Save",
+///     Some(()),
+///     tok,
+///     Variant::Primary,
+///     A11y::button("Save"),
+/// );
+/// ```
 pub fn themed_button<'a, M: Clone + 'a>(
     title: impl Into<String>,
     msg: Option<M>,
@@ -256,6 +312,16 @@ pub fn themed_button_sized<'a, M: Clone + 'a>(
     a11y::attach(b.into(), &a11y)
 }
 
+/// Catalog `split-button`. Primary action plus a more menu.
+///
+/// ```
+/// use icedtea::a11y::A11y;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> =
+///     widget::split_button("Save", (), (), tok, A11y::button("Save"));
+/// ```
 pub fn split_button<'a, M: Clone + 'a>(
     title: impl Into<String>,
     primary: M,
@@ -289,6 +355,16 @@ pub fn split_button<'a, M: Clone + 'a>(
     )
 }
 
+/// Catalog `toggle-button`.
+///
+/// ```
+/// use icedtea::a11y::A11y;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> =
+///     widget::toggle_button("Bold", true, (), tok, A11y::button("Bold").with_checked(true));
+/// ```
 pub fn toggle_button<'a, M: Clone + 'a>(
     title: impl Into<String>,
     pressed: bool,
@@ -332,6 +408,17 @@ pub fn themed_checkbox<'a, M: Clone + 'a>(
     a11y::attach(c.into(), &a11y)
 }
 
+/// Catalog `switch`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = widget::themed_switch(
+///     "Sounds", false, |_| (), tok, A11y::new("Sounds", Role::Switch),
+/// );
+/// ```
 pub fn themed_switch<'a, M: Clone + 'a>(
     label_s: impl Into<String>,
     on: bool,
@@ -410,6 +497,17 @@ pub fn scroll_delta_pixels(delta: iced::mouse::ScrollDelta, row_h: f32) -> f32 {
     }
 }
 
+/// Catalog `slider`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = widget::themed_slider(
+///     0.0..=1.0, 0.4, |_| (), tok, A11y::new("vol", Role::Slider).with_value("0.4"),
+/// );
+/// ```
 pub fn themed_slider<'a, M: Clone + 'a>(
     range: std::ops::RangeInclusive<f32>,
     value: f32,
@@ -446,6 +544,16 @@ pub fn progress_label(value: f32, remaining: Option<&str>) -> String {
     }
 }
 
+/// Catalog `progress`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> =
+///     widget::progress(0.4, None, tok, A11y::new("p", Role::Progress).with_value("0.4"));
+/// ```
 pub fn progress<'a, M: 'a>(
     value: f32,
     copy: Option<&str>,
@@ -471,6 +579,16 @@ pub fn ring_angles(value: f32) -> (f32, f32) {
 }
 
 /// Start/end radians for an indeterminate spinner (`phase` 0..=1).
+/// Catalog `spinner`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> =
+///     widget::spinner(tok, 0.2, A11y::new("spin", Role::Progress));
+/// ```
 pub fn spinner_angles(phase: f32) -> (f32, f32) {
     let p = phase.rem_euclid(1.0);
     let start = p * std::f32::consts::TAU - std::f32::consts::FRAC_PI_2;
@@ -483,6 +601,17 @@ pub fn ring_should_stroke(start: f32, end: f32) -> bool {
 }
 
 /// Circular progress: arc sweep follows `value`.
+/// Catalog `progress-ring`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = widget::progress_ring(
+///     0.4, None, tok, A11y::new("pr", Role::Progress).with_value("0.4"),
+/// );
+/// ```
 pub fn progress_ring<'a, M: 'a>(
     value: f32,
     copy: Option<&str>,
@@ -555,6 +684,16 @@ pub fn spark_points(values: &[f32], width: f32, height: f32) -> Vec<(f32, f32)> 
 }
 
 /// One-row series. Domain plots stay in the application.
+/// Catalog `sparkline`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> =
+///     widget::sparkline(&[1.0, 3.0, 2.0], tok, A11y::new("spark", Role::Image));
+/// ```
 pub fn sparkline<'a, M: 'a>(values: &'a [f32], tok: Tokens, a11y: A11y) -> Element<'a, M> {
     a11y::attach(
         Canvas::new(crate::host_canvas::Sparkline {
@@ -585,24 +724,7 @@ pub fn spinner<'a, M: 'a>(tok: Tokens, phase: f32, a11y: A11y) -> Element<'a, M>
     )
 }
 
-/// Bitmap the application owns (`Handle::from_bytes` / path).
-pub fn image<'a, M: 'a>(
-    handle: iced::widget::image::Handle,
-    width: impl Into<Length>,
-    height: impl Into<Length>,
-    a11y: A11y,
-) -> Element<'a, M> {
-    a11y::attach(
-        iced::widget::image(handle)
-            .content_fit(iced::ContentFit::Contain)
-            .width(width)
-            .height(height)
-            .into(),
-        &a11y,
-    )
-}
-
-/// Image with fit and loading/error faces.
+/// Image with fit and loading/error faces. The catalog `image` id.
 #[derive(Clone)]
 pub enum ImageSlot {
     Ready {
@@ -613,6 +735,17 @@ pub enum ImageSlot {
     Error(String),
 }
 
+/// Catalog `image`. Ready keeps the requested box.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget::{self, ImageSlot};
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = widget::image_slot(
+///     ImageSlot::Loading, 120.0, 80.0, tok, A11y::new("img", Role::Image),
+/// );
+/// ```
 pub fn image_slot<'a, M: Clone + 'a>(
     slot: ImageSlot,
     width: impl Into<Length>,
@@ -664,6 +797,17 @@ pub fn image_slot<'a, M: Clone + 'a>(
     }
 }
 
+/// Catalog `number`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = widget::number_input(
+///     3.0, |_| (), tok, A11y::new("n", Role::SpinButton),
+/// );
+/// ```
 pub fn number_input<'a, M: Clone + 'a>(
     value: f64,
     on_change: impl Fn(String) -> M + 'a,
@@ -713,6 +857,17 @@ fn mask_handler<'a, M: 'a>(
 }
 
 /// Text field that keeps `value` on `template` (date, time, card).
+/// Catalog `mask`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = widget::masked_input(
+///     "000-00-0000", "", |_| (), tok, A11y::new("ssn", Role::TextBox),
+/// );
+/// ```
 pub fn masked_input<'a, M: Clone + 'a>(
     template: &'a str,
     value: &str,
@@ -734,6 +889,17 @@ pub fn masked_input<'a, M: Clone + 'a>(
 
 /// Single-line field. `input_id` is for `iced::widget::operation::focus`
 /// after show.
+/// Catalog `text-input`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = widget::themed_text_input(
+///     "Name", "", |_| (), None, tok, A11y::new("Name", Role::TextBox), None,
+/// );
+/// ```
 pub fn themed_text_input<'a, M: Clone + 'a>(
     placeholder: &str,
     value: &str,
@@ -760,6 +926,18 @@ pub fn themed_text_input<'a, M: Clone + 'a>(
 
 /// Text field plus a keyboard-complete pick list. The application
 /// owns the suggestion strings and the pick message.
+/// Catalog `suggest`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let opts = ["save".into(), "open".into()];
+/// let _: icedtea::Element<'_, ()> = widget::suggest_field(
+///     "Type", "", |_| (), &opts, |_| (), tok, A11y::new("cmd", Role::ComboBox),
+/// );
+/// ```
 pub fn suggest_field<'a, M: Clone + 'a>(
     placeholder: &str,
     value: &str,
@@ -791,6 +969,17 @@ pub fn suggest_field<'a, M: Clone + 'a>(
     a11y::attach(col.into(), &a11y)
 }
 
+/// Catalog `password`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = widget::password_input(
+///     "Secret", "", |_| (), tok, A11y::new("Secret", Role::TextBox), true,
+/// );
+/// ```
 pub fn password_input<'a, M: Clone + 'a>(
     placeholder: &str,
     value: &str,
@@ -855,6 +1044,18 @@ pub fn secret_field<'a, M: Clone + 'a>(
 
 /// Multiline editor. `height` is icedtea size language ([`crate::layout::FILL`]
 /// or [`crate::layout::fixed`]).
+/// Catalog `textarea`. Height is [`crate::layout::FILL`] or [`crate::layout::fixed`].
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let content = icedtea::iced::widget::text_editor::Content::new();
+/// let _: icedtea::Element<'_, ()> = widget::textarea(
+///     &content, |_| (), tok, icedtea::layout::FILL, A11y::new("notes", Role::TextBox),
+/// );
+/// ```
 pub fn textarea<'a, M: Clone + 'a>(
     content: &'a Content,
     on_action: impl Fn(text_editor::Action) -> M + 'a,
@@ -883,6 +1084,19 @@ pub fn textarea<'a, M: Clone + 'a>(
 /// `theme_name` picks a highlighter face that fits the UI colorway.
 /// `height` is icedtea size language ([`crate::layout::FILL`] or
 /// [`crate::layout::fixed`]).
+/// Catalog `code`. Application owns the buffer.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let content = icedtea::iced::widget::text_editor::Content::with_text("fn main() {}");
+/// let _: icedtea::Element<'_, ()> = widget::highlighted_code(
+///     &content, "rs", |_| (), tok, "dark", icedtea::layout::FILL,
+///     A11y::new("src", Role::TextBox),
+/// );
+/// ```
 pub fn highlighted_code<'a, M: Clone + 'a>(
     content: &'a Content,
     syntax: &str,
@@ -938,6 +1152,16 @@ pub fn editor_style(
     }
 }
 
+/// Catalog `search`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> =
+///     widget::search_input("", |_| (), tok, A11y::new("Search", Role::TextBox));
+/// ```
 pub fn search_input<'a, M: Clone + 'a>(
     value: &str,
     on_input: impl Fn(String) -> M + 'a,
@@ -1221,6 +1445,18 @@ fn time_colon<'a, M: 'a>(tok: Tokens) -> Element<'a, M> {
     .into()
 }
 
+/// Catalog `time`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget::{self, TimeClock, TimeValue};
+/// let tok = theme::named("dark").tokens;
+/// let t = TimeValue::hm(9, 30);
+/// let _: icedtea::Element<'_, ()> = widget::time_picker(
+///     t, TimeClock::HOURS_MINUTES, |_| (), tok, A11y::new("time", Role::Group),
+/// );
+/// ```
 pub fn time_picker<'a, M: Clone + 'a>(
     value: TimeValue,
     clock: TimeClock,
@@ -1272,6 +1508,16 @@ pub fn time_picker<'a, M: Clone + 'a>(
     a11y::attach(row.into(), &a11y)
 }
 
+/// Catalog `color`.
+///
+/// ```
+/// use icedtea::a11y::A11y;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> =
+///     widget::color_swatch(1, 120, 212, (), tok, A11y::button("color"));
+/// ```
 pub fn color_swatch<'a, M: Clone + 'a>(
     r: u8,
     g: u8,
@@ -1408,6 +1654,17 @@ pub fn parse(source: &str) -> MarkdownDoc {
     }
 }
 
+/// Catalog `markdown`. Parse with [`parse`], then view the items.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let doc = widget::parse("# Hi");
+/// let _: icedtea::Element<'_, ()> =
+///     widget::markdown_view(&doc.items, tok, |_| (), A11y::new("md", Role::Group));
+/// ```
 pub fn markdown_view<'a, M: Clone + 'a>(
     items: &'a [markdown::Item],
     tok: Tokens,
@@ -1438,6 +1695,20 @@ fn markdown_style(tok: Tokens) -> markdown::Style {
     style
 }
 
+/// Catalog `tooltip`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = widget::tooltip_wrap(
+///     widget::label("Hover", tok, A11y::new("Hover", Role::Header)),
+///     "Tip",
+///     tok,
+///     A11y::new("Tip", Role::Tooltip),
+/// );
+/// ```
 pub fn tooltip_wrap<'a, M: 'a>(
     child: Element<'a, M>,
     tip: impl Into<String>,
@@ -1486,6 +1757,17 @@ fn chip_wash(tok: Tokens, variant: Variant) -> iced::Color {
     }
 }
 
+/// Catalog `chip`.
+///
+/// ```
+/// use icedtea::a11y::A11y;
+/// use icedtea::theme;
+/// use icedtea::variant::Variant;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> =
+///     widget::chip("Rust", None, tok, Variant::Quiet, A11y::button("Rust"));
+/// ```
 pub fn chip<'a, M: Clone + 'a>(
     title: impl Into<String>,
     dismiss: Option<M>,
@@ -1518,6 +1800,17 @@ pub fn chip<'a, M: Clone + 'a>(
     )
 }
 
+/// Catalog `badge`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::variant::Variant;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> =
+///     widget::badge("New", tok, Variant::Primary, A11y::new("New", Role::Status));
+/// ```
 pub fn badge<'a, M: 'a>(
     title: impl Into<String>,
     tok: Tokens,
@@ -1542,6 +1835,20 @@ pub fn badge<'a, M: 'a>(
     )
 }
 
+/// Catalog `card` and `group-box`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = widget::group_box(
+///     "Document",
+///     widget::label("notes.txt", tok, A11y::new("notes", Role::Header)),
+///     tok,
+///     A11y::new("Document", Role::Group),
+/// );
+/// ```
 pub fn group_box<'a, M: 'a>(
     title: impl Into<String>,
     child: Element<'a, M>,
@@ -1594,6 +1901,18 @@ pub fn banner<'a, M: Clone + 'a>(
     )
 }
 
+/// Catalog `callout`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::toast::ToastKind;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = widget::info_bar(
+///     ToastKind::Warning, "Watch this", tok, A11y::new("Watch this", Role::Status),
+/// );
+/// ```
 pub fn info_bar<'a, M: Clone + 'a>(
     kind: ToastKind,
     text_s: impl Into<String>,
@@ -1641,6 +1960,18 @@ pub fn breadcrumb<'a, M: Clone + 'a>(
     a11y::attach(r.into(), &a11y)
 }
 
+/// Catalog `toast`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::toast::{Toast, ToastKind};
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let t = Toast { id: 1, kind: ToastKind::Success, text: "Saved".into(), ttl_ms: 0 };
+/// let _: icedtea::Element<'_, ()> =
+///     widget::toast_view(&t, (), tok, A11y::new("Saved", Role::Status));
+/// ```
 pub fn toast_view<'a, M: Clone + 'a>(
     toast: &Toast,
     dismiss: M,
@@ -1682,6 +2013,17 @@ fn toast_style(
     move |_| style::callout(tok, kind)
 }
 
+/// Catalog `teaching-tip`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = widget::teaching_tip(
+///     "Hint", "Press Ctrl+P", (), tok, A11y::new("Hint", Role::Tooltip),
+/// );
+/// ```
 pub fn teaching_tip<'a, M: Clone + 'a>(
     title: impl Into<String>,
     body: impl Into<String>,
@@ -1712,6 +2054,16 @@ pub fn teaching_tip<'a, M: Clone + 'a>(
     )
 }
 
+/// Catalog `skeleton`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> =
+///     widget::placeholder_skeleton(tok, A11y::new("skel", Role::Status));
+/// ```
 pub fn placeholder_skeleton<'a, M: 'a>(tok: Tokens, a11y: A11y) -> Element<'a, M> {
     a11y::attach(
         column![
@@ -1776,6 +2128,20 @@ where
 
 /// Append-only lines. Sticks to the end. `window` virtualizes long logs.
 #[allow(clippy::too_many_arguments)]
+/// Catalog `log`. Virtualizes long logs.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::collection::VisibleWindow;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let lines = ["boot".to_string()];
+/// let _: icedtea::Element<'_, ()> = widget::log_view(
+///     &lines, VisibleWindow::new(200.0), 20.0, 2, |_| (), None, tok,
+///     A11y::new("log", Role::List),
+/// );
+/// ```
 pub fn log_view<'a, M: Clone + 'a>(
     lines: &'a [String],
     window: VisibleWindow,
@@ -2023,6 +2389,17 @@ where
     )
 }
 
+/// Catalog `grid`. Tiles share the row width.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let labels = vec!["Inbox".into(), "Mail".into()];
+/// let _: icedtea::Element<'_, ()> =
+///     widget::item_grid(&labels, |_| (), tok, A11y::new("grid", Role::List));
+/// ```
 pub fn item_grid<'a, M: Clone + 'a>(
     labels: &[String],
     on_select: impl Fn(usize) -> M + Copy + 'a,
@@ -2063,6 +2440,26 @@ pub fn item_grid<'a, M: Clone + 'a>(
 }
 
 #[allow(clippy::too_many_arguments)]
+/// Catalog `table`. Last column fills. Virtualizes long lists.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::collection::{Selection, TableModel, VisibleWindow};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let table = TableModel {
+///     headers: vec!["Name".into()],
+///     rows: vec![vec!["lib.rs".into()]],
+///     sort_col: None,
+///     sort_asc: true,
+/// };
+/// let widths = [120.0];
+/// let _: icedtea::Element<'_, ()> = widget::data_table(
+///     &table, &Selection::None, None, &widths, true, VisibleWindow::new(200.0),
+///     32.0, 2, |_, _| (), |_| (), |_| (), tok, A11y::new("table", Role::Table),
+/// );
+/// ```
 pub fn data_table<'a, M, T>(
     model: &'a T,
     selection: &'a Selection,
@@ -2177,6 +2574,19 @@ where
 
 /// Heading or file tree. The disclosure control emits `on_toggle`; the
 /// row label emits `on_select`. `selected` is the app-owned id.
+/// Catalog `tree`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::collection::TreeNode;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let tree = TreeNode::leaf(1, "lib.rs");
+/// let _: icedtea::Element<'_, ()> = widget::tree_view(
+///     &tree, None, |_| (), |_| (), tok, A11y::new("tree", Role::Tree),
+/// );
+/// ```
 pub fn tree_view<'a, M: Clone + 'a>(
     root: &TreeNode,
     selected: Option<u64>,
@@ -2240,6 +2650,19 @@ pub fn tree_view<'a, M: Clone + 'a>(
     )
 }
 
+/// Catalog `tabs`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::collection::Tabs;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let tabs = Tabs::new(["One", "Two"]);
+/// let _: icedtea::Element<'_, ()> = widget::tab_bar(
+///     &tabs, |_| (), |_| (), tok, A11y::new("tabs", Role::Tab),
+/// );
+/// ```
 pub fn tab_bar<'a, M: Clone + 'a>(
     tabs: &Tabs,
     on_select: impl Fn(usize) -> M + Copy + 'a,
@@ -2271,6 +2694,24 @@ pub fn tab_bar<'a, M: Clone + 'a>(
     a11y::attach(r.into(), &a11y)
 }
 
+/// Catalog `accordion`. Open row shows a body under the header.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::collection::Accordion;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let titles = ["Files".into()];
+/// let _: icedtea::Element<'_, ()> = widget::accordion_view(
+///     &titles,
+///     vec![widget::label("New", tok, A11y::new("New", Role::Status))],
+///     &Accordion { open: Some(0) },
+///     |_| (),
+///     tok,
+///     A11y::new("acc", Role::Group),
+/// );
+/// ```
 pub fn accordion_view<'a, M: Clone + 'a>(
     titles: &[String],
     bodies: Vec<Element<'a, M>>,
@@ -2307,6 +2748,16 @@ pub fn accordion_view<'a, M: Clone + 'a>(
     a11y::attach(col.into(), &a11y)
 }
 
+/// Catalog `pagination`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> =
+///     widget::pagination(40, 0, 10, |_| (), tok, A11y::new("pages", Role::Group));
+/// ```
 pub fn pagination<'a, M: Clone + 'a>(
     len: usize,
     page: usize,
@@ -2616,12 +3067,6 @@ mod tests {
         assert!((pts[0].0 - 0.0).abs() < 0.01);
         assert!(pts[1].1 < pts[0].1);
         let _: Element<'_, ()> = sparkline(&[1.0, 2.0, 1.5], tok, role("spark", Role::Image));
-        let _: Element<'_, ()> = image(
-            iced::widget::image::Handle::from_bytes(TEST_PNG),
-            48.0,
-            48.0,
-            role("px", Role::Image),
-        );
         let _: Element<'_, ()> = image_slot(
             ImageSlot::Ready {
                 handle: iced::widget::image::Handle::from_bytes(TEST_PNG),

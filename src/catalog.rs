@@ -1,4 +1,12 @@
 //! Public widget and pattern ids. The gallery must page every entry.
+//!
+//! Each id has one constructor. Widgets take [`crate::a11y::A11y`] and
+//! tokens. Chrome rows take an [`crate::action::ActionTable`].
+//!
+//! ```
+//! assert!(icedtea::catalog::get("button").is_some());
+//! assert_eq!(icedtea::catalog::get("button").unwrap().page, "controls");
+//! ```
 
 /// Every exported control or pattern. Gallery pages this list.
 ///
@@ -201,5 +209,130 @@ mod tests {
                 .join(name);
             assert!(p.is_file());
         }
+    }
+
+    #[test]
+    fn every_catalog_id_has_one_shipped_constructor() {
+        let widget = include_str!("widget.rs");
+        let pattern = include_str!("pattern.rs");
+        let theme = include_str!("theme.rs");
+        let key = include_str!("key.rs");
+        let layout = include_str!("layout/recipes.rs");
+        let map = [
+            ("button", "pub fn themed_button", widget),
+            ("split-button", "pub fn split_button", widget),
+            ("toggle-button", "pub fn toggle_button", widget),
+            ("checkbox", "pub fn themed_checkbox", widget),
+            ("radio", "pub fn themed_radio", widget),
+            ("switch", "pub fn themed_switch", widget),
+            ("slider", "pub fn themed_slider", widget),
+            ("text-input", "pub fn themed_text_input", widget),
+            ("password", "pub fn password_input", widget),
+            ("secret", "pub fn secret_field", widget),
+            ("textarea", "pub fn textarea", widget),
+            ("search", "pub fn search_input", widget),
+            ("suggest", "pub fn suggest_field", widget),
+            ("select", "pub fn themed_pick_list", widget),
+            ("number", "pub fn number_input", widget),
+            ("mask", "pub fn masked_input", widget),
+            ("date", "pub fn date_picker", widget),
+            ("time", "pub fn time_picker", widget),
+            ("color", "pub fn color_swatch", widget),
+            ("progress", "pub fn progress<", widget),
+            ("progress-ring", "pub fn progress_ring", widget),
+            ("sparkline", "pub fn sparkline", widget),
+            ("spinner", "pub fn spinner", widget),
+            ("display", "pub fn display_reading", widget),
+            ("label", "pub fn label", widget),
+            ("rich-cell", "pub fn rich_cell", widget),
+            ("icon", "pub fn icon_svg", widget),
+            ("tooltip", "pub fn tooltip_wrap", widget),
+            ("link", "pub fn hyperlink", widget),
+            ("markdown", "pub fn markdown_view", widget),
+            ("code", "pub fn highlighted_code", widget),
+            ("image", "pub fn image_slot", widget),
+            ("list", "pub fn list_view", widget),
+            ("log", "pub fn log_view", widget),
+            ("grid", "pub fn item_grid", widget),
+            ("table", "pub fn data_table", widget),
+            ("tree", "pub fn tree_view", widget),
+            ("tabs", "pub fn tab_bar", widget),
+            ("accordion", "pub fn accordion_view", widget),
+            ("pagination", "pub fn pagination", widget),
+            ("theme", "pub fn named", theme),
+            ("colors", "pub fn mix", theme),
+            ("keys", "pub fn handle", key),
+            ("card", "pub fn group_box", widget),
+            ("rule", "pub fn rule_h", widget),
+            ("chip", "pub fn chip", widget),
+            ("badge", "pub fn badge", widget),
+            ("wrap", "pub fn wrap", layout),
+            ("pad", "pub fn pad", layout),
+            ("callout", "pub fn info_bar", widget),
+            ("banner", "pub fn banner", widget),
+            ("group-box", "pub fn group_box", widget),
+            ("skeleton", "pub fn placeholder_skeleton", widget),
+            ("teaching-tip", "pub fn teaching_tip", widget),
+            ("command-bar", "pub fn command_bar", pattern),
+            ("context-menu", "pub fn context_menu", pattern),
+            ("breadcrumb", "pub fn breadcrumb", widget),
+            ("menu", "pub fn menu_bar", pattern),
+            ("toolbar", "pub fn toolbar", pattern),
+            ("status-bar", "pub fn status_bar", pattern),
+            ("scrollbar", "pub fn themed_scroll", widget),
+            ("toast", "pub fn toast_view", widget),
+            ("busy", "pub fn busy_overlay", widget),
+            ("dialogs", "pub fn dialog_sheet", pattern),
+            ("list-detail", "pub fn list_detail", pattern),
+            ("navigation", "pub fn navigation_view", pattern),
+            ("tab-view", "pub fn tab_view", pattern),
+            ("preferences", "pub fn preferences_page", pattern),
+            ("about", "pub fn about_page", pattern),
+            ("status-page", "pub fn status_page", pattern),
+            ("palette", "pub fn command_palette_view", pattern),
+            ("main-window", "pub fn main_window", pattern),
+        ];
+        assert_eq!(map.len(), ENTRIES.len());
+        for e in ENTRIES {
+            let hit = map.iter().find(|(id, _, _)| *id == e.id);
+            let (_, needle, src) = hit.expect(e.id);
+            assert!(
+                src.contains(needle),
+                "{} missing constructor {}",
+                e.id,
+                needle
+            );
+            let at = src.find(needle).unwrap();
+            let window = &src[at.saturating_sub(700)..at];
+            assert!(
+                window.contains("```"),
+                "{} constructor {} needs a rustdoc example",
+                e.id,
+                needle
+            );
+        }
+    }
+
+    #[test]
+    fn collapsed_dual_paths_are_not_public() {
+        let widget = include_str!("widget.rs");
+        assert!(
+            !widget.contains("pub fn image<"),
+            "image_slot is the image constructor"
+        );
+        let key = include_str!("key.rs");
+        assert!(
+            !key.contains("pub fn listen_raw"),
+            "listen is the keyboard subscription"
+        );
+        let recipes = include_str!("layout/recipes.rs");
+        assert!(
+            !recipes.contains("pub fn scroll_y<"),
+            "themed_scroll is the scroll constructor"
+        );
+        assert!(
+            !recipes.contains("pub fn sidebar_mode"),
+            "Breakpoint::from_width picks the sidebar recipe"
+        );
     }
 }

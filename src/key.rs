@@ -1,8 +1,31 @@
-//! Key handling: focused text owns unmodified typing; an open modal
-//! consumes; otherwise the action table matches chords and named keys.
+//! Key handling: subscribe with [`listen`], resolve with [`handle`].
 //!
-//! [`dispatch`] / [`KeyLayer`] remain for applications that build their
-//! own stack. [`handle`] implements text, modal, then the action table.
+//! An open modal consumes (even if a field is focused). Otherwise
+//! focused text owns unmodified typing. Otherwise the action table
+//! matches chords and named keys.
+//!
+//! ```
+//! use icedtea::action::{Action, ActionTable};
+//! use icedtea::key::{handle, KeyContext};
+//! use icedtea::shortcut::Shortcut;
+//! let mut table = ActionTable::new();
+//! table.insert(
+//!     Action::new("file.save", "Save", 1u8)
+//!         .with_shortcut(Shortcut::parse("ctrl+s").unwrap()),
+//! );
+//! let ev = iced::keyboard::Event::KeyPressed {
+//!     key: iced::keyboard::Key::Character("s".into()),
+//!     modified_key: iced::keyboard::Key::Character("s".into()),
+//!     physical_key: iced::keyboard::key::Physical::Unidentified(
+//!         iced::keyboard::key::NativeCode::Unidentified,
+//!     ),
+//!     location: iced::keyboard::Location::Standard,
+//!     modifiers: icedtea::shortcut::primary(),
+//!     text: None,
+//!     repeat: false,
+//! };
+//! assert_eq!(handle(KeyContext::default(), &table, &ev), Some(1));
+//! ```
 
 use iced::keyboard::Event as KeyEvent;
 use iced::Subscription;
@@ -80,16 +103,11 @@ impl KeyContext {
     }
 }
 
-/// Subscription of ignored keyboard events (compose in `run!`).
+/// Keyboard subscription for `run!` (includes keys a focused field captured).
 ///
-/// iced 0.14 `text_input` captures Escape. Overlay hide must use
-/// [`listen_raw`] and pass that key into [`crate::window::should_hide`].
+/// Pass each event to [`handle`]. Overlay hide still uses
+/// [`crate::window::should_hide`] on Escape from this stream.
 pub fn listen() -> Subscription<KeyEvent> {
-    iced::keyboard::listen()
-}
-
-/// Keyboard events including those a focused `text_input` captured.
-pub fn listen_raw() -> Subscription<KeyEvent> {
     iced::event::listen_with(raw_keyboard)
 }
 
@@ -246,6 +264,30 @@ pub fn press(event: &KeyEvent) -> Option<Press> {
 /// An open modal consumes (no application shortcut), even if a field
 /// is focused. Focused text owns unmodified typing. Otherwise chords
 /// and named keys match `table`.
+/// Resolve a key against the action table. An open modal consumes.
+///
+/// ```
+/// use icedtea::action::{Action, ActionTable};
+/// use icedtea::key::{handle, KeyContext};
+/// use icedtea::shortcut::Shortcut;
+/// let mut table = ActionTable::new();
+/// table.insert(
+///     Action::new("file.save", "Save", 1u8)
+///         .with_shortcut(Shortcut::parse("ctrl+s").unwrap()),
+/// );
+/// let ev = iced::keyboard::Event::KeyPressed {
+///     key: iced::keyboard::Key::Character("s".into()),
+///     modified_key: iced::keyboard::Key::Character("s".into()),
+///     physical_key: iced::keyboard::key::Physical::Unidentified(
+///         iced::keyboard::key::NativeCode::Unidentified,
+///     ),
+///     location: iced::keyboard::Location::Standard,
+///     modifiers: icedtea::shortcut::primary(),
+///     text: None,
+///     repeat: false,
+/// };
+/// assert_eq!(handle(KeyContext::default(), &table, &ev), Some(1));
+/// ```
 pub fn handle<M: Clone>(ctx: KeyContext, table: &ActionTable<M>, event: &KeyEvent) -> Option<M> {
     let KeyEvent::KeyPressed { key, modifiers, .. } = event else {
         return None;
@@ -316,7 +358,6 @@ mod tests {
         );
         assert_eq!(index(KeyLayer::Application), 3);
         let _ = listen();
-        let _ = listen_raw();
         let esc = press(
             Key::Named(iced::keyboard::key::Named::Escape),
             Modifiers::empty(),

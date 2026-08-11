@@ -2,7 +2,7 @@
 
 Layout is Rust functions that return iced `Element`s. Recipes live in
 `icedtea::layout`: `dock`, `split_view`, `clamp`, `form`, `grid`,
-`pad` (equal-fill tiles), `overlay_center`, `scroll_y`, plus size
+`pad` (equal-fill tiles), `overlay_center`, plus size
 policy and breakpoints.
 
 `layout::pad(cells, 4, density.space)` shares row width across cells.

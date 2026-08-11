@@ -1022,7 +1022,7 @@ impl Gallery {
 
     fn subscription(&self) -> Subscription<Message> {
         let mut subs = vec![
-            icedtea::key::listen_raw().map(Message::Key),
+            icedtea::key::listen().map(Message::Key),
             icedtea::dnd::listen_files().map(Message::Drop),
             icedtea::iced::time::every(std::time::Duration::from_secs(1)).map(|_| Message::Tick),
             icedtea::iced::system::theme_changes().map(Message::OsMode),

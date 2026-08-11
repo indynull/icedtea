@@ -1,8 +1,21 @@
-//! Application chrome as view helpers: main window, list/detail, nav, prefs, about.
+//! Application chrome: menu, toolbar, list/detail, prefs, about, palette.
 //!
-//! Each constructor returns an [`iced::Element`] and emits the
-//! application's messages. The gallery Patterns group pages these
-//! helpers.
+//! Pass an [`ActionTable`](crate::action::ActionTable) and tokens.
+//! Children are icedtea widgets (they already carry [`A11y`](crate::a11y::A11y)).
+//!
+//! ```
+//! use icedtea::action::{Action, ActionTable};
+//! use icedtea::i18n::{Catalog, Direction};
+//! use icedtea::pattern;
+//! use icedtea::theme;
+//! let tok = theme::named("dark").tokens;
+//! let mut table = ActionTable::new();
+//! table.insert(Action::new("file.save", "Save", ()));
+//! let cat = Catalog::builtin();
+//! let _: icedtea::Element<'_, ()> =
+//!     pattern::toolbar(table.iter(), tok, Direction::Ltr);
+//! let _ = cat;
+//! ```
 
 use iced::widget::{column, container, row, text, Column, Row};
 use iced::{Element, Length};
@@ -70,7 +83,20 @@ fn bind_menu_pick<M: Clone>(entries: Vec<(String, M)>) -> impl Fn(String) -> M {
     move |chosen| pick_menu_message(&entries, &chosen)
 }
 
-/// In-window menu bar: File / Edit / View titles; each opens an overlay list.
+/// In-window menu bar from one [`ActionTable`].
+///
+/// ```
+/// use icedtea::action::{Action, ActionTable};
+/// use icedtea::i18n::{Catalog, Direction};
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// let tok = theme::named("dark").tokens;
+/// let mut table = ActionTable::new();
+/// table.insert(Action::new("file.save", "Save", ()));
+/// let cat = Catalog::builtin();
+/// let _: icedtea::Element<'_, ()> =
+///     pattern::menu_bar(&table, tok, Direction::Ltr, &cat);
+/// ```
 pub fn menu_bar<'a, M: Clone + 'a>(
     table: &'a ActionTable<M>,
     tok: Tokens,
@@ -106,7 +132,19 @@ pub fn menu_bar<'a, M: Clone + 'a>(
     )
 }
 
-/// Toolbar row of actions.
+/// Toolbar row from the same action table as the menu.
+///
+/// ```
+/// use icedtea::action::{Action, ActionTable};
+/// use icedtea::i18n::Direction;
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// let tok = theme::named("dark").tokens;
+/// let mut table = ActionTable::new();
+/// table.insert(Action::new("file.save", "Save", ()));
+/// let _: icedtea::Element<'_, ()> =
+///     pattern::toolbar(table.iter(), tok, Direction::Ltr);
+/// ```
 pub fn toolbar<'a, M: Clone + 'a>(
     actions: impl IntoIterator<Item = &'a Action<M>>,
     tok: Tokens,
@@ -132,7 +170,19 @@ pub fn toolbar<'a, M: Clone + 'a>(
     )
 }
 
-/// Command bar: the same action row with primary density.
+/// Command bar: the same action row as [`toolbar`], denser.
+///
+/// ```
+/// use icedtea::action::{Action, ActionTable};
+/// use icedtea::i18n::Direction;
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// let tok = theme::named("dark").tokens;
+/// let mut table = ActionTable::new();
+/// table.insert(Action::new("file.save", "Save", ()));
+/// let _: icedtea::Element<'_, ()> =
+///     pattern::command_bar(table.iter(), tok, Direction::Ltr);
+/// ```
 pub fn command_bar<'a, M: Clone + 'a>(
     actions: impl IntoIterator<Item = &'a Action<M>>,
     tok: Tokens,
@@ -141,7 +191,19 @@ pub fn command_bar<'a, M: Clone + 'a>(
     toolbar(actions, tok, dir)
 }
 
-/// Footer with action shortcut hints.
+/// Footer with action shortcut hints from the same table.
+///
+/// ```
+/// use icedtea::action::{Action, ActionTable};
+/// use icedtea::i18n::Direction;
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// let tok = theme::named("dark").tokens;
+/// let mut table = ActionTable::new();
+/// table.insert(Action::new("file.save", "Save", ()));
+/// let _: icedtea::Element<'_, ()> =
+///     pattern::status_bar("ready", &table, tok, Direction::Ltr);
+/// ```
 pub fn status_bar<'a, M: Clone + 'a>(
     status: impl Into<String>,
     table: &ActionTable<M>,
@@ -170,7 +232,25 @@ pub fn status_bar<'a, M: Clone + 'a>(
     )
 }
 
-/// Command palette overlay card.
+/// Command palette overlay card over the action table.
+///
+/// ```
+/// use icedtea::action::{Action, ActionTable};
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// let tok = theme::named("dark").tokens;
+/// let mut table = ActionTable::new();
+/// table.insert(Action::new("file.save", "Save", ()));
+/// let hits: Vec<_> = table.iter().collect();
+/// let _: icedtea::Element<'_, ()> = pattern::command_palette_view(
+///     "",
+///     &hits,
+///     0,
+///     |_| (),
+///     |_| (),
+///     tok,
+/// );
+/// ```
 pub fn command_palette_view<'a, M: Clone + 'a>(
     query: &str,
     results: &[&Action<M>],
@@ -223,7 +303,19 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
     .into()
 }
 
-/// Empty / status page.
+/// Empty / status page. Centered title, body, and optional action.
+///
+/// ```
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = pattern::status_page(
+///     "Nothing here",
+///     "Create an item to begin.",
+///     Some(("New".into(), ())),
+///     tok,
+/// );
+/// ```
 pub fn status_page<'a, M: Clone + 'a>(
     title: impl Into<String>,
     body: impl Into<String>,
@@ -257,6 +349,16 @@ pub fn status_page<'a, M: Clone + 'a>(
 }
 
 /// About dialog body.
+///
+/// ```
+/// use icedtea::i18n::Catalog;
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// let tok = theme::named("dark").tokens;
+/// let cat = Catalog::builtin();
+/// let _: icedtea::Element<'_, ()> =
+///     pattern::about_page("icedtea", "0.2.0", "MIT", "Credits", tok, &cat);
+/// ```
 pub fn about_page<'a, M: Clone + 'a>(
     name: &'a str,
     version: &'a str,
@@ -303,6 +405,21 @@ pub fn filter_prefs<'a>(groups: &'a [PrefGroup], query: &str) -> Vec<&'a PrefGro
         .collect()
 }
 
+/// Searchable preferences groups.
+///
+/// ```
+/// use icedtea::i18n::Catalog;
+/// use icedtea::pattern::{self, PrefGroup};
+/// use icedtea::theme;
+/// let tok = theme::named("dark").tokens;
+/// let cat = Catalog::builtin();
+/// let groups = [PrefGroup {
+///     title: "Editor".into(),
+///     keys: vec![("tab width".into(), "4".into())],
+/// }];
+/// let _: icedtea::Element<'_, ()> =
+///     pattern::preferences_page(&groups, "", |_| (), tok, &cat);
+/// ```
 pub fn preferences_page<'a, M: Clone + 'a>(
     groups: &'a [PrefGroup],
     query: &str,
@@ -355,9 +472,22 @@ pub fn preferences_page<'a, M: Clone + 'a>(
     .into()
 }
 
-/// List + detail split. `sidebar` is icedtea size language
-/// ([`crate::layout::fixed`] or [`crate::layout::FILL`]). Children fill
-/// their panes.
+/// List + detail split. `sidebar` is [`crate::layout::fixed`] or
+/// [`crate::layout::FILL`]. Children fill their panes.
+///
+/// ```
+/// use icedtea::a11y::A11y;
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = pattern::list_detail(
+///     widget::label("Inbox", tok, A11y::new("Inbox", icedtea::a11y::Role::Header)),
+///     widget::label("Detail", tok, A11y::new("Detail", icedtea::a11y::Role::Header)),
+///     icedtea::layout::fixed(260.0),
+///     tok,
+/// );
+/// ```
 pub fn list_detail<'a, M: 'a>(
     list: Element<'a, M>,
     detail: Element<'a, M>,
@@ -389,6 +519,27 @@ pub fn list_detail<'a, M: 'a>(
 /// `width` is the window inner width. Subscribe with
 /// `iced::window::resize_events` and a non-capturing
 /// `Subscription::map`; store the width in `update`.
+///
+/// ```
+/// use icedtea::a11y::A11y;
+/// use icedtea::i18n::Catalog;
+/// use icedtea::nav::NavStack;
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let nav = NavStack::new("home");
+/// let cat = Catalog::builtin();
+/// let _: icedtea::Element<'_, ()> = pattern::navigation_view(
+///     widget::label("Mail", tok, A11y::new("Mail", icedtea::a11y::Role::Header)),
+///     widget::label("Inbox", tok, A11y::new("Inbox", icedtea::a11y::Role::Header)),
+///     &nav,
+///     1600.0,
+///     (),
+///     tok,
+///     &cat,
+/// );
+/// ```
 pub fn navigation_view<'a, M: Clone + 'a>(
     sidebar: Element<'a, M>,
     content: Element<'a, M>,
@@ -416,7 +567,24 @@ pub fn navigation_view<'a, M: Clone + 'a>(
     }
 }
 
-/// Tabbed document area.
+/// Tabbed document area. Tabs plus a filling body.
+///
+/// ```
+/// use icedtea::a11y::A11y;
+/// use icedtea::collection::Tabs;
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let tabs = Tabs::new(["Notes", "Guide"]);
+/// let _: icedtea::Element<'_, ()> = pattern::tab_view(
+///     &tabs,
+///     widget::label("Notes", tok, A11y::new("Notes", icedtea::a11y::Role::Header)),
+///     |_| (),
+///     |_| (),
+///     tok,
+/// );
+/// ```
 pub fn tab_view<'a, M: Clone + 'a>(
     tabs: &Tabs,
     body: Element<'a, M>,
@@ -433,6 +601,26 @@ pub fn tab_view<'a, M: Clone + 'a>(
 }
 
 /// Main window chrome: menu, toolbar, docked center, status.
+///
+/// ```
+/// use icedtea::a11y::A11y;
+/// use icedtea::action::{Action, ActionTable};
+/// use icedtea::i18n::{Catalog, Direction};
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let mut table = ActionTable::new();
+/// table.insert(Action::new("file.save", "Save", ()));
+/// let cat = Catalog::builtin();
+/// let _: icedtea::Element<'_, ()> = pattern::main_window(
+///     pattern::menu_bar(&table, tok, Direction::Ltr, &cat),
+///     pattern::toolbar(table.iter(), tok, Direction::Ltr),
+///     widget::label("notes.txt", tok, A11y::new("doc", icedtea::a11y::Role::Header)),
+///     pattern::status_bar("ok", &table, tok, Direction::Ltr),
+///     tok,
+/// );
+/// ```
 pub fn main_window<'a, M: Clone + 'a>(
     menu: Element<'a, M>,
     toolbar: Element<'a, M>,
@@ -454,11 +642,36 @@ pub fn main_window<'a, M: Clone + 'a>(
 }
 
 /// In-window modal on a dim backdrop.
+///
+/// ```
+/// use icedtea::a11y::A11y;
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = pattern::modal_card(
+///     widget::label(" ", tok, A11y::new("dim", icedtea::a11y::Role::Status)),
+///     pattern::dialog_sheet("Save", "Overwrite?", ("Save".into(), ()), None, tok),
+/// );
+/// ```
 pub fn modal_card<'a, M: 'a>(backdrop: Element<'a, M>, card: Element<'a, M>) -> Element<'a, M> {
     layout::overlay_center(backdrop, card)
 }
 
-/// Confirm / message / save sheet: title, body, secondary + primary actions.
+/// Confirm / message / save sheet.
+///
+/// ```
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = pattern::dialog_sheet(
+///     "Save",
+///     "Overwrite notes.txt?",
+///     ("Save".into(), ()),
+///     Some(("Cancel".into(), ())),
+///     tok,
+/// );
+/// ```
 pub fn dialog_sheet<'a, M: Clone + 'a>(
     title: impl Into<String>,
     body: impl Into<String>,
@@ -499,6 +712,16 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
 }
 
 /// Context menu: vertical action list.
+///
+/// ```
+/// use icedtea::action::{Action, ActionTable};
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// let tok = theme::named("dark").tokens;
+/// let mut table = ActionTable::new();
+/// table.insert(Action::new("file.save", "Save", ()));
+/// let _: icedtea::Element<'_, ()> = pattern::context_menu(table.iter(), tok);
+/// ```
 pub fn context_menu<'a, M: Clone + 'a>(
     actions: impl IntoIterator<Item = &'a Action<M>>,
     tok: Tokens,

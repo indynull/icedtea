@@ -1,7 +1,17 @@
 //! Window kinds, overlay placement, and hide policy.
 //!
-//! `Boot::overlay` plus `place` / `place_centered` position a palette.
-//! The gallery Command palette page walks hide policy and retarget.
+//! `Boot::overlay` plus [`place`] or [`place_centered`] position a
+//! palette. Subscribe with [`crate::key::listen`] and pass Escape to
+//! [`should_hide`].
+//!
+//! ```
+//! use icedtea::window::{HideEvent, HidePolicy, should_hide};
+//! assert!(should_hide(
+//!     HidePolicy::EscapeOrFocusLoss,
+//!     HideEvent::Escape,
+//!     true,
+//! ));
+//! ```
 
 use iced::window::{self, Level, Position};
 use iced::{Point, Size};

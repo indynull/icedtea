@@ -10,9 +10,8 @@ centers `size` on that display (else the first).
 Hide policy (`HidePolicy::EscapeOrFocusLoss`, and friends) is
 evaluated with `should_hide(policy, event, in_card)`. `in_card` (search
 field or result list) suppresses only `HideEvent::FocusLoss`. Escape
-still hides. iced 0.14 `text_input` captures Escape; subscribe with
-`key::listen_raw` (not `key::listen`, which sees only ignored events)
-and pass that key into `should_hide`.
+still hides. Subscribe with `key::listen` and pass Escape into
+`should_hide`.
 
 The gallery Command palette page is the overlay card: inner size,
 pointer place on two fake displays, and Escape / focus loss with a

@@ -1,4 +1,14 @@
 //! Accessible name, role, value, and state for every public widget.
+//!
+//! Pass [`A11y`] into the widget constructor. The constructor calls
+//! [`attach`]. Do not wrap an icedtea widget in a second `attach`.
+//!
+//! ```
+//! use icedtea::a11y::{A11y, Role};
+//! let a = A11y::button("Save").with_disabled(true);
+//! assert_eq!(a.role, Role::Button);
+//! assert!(a.disabled);
+//! ```
 
 use iced::widget::{container, Id};
 use iced::Element;

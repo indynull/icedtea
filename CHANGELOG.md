@@ -18,6 +18,8 @@ return `Element`s and emit the application's messages.
 - Every public widget takes `A11y`. Lists, tables, and logs virtualize.
 - Image slots keep their box. Item-grid tiles share the row. An open
   accordion shows a body under its header.
+- One constructor per job: `image_slot`, `key::listen`,
+  `themed_scroll`, `Breakpoint` for sidebar recipe.
 - Gallery pages host every `catalog::ENTRIES` id. Related controls
   share a page. `just gallery-gif` records the README tour. Guide:
   <https://indynull.github.io/icedtea/>. API docs:

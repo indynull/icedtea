@@ -1,8 +1,6 @@
 //! Layout recipe helpers: clamp, wrap, dock, form, overlay, scroll stick.
 
-use iced::widget::{
-    column, container, mouse_area, row, scrollable, stack, Column, Row, Space, Stack,
-};
+use iced::widget::{column, container, mouse_area, row, stack, Column, Row, Space, Stack};
 use iced::{Alignment, Element, Length, Padding};
 
 /// Fill the parent on this axis.
@@ -28,7 +26,6 @@ fn stretches(len: Length) -> bool {
     matches!(len, Length::Fill | Length::FillPortion(_))
 }
 
-use super::breakpoint::Breakpoint;
 use super::size::{distribute, SizePolicy};
 use super::span::{cell_geometry, grid_extent, GridCell};
 use super::split::{Axis, SashEvent, SplitState};
@@ -170,15 +167,6 @@ pub fn split_sizes(state: SplitState, total: f32) -> (f32, f32, f32) {
     )
 }
 
-/// Sidebar recipe given breakpoint: beside or stacked.
-pub fn sidebar_mode(width: f32) -> &'static str {
-    if Breakpoint::from_width(width).sidebar_beside() {
-        "beside"
-    } else {
-        "stack"
-    }
-}
-
 /// Dock a header, optional side panes, center, and footer.
 ///
 /// The outer column fills its parent so a [`Length::Fill`] center
@@ -226,11 +214,6 @@ pub fn overlay_center<'a, M: 'a>(backdrop: Element<'a, M>, card: Element<'a, M>)
                 .center_y(Length::Fill),
         )
         .into()
-}
-
-/// Vertical scroll with fill height.
-pub fn scroll_y<'a, M: 'a>(child: Element<'a, M>) -> Element<'a, M> {
-    scrollable(child).height(Length::Fill).into()
 }
 
 /// Horizontal box. RTL reverses child order.
@@ -283,6 +266,17 @@ pub fn column_box<'a, M: 'a>(
 }
 
 /// Equal-fill tile pad: each cell shares the row width.
+/// Catalog `pad`. Equal-fill tiles. Pair with [`crate::widget::themed_button_sized`].
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::layout;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let cell = widget::label("7", tok, A11y::new("7", Role::Header));
+/// let _: icedtea::Element<'_, ()> = layout::pad(vec![cell], 1, 8);
+/// ```
 pub fn pad<'a, M: 'a>(cells: Vec<Element<'a, M>>, columns: usize, spacing: u32) -> Element<'a, M> {
     let filled: Vec<Element<'a, M>> = cells
         .into_iter()
@@ -454,8 +448,8 @@ mod tests {
         assert_eq!(end_offset(10.0, 20.0), 0.0);
         assert!(stack_visible(1, 1));
         assert!(!stack_visible(1, 0));
-        assert_eq!(sidebar_mode(500.0), "stack");
-        assert_eq!(sidebar_mode(900.0), "beside");
+        assert!(!crate::layout::Breakpoint::from_width(500.0).sidebar_beside());
+        assert!(crate::layout::Breakpoint::from_width(900.0).sidebar_beside());
         let st = SplitState::new(Axis::Horizontal, 0.4);
         let (a, sash, b) = split_sizes(st, 206.0);
         assert!((a + sash + b - 206.0).abs() < 0.01);
@@ -481,8 +475,17 @@ mod tests {
             t().into(),
         );
         let _: Element<'_, ()> = dock(None, None, None, None, t().into());
+        let split_src = include_str!("recipes.rs");
+        let grip = split_src
+            .split("pub fn split_view")
+            .nth(1)
+            .unwrap()
+            .split("pub fn grid_spanned")
+            .next()
+            .unwrap();
+        assert!(grip.contains(".on_press(on_sash(SashEvent::Press))"));
+        assert!(!grip.contains("on_move"), "grip must not drive sash move");
         let _: Element<'_, ()> = overlay_center(t().into(), t().into());
-        let _: Element<'_, ()> = scroll_y(t().into());
         let _: Element<'_, ()> = row_box(
             [t().into(), t().into()],
             8,
