@@ -494,23 +494,13 @@ pub fn transfer_index(
 pub struct ColumnLayout {
     pub widths: Vec<f32>,
     pub order: Vec<usize>,
-    pub frozen: usize,
 }
 
 impl ColumnLayout {
     pub fn new(widths: impl Into<Vec<f32>>) -> Self {
         let widths = widths.into();
         let order: Vec<usize> = (0..widths.len()).collect();
-        Self {
-            widths,
-            order,
-            frozen: 0,
-        }
-    }
-
-    pub fn with_frozen(mut self, n: usize) -> Self {
-        self.frozen = n.min(self.order.len());
-        self
+        Self { widths, order }
     }
 
     pub fn resize(&mut self, col: usize, delta: f32, min: f32) {
@@ -1122,7 +1112,7 @@ mod tests {
         assert_eq!(transfer_index(&mut from, &mut to, 2, 0), 0);
         assert_eq!(from, vec![1, 3]);
         assert_eq!(to, vec![2, 9]);
-        let mut cols = ColumnLayout::new(vec![80.0, 120.0, 60.0]).with_frozen(1);
+        let mut cols = ColumnLayout::new(vec![80.0, 120.0, 60.0]);
         cols.reorder(2, 1);
         assert_eq!(cols.display()[0], 0);
         assert_eq!(cols.display()[1], 2);

@@ -725,8 +725,7 @@ impl Gallery {
             list_window: VisibleWindow::new(400.0),
             table_window: VisibleWindow::new(360.0),
             table_cursor: (0, 0),
-            table_cols: icedtea::collection::ColumnLayout::new(vec![220.0, 140.0, 120.0, 280.0])
-                .with_frozen(1),
+            table_cols: icedtea::collection::ColumnLayout::new(vec![220.0, 140.0, 120.0, 280.0]),
             log_lines: (0..200)
                 .map(|i| {
                     let lvl = ["info", "warn", "error"][i % 3];

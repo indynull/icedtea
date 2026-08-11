@@ -3,7 +3,6 @@
 ## Do
 
 - `list_view` from `visible_range_var` (variable row heights).
-- Paint `CommandPalette::prompt` in `command_palette_view`.
 
 ## Consider
 

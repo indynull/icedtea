@@ -38,7 +38,7 @@ them.
 `ActionTable::conflicts` reports duplicate shortcuts in the same
 context. `with_sequence` plus `key::SequenceBuffer` is `ctrl+k` then
 `g`. `handle_in` takes a keymap context. The palette keeps recent and
-favorites and can open a `Prompt`. `pattern::cheatsheet` lists the
+favorites. `pattern::cheatsheet` lists the
 table.
 
 ## Own stack
