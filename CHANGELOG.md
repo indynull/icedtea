@@ -2,9 +2,10 @@
 
 ## Unreleased
 
-Guide lists every catalog id by group, with rustdoc, source, and
-crate links. Crate-root rustdoc is a teaching tour. The first
-window uses one `Action` and a toolbar (`examples/hello.rs`).
+The first window is a Save tool (`examples/hello.rs`). Crate-root
+rustdoc walks compose, boot, keys, tokens, a widget, a pattern, and
+scope. The guide has a four-job cookbook. Constructor rustdoc names
+the message. The reference lists every public constructor by group.
 
 `pattern::workspace` paints a `DockNode` (splits, sash, tabs).
 `move_panel` takes a leaf out of a split by collapsing onto the
