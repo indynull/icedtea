@@ -622,20 +622,39 @@ pub fn image_slot<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let width = width.into();
     let height = height.into();
+    let box_up = |child: Element<'a, M>| container(child).width(width).height(height);
     match slot {
         ImageSlot::Ready { handle, fit } => a11y::attach(
-            iced::widget::image(handle)
-                .content_fit(fit)
-                .width(width)
-                .height(height)
-                .into(),
+            container(
+                iced::widget::image(handle)
+                    .content_fit(fit)
+                    .width(Length::Fill)
+                    .height(Length::Fill),
+            )
+            .width(width)
+            .height(height)
+            .style(move |_| style::fill(crate::theme::chip_fill(tok), tok.text))
+            .into(),
             &a11y,
         ),
-        ImageSlot::Loading => placeholder_skeleton(tok, a11y),
+        ImageSlot::Loading => a11y::attach(
+            box_up(
+                column![
+                    container(Space::new().width(Length::Fill).height(14))
+                        .style(move |_| style::skeleton(tok)),
+                    container(Space::new().width(Length::Fill).height(14))
+                        .style(move |_| style::skeleton(tok)),
+                ]
+                .spacing(8)
+                .padding(12)
+                .into(),
+            )
+            .style(move |_| style::fill(crate::theme::chip_fill(tok), tok.text))
+            .into(),
+            &a11y,
+        ),
         ImageSlot::Error(msg) => a11y::attach(
-            container(meta(msg.clone(), tok, A11y::new(msg, Role::Status)))
-                .width(width)
-                .height(height)
+            box_up(meta(msg.clone(), tok, A11y::new(msg, Role::Status)))
                 .center_x(width)
                 .center_y(height)
                 .style(move |_| style::callout(tok, ToastKind::Warning))
@@ -1539,6 +1558,7 @@ pub fn group_box<'a, M: 'a>(
             .spacing(8),
         )
         .padding(12)
+        .width(Length::Fill)
         .style(move |_| style::card(tok, false))
         .into(),
         &a11y,
@@ -2009,20 +2029,37 @@ pub fn item_grid<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let cells: Vec<Element<'a, M>> = labels
-        .iter()
-        .enumerate()
-        .map(|(i, s)| {
-            themed_button(
-                s.clone(),
-                a11y.apply_message(Some(on_select(i))),
-                tok,
-                Variant::Quiet,
-                A11y::new(s.clone(), Role::ListItem).with_disabled(a11y.disabled),
-            )
-        })
-        .collect();
-    a11y::attach(crate::layout::grid(cells, 3, 8), &a11y)
+    let cols = 3;
+    let mut rows = iced::widget::Column::new()
+        .spacing(8)
+        .width(Length::Fill)
+        .height(Length::Fill);
+    let mut i = 0;
+    while i < labels.len() {
+        let mut r = iced::widget::Row::new()
+            .spacing(8)
+            .width(Length::Fill)
+            .height(Length::Fill);
+        for _ in 0..cols {
+            if i < labels.len() {
+                let s = labels[i].clone();
+                r = r.push(themed_button_sized(
+                    s.clone(),
+                    a11y.apply_message(Some(on_select(i))),
+                    tok,
+                    Variant::Quiet,
+                    Length::Fill,
+                    Length::Fill,
+                    A11y::new(s, Role::ListItem).with_disabled(a11y.disabled),
+                ));
+                i += 1;
+            } else {
+                r = r.push(Space::new().width(Length::Fill).height(Length::Fill));
+            }
+        }
+        rows = rows.push(r);
+    }
+    a11y::attach(rows.into(), &a11y)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2054,7 +2091,11 @@ where
     let mut header = Row::new().spacing(0);
     for c in 0..cols {
         let title = model.header(c).to_string();
-        let w = widths.get(c).copied().unwrap_or(96.0);
+        let w = if c + 1 == cols {
+            Length::Fill
+        } else {
+            Length::Fixed(widths.get(c).copied().unwrap_or(96.0))
+        };
         header = header.push(
             container(themed_button(
                 title.clone(),
@@ -2063,7 +2104,7 @@ where
                 Variant::Ghost,
                 A11y::button(title).with_disabled(disabled),
             ))
-            .width(Length::Fixed(w)),
+            .width(w),
         );
     }
     a11y::attach(
@@ -2087,7 +2128,11 @@ where
                         for c in 0..cols {
                             let focused = cursor == Some((i, c));
                             let value = model.cell(i, c).to_string();
-                            let w = widths.get(c).copied().unwrap_or(96.0);
+                            let w = if c + 1 == cols {
+                                Length::Fill
+                            } else {
+                                Length::Fixed(widths.get(c).copied().unwrap_or(96.0))
+                            };
                             let bg = if focused {
                                 tok.selection
                             } else if selected {
@@ -2099,7 +2144,7 @@ where
                             };
                             let face =
                                 container(text(value.clone()).size(typo::BODY).color(tok.text))
-                                    .width(Length::Fixed(w))
+                                    .width(w)
                                     .height(h)
                                     .padding([8, 8])
                                     .style(move |_| style::fill(bg, tok.text));
@@ -2234,20 +2279,29 @@ pub fn accordion_view<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let mut col = Column::new().spacing(4);
+    let mut col = Column::new().spacing(0).width(Length::Fill);
     for (i, (title, body)) in titles.iter().zip(bodies).enumerate() {
         let open = state.open == Some(i);
-        col = col.push(themed_button(
-            title.clone(),
+        let mark = if open { "▾" } else { "▸" };
+        let head = format!("{mark}  {title}");
+        col = col.push(themed_button_sized(
+            head,
             a11y.apply_message(Some(on_toggle(i))),
             tok,
             Variant::Quiet,
+            Length::Fill,
+            Length::Shrink,
             A11y::button(title.clone())
                 .with_checked(open)
                 .with_disabled(a11y.disabled),
         ));
         if open {
-            col = col.push(body);
+            col = col.push(
+                container(body)
+                    .width(Length::Fill)
+                    .padding(12)
+                    .style(move |_| style::panel(tok)),
+            );
         }
     }
     a11y::attach(col.into(), &a11y)
@@ -4052,5 +4106,114 @@ mod tests {
                 "painted y {y} is not k*{row_h} - {scroll}"
             );
         }
+    }
+
+    fn layout_size<M: Clone>(el: &mut Element<'_, M>, max: iced::Size) -> iced::Size {
+        use iced::advanced::layout::Limits;
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels};
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(iced::Size::ZERO, max);
+        el.as_widget_mut()
+            .layout(&mut tree, &renderer, &limits)
+            .size()
+    }
+
+    #[test]
+    fn image_slot_ready_keeps_the_requested_box() {
+        let tok = named("dark").tokens;
+        let px = vec![
+            255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 0, 255,
+        ];
+        let handle = iced::widget::image::Handle::from_rgba(2, 2, px);
+        for fit in [iced::ContentFit::Contain, iced::ContentFit::Cover] {
+            let mut el: Element<'_, ()> = image_slot(
+                ImageSlot::Ready {
+                    handle: handle.clone(),
+                    fit,
+                },
+                120.0,
+                80.0,
+                tok,
+                A11y::new("img", Role::Image),
+            );
+            let size = layout_size(&mut el, iced::Size::new(400.0, 400.0));
+            assert_eq!(size, iced::Size::new(120.0, 80.0), "{fit:?}");
+        }
+    }
+
+    #[test]
+    fn item_grid_cells_share_the_row_width() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+        let tok = named("dark").tokens;
+        let labels = vec!["Inbox".into(), "Calendar".into(), "Mail".into()];
+        let mut el: Element<'_, ()> =
+            item_grid(&labels, |_| (), tok, A11y::new("grid", Role::List));
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(300.0, 240.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        assert!((node.size().width - 300.0).abs() < 1.0);
+        let layout = Layout::new(&node);
+        let mut widths = Vec::new();
+        fn walk_row(layout: Layout<'_>, widths: &mut Vec<f32>) {
+            let kids: Vec<_> = layout.children().collect();
+            if kids.len() == 3 && kids.iter().all(|c| c.bounds().width > 40.0) {
+                *widths = kids.iter().map(|c| c.bounds().width).collect();
+                return;
+            }
+            for k in kids {
+                walk_row(k, widths);
+            }
+        }
+        walk_row(layout, &mut widths);
+        assert_eq!(widths.len(), 3);
+        assert!((widths[0] - widths[1]).abs() < 1.0);
+        assert!((widths[1] - widths[2]).abs() < 1.0);
+        assert!(
+            (widths[0] * 3.0 + 16.0 - 300.0).abs() < 4.0,
+            "cells {widths:?} should share the 300px row"
+        );
+    }
+
+    #[test]
+    fn open_accordion_shows_a_body_under_its_header() {
+        let tok = named("dark").tokens;
+        let titles = ["Files".into()];
+        let body = || label("New, Open, Save", tok, A11y::new("body", Role::Status));
+        let mut closed: Element<'_, ()> = accordion_view(
+            &titles,
+            vec![body()],
+            &Accordion { open: None },
+            |_| (),
+            tok,
+            A11y::new("acc", Role::Group),
+        );
+        let mut open: Element<'_, ()> = accordion_view(
+            &titles,
+            vec![body()],
+            &Accordion { open: Some(0) },
+            |_| (),
+            tok,
+            A11y::new("acc", Role::Group),
+        );
+        let max = iced::Size::new(300.0, 400.0);
+        let closed_h = layout_size(&mut closed, max).height;
+        let open_size = layout_size(&mut open, max);
+        assert!(
+            open_size.height > closed_h + 8.0,
+            "open {0} must include the body above closed {closed_h}",
+            open_size.height
+        );
+        assert!((open_size.width - 300.0).abs() < 1.0);
     }
 }
