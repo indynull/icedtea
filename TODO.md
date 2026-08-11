@@ -20,7 +20,8 @@ Shipped or shipping in this cut as library constructors and models:
   state and close confirm (application owns the document). Status jobs
   and toasts. Runtime density and user theme/accent/scale persistence.
 - Gallery demos handle the messages their widgets emit (outline jump,
-  dismiss, places).
+  dismiss, places). Placed context menu on editors, collections, and
+  copyable fields.
 
 ## Consider
 

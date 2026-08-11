@@ -37,6 +37,12 @@ typed: Shift+8 is `*`, not `8`. F1-F24 are `Press::Function`. Control,
 alt, and logo chords return `None` from `typed` / `press` so `handle`
 still owns them.
 
+`pattern::context_menu` places the same `Action` list under the
+pointer. The application stores the point (`layout::listen_cursor`)
+and whether the menu is open. Click-away and Escape close it. Editors
+enable Cut/Copy from `text_editor::Content::selection`. Lists select
+on right-click, then the application opens the menu.
+
 Subscribe with `key::listen` and map events into `update`, as
 `examples/hello.rs` does.
 

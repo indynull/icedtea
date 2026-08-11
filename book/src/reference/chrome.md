@@ -207,7 +207,7 @@ Same `Action` iterator as `toolbar`. Disabled actions paint muted.
 
 ### Context menu
 
-**`context-menu`** — A vertical action list.
+**`context-menu`** — Action list under the pointer.
 
 Constructor: [`pattern::context_menu`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.context_menu.html)
 
@@ -215,7 +215,8 @@ Constructor: [`pattern::context_menu`](https://docs.rs/icedtea/latest/icedtea/pa
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
-Feed the same table (or a slice). Empty table is an empty column.
+Stack on the window with the click point. Click-away dismisses.
+Empty table still paints a card.
 
 ### Breadcrumb
 

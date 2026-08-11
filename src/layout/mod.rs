@@ -29,6 +29,6 @@ pub use recipes::{
 pub use size::{distribute, SizePolicy};
 pub use span::{cell_geometry, grid_extent, span_occupies, GridCell};
 pub use split::{
-    listen_sash, sash_from_window_event, sash_pointer_pos, Axis, PointerDrive, SashDrag, SashEvent,
-    SplitState,
+    listen_cursor, listen_sash, sash_from_window_event, sash_pointer_pos, Axis, CursorEvent,
+    PointerDrive, SashDrag, SashEvent, SplitState,
 };

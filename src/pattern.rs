@@ -17,8 +17,8 @@
 //! let _ = cat;
 //! ```
 
-use iced::widget::{column, container, row, text, Column, Row};
-use iced::{Element, Length};
+use iced::widget::{column, container, mouse_area, row, text, Column, Row, Space, Stack};
+use iced::{Element, Length, Padding, Point, Size};
 
 use crate::a11y::{A11y, Role};
 use crate::action::{Action, ActionTable};
@@ -760,9 +760,11 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
     )
 }
 
-/// A vertical action list.
+/// Place a context menu at `origin` in the window. Click-away dismisses.
 ///
-/// Feed the same table (or a slice). Empty table is an empty column.
+/// Stack this on the window when the application holds a point. Empty
+/// `actions` still paints a card so click-away works. `viewport` clamps
+/// the card onto the window.
 ///
 /// See also catalog id `context-menu`.
 ///
@@ -773,12 +775,25 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
 /// let tok = theme::named("dark").tokens;
 /// let mut table = ActionTable::new();
 /// table.insert(Action::new("file.save", "Save", ()));
-/// let _: icedtea::Element<'_, ()> = pattern::context_menu(table.iter(), tok);
+/// let _: icedtea::Element<'_, ()> = pattern::context_menu(
+///     table.iter().cloned(),
+///     icedtea::iced::Point::new(24.0, 48.0),
+///     icedtea::iced::Size::new(800.0, 600.0),
+///     (),
+///     tok,
+/// );
 /// ```
 pub fn context_menu<'a, M: Clone + 'a>(
-    actions: impl IntoIterator<Item = &'a Action<M>>,
+    actions: impl IntoIterator<Item = Action<M>>,
+    origin: Point,
+    viewport: Size,
+    on_dismiss: M,
     tok: Tokens,
 ) -> Element<'a, M> {
+    const MENU_W: f32 = 220.0;
+    const MENU_H: f32 = 280.0;
+    let x = origin.x.min((viewport.width - MENU_W).max(0.0)).max(0.0);
+    let y = origin.y.min((viewport.height - MENU_H).max(0.0)).max(0.0);
     let mut col = Column::new().spacing(2).padding(6);
     for a in actions {
         col = col.push(themed_button(
@@ -789,8 +804,24 @@ pub fn context_menu<'a, M: Clone + 'a>(
             A11y::new(a.title.clone(), Role::MenuItem).with_disabled(!a.enabled),
         ));
     }
-    container(col)
-        .style(move |_| style::raised_card(tok))
+    let card = container(col)
+        .width(Length::Fixed(MENU_W))
+        .style(move |_| style::raised_card(tok));
+    let placed = container(card).padding(Padding {
+        top: y,
+        right: 0.0,
+        bottom: 0.0,
+        left: x,
+    });
+    Stack::new()
+        .push(
+            mouse_area(Space::new().width(Length::Fill).height(Length::Fill))
+                .on_press(on_dismiss.clone())
+                .on_right_press(on_dismiss),
+        )
+        .push(placed)
+        .width(Length::Fill)
+        .height(Length::Fill)
         .into()
 }
 
@@ -1236,7 +1267,13 @@ mod tests {
         let _: Element<'_, ()> = tab_view(&tabs, lab("b"), |_| (), |_| (), tok);
         let _: Element<'_, ()> = main_window(lab("m"), lab("t"), lab("c"), lab("s"), tok);
         let _: Element<'_, ()> = modal_card(lab("b"), lab("c"));
-        let _: Element<'_, ()> = context_menu(table.iter(), tok);
+        let _: Element<'_, ()> = context_menu(
+            table.iter().cloned(),
+            iced::Point::ORIGIN,
+            iced::Size::new(640.0, 400.0),
+            (),
+            tok,
+        );
         fn paint(el: &mut Element<'_, ()>) {
             use iced::advanced::layout::{Layout, Limits};
             use iced::advanced::renderer::Style;
@@ -1278,8 +1315,31 @@ mod tests {
         paint(&mut prefs_el);
         let mut mw = main_window(lab("m"), lab("t"), lab("c"), lab("s"), tok);
         paint(&mut mw);
-        let mut cm = context_menu(table.iter(), tok);
+        let mut cm = context_menu(
+            table.iter().cloned(),
+            iced::Point::new(12.0, 20.0),
+            iced::Size::new(640.0, 400.0),
+            (),
+            tok,
+        );
         paint(&mut cm);
+        let mut edge = context_menu(
+            table.iter().cloned(),
+            iced::Point::new(800.0, 500.0),
+            iced::Size::new(640.0, 400.0),
+            (),
+            tok,
+        );
+        paint(&mut edge);
+        let none: [Action<()>; 0] = [];
+        let mut empty = context_menu(
+            none,
+            iced::Point::new(-8.0, -4.0),
+            iced::Size::new(10.0, 10.0),
+            (),
+            tok,
+        );
+        paint(&mut empty);
         let mut ld = list_detail(lab("l"), lab("d"), crate::layout::fixed(260.0), tok);
         paint(&mut ld);
         let mut nv = navigation_view(lab("s"), lab("c"), &nav, 900.0, (), tok, &cat);
@@ -1316,12 +1376,35 @@ mod tests {
         paint(&mut shut);
         let mut sheet = cheatsheet(&table, "sa", tok);
         paint(&mut sheet);
-        let jobs = [crate::collection::Job {
-            id: 1,
-            title: "Index".into(),
-            progress: Some(0.4),
-        }];
+        let mut extra = ActionTable::new();
+        extra.insert(Action::new("file.save", "Save", ()));
+        let mut dead = Action::new("edit.redo", "Redo", ());
+        dead.enabled = false;
+        extra.insert(dead);
+        let mut miss = cheatsheet(&extra, "zzzz", tok);
+        paint(&mut miss);
+        let jobs = [
+            crate::collection::Job {
+                id: 1,
+                title: "Index".into(),
+                progress: Some(0.4),
+            },
+            crate::collection::Job {
+                id: 2,
+                title: "Idle".into(),
+                progress: None,
+            },
+        ];
         let mut js = job_strip(&jobs, tok, A11y::new("jobs", Role::Status));
         paint(&mut js);
+        let root = crate::workspace::DockNode::tabs(
+            vec![
+                crate::workspace::Panel::new("a", "A"),
+                crate::workspace::Panel::new("b", "B"),
+            ],
+            0,
+        );
+        let mut ws = workspace(&root, lab("c"), tok, A11y::new("ws", Role::Group));
+        paint(&mut ws);
     }
 }

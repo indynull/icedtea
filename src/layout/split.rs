@@ -113,6 +113,32 @@ pub fn listen_sash() -> Subscription<PointerDrive> {
     iced::event::listen_with(sash_listen)
 }
 
+/// Window-space pointer for a placed context menu.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CursorEvent {
+    Move(Point),
+    Context,
+}
+
+/// Cursor motion and right-button press in window space.
+pub fn listen_cursor() -> Subscription<CursorEvent> {
+    iced::event::listen_with(cursor_listen)
+}
+
+fn cursor_listen(
+    event: iced::Event,
+    _status: iced::event::Status,
+    _id: iced::window::Id,
+) -> Option<CursorEvent> {
+    match event {
+        Event::Mouse(mouse::Event::CursorMoved { position }) => Some(CursorEvent::Move(position)),
+        Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Right)) => {
+            Some(CursorEvent::Context)
+        }
+        _ => None,
+    }
+}
+
 fn sash_listen(
     event: iced::Event,
     _status: iced::event::Status,
@@ -243,10 +269,34 @@ mod tests {
         ));
         let _ = listen_sash();
         assert!(sash_listen(
-            moved,
+            moved.clone(),
             iced::event::Status::Ignored,
             iced::window::Id::unique(),
         )
         .is_some());
+        let _ = listen_cursor();
+        assert_eq!(
+            cursor_listen(
+                first,
+                iced::event::Status::Ignored,
+                iced::window::Id::unique(),
+            ),
+            Some(CursorEvent::Move(Point::new(100.0, 8.0)))
+        );
+        let right = Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Right));
+        assert_eq!(
+            cursor_listen(
+                right,
+                iced::event::Status::Ignored,
+                iced::window::Id::unique(),
+            ),
+            Some(CursorEvent::Context)
+        );
+        assert!(cursor_listen(
+            released,
+            iced::event::Status::Ignored,
+            iced::window::Id::unique(),
+        )
+        .is_none());
     }
 }

@@ -2816,7 +2816,10 @@ where
                         let row: Element<'a, M> = if disabled {
                             face
                         } else {
-                            mouse_area(face).on_press(on_select(i)).into()
+                            mouse_area(face)
+                                .on_press(on_select(i))
+                                .on_right_press(on_select(i))
+                                .into()
                         };
                         col = col.push(a11y::attach(
                             row,
@@ -3001,7 +3004,10 @@ where
                             let cell: Element<'a, M> = if disabled {
                                 face.into()
                             } else {
-                                mouse_area(face).on_press(on_cell(i, c)).into()
+                                mouse_area(face)
+                                    .on_press(on_cell(i, c))
+                                    .on_right_press(on_cell(i, c))
+                                    .into()
                             };
                             line = line.push(a11y::attach(
                                 cell,
@@ -3086,7 +3092,10 @@ pub fn tree_view<'a, M: Clone + 'a>(
         let pick: Element<'a, M> = if a11y.disabled {
             title
         } else {
-            mouse_area(title).on_press(on_select(id)).into()
+            mouse_area(title)
+                .on_press(on_select(id))
+                .on_right_press(on_select(id))
+                .into()
         };
         line = line.push(a11y::attach(
             pick,

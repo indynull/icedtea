@@ -430,6 +430,15 @@ enum Message {
     RevealSecret,
     CopySecret,
     WindowSize(f32),
+    WindowHeight(f32),
+    Cursor(icedtea::layout::CursorEvent),
+    ContextDismiss,
+    EditCopy,
+    EditCut,
+    EditPaste,
+    EditSelectAll,
+    Pasted(Option<String>),
+    CopyValue,
     TimeStep(TimeClock, TimeField),
     Slide(f32),
     Check(bool),
@@ -448,6 +457,26 @@ enum Message {
 
 fn window_width((_id, size): (icedtea::iced::window::Id, icedtea::iced::Size)) -> Message {
     Message::WindowSize(size.width)
+}
+
+fn window_height((_id, size): (icedtea::iced::window::Id, icedtea::iced::Size)) -> Message {
+    Message::WindowHeight(size.height)
+}
+
+fn wants_context(page: &str) -> bool {
+    matches!(
+        page,
+        "fields"
+            | "code"
+            | "list"
+            | "table"
+            | "tree"
+            | "grid"
+            | "markdown"
+            | "type"
+            | "chrome-rows"
+            | "list-detail"
+    )
 }
 
 fn nav_sash(drive: PointerDrive) -> Message {
@@ -522,6 +551,9 @@ struct Gallery {
     palette: CommandPalette,
     palette_focus: bool,
     window_width: f32,
+    window_height: f32,
+    pointer: icedtea::iced::Point,
+    context: Option<icedtea::iced::Point>,
     last_press: Option<String>,
     press_log: Vec<String>,
     nav_split: SplitState,
@@ -745,6 +777,9 @@ impl Gallery {
             palette,
             palette_focus: true,
             window_width: 900.0,
+            window_height: 640.0,
+            pointer: icedtea::iced::Point::ORIGIN,
+            context: None,
             last_press: None,
             press_log: Vec::new(),
             nav_split: SplitState::new(Axis::Horizontal, 280.0 / 900.0),
@@ -812,6 +847,105 @@ impl Gallery {
         self.nav_split.min_ratio = min_r;
         self.nav_split.max_ratio = max_r;
         self.nav_split.ratio = self.nav_split.ratio.clamp(min_r, max_r);
+    }
+
+    fn pointer_in_content(&self) -> bool {
+        let side = self.nav_split.ratio * self.window_width + 8.0;
+        self.pointer.x > side
+    }
+
+    fn edit_content(&self) -> &Content {
+        if self.page == "code" {
+            &self.code_editor
+        } else {
+            &self.editor
+        }
+    }
+
+    fn edit_content_mut(&mut self) -> &mut Content {
+        if self.page == "code" {
+            &mut self.code_editor
+        } else {
+            &mut self.editor
+        }
+    }
+
+    fn edit_selection(&self) -> Option<String> {
+        self.edit_content().selection()
+    }
+
+    fn copy_value(&self) -> String {
+        match self.page {
+            "markdown" => self.md.source.clone(),
+            "list" | "list-detail" => self
+                .sel
+                .primary()
+                .and_then(|i| self.list.items.get(i))
+                .map(|r| r.title.clone())
+                .unwrap_or_default(),
+            "table" => self
+                .sel
+                .primary()
+                .map(|i| self.table.cell(i, 0).to_string())
+                .unwrap_or_default(),
+            "tree" => self
+                .tree_sel
+                .map(|id| format!("Selected {id}"))
+                .unwrap_or_default(),
+            "grid" => self
+                .grid_sel
+                .and_then(|i| {
+                    [
+                        "Inbox", "Calendar", "Mail", "Files", "Photos", "Music", "Chat", "Maps",
+                        "Notes", "Terminal", "Settings", "Help",
+                    ]
+                    .get(i)
+                    .copied()
+                })
+                .unwrap_or("")
+                .to_string(),
+            "type" => "Page title".into(),
+            _ => {
+                if !self.query.is_empty() {
+                    self.query.clone()
+                } else {
+                    self.secret.clone()
+                }
+            }
+        }
+    }
+
+    fn context_actions(&self) -> Vec<Action<Message>> {
+        if self.page == "chrome-rows" {
+            return self.actions.iter().cloned().collect();
+        }
+        let mut v = Vec::new();
+        let editor = self.page == "fields" || self.page == "code";
+        if editor {
+            let has = self.edit_selection().is_some();
+            v.push(
+                Action::new("edit.cut", "Cut", Message::EditCut)
+                    .with_shortcut(Shortcut::parse("ctrl+x").unwrap()),
+            );
+            v.last_mut().unwrap().enabled = has;
+            v.push(
+                Action::new("edit.copy", "Copy", Message::EditCopy)
+                    .with_shortcut(Shortcut::parse("ctrl+c").unwrap()),
+            );
+            v.last_mut().unwrap().enabled = has;
+            v.push(
+                Action::new("edit.paste", "Paste", Message::EditPaste)
+                    .with_shortcut(Shortcut::parse("ctrl+v").unwrap()),
+            );
+            v.push(Action::new(
+                "edit.select-all",
+                "Select all",
+                Message::EditSelectAll,
+            ));
+        } else {
+            v.push(Action::new("edit.copy", "Copy", Message::CopyValue));
+        }
+        v
     }
 
     fn theme(&self) -> Theme {
@@ -1042,6 +1176,12 @@ impl Gallery {
                     }
                     return Task::none();
                 }
+                if self.context.is_some() {
+                    if matches!(icedtea::key::press(&ev), Some(icedtea::key::Press::Escape)) {
+                        self.context = None;
+                    }
+                    return Task::none();
+                }
                 let ctx = KeyContext {
                     text_input_focused: self.page == "search"
                         || (self.page == "palette" && self.palette_focus),
@@ -1140,6 +1280,68 @@ impl Gallery {
                 self.window_width = w;
                 self.clamp_nav();
             }
+            Message::WindowHeight(h) => self.window_height = h,
+            Message::Cursor(ev) => match ev {
+                icedtea::layout::CursorEvent::Move(p) => self.pointer = p,
+                icedtea::layout::CursorEvent::Context => {
+                    if wants_context(self.page) && self.pointer_in_content() {
+                        self.context = Some(self.pointer);
+                    }
+                }
+            },
+            Message::ContextDismiss => self.context = None,
+            Message::EditCopy => {
+                if let Some(s) = self.edit_selection() {
+                    self.note = "Copied".into();
+                    self.context = None;
+                    return icedtea::copy_text(s);
+                }
+            }
+            Message::EditCut => {
+                if let Some(s) = self.edit_selection() {
+                    self.edit_content_mut().perform(
+                        icedtea::iced::widget::text_editor::Action::Edit(
+                            icedtea::iced::widget::text_editor::Edit::Delete,
+                        ),
+                    );
+                    self.note = "Cut".into();
+                    self.context = None;
+                    return icedtea::copy_text(s);
+                }
+            }
+            Message::EditPaste => {
+                self.context = None;
+                return icedtea::paste_text(Message::Pasted);
+            }
+            Message::Pasted(Some(s)) => {
+                if self.page == "code" {
+                    self.code_editor
+                        .perform(icedtea::iced::widget::text_editor::Action::Edit(
+                            icedtea::iced::widget::text_editor::Edit::Paste(std::sync::Arc::new(s)),
+                        ));
+                } else if self.page == "fields" {
+                    self.editor
+                        .perform(icedtea::iced::widget::text_editor::Action::Edit(
+                            icedtea::iced::widget::text_editor::Edit::Paste(std::sync::Arc::new(s)),
+                        ));
+                } else {
+                    self.query = s;
+                }
+                self.note = "Pasted".into();
+            }
+            Message::Pasted(None) => self.note = "Clipboard empty".into(),
+            Message::EditSelectAll => {
+                self.edit_content_mut()
+                    .perform(icedtea::iced::widget::text_editor::Action::SelectAll);
+                self.note = "Selected all".into();
+                self.context = None;
+            }
+            Message::CopyValue => {
+                let s = self.copy_value();
+                self.note = "Copied".into();
+                self.context = None;
+                return icedtea::copy_text(s);
+            }
             Message::TimeStep(clock, field) => {
                 self.time = self.time.step_field(field, clock);
             }
@@ -1226,7 +1428,9 @@ impl Gallery {
             icedtea::iced::time::every(std::time::Duration::from_secs(1)).map(|_| Message::Tick),
             icedtea::iced::system::theme_changes().map(Message::OsMode),
             icedtea::iced::window::resize_events().map(window_width),
+            icedtea::iced::window::resize_events().map(window_height),
             layout::listen_sash().map(nav_sash),
+            layout::listen_cursor().map(Message::Cursor),
         ];
         if tour_cmd_path().is_some() {
             subs.push(
@@ -1375,7 +1579,7 @@ impl Gallery {
         )
         .width(Length::Fill)
         .style(move |_| icedtea::style::panel(tok));
-        container(layout::dock(
+        let shell = container(layout::dock(
             Some({
                 let mut top = column![
                     pattern::menu_bar(&self.actions, tok, self.direction, &self.catalog),
@@ -1402,8 +1606,23 @@ impl Gallery {
         ))
         .width(Length::Fill)
         .height(Length::Fill)
-        .style(move |_| icedtea::style::fill(tok.canvas, tok.text))
-        .into()
+        .style(move |_| icedtea::style::fill(tok.canvas, tok.text));
+        if let Some(origin) = self.context {
+            let acts = self.context_actions();
+            icedtea::iced::widget::stack![
+                shell,
+                pattern::context_menu(
+                    acts,
+                    origin,
+                    icedtea::iced::Size::new(self.window_width, self.window_height),
+                    Message::ContextDismiss,
+                    tok,
+                ),
+            ]
+            .into()
+        } else {
+            shell.into()
+        }
     }
 
     fn page_view(&self) -> Element<'_, Message> {
@@ -2651,7 +2870,20 @@ impl Gallery {
                 .into()
             }
             "command-bar" => pattern::command_bar(self.actions.iter(), tok, self.direction),
-            "context-menu" => pattern::context_menu(self.actions.iter(), tok),
+            "context-menu" => column![
+                widget::meta(
+                    "Right-click the page for Cut, Copy, Paste on editors and Copy on lists.",
+                    tok,
+                    named("ctx-hint", Role::Status),
+                ),
+                widget::label(
+                    "The menu sits under the pointer. Escape or click away closes it.",
+                    tok,
+                    named("ctx-body", Role::Status),
+                ),
+            ]
+            .spacing(8)
+            .into(),
             "scrollbar" => {
                 const LINES: &[&str] = &[
                     "Booted the gallery window",
@@ -3509,6 +3741,27 @@ mod tests {
         let _ = g.view();
         g.page = "markdown";
         let _ = g.view();
+        g.page = "list";
+        g.pointer = icedtea::iced::Point::new(400.0, 80.0);
+        let _ = g.update(super::Message::Cursor(
+            icedtea::layout::CursorEvent::Context,
+        ));
+        assert!(g.context.is_some());
+        let _ = g.view();
+        let _ = g.update(super::Message::CopyValue);
+        assert!(g.context.is_none());
+        assert_eq!(g.note, "Copied");
+        g.page = "fields";
+        g.pointer = icedtea::iced::Point::new(400.0, 80.0);
+        let _ = g.update(super::Message::Cursor(
+            icedtea::layout::CursorEvent::Context,
+        ));
+        assert!(g
+            .context_actions()
+            .iter()
+            .any(|a| a.id.as_str() == "edit.paste"));
+        let _ = g.update(super::Message::ContextDismiss);
+        assert!(g.context.is_none());
     }
 
     #[test]
