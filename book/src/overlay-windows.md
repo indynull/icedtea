@@ -25,3 +25,8 @@ out.
 In-window modals use `pattern::modal_card` on a dim backdrop. Native
 file dialogs go through `icedtea::native_dialog`; message, confirm,
 color, and font stay in-app (`dialog::InAppDialog`).
+
+- [`window`](https://docs.rs/icedtea/latest/icedtea/window/index.html)
+- [`Boot`](https://docs.rs/icedtea/latest/icedtea/app/struct.Boot.html)
+- [source](https://github.com/indynull/icedtea/blob/master/src/window.rs)
+- [crates.io](https://crates.io/crates/icedtea)

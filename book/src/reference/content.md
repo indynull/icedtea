@@ -1,0 +1,110 @@
+# Content
+
+Type, icons, documents, and images. Gallery pages `type`, `markdown`,
+`code`, `image`.
+[rustdoc](https://docs.rs/icedtea/latest/icedtea/widget/index.html) ·
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea) ·
+[iced](https://crates.io/crates/iced)
+
+### Label
+
+**`label`** — A line of body text.
+
+Constructor: [`widget::label`](https://docs.rs/icedtea/latest/icedtea/widget/fn.label.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea) ·
+[iced](https://crates.io/crates/iced)
+
+Platform sans. Empty string is an empty node; still pass `A11y`.
+
+### Rich cell
+
+**`rich-cell`** — A table or list cell: plain, emphasis, code, or link.
+
+Constructor: [`widget::rich_cell`](https://docs.rs/icedtea/latest/icedtea/widget/fn.rich_cell.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea) ·
+[iced](https://crates.io/crates/iced)
+
+Not a markup parser. `RichCell::Link` takes an optional message.
+`MarkdownDoc` stays documents.
+
+### Icon
+
+**`icon`** — A chrome SVG from the bundled set.
+
+Constructor: [`widget::icon_svg`](https://docs.rs/icedtea/latest/icedtea/widget/fn.icon_svg.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea) ·
+[iced](https://crates.io/crates/iced)
+
+Chrome set only (`Icon::Search`, `Close`, and the rest). Tokens tint
+the fill.
+
+### Tooltip
+
+**`tooltip`** — Hover text on a child.
+
+Constructor: [`widget::tooltip_wrap`](https://docs.rs/icedtea/latest/icedtea/widget/fn.tooltip_wrap.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea) ·
+[iced](https://crates.io/crates/iced)
+
+Empty tip text is a no-op wrap. The child keeps its own `A11y`.
+
+### Hyperlink
+
+**`link`** — A text link that sends a message.
+
+Constructor: [`widget::hyperlink`](https://docs.rs/icedtea/latest/icedtea/widget/fn.hyperlink.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea) ·
+[iced](https://crates.io/crates/iced)
+
+The application opens the URL or navigates. Disabled paints muted
+text and drops the press.
+
+### Markdown
+
+**`markdown`** — A parsed document.
+
+Constructor: [`widget::markdown_view`](https://docs.rs/icedtea/latest/icedtea/widget/fn.markdown_view.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea) ·
+[iced](https://crates.io/crates/iced)
+
+Parse with `MarkdownDoc::parse`, then view the items. Truncate by
+slicing the source before parse. Links use `Tokens.accent`.
+
+### Code
+
+**`code`** — Highlighted source.
+
+Constructor: [`widget::highlighted_code`](https://docs.rs/icedtea/latest/icedtea/widget/fn.highlighted_code.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea) ·
+[iced](https://crates.io/crates/iced)
+
+The application owns the buffer and the language name. Highlighter
+face follows the active colorway (`theme::code_highlight`).
+
+### Image
+
+**`image`** — A slot that keeps its box.
+
+Constructor: [`widget::image_slot`](https://docs.rs/icedtea/latest/icedtea/widget/fn.image_slot.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea) ·
+[iced](https://crates.io/crates/iced)
+
+Ready keeps the requested width and height. Missing bytes show the
+empty slot, not a collapsed layout.

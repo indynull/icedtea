@@ -1,4 +1,64 @@
-#![doc = include_str!("../README.md")]
+//! Native desktop widgets and chrome for [iced](https://iced.rs/).
+//!
+//! icedtea starts a themed window, paints controls from semantic tokens,
+//! and routes one [`action::Action`] table through menus, toolbars,
+//! shortcuts, and the command palette. Constructors return iced
+//! [`Element`]s and emit your messages.
+//!
+//! # First window
+//!
+//! One `Action` feeds the toolbar. The same message increments the count
+//! when the row is pressed:
+//!
+//! ```
+//! use icedtea::action::{Action, ActionTable};
+//! use icedtea::i18n::Direction;
+//! use icedtea::pattern;
+//! use icedtea::shortcut::Shortcut;
+//! use icedtea::theme;
+//! let tok = theme::named("dark").tokens;
+//! let mut table = ActionTable::new();
+//! table.insert(
+//!     Action::new("count.inc", "Count", ())
+//!         .with_shortcut(Shortcut::parse("ctrl+i").unwrap()),
+//! );
+//! let chrome: icedtea::Element<'_, ()> =
+//!     pattern::toolbar(table.iter(), tok, Direction::Ltr);
+//! let _ = chrome;
+//! assert_eq!(table.invoke("count.inc"), Some(()));
+//! ```
+//!
+//! [`run!`] opens that window. The same program is
+//! [`examples/hello.rs`](https://github.com/indynull/icedtea/blob/master/examples/hello.rs).
+//!
+//! # Nouns
+//!
+//! * [`app::Boot`] — title, application id, theme, locale, window kind.
+//! * [`theme::Tokens`] — canvas, text, primary; washes from [`theme::mix`].
+//! * [`action::Action`] — one command for every chrome row.
+//! * Constructors in [`widget`] — themed controls that take tokens and
+//!   [`a11y::A11y`].
+//! * [`pattern`] — list/detail, palette, main window, and other composed
+//!   chrome.
+//!
+//! # Modules
+//!
+//! | Start here | Role |
+//! | --- | --- |
+//! | [`app`] / [`run!`] | Boot the window |
+//! | [`action`] / [`key`] / [`shortcut`] | Commands and chords |
+//! | [`theme`] / [`variant`] / [`typo`] | Color, variant, type |
+//! | [`widget`] / [`collection`] | Controls, lists, tables |
+//! | [`layout`] / [`pattern`] / [`window`] | Recipes and chrome |
+//! | [`catalog`] | Closed list of public ids |
+//!
+//! The [guide](https://indynull.github.io/icedtea/) walks composition
+//! and lists every catalog id. The
+//! [gallery](https://github.com/indynull/icedtea/tree/master/icedtea-gallery)
+//! shows them live.
+//! [crates.io](https://crates.io/crates/icedtea) ·
+//! [source](https://github.com/indynull/icedtea).
+
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod a11y;
@@ -89,12 +149,30 @@ mod tests {
     #[test]
     fn docs_describe_icedtea() {
         let readme = include_str!("../README.md");
+        let root = include_str!("lib.rs");
+        let tour = root.split("#![cfg_attr").next().unwrap_or(root);
         let arch = include_str!("../book/src/architecture.md");
         let first = include_str!("../book/src/first-window.md");
+        let hello = include_str!("../examples/hello.rs");
+        assert!(
+            !tour.contains("include_str!(\"../README.md\")"),
+            "crate-root rustdoc is a tour, not the GitHub README"
+        );
+        assert!(tour.contains("Action"));
+        assert!(tour.contains("toolbar"));
+        assert!(tour.contains("Boot"));
+        assert!(tour.contains("Tokens"));
+        assert!(tour.contains("pattern"));
+        assert!(tour.contains("count.inc"));
         assert!(readme.contains("icedtea::run!"));
         assert!(readme.contains("icedtea-gallery"));
         assert!(readme.contains("example hello"));
-        assert!(first.contains("icedtea::run!"));
+        assert!(readme.contains("count.inc"));
+        assert!(readme.contains("pattern::toolbar"));
+        assert!(hello.contains("count.inc"));
+        assert!(hello.contains("pattern::toolbar"));
+        assert!(hello.contains("Action::new"));
+        assert!(first.contains("examples/hello.rs") || first.contains("count.inc"));
         let install = include_str!("../book/src/install.md");
         for src in [readme, install] {
             let at = src
@@ -107,9 +185,8 @@ mod tests {
         }
         assert!(arch.contains("Action"));
         assert!(arch.contains("Tokens"));
-        assert!(arch.contains("catalog::ENTRIES"));
-        assert!(arch.contains("one constructor"));
-        assert!(readme.contains("one constructor"));
+        assert!(arch.contains("Boot"));
+        assert!(arch.contains("pattern"));
         assert!(!arch.contains("Rust is all you need"));
         assert!(!arch.contains("book.iced.rs/philosophy"));
         assert!(!readme.contains("The Elm Architecture"));

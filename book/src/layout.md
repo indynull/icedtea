@@ -1,9 +1,9 @@
 # Layout
 
 Layout is Rust functions that return iced `Element`s. Recipes live in
-`icedtea::layout`: `dock`, `split_view`, `clamp`, `form`, `grid`,
-`pad` (equal-fill tiles), `overlay_center`, plus size
-policy and breakpoints.
+[`icedtea::layout`](https://docs.rs/icedtea/latest/icedtea/layout/index.html):
+`dock`, `split_view`, `clamp`, `form`, `grid`, `pad` (equal-fill
+tiles), `overlay_center`, plus size policy and breakpoints.
 
 `layout::pad(cells, 4, density.space)` shares row width across cells.
 Pair it with `widget::themed_button_sized` and `Density::tile()` for a
@@ -30,12 +30,12 @@ let panes = row_box(
 let _ = column_box([caption, editor], 4, 8, layout::FILL, layout::FILL);
 ```
 
-```rust,ignore
+```rust
 use icedtea::layout::{Breakpoint, SizePolicy, distribute};
 
 let sizes = distribute(100.0, &[SizePolicy::fixed(20.0), SizePolicy::expand(1.0)]);
 assert_eq!(sizes[0], 20.0);
-let mode = Breakpoint::from_width(width);
+let _ = Breakpoint::from_width(800.0);
 ```
 
 Split ratios persist through `UiState::set_split`. The sash grip emits
@@ -48,3 +48,7 @@ save and restore, ratio clamps, and `move_panel` between docks.
 side pane at compact width. `pattern::tool_panel` is overlay chrome
 for a float-or-dock tool window. Perspectives are named `DockNode`
 snapshots.
+
+- [layout rustdoc](https://docs.rs/icedtea/latest/icedtea/layout/index.html)
+- [source](https://github.com/indynull/icedtea/blob/master/src/layout/mod.rs)
+- [crates.io](https://crates.io/crates/icedtea)

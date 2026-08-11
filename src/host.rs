@@ -1,4 +1,4 @@
-//! Native file dialogs and clipboard tasks. Excluded from coverage fail-under.
+//! Native file dialogs and clipboard tasks.
 
 use std::path::PathBuf;
 

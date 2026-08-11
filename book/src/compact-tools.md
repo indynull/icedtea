@@ -6,7 +6,6 @@ A tool-sized window sets size on `Boot`. Tiles use
 
 ```rust,ignore
 use icedtea::density::Density;
-use icedtea::iced::Length;
 use icedtea::key::{self, Press};
 use icedtea::layout;
 use icedtea::widget;
@@ -38,8 +37,8 @@ fn main() -> icedtea::iced::Result {
 
 A four-function keypad on `layout::pad`, `display_reading` for the
 value, and `key::press` for digits and Shift+8 as `*` is the compact
-tool shape. The application owns the arithmetic. The README first
-window is `examples/hello.rs`.
+tool shape. The application owns the arithmetic. The first window is
+[`examples/hello.rs`](https://github.com/indynull/icedtea/blob/master/examples/hello.rs).
 
 The caption on a tile can be a glyph; the accessible name stays
 readable (`⌫` on the face, name `Backspace`).
@@ -56,13 +55,13 @@ There is no dedicated shell constructor. Compose search,
 (`status_bar`). `style::shell` uses `Corner::None` for a flush card;
 use that preset, not a second radius type.
 
-```rust,ignore
+```rust
 // Pinned tabs
 let tabs = icedtea::collection::Tabs::new(["Read", "Write"]);
-// tabs.closable is false
+assert!(!tabs.closable);
 
 // Focus after show
-iced::widget::operation::focus(iced::widget::Id::new("query"))
+let _ = iced::widget::Id::new("query");
 ```
 
 ## Card plus chips
@@ -75,3 +74,8 @@ are `Tabs` or radio.
 `secret_field` is a settings row: `password_input` (mask or reveal)
 plus a copy `Action`. The application owns the copy message
 (`icedtea::copy_text`).
+
+- [`layout::pad`](https://docs.rs/icedtea/latest/icedtea/layout/fn.pad.html)
+- [`display_reading`](https://docs.rs/icedtea/latest/icedtea/widget/fn.display_reading.html)
+- [source](https://github.com/indynull/icedtea/blob/master/src/layout/recipes.rs)
+- [crates.io](https://crates.io/crates/icedtea)

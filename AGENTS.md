@@ -118,6 +118,26 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
 - Performance: first useful frame quickly; scrolling and typing stay
   smooth at ordinary data sizes; virtualized collections for large
   data. Measure before claiming.
+- Always write crate-root rustdoc as a teaching tour: what icedtea is,
+  a first compose that uses one `Action` plus chrome, the noun map
+  (Boot, tokens, Action, constructors, patterns), and links into the
+  owning modules. README is a short first path, a picture of the
+  gallery, and links. Never `include_str!` the README as the crate-root
+  body.
+- Always write constructor rustdoc as a job: when to call it, the
+  arguments that matter, disabled/empty, a compiling call. Catalog id
+  is a see-also, not the title.
+- Always keep the guide catalog-complete: every `ENTRIES` id appears
+  under its gallery group with rustdoc, source, and crates.io (or
+  docs.rs) links. Composition chapters teach how to put pieces
+  together; the reference lists the pieces.
+- Always use one first-path program (`examples/hello.rs`) that shows
+  Action plus chrome. README, crate-root, and First window include that
+  program. Never lead with a lone increment button.
+- Never put maintainer process (coverage fail-under, publish pipeline,
+  “one catalog id / one constructor”) on the reader path (README,
+  introduction, first-window, widget reference). That contract lives
+  in this file.
 
 A third-party app ships with only icedtea for chrome, actions, layout,
 and theme. A compact tool does not import iced `button`, window

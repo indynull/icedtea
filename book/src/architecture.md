@@ -1,40 +1,33 @@
 # Architecture
 
-icedtea is the design system, layouts, chrome, and widgets for a
-desktop window. `icedtea::run!` loads theme, then starts the
-window from `Boot` and your `new`, `update`, `view`, and `theme`
-functions. `bootstrap` is the same path without opening a window.
+Five nouns cover a window.
 
-## Boot
+**Boot.** [`Boot`](https://docs.rs/icedtea/latest/icedtea/app/struct.Boot.html)
+sets title, application id, theme name, locale, density, and window
+kind: application, dialog, or overlay. [`run!`](https://docs.rs/icedtea/latest/icedtea/macro.run.html)
+loads that and starts iced. [`bootstrap`](https://docs.rs/icedtea/latest/icedtea/app/fn.bootstrap.html)
+is the same path without opening a window.
 
-`Boot` sets title, application id, theme name, locale, density, and
-window kind: application, dialog, or overlay.
+**Tokens.** [`theme::named`](https://docs.rs/icedtea/latest/icedtea/theme/fn.named.html)
+and [`theme::mix`](https://docs.rs/icedtea/latest/icedtea/theme/fn.mix.html)
+produce [`Tokens`](https://docs.rs/icedtea/latest/icedtea/theme/struct.Tokens.html).
+Widgets take tokens and a [`Variant`](https://docs.rs/icedtea/latest/icedtea/variant/enum.Variant.html).
+Register more colorways on `ThemeCatalog`.
 
-## Theme
+**Action.** One [`Action`](https://docs.rs/icedtea/latest/icedtea/action/struct.Action.html)
+feeds the menu bar, toolbar, shortcuts, context menus, footer hints,
+and the command palette. The action carries your message type. Write
+`ctrl+s` once: Command on macOS, Control on Linux and Windows.
 
-`theme::named` and `theme::mix` produce `Tokens`. Widgets take tokens
-and a `Variant`. Register more colorways on `ThemeCatalog`. Code
-highlighting follows the active colorway (`theme::code_highlight`).
+**Constructors.** Functions in [`widget`](https://docs.rs/icedtea/latest/icedtea/widget/index.html)
+return iced `Element`s and emit your messages. Each takes `A11y` and
+tokens. The application owns state.
 
-## Actions
+**Patterns.** [`pattern`](https://docs.rs/icedtea/latest/icedtea/pattern/index.html)
+composes recipes (`dock`, `split`, `clamp`, `form`) with widgets:
+list/detail, navigation, preferences, about, the main window.
 
-One `Action` feeds the menu bar, toolbar, shortcuts, context menus,
-footer hints, and the command palette. The action carries your message
-type. Write `ctrl+s` once: Command on macOS, Control on Linux and
-Windows.
-
-## Layout and chrome
-
-Recipes (`dock`, `split`, `clamp`, `form`, `overlay`) compose rows and
-columns. Patterns (`list_detail`, `inspector`, `workspace`, `drawer`,
-`document_tabs`, `navigation_view`, `preferences`, `about`) combine
-recipes with widgets. `workspace::DockNode` is the nested dock tree.
-
-## Catalog
-
-`catalog::ENTRIES` is the public surface. Each id has one constructor
-and appears on a gallery page. Related atoms share a page. The
-constructor takes `A11y` and tokens; rustdoc on that function is the
-intended call. Constructors emit the application's messages; the
-application owns `update`. Constructors, time, and virtual lists are
-in [Widgets](widgets.md).
+[First window](first-window.md) uses Boot, tokens, one Action, a
+toolbar, and a button. The [reference](widgets.md) names every public
+constructor. [Crate docs](https://docs.rs/icedtea) ·
+[source](https://github.com/indynull/icedtea).

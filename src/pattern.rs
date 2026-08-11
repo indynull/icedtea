@@ -83,7 +83,12 @@ fn bind_menu_pick<M: Clone>(entries: Vec<(String, M)>) -> impl Fn(String) -> M {
     move |chosen| pick_menu_message(&entries, &chosen)
 }
 
-/// In-window menu bar from one [`ActionTable`].
+/// An in-window menu bar from one [`ActionTable`].
+///
+/// Groups by the id prefix before `.`. Disabled actions stay out of
+/// the pick list.
+///
+/// See also catalog id `menu`.
 ///
 /// ```
 /// use icedtea::action::{Action, ActionTable};
@@ -132,7 +137,11 @@ pub fn menu_bar<'a, M: Clone + 'a>(
     )
 }
 
-/// Toolbar row from the same action table as the menu.
+/// A row of action buttons from the same table as the menu.
+///
+/// Disabled actions paint muted.
+///
+/// See also catalog id `toolbar`.
 ///
 /// ```
 /// use icedtea::action::{Action, ActionTable};
@@ -170,7 +179,11 @@ pub fn toolbar<'a, M: Clone + 'a>(
     )
 }
 
-/// Command bar: the same action row as [`toolbar`], denser.
+/// The toolbar row, denser.
+///
+/// Same `Action` iterator as [`toolbar`].
+///
+/// See also catalog id `command-bar`.
 ///
 /// ```
 /// use icedtea::action::{Action, ActionTable};
@@ -191,7 +204,9 @@ pub fn command_bar<'a, M: Clone + 'a>(
     toolbar(actions, tok, dir)
 }
 
-/// Footer with action shortcut hints from the same table.
+/// Footer text plus shortcut hints from the same table.
+///
+/// See also catalog id `status-bar`.
 ///
 /// ```
 /// use icedtea::action::{Action, ActionTable};
@@ -232,7 +247,11 @@ pub fn status_bar<'a, M: Clone + 'a>(
     )
 }
 
-/// Command palette overlay card over the action table.
+/// Fuzzy find over the action table.
+///
+/// Empty query can show recent and favorites.
+///
+/// See also catalog id `palette`.
 ///
 /// ```
 /// use icedtea::action::{Action, ActionTable};
@@ -303,7 +322,11 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
     .into()
 }
 
-/// Empty / status page. Centered title, body, and optional action.
+/// Centered empty or error state.
+///
+/// Title, body, and an optional action. Use when a list has no rows.
+///
+/// See also catalog id `status-page`.
 ///
 /// ```
 /// use icedtea::pattern;
@@ -348,7 +371,9 @@ pub fn status_page<'a, M: Clone + 'a>(
         .into()
 }
 
-/// About dialog body.
+/// Name, version, license, and credits.
+///
+/// See also catalog id `about`.
 ///
 /// ```
 /// use icedtea::i18n::Catalog;
@@ -405,7 +430,12 @@ pub fn filter_prefs<'a>(groups: &'a [PrefGroup], query: &str) -> Vec<&'a PrefGro
         .collect()
 }
 
-/// Searchable preferences groups.
+/// Searchable preference groups.
+///
+/// `PrefGroup` is a title plus key/value rows. Empty query shows every
+/// group.
+///
+/// See also catalog id `preferences`.
 ///
 /// ```
 /// use icedtea::i18n::Catalog;
@@ -472,8 +502,12 @@ pub fn preferences_page<'a, M: Clone + 'a>(
     .into()
 }
 
-/// List + detail split. `sidebar` is [`crate::layout::fixed`] or
-/// [`crate::layout::FILL`]. Children fill their panes.
+/// A sidebar list beside a filling detail pane.
+///
+/// `sidebar` is [`crate::layout::fixed`] or [`crate::layout::FILL`].
+/// Children fill their panes.
+///
+/// See also catalog id `list-detail`.
 ///
 /// ```
 /// use icedtea::a11y::A11y;
@@ -514,11 +548,13 @@ pub fn list_detail<'a, M: 'a>(
     .into()
 }
 
-/// Navigation view: sidebar + content; compact shows back.
+/// Sidebar beside content, or a stack with Back.
 ///
 /// `width` is the window inner width. Subscribe with
 /// `iced::window::resize_events` and a non-capturing
 /// `Subscription::map`; store the width in `update`.
+///
+/// See also catalog id `navigation`.
 ///
 /// ```
 /// use icedtea::a11y::A11y;
@@ -567,7 +603,12 @@ pub fn navigation_view<'a, M: Clone + 'a>(
     }
 }
 
-/// Tabbed document area. Tabs plus a filling body.
+/// Tabs plus a filling body.
+///
+/// Select and close messages. The application paints the body for the
+/// active tab.
+///
+/// See also catalog id `tab-view`.
 ///
 /// ```
 /// use icedtea::a11y::A11y;
@@ -600,7 +641,11 @@ pub fn tab_view<'a, M: Clone + 'a>(
     .into()
 }
 
-/// Main window chrome: menu, toolbar, docked center, status.
+/// Menu, toolbar, center, and status docked together.
+///
+/// Pass the four regions as `Element`s.
+///
+/// See also catalog id `main-window`.
 ///
 /// ```
 /// use icedtea::a11y::A11y;
@@ -658,7 +703,11 @@ pub fn modal_card<'a, M: 'a>(backdrop: Element<'a, M>, card: Element<'a, M>) -> 
     layout::overlay_center(backdrop, card)
 }
 
-/// Confirm / message / save sheet.
+/// A confirm / message / save sheet.
+///
+/// Primary and optional cancel messages.
+///
+/// See also catalog id `dialogs`.
 ///
 /// ```
 /// use icedtea::pattern;
@@ -711,7 +760,11 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
     )
 }
 
-/// Context menu: vertical action list.
+/// A vertical action list.
+///
+/// Feed the same table (or a slice). Empty table is an empty column.
+///
+/// See also catalog id `context-menu`.
 ///
 /// ```
 /// use icedtea::action::{Action, ActionTable};
@@ -741,7 +794,11 @@ pub fn context_menu<'a, M: Clone + 'a>(
         .into()
 }
 
-/// Catalog `document-tabs`. Dirty titles get a bullet; close confirm is the app's.
+/// Closable document titles; dirty titles get a bullet.
+///
+/// Close confirm is the application's.
+///
+/// See also catalog id `document-tabs`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -773,7 +830,11 @@ pub fn document_tabs<'a, M: Clone + 'a>(
     tab_view(&shown, body, on_select, on_close, tok)
 }
 
-/// Catalog `inspector`. Master, detail, and a side inspector stay in one row.
+/// Master, detail, and a side inspector stay in one row.
+///
+/// The application owns selection in the list.
+///
+/// See also catalog id `inspector`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -812,7 +873,12 @@ pub fn inspector<'a, M: 'a>(
     .into()
 }
 
-/// Catalog `workspace`. Nested dock slots as a labeled strip plus `center`.
+/// Nested dock slots as a labeled strip plus `center`.
+///
+/// [`crate::workspace::DockNode`] is the layout tree. Applications own
+/// panel content.
+///
+/// See also catalog id `workspace`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -855,7 +921,11 @@ pub fn workspace<'a, M: Clone + 'a>(
     )
 }
 
-/// Catalog `tool-panel`. Overlay chrome for a floatable tool window.
+/// Overlay chrome for a floatable tool window.
+///
+/// Title plus body. `on_dock` is the Dock control.
+///
+/// See also catalog id `tool-panel`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -897,7 +967,11 @@ pub fn tool_panel<'a, M: Clone + 'a>(
     )
 }
 
-/// Catalog `drawer`. Compact-width slide-over for a collapsed dock.
+/// Compact-width slide-over for a collapsed dock.
+///
+/// `open` shows the pane over `content`. Closed paints content only.
+///
+/// See also catalog id `drawer`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -925,7 +999,11 @@ pub fn drawer<'a, M: 'a>(
     }
 }
 
-/// Catalog `cheatsheet`. Searchable shortcut list from the action table.
+/// A searchable shortcut list from the action table.
+///
+/// Empty query lists every enabled action. Disabled actions stay out.
+///
+/// See also catalog id `cheatsheet`.
 ///
 /// ```
 /// use icedtea::action::{Action, ActionTable};
@@ -979,7 +1057,11 @@ pub fn cheatsheet<'a, M: Clone + 'a>(
     )
 }
 
-/// Catalog `jobs`. Progress rows for background work.
+/// Progress rows for background work.
+///
+/// The application owns job titles and fractions. Empty strip hides.
+///
+/// See also catalog id `jobs`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};

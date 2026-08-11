@@ -1,27 +1,12 @@
 # icedtea
 
-[![Documentation](https://img.shields.io/docsrs/icedtea/latest)][documentation]
-[![Crates.io](https://img.shields.io/crates/v/icedtea.svg)][crates-io]
-[![License](https://img.shields.io/crates/l/icedtea)][license]
-[![check](https://github.com/indynull/icedtea/actions/workflows/ci.yml/badge.svg)][actions]
-
 Native desktop widgets and chrome for [iced](https://iced.rs/).
 
-`icedtea::run!` starts a themed window. Constructors return iced
-`Element`s and emit your messages. Color, layout, and chrome are Rust
-values.
+`icedtea::run!` starts a themed window. One `Action` feeds the toolbar,
+menus, and shortcuts. Constructors return iced `Element`s and emit
+your messages.
 
 ![The icedtea gallery](https://github.com/indynull/icedtea/raw/master/assets/gallery.gif)
-
-The [gallery](https://github.com/indynull/icedtea/tree/master/icedtea-gallery)
-is a running catalog: every [`catalog::ENTRIES`][catalog] id appears
-on a page. Each id has one constructor; rustdoc on that function is
-the intended call. Related controls share a page. Clicks update
-gallery state (outline jump, dismiss, places). Run it from a checkout:
-
-```bash
-cargo run -p icedtea-gallery
-```
 
 ## First window
 
@@ -31,8 +16,16 @@ iced = "0.14"
 icedtea = "0.2"
 ```
 
+Same program: [`examples/hello.rs`](examples/hello.rs). `ctrl+i` or
+the toolbar increments the count.
+
 ```rust,ignore
 use icedtea::a11y::A11y;
+use icedtea::action::{Action, ActionTable};
+use icedtea::i18n::Direction;
+use icedtea::key::{self, KeyContext};
+use icedtea::pattern;
+use icedtea::shortcut::Shortcut;
 use icedtea::theme;
 use icedtea::variant::Variant;
 use icedtea::widget;
@@ -44,79 +37,87 @@ fn main() -> icedtea::iced::Result {
         Hello::new,
         Hello::update,
         Hello::view,
-        Hello::theme
+        Hello::theme,
+        Hello::subscription
     )
 }
 
 struct Hello {
     n: i32,
+    table: ActionTable<Message>,
 }
 
 #[derive(Clone)]
 enum Message {
     Inc,
+    Key(icedtea::iced::keyboard::Event),
 }
 
 impl Hello {
     fn new() -> (Self, Task<Message>) {
-        (Self { n: 0 }, Task::none())
+        let mut table = ActionTable::new();
+        table.insert(
+            Action::new("count.inc", "Count", Message::Inc)
+                .with_shortcut(Shortcut::parse("ctrl+i").unwrap()),
+        );
+        (Self { n: 0, table }, Task::none())
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
-        if matches!(message, Message::Inc) {
-            self.n += 1;
+        match message {
+            Message::Inc => self.n += 1,
+            Message::Key(ev) => {
+                if let Some(next) = key::handle(KeyContext::default(), &self.table, &ev) {
+                    return self.update(next);
+                }
+            }
         }
         Task::none()
     }
 
     fn view(&self) -> Element<'_, Message> {
         let tok = theme::named("dark").tokens;
-        widget::themed_button(
-            format!("Count {}", self.n),
-            Some(Message::Inc),
-            tok,
-            Variant::Primary,
-            A11y::button("inc"),
-        )
+        icedtea::iced::widget::column![
+            pattern::toolbar(self.table.iter(), tok, Direction::Ltr),
+            widget::themed_button(
+                format!("Count {}", self.n),
+                Some(Message::Inc),
+                tok,
+                Variant::Primary,
+                A11y::button("inc"),
+            ),
+        ]
+        .spacing(12)
+        .padding(16)
+        .into()
     }
 
     fn theme(&self) -> icedtea::iced::Theme {
         theme::iced_theme("dark", theme::named("dark").tokens)
     }
+
+    fn subscription(&self) -> icedtea::iced::Subscription<Message> {
+        key::listen().map(Message::Key)
+    }
 }
 ```
 
-Same program: `cargo run --example hello` in this repository.
-
-Tokens mix in ordinary Rust:
-
-```rust
-let tokens = icedtea::theme::named("dark").tokens;
-let mixed = icedtea::theme::mix(tokens.primary, tokens.canvas, 0.28);
-assert_eq!(mixed, tokens.selection);
-```
+`cargo run --example hello` from a checkout.
 
 ## Where to look
 
 - [Guide](https://indynull.github.io/icedtea/) — first window, actions,
-  layout, theming, overlays
-- [API docs][documentation] — `widget`, `theme`, `action`, `layout`,
-  `window`, `pattern`
+  layout, theming, and a reference for every control
+- [Crate docs](https://docs.rs/icedtea) — `widget`, `theme`, `action`,
+  `layout`, `window`, `pattern`
 - [Gallery](https://github.com/indynull/icedtea/tree/master/icedtea-gallery)
-  — every public control and pattern
-- [Release notes](CHANGELOG.md)
+  — every public control (`cargo run -p icedtea-gallery`)
+- [crates.io](https://crates.io/crates/icedtea) ·
+  [source](https://github.com/indynull/icedtea)
 
-One `Action` feeds menus, toolbars, shortcuts, and the command
-palette. `theme::named` has forty colorways. Linux needs
-`libxkbcommon-dev` and `libwayland-dev`. macOS needs the Xcode
-command-line tools. Windows needs the MSVC build tools.
+Linux needs `libxkbcommon-dev` and `libwayland-dev`. macOS needs the
+Xcode command-line tools. Windows needs the MSVC build tools.
 
 | iced | icedtea |
 | --- | --- |
 | 0.14 | 0.2 |
-
-[documentation]: https://docs.rs/icedtea
-[crates-io]: https://crates.io/crates/icedtea
-[license]: https://github.com/indynull/icedtea/blob/master/LICENSE
-[actions]: https://github.com/indynull/icedtea/actions
-[catalog]: https://docs.rs/icedtea/latest/icedtea/catalog/static.ENTRIES.html

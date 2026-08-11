@@ -65,7 +65,12 @@ pub fn wrap_rows(n: usize, child_w: f32, gap: f32, width: f32) -> usize {
     n.div_ceil(wrap_per_row(child_w, gap, width))
 }
 
-/// Catalog `wrap`. Flow children to the next line from available `width`.
+/// Flow children to the next line from available `width`.
+///
+/// Pass child width, gap, and available width. Empty children yield an
+/// empty column.
+///
+/// See also catalog id `wrap`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -276,7 +281,11 @@ pub fn column_box<'a, M: 'a>(
 }
 
 /// Equal-fill tile pad: each cell shares the row width.
-/// Catalog `pad`. Equal-fill tiles. Pair with [`crate::widget::themed_button_sized`].
+/// Equal-fill tiles. Pair with [`crate::widget::themed_button_sized`].
+///
+/// `columns` is the row length.
+///
+/// See also catalog id `pad`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};

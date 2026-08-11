@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+Guide lists every catalog id by gallery group, with rustdoc, source,
+and crate links. Crate-root rustdoc is a teaching tour. The first
+window uses one `Action` and a toolbar (`examples/hello.rs`).
+
 Workspace docks, drawers, and tool panels. Variable-height lists,
 frozen columns, range selection, command contexts and sequences,
 palette prompts, cheatsheet, inspector, document tabs, and a job

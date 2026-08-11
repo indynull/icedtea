@@ -51,6 +51,10 @@ pub struct NamedTheme {
 
 /// Blend `fg` over `bg` by `amount` (0 = bg, 1 = fg). Result is opaque.
 ///
+/// Hover, pressed, and selection washes use this.
+///
+/// See also catalog id `colors`.
+///
 /// ```
 /// use iced::Color;
 /// let mixed = icedtea::theme::mix(Color::WHITE, Color::BLACK, 0.5);
@@ -366,7 +370,9 @@ pub fn code_highlight(name: &str) -> iced::highlighter::Theme {
     }
 }
 
-/// Look up a built-in theme by name. Unknown names resolve to `dark`.
+/// Look up a built-in colorway by name. Unknown names resolve to `dark`.
+///
+/// See also catalog id `theme`.
 ///
 /// ```
 /// let t = icedtea::theme::named("nope");

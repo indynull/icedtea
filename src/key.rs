@@ -264,7 +264,8 @@ pub fn press(event: &KeyEvent) -> Option<Press> {
 /// An open modal consumes (no application shortcut), even if a field
 /// is focused. Focused text owns unmodified typing. Otherwise chords
 /// and named keys match `table`.
-/// Resolve a key against the action table. An open modal consumes.
+///
+/// See also catalog id `keys`.
 ///
 /// ```
 /// use icedtea::action::{Action, ActionTable};

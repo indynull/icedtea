@@ -1,9 +1,9 @@
 //! Themed iced widget constructors for `view`.
 //!
 //! Every drawing constructor returns an [`iced::Element`], emits the
-//! application's messages, and takes [`A11y`] plus [`Tokens`]. One
-//! catalog id, one `pub fn`. Rustdoc on that function is the intended
-//! call. Do not call iced `button` / `text_input` for a catalog control.
+//! application's messages, and takes [`A11y`] plus [`Tokens`]. Rustdoc
+//! on the function is the call: the job, the arguments that matter,
+//! and a compiling example.
 //!
 //! ```
 //! use icedtea::a11y::A11y;
@@ -59,7 +59,12 @@ pub fn icon_style(tok: Tokens) -> impl Fn(&iced::Theme, svg::Status) -> svg::Sty
     }
 }
 
-/// Catalog `icon`. Chrome set only.
+/// Paint a bundled chrome icon.
+///
+/// Chrome set only (`Icon::Search`, `Close`, and the rest). Tokens tint
+/// the fill.
+///
+/// See also catalog id `icon`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -97,7 +102,11 @@ pub enum RichCell {
     Link(String),
 }
 
-/// Catalog `rich-cell`. Not a markup parser.
+/// Paint a table or list cell: plain, emphasis, code, or link.
+///
+/// Not a markup parser. [`MarkdownDoc`] stays documents.
+///
+/// See also catalog id `rich-cell`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -145,7 +154,11 @@ pub fn rich_cell<'a, M: Clone + 'a>(
     }
 }
 
-/// Body text. Catalog `label`.
+/// A line of body text.
+///
+/// Platform sans. Empty string is an empty node; still pass `A11y`.
+///
+/// See also catalog id `label`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -167,7 +180,12 @@ pub fn label<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Elemen
     )
 }
 
-/// Large reading on the type scale, end-aligned. Catalog `display`.
+/// A large value for a compact tool, end-aligned.
+///
+/// Empty string is a blank reading. `display_line` is the smaller
+/// caption above it.
+///
+/// See also catalog id `display`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -237,7 +255,12 @@ pub fn code_block<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> E
     )
 }
 
-/// Catalog `link`.
+/// A text link that sends a message.
+///
+/// The application opens the URL or navigates. Disabled paints muted
+/// text and drops the press.
+///
+/// See also catalog id `link`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -263,7 +286,13 @@ pub fn hyperlink<'a, M: Clone + 'a>(
     a11y::attach(b.into(), &a11y)
 }
 
-/// Catalog `button`. Tokens, variant, and [`A11y::button`].
+/// Press a labeled control to send a message.
+///
+/// `title` is the face. `msg` is `None` when there is nothing to send.
+/// [`A11y::button`] plus `with_disabled(true)` drops the handler.
+/// `variant` picks the token wash.
+///
+/// See also catalog id `button`.
 ///
 /// ```
 /// use icedtea::a11y::A11y;
@@ -324,7 +353,12 @@ pub fn themed_button_sized<'a, M: Clone + 'a>(
     a11y::attach(b.into(), &a11y)
 }
 
-/// Catalog `split-button`. Primary action plus a more menu.
+/// A primary press plus a more menu.
+///
+/// `primary` is the main message. `more` opens the overflow. Disabled
+/// drops both.
+///
+/// See also catalog id `split-button`.
 ///
 /// ```
 /// use icedtea::a11y::A11y;
@@ -367,7 +401,12 @@ pub fn split_button<'a, M: Clone + 'a>(
     )
 }
 
-/// Catalog `toggle-button`.
+/// A button that stays pressed while on.
+///
+/// Pass the current on/off state. The message fires on press. Disabled
+/// keeps the face and drops the handler.
+///
+/// See also catalog id `toggle-button`.
 ///
 /// ```
 /// use icedtea::a11y::A11y;
@@ -402,7 +441,12 @@ pub fn toggle_button<'a, M: Clone + 'a>(
     )
 }
 
-/// Catalog `checkbox`.
+/// Check or clear a boolean.
+///
+/// The application owns the bool. The message carries the next value.
+/// Disabled keeps the box and ignores clicks.
+///
+/// See also catalog id `checkbox`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -435,7 +479,12 @@ pub fn themed_checkbox<'a, M: Clone + 'a>(
     a11y::attach(c.into(), &a11y)
 }
 
-/// Catalog `switch`.
+/// A sliding on/off control.
+///
+/// Same contract as checkbox: the application owns the bool. Disabled
+/// freezes the thumb.
+///
+/// See also catalog id `switch`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -462,7 +511,12 @@ pub fn themed_switch<'a, M: Clone + 'a>(
     a11y::attach(t.into(), &a11y)
 }
 
-/// Catalog `radio`.
+/// Pick one value from a small set.
+///
+/// Compare the selected value to this option. Disabled rows stay in
+/// the group and do not change the selection.
+///
+/// See also catalog id `radio`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -540,7 +594,12 @@ pub fn scroll_delta_pixels(delta: iced::mouse::ScrollDelta, row_h: f32) -> f32 {
     }
 }
 
-/// Catalog `slider`.
+/// Pick a number on a range.
+///
+/// Pass min, max, and the current value. The message is the new value
+/// while the thumb moves. Disabled ignores drag.
+///
+/// See also catalog id `slider`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -587,7 +646,11 @@ pub fn progress_label(value: f32, remaining: Option<&str>) -> String {
     }
 }
 
-/// Catalog `progress`.
+/// A determinate bar from 0 to 1.
+///
+/// Values outside the range clamp. No message; it is a readout.
+///
+/// See also catalog id `progress`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -634,7 +697,11 @@ pub fn ring_should_stroke(start: f32, end: f32) -> bool {
 }
 
 /// Circular progress: arc sweep follows `value`.
-/// Catalog `progress-ring`.
+/// A determinate arc from 0 to 1.
+///
+/// Same fraction contract as [`progress`], drawn as a ring.
+///
+/// See also catalog id `progress-ring`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -670,7 +737,12 @@ pub fn progress_ring<'a, M: 'a>(
     a11y::attach(el, &a11y)
 }
 
-/// Catalog `busy`. Dim plus spinner over `child` when `busy`.
+/// Dim plus spinner over `child` when `busy`.
+///
+/// When `busy` is false the child is unmodified. Advance spinner
+/// `phase` while true.
+///
+/// See also catalog id `busy`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -731,7 +803,11 @@ pub fn spark_points(values: &[f32], width: f32, height: f32) -> Vec<(f32, f32)> 
 }
 
 /// One-row series. Domain plots stay in the application.
-/// Catalog `sparkline`.
+/// A tiny series chart.
+///
+/// Empty data paints an empty box.
+///
+/// See also catalog id `sparkline`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -754,7 +830,11 @@ pub fn sparkline<'a, M: 'a>(values: &'a [f32], tok: Tokens, a11y: A11y) -> Eleme
     )
 }
 
-/// Catalog `spinner`. Indeterminate quarter-arc at `phase` (0..=1).
+/// An indeterminate quarter-arc at `phase` (0..=1).
+///
+/// Advance `phase` each frame while work is running.
+///
+/// See also catalog id `spinner`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -791,7 +871,12 @@ pub enum ImageSlot {
     Error(String),
 }
 
-/// Catalog `image`. Ready keeps the requested box.
+/// An image slot that keeps its box.
+///
+/// Ready keeps the requested width and height. Missing bytes show the
+/// empty slot, not a collapsed layout.
+///
+/// See also catalog id `image`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -853,7 +938,12 @@ pub fn image_slot<'a, M: Clone + 'a>(
     }
 }
 
-/// Catalog `number`.
+/// Edit a numeric value with step buttons.
+///
+/// The application owns the number. Step messages bump it. Disabled
+/// freezes the value.
+///
+/// See also catalog id `number`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -913,7 +1003,11 @@ fn mask_handler<'a, M: 'a>(
 }
 
 /// Text field that keeps `value` on `template` (date, time, card).
-/// Catalog `mask`.
+/// Fill digit slots on a template (`0000-0000`).
+///
+/// Non-digit template characters stay put. Empty slots are blanks.
+///
+/// See also catalog id `mask`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -945,7 +1039,12 @@ pub fn masked_input<'a, M: Clone + 'a>(
 
 /// Single-line field. `input_id` is for `iced::widget::operation::focus`
 /// after show.
-/// Catalog `text-input`.
+/// A single-line editor.
+///
+/// Optional iced `Id` so you can `focus` after show. Disabled greys
+/// the field and drops edit. Empty value is a valid state.
+///
+/// See also catalog id `text-input`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -982,7 +1081,12 @@ pub fn themed_text_input<'a, M: Clone + 'a>(
 
 /// Text field plus a keyboard-complete pick list. The application
 /// owns the suggestion strings and the pick message.
-/// Catalog `suggest`.
+/// A text field with a pick list of completions.
+///
+/// The application owns the query and the suggestion list. Picking a
+/// row writes that string.
+///
+/// See also catalog id `suggest`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -1025,7 +1129,12 @@ pub fn suggest_field<'a, M: Clone + 'a>(
     a11y::attach(col.into(), &a11y)
 }
 
-/// Catalog `password`.
+/// A masked single-line editor.
+///
+/// Characters paint as dots. The application owns the string. Disabled
+/// drops edit.
+///
+/// See also catalog id `password`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -1054,7 +1163,12 @@ pub fn password_input<'a, M: Clone + 'a>(
     a11y::attach(i.into(), &a11y)
 }
 
-/// Catalog `secret`. Reveal plus a copy [`crate::action::Action`].
+/// A settings row: masked field, reveal, and copy.
+///
+/// Reveal toggles the mask. Copy is an [`crate::action::Action`] whose
+/// message the application handles with `icedtea::copy_text`.
+///
+/// See also catalog id `secret`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -1121,7 +1235,12 @@ pub fn secret_field<'a, M: Clone + 'a>(
 
 /// Multiline editor. `height` is icedtea size language ([`crate::layout::FILL`]
 /// or [`crate::layout::fixed`]).
-/// Catalog `textarea`. Height is [`crate::layout::FILL`] or [`crate::layout::fixed`].
+/// A multi-line editor.
+///
+/// Height is [`crate::layout::FILL`] or [`crate::layout::fixed`]. The
+/// application owns the buffer. Disabled drops edit.
+///
+/// See also catalog id `textarea`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -1161,7 +1280,12 @@ pub fn textarea<'a, M: Clone + 'a>(
 /// `theme_name` picks a highlighter face that fits the UI colorway.
 /// `height` is icedtea size language ([`crate::layout::FILL`] or
 /// [`crate::layout::fixed`]).
-/// Catalog `code`. Application owns the buffer.
+/// Highlighted source.
+///
+/// The application owns the buffer and the language name. Highlighter
+/// face follows the active colorway.
+///
+/// See also catalog id `code`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -1229,7 +1353,11 @@ pub fn editor_style(
     }
 }
 
-/// Catalog `search`.
+/// A query field with a search icon.
+///
+/// Use for palette and list filters. Empty query means show all.
+///
+/// See also catalog id `search`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -1265,7 +1393,12 @@ pub fn search_input<'a, M: Clone + 'a>(
     )
 }
 
-/// Catalog `select`.
+/// Pick one string from a list.
+///
+/// Placeholder shows when nothing is selected. Disabled keeps the
+/// current face.
+///
+/// See also catalog id `select`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -1345,7 +1478,11 @@ pub fn days_in_month(year: i32, month: u32) -> u32 {
     }
 }
 
-/// Catalog `date`.
+/// Pick a calendar date.
+///
+/// The application owns the selected day. Disabled ignores picks.
+///
+/// See also catalog id `date`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -1553,7 +1690,12 @@ fn time_colon<'a, M: 'a>(tok: Tokens) -> Element<'a, M> {
     .into()
 }
 
-/// Catalog `time`.
+/// Step hour, minute, second, or period on a 24-hour value.
+///
+/// `TimeValue` is the clock. `TimeClock` is display only. Disabled
+/// freezes the fields.
+///
+/// See also catalog id `time`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -1616,7 +1758,12 @@ pub fn time_picker<'a, M: Clone + 'a>(
     a11y::attach(row.into(), &a11y)
 }
 
-/// Catalog `color`.
+/// A swatch that opens a color pick.
+///
+/// The application owns the `Color`. Disabled keeps the swatch and
+/// drops the pick.
+///
+/// See also catalog id `color`.
 ///
 /// ```
 /// use icedtea::a11y::A11y;
@@ -1850,7 +1997,12 @@ pub fn parse(source: &str) -> MarkdownDoc {
     }
 }
 
-/// Catalog `markdown`. Parse with [`parse`], then view the items.
+/// A parsed markdown document.
+///
+/// Parse with [`parse`], then view the items. Truncate by slicing the
+/// source before parse.
+///
+/// See also catalog id `markdown`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -1891,7 +2043,11 @@ fn markdown_style(tok: Tokens) -> markdown::Style {
     style
 }
 
-/// Catalog `tooltip`.
+/// Hover text on a child.
+///
+/// Empty tip text is a no-op wrap. The child keeps its own `A11y`.
+///
+/// See also catalog id `tooltip`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -1925,7 +2081,11 @@ pub fn tooltip_wrap<'a, M: 'a>(
     )
 }
 
-/// Catalog `rule`.
+/// A horizontal divider.
+///
+/// `rule_v` is the vertical twin.
+///
+/// See also catalog id `rule`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -1963,7 +2123,11 @@ fn chip_wash(tok: Tokens, variant: Variant) -> iced::Color {
     }
 }
 
-/// Catalog `chip`.
+/// A compact labeled pill.
+///
+/// Optional press message. Disabled keeps the face.
+///
+/// See also catalog id `chip`.
 ///
 /// ```
 /// use icedtea::a11y::A11y;
@@ -2006,7 +2170,11 @@ pub fn chip<'a, M: Clone + 'a>(
     )
 }
 
-/// Catalog `badge`.
+/// A count or status mark.
+///
+/// Short text. Empty string is an empty pill.
+///
+/// See also catalog id `badge`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -2041,7 +2209,9 @@ pub fn badge<'a, M: 'a>(
     )
 }
 
-/// Catalog `card` and `group-box`.
+/// A titled panel around children.
+///
+/// Empty title is a border only. Catalog ids `card` and `group-box`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -2078,7 +2248,11 @@ pub fn group_box<'a, M: 'a>(
     )
 }
 
-/// Catalog `banner`.
+/// A page-level message with an optional action.
+///
+/// Use for “offline” or “update available”. Optional button message.
+///
+/// See also catalog id `banner`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -2121,7 +2295,11 @@ pub fn banner<'a, M: Clone + 'a>(
     )
 }
 
-/// Catalog `callout`.
+/// An inline info bar.
+///
+/// Tone comes from `Variant`. Empty body is title only.
+///
+/// See also catalog id `callout`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -2150,7 +2328,12 @@ pub fn info_bar<'a, M: Clone + 'a>(
     )
 }
 
-/// Catalog `breadcrumb`.
+/// A path of links.
+///
+/// Crumbs before the last send a message. The last crumb is the
+/// current page. Empty path is empty.
+///
+/// See also catalog id `breadcrumb`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -2196,7 +2379,12 @@ pub fn breadcrumb<'a, M: Clone + 'a>(
     a11y::attach(r.into(), &a11y)
 }
 
-/// Catalog `toast`.
+/// A transient notice.
+///
+/// The application owns the queue and dismiss. Empty queue paints
+/// nothing.
+///
+/// See also catalog id `toast`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -2249,7 +2437,11 @@ fn toast_style(
     move |_| style::callout(tok, kind)
 }
 
-/// Catalog `teaching-tip`.
+/// A one-shot hint next to a control.
+///
+/// The application owns dismissed state. Empty body hides the tip.
+///
+/// See also catalog id `teaching-tip`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -2290,7 +2482,11 @@ pub fn teaching_tip<'a, M: Clone + 'a>(
     )
 }
 
-/// Catalog `skeleton`.
+/// A placeholder block while content loads.
+///
+/// Size the box. No message.
+///
+/// See also catalog id `skeleton`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -2314,8 +2510,12 @@ pub fn placeholder_skeleton<'a, M: 'a>(tok: Tokens, a11y: A11y) -> Element<'a, M
     )
 }
 
-/// Vertical scroller. `stick` pins to the end. `scroll_id` is for
-/// `scroll_to`. `on_scroll` sees iced's viewport when the offset moves.
+/// A themed scroller with a usable handle.
+///
+/// `stick` pins to the end. `scroll_id` is for `scroll_to`. `on_scroll`
+/// sees iced's viewport when the offset moves.
+///
+/// See also catalog id `scrollbar`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -2364,7 +2564,11 @@ where
 
 /// Append-only lines. Sticks to the end. `window` virtualizes long logs.
 #[allow(clippy::too_many_arguments)]
-/// Catalog `log`. Virtualizes long logs.
+/// Append-only lines that stick to the end.
+///
+/// Virtualizes long logs. Empty lines show “No lines”.
+///
+/// See also catalog id `log`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -2526,10 +2730,14 @@ fn two_line_row<'a, M: 'a>(
         .into()
 }
 
-/// Virtual list. `empty` is the copy when `model` has no rows. `meta_color`
-/// paints the second line. `scroll` is the only offset: the rail and the
+/// A virtualized row list.
+///
+/// `empty` is the copy when `model` has no rows. `meta_color` paints
+/// the second line. `scroll` is the only offset: the rail and the
 /// wheel write it, and each row `i` is painted at `i * row_h - scroll`.
 /// `scroll_id` names the clip pane. The 24px rail sits beside it.
+///
+/// See also catalog id `list`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -2625,7 +2833,11 @@ where
     )
 }
 
-/// Catalog `grid`. Tiles share the row width.
+/// Tiles that share the row width.
+///
+/// Click sends the index. Empty grid is an empty column.
+///
+/// See also catalog id `grid`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -2676,7 +2888,12 @@ pub fn item_grid<'a, M: Clone + 'a>(
 }
 
 #[allow(clippy::too_many_arguments)]
-/// Catalog `table`. Last column fills. Virtualizes long lists.
+/// A virtualized table. Last column fills.
+///
+/// `on_cell` is (row, column). `on_sort` is the header click. Empty
+/// rows still paint headers.
+///
+/// See also catalog id `table`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -2810,7 +3027,11 @@ where
 
 /// Heading or file tree. The disclosure control emits `on_toggle`; the
 /// row label emits `on_select`. `selected` is the app-owned id.
-/// Catalog `tree`.
+/// An expandable outline.
+///
+/// The application owns expand state. Leaf rows have no twisty.
+///
+/// See also catalog id `tree`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -2886,7 +3107,12 @@ pub fn tree_view<'a, M: Clone + 'a>(
     )
 }
 
-/// Catalog `tabs`.
+/// A tab bar over a body the application paints.
+///
+/// `Tabs { closable: false }` is pinned sections. Select sends the
+/// index.
+///
+/// See also catalog id `tabs`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -2930,7 +3156,12 @@ pub fn tab_bar<'a, M: Clone + 'a>(
     a11y::attach(r.into(), &a11y)
 }
 
-/// Catalog `accordion`. Open row shows a body under the header.
+/// An open row shows a body under the header.
+///
+/// The application owns which row is open. Closed rows are headers
+/// only.
+///
+/// See also catalog id `accordion`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -2984,7 +3215,12 @@ pub fn accordion_view<'a, M: Clone + 'a>(
     a11y::attach(col.into(), &a11y)
 }
 
-/// Catalog `pagination`.
+/// Page through a long list.
+///
+/// Pass page count and the current page. Messages are previous, next,
+/// and jump.
+///
+/// See also catalog id `pagination`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};

@@ -217,11 +217,201 @@ mod tests {
             "navigation.md",
             "overlay-windows.md",
             "compact-tools.md",
+            "reference/controls.md",
+            "reference/fields.md",
+            "reference/readout.md",
+            "reference/content.md",
+            "reference/collections.md",
+            "reference/chrome.md",
+            "reference/patterns.md",
         ] {
             let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("book/src")
                 .join(name);
             assert!(p.is_file());
+        }
+    }
+
+    #[test]
+    fn handbook_describes_every_catalog_id() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("book/src");
+        let group_file = [
+            ("Controls", "reference/controls.md"),
+            ("Fields", "reference/fields.md"),
+            ("Readout", "reference/readout.md"),
+            ("Content", "reference/content.md"),
+            ("Collections", "reference/collections.md"),
+            ("Chrome", "reference/chrome.md"),
+            ("Patterns", "reference/patterns.md"),
+        ];
+        let ctors = [
+            ("button", "themed_button"),
+            ("split-button", "split_button"),
+            ("toggle-button", "toggle_button"),
+            ("checkbox", "themed_checkbox"),
+            ("radio", "themed_radio"),
+            ("switch", "themed_switch"),
+            ("slider", "themed_slider"),
+            ("text-input", "themed_text_input"),
+            ("password", "password_input"),
+            ("secret", "secret_field"),
+            ("textarea", "textarea"),
+            ("search", "search_input"),
+            ("suggest", "suggest_field"),
+            ("select", "themed_pick_list"),
+            ("number", "number_input"),
+            ("mask", "masked_input"),
+            ("date", "date_picker"),
+            ("time", "time_picker"),
+            ("color", "color_swatch"),
+            ("progress", "progress"),
+            ("progress-ring", "progress_ring"),
+            ("sparkline", "sparkline"),
+            ("spinner", "spinner"),
+            ("display", "display_reading"),
+            ("label", "label"),
+            ("rich-cell", "rich_cell"),
+            ("icon", "icon_svg"),
+            ("tooltip", "tooltip_wrap"),
+            ("link", "hyperlink"),
+            ("markdown", "markdown_view"),
+            ("code", "highlighted_code"),
+            ("image", "image_slot"),
+            ("list", "list_view"),
+            ("log", "log_view"),
+            ("grid", "item_grid"),
+            ("table", "data_table"),
+            ("tree", "tree_view"),
+            ("tabs", "tab_bar"),
+            ("accordion", "accordion_view"),
+            ("pagination", "pagination"),
+            ("document-tabs", "document_tabs"),
+            ("theme", "named"),
+            ("colors", "mix"),
+            ("keys", "handle"),
+            ("cheatsheet", "cheatsheet"),
+            ("card", "group_box"),
+            ("rule", "rule_h"),
+            ("chip", "chip"),
+            ("badge", "badge"),
+            ("wrap", "wrap"),
+            ("pad", "pad"),
+            ("callout", "info_bar"),
+            ("banner", "banner"),
+            ("group-box", "group_box"),
+            ("skeleton", "placeholder_skeleton"),
+            ("teaching-tip", "teaching_tip"),
+            ("command-bar", "command_bar"),
+            ("context-menu", "context_menu"),
+            ("breadcrumb", "breadcrumb"),
+            ("menu", "menu_bar"),
+            ("toolbar", "toolbar"),
+            ("status-bar", "status_bar"),
+            ("scrollbar", "themed_scroll"),
+            ("toast", "toast_view"),
+            ("busy", "busy_overlay"),
+            ("jobs", "job_strip"),
+            ("dialogs", "dialog_sheet"),
+            ("list-detail", "list_detail"),
+            ("inspector", "inspector"),
+            ("workspace", "workspace"),
+            ("tool-panel", "tool_panel"),
+            ("drawer", "drawer"),
+            ("navigation", "navigation_view"),
+            ("tab-view", "tab_view"),
+            ("preferences", "preferences_page"),
+            ("about", "about_page"),
+            ("status-page", "status_page"),
+            ("palette", "command_palette_view"),
+            ("main-window", "main_window"),
+        ];
+        assert_eq!(ctors.len(), ENTRIES.len());
+        for (group, rel) in group_file {
+            let text = std::fs::read_to_string(root.join(rel)).unwrap();
+            assert!(
+                text.contains(&format!("# {group}")),
+                "{rel} must be the {group} handbook page"
+            );
+            for e in ENTRIES.iter().filter(|e| e.group == group) {
+                let marker = format!("**`{}`**", e.id);
+                let at = text
+                    .find(&marker)
+                    .unwrap_or_else(|| panic!("{rel} missing catalog id {}", e.id));
+                let rest = &text[at..];
+                let end = rest[marker.len()..]
+                    .find("\n### ")
+                    .map(|i| i + marker.len())
+                    .unwrap_or(rest.len());
+                let section = &rest[..end];
+                let ctor = ctors
+                    .iter()
+                    .find(|(id, _)| *id == e.id)
+                    .map(|(_, n)| *n)
+                    .unwrap();
+                assert!(section.contains(ctor), "{} section must name {ctor}", e.id);
+                assert!(
+                    section.contains("docs.rs/icedtea"),
+                    "{} section must link rustdoc",
+                    e.id
+                );
+                assert!(
+                    section.contains("github.com/indynull/icedtea/blob/master"),
+                    "{} section must link source",
+                    e.id
+                );
+                assert!(
+                    section.contains("crates.io/crates/icedtea")
+                        || section.contains("crates.io/crates/iced"),
+                    "{} section must link the published crate",
+                    e.id
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn reader_path_omits_maintainer_process() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let files = [
+            "README.md",
+            "book/src/introduction.md",
+            "book/src/first-window.md",
+            "book/src/widgets.md",
+            "book/src/reference/controls.md",
+            "book/src/reference/fields.md",
+            "book/src/reference/readout.md",
+            "book/src/reference/content.md",
+            "book/src/reference/collections.md",
+            "book/src/reference/chrome.md",
+            "book/src/reference/patterns.md",
+        ];
+        for rel in files {
+            let text = std::fs::read_to_string(root.join(rel)).unwrap();
+            for needle in [
+                "one catalog id",
+                "one constructor",
+                "llvm-cov",
+                "fail-under",
+                "identity token",
+            ] {
+                assert!(
+                    !text.to_ascii_lowercase().contains(needle),
+                    "{rel} must not teach {needle}"
+                );
+            }
+        }
+        let root_rs = include_str!("lib.rs");
+        let tour = root_rs.split("#![cfg_attr").next().unwrap_or(root_rs);
+        for needle in [
+            "one catalog id",
+            "one constructor",
+            "llvm-cov",
+            "fail-under",
+        ] {
+            assert!(
+                !tour.contains(needle),
+                "crate-root tour must not teach {needle}"
+            );
         }
     }
 
