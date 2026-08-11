@@ -2,26 +2,8 @@
 
 ## Do
 
-Shipped or shipping in this cut as library constructors and models:
-
-- Nested/tabbed docking with save/restore, perspectives, min/max and
-  ratio constraints, panel move between docks, breakpoint drawers.
-  Float-or-dock is an overlay tool panel, not an in-frame document mosaic.
-- Variable-height virtualization by extending list. Multi-column tables
-  with sticky headers, resize/reorder, frozen columns. Range selection
-  and keyboard movement that stay virtualized. Cross-list drag of
-  indices. Lazy mount of heavy rows.
-- Namespaced commands with conflict detection, sequential key
-  sequences, context-sensitive maps. Palette recent/favorites and
-  parameter prompts. Searchable keyboard cheatsheet.
-- Roving tabindex, spatial arrow navigation, modal focus traps,
-  landmarks and live regions, hierarchical breadcrumb.
-- Master-detail plus inspector kept in sync. Document tabs with dirty
-  state and close confirm (application owns the document). Status jobs
-  and toasts. Runtime density and user theme/accent/scale persistence.
-- Gallery demos handle the messages their widgets emit (outline jump,
-  dismiss, places). Placed context menu on editors, collections, and
-  copyable fields.
+- `list_view` from `visible_range_var` (variable row heights).
+- Paint `CommandPalette::prompt` in `command_palette_view`.
 
 ## Consider
 

@@ -46,7 +46,7 @@ Three panes. The application owns selection in the list.
 
 ### Drawer
 
-**`drawer`** — A compact-width slide-over for a collapsed dock.
+**`drawer`** — A compact-width side pane beside content.
 
 Constructor: [`pattern::drawer`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.drawer.html)
 
@@ -54,11 +54,11 @@ Constructor: [`pattern::drawer`](https://docs.rs/icedtea/latest/icedtea/pattern/
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
-`open` shows the pane over `content`. Closed paints content only.
+`open` is `list_detail` with a fixed pane. Closed paints content only.
 
 ### Workspace
 
-**`workspace`** — Nested dock slots as a labeled strip plus center.
+**`workspace`** — Nested dock tree: splits, sash, tab groups, leaf chrome.
 
 Constructor: [`pattern::workspace`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.workspace.html)
 
@@ -67,11 +67,11 @@ Constructor: [`pattern::workspace`](https://docs.rs/icedtea/latest/icedtea/patte
 [iced](https://crates.io/crates/iced)
 
 `DockNode` is the layout tree (save, restore, `move_panel`).
-Applications own panel content.
+`center` fills the first leaf. Other leaves show their title.
 
 ### Tool panel
 
-**`tool-panel`** — Overlay chrome for a floatable tool window.
+**`tool-panel`** — Title chrome plus a Dock control.
 
 Constructor: [`pattern::tool_panel`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.tool_panel.html)
 

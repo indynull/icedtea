@@ -489,7 +489,7 @@ pub fn transfer_index(
     dest
 }
 
-/// Column order, widths, and frozen prefix for a virtual table.
+/// Column order and widths for a virtual table.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ColumnLayout {
     pub widths: Vec<f32>,
@@ -525,14 +525,9 @@ impl ColumnLayout {
         self.order.insert(to, id);
     }
 
-    /// Display columns: frozen prefix, then the rest in `order`.
+    /// Columns in `order`.
     pub fn display(&self) -> Vec<usize> {
-        let n = self.order.len();
-        let frozen = self.frozen.min(n);
-        let mut out = Vec::with_capacity(n);
-        out.extend_from_slice(&self.order[..frozen]);
-        out.extend_from_slice(&self.order[frozen..]);
-        out
+        self.order.clone()
     }
 
     pub fn width(&self, col: usize) -> f32 {

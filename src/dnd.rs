@@ -73,7 +73,7 @@ impl DropAccept {
     pub fn accepts(self, payload: &DragPayload) -> bool {
         matches!(
             (self, payload),
-            (Self::Text, DragPayload::Text(_) | DragPayload::Index { .. })
+            (Self::Text, DragPayload::Text(_))
                 | (Self::Files, DragPayload::Files(_))
                 | (Self::Both, _)
         )
@@ -167,7 +167,8 @@ mod tests {
         assert_eq!(idx.as_index(), Some(("inbox", 3)));
         assert!(idx.as_text().is_none());
         assert!(idx.as_files().is_empty());
-        assert!(DropAccept::Text.accepts(&idx));
+        assert!(!DropAccept::Text.accepts(&idx));
+        assert!(DropAccept::Both.accepts(&idx));
         let _ = listen_files();
         assert!(
             files_from_event(ev, iced::event::Status::Ignored, iced::window::Id::unique(),)

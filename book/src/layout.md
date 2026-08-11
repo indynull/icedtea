@@ -45,9 +45,9 @@ pointer for a placed context menu.
 
 `workspace::DockNode` is a nested leaf / split / tab tree with JSON
 save and restore, ratio clamps, and `move_panel` between docks.
-`pattern::workspace` draws that tree. `pattern::drawer` collapses a
-side pane at compact width. `pattern::tool_panel` is overlay chrome
-for a float-or-dock tool window. Perspectives are named `DockNode`
+`pattern::workspace` paints that tree with splits, a sash, and tabs.
+`pattern::drawer` is a compact side pane beside content. `pattern::tool_panel` is title chrome
+plus a Dock control. Perspectives are named `DockNode`
 snapshots.
 
 - [layout rustdoc](https://docs.rs/icedtea/latest/icedtea/layout/index.html)

@@ -379,6 +379,8 @@ enum Message {
     DrawerToggle,
     Cheat(String),
     WsMove,
+    WsPress(usize),
+    WsTab(usize, usize),
     Acc(usize),
     Page(usize),
     Sort(usize),
@@ -476,6 +478,7 @@ fn wants_context(page: &str) -> bool {
             | "type"
             | "chrome-rows"
             | "list-detail"
+            | "context-menu"
     )
 }
 
@@ -518,7 +521,7 @@ struct Gallery {
     list_window: VisibleWindow,
     table_window: VisibleWindow,
     table_cursor: (usize, usize),
-    table_widths: [f32; 4],
+    table_cols: icedtea::collection::ColumnLayout,
     log_lines: Vec<String>,
     log_window: VisibleWindow,
     mask: String,
@@ -558,6 +561,8 @@ struct Gallery {
     press_log: Vec<String>,
     nav_split: SplitState,
     nav_drag: SashDrag,
+    ws_sash: Option<usize>,
+    ws_drag: SashDrag,
     collapsed: HashSet<&'static str>,
     tour_at: usize,
     docs: icedtea::collection::DocumentTabs,
@@ -717,7 +722,8 @@ impl Gallery {
             list_window: VisibleWindow::new(400.0),
             table_window: VisibleWindow::new(360.0),
             table_cursor: (0, 0),
-            table_widths: [220.0, 140.0, 120.0, 280.0],
+            table_cols: icedtea::collection::ColumnLayout::new(vec![220.0, 140.0, 120.0, 280.0])
+                .with_frozen(1),
             log_lines: (0..200)
                 .map(|i| {
                     let lvl = ["info", "warn", "error"][i % 3];
@@ -784,6 +790,8 @@ impl Gallery {
             press_log: Vec::new(),
             nav_split: SplitState::new(Axis::Horizontal, 280.0 / 900.0),
             nav_drag: SashDrag::default(),
+            ws_sash: None,
+            ws_drag: SashDrag::default(),
             collapsed: HashSet::new(),
             tour_at: 0,
             docs: {
@@ -952,7 +960,28 @@ impl Gallery {
         theme::iced_theme(&self.theme, self.tokens)
     }
 
+    fn ws_sash_total(&self, axis: Axis) -> f32 {
+        match axis {
+            Axis::Horizontal => (self.window_width * (1.0 - self.nav_split.ratio)).max(1.0),
+            Axis::Vertical => self.window_height.max(1.0),
+        }
+    }
+
     fn update(&mut self, message: Message) -> Task<Message> {
+        if self.context.is_some()
+            && !matches!(
+                message,
+                Message::Cursor(_)
+                    | Message::Key(_)
+                    | Message::ContextDismiss
+                    | Message::Sash(_)
+                    | Message::Tick
+                    | Message::WindowSize(_)
+                    | Message::WindowHeight(_)
+            )
+        {
+            self.context = None;
+        }
         match message {
             Message::Theme(name) => {
                 self.theme = name.clone();
@@ -1026,6 +1055,19 @@ impl Gallery {
             }
             Message::DrawerToggle => self.drawer_open = !self.drawer_open,
             Message::Cheat(q) => self.cheat_q = q,
+            Message::WsPress(i) => {
+                self.ws_sash = Some(i);
+                self.ws_drag = SashDrag::default();
+                if let Some(axis) = self.ws.split_axis(i) {
+                    let ratio = self.ws.split_ratio(i).unwrap_or(0.5);
+                    let total = self.ws_sash_total(axis);
+                    let mut st = SplitState::new(axis, ratio);
+                    let _ = self.ws_drag.apply(&mut st, SashEvent::Press, total);
+                }
+            }
+            Message::WsTab(group, i) => {
+                let _ = self.ws.select_tab_group(group, i);
+            }
             Message::WsMove => {
                 if self.ws.move_panel("term", "explorer") {
                     self.toasts.push_info("Terminal moved beside Explorer");
@@ -1179,6 +1221,19 @@ impl Gallery {
                 if self.context.is_some() {
                     if matches!(icedtea::key::press(&ev), Some(icedtea::key::Press::Escape)) {
                         self.context = None;
+                        return Task::none();
+                    }
+                    let mut menu = ActionTable::new();
+                    for a in self.context_actions() {
+                        menu.insert(a);
+                    }
+                    let ctx = KeyContext {
+                        text_input_focused: false,
+                        modal_open: false,
+                    };
+                    if let Some(msg) = icedtea::key::handle(ctx, &menu, &ev) {
+                        self.context = None;
+                        return self.update(msg);
                     }
                     return Task::none();
                 }
@@ -1346,10 +1401,29 @@ impl Gallery {
                 self.time = self.time.step_field(field, clock);
             }
             Message::Sash(ev) => {
-                let _ = self
-                    .nav_drag
-                    .apply(&mut self.nav_split, ev, self.window_width);
-                self.clamp_nav();
+                if let Some(i) = self.ws_sash {
+                    if let Some(axis) = self.ws.split_axis(i) {
+                        let ev = match ev {
+                            SashEvent::Move(_) => SashEvent::Move(
+                                icedtea::layout::sash_pointer_pos(axis, self.pointer),
+                            ),
+                            other => other,
+                        };
+                        let ratio = self.ws.split_ratio(i).unwrap_or(0.5);
+                        let total = self.ws_sash_total(axis);
+                        let mut st = SplitState::new(axis, ratio);
+                        let _ = self.ws_drag.apply(&mut st, ev, total);
+                        let _ = self.ws.set_split_ratio(i, st.ratio);
+                    }
+                    if matches!(ev, SashEvent::Release) {
+                        self.ws_sash = None;
+                    }
+                } else {
+                    let _ = self
+                        .nav_drag
+                        .apply(&mut self.nav_split, ev, self.window_width);
+                    self.clamp_nav();
+                }
             }
             Message::Select(id) => {
                 self.page = id;
@@ -2615,7 +2689,7 @@ impl Gallery {
                 &self.table,
                 &self.sel,
                 Some(self.table_cursor),
-                &self.table_widths,
+                &self.table_cols,
                 true,
                 self.table_window,
                 48.0,
@@ -2870,20 +2944,27 @@ impl Gallery {
                 .into()
             }
             "command-bar" => pattern::command_bar(self.actions.iter(), tok, self.direction),
-            "context-menu" => column![
-                widget::meta(
-                    "Right-click the page for Cut, Copy, Paste on editors and Copy on lists.",
-                    tok,
-                    named("ctx-hint", Role::Status),
-                ),
-                widget::label(
-                    "The menu sits under the pointer. Escape or click away closes it.",
-                    tok,
-                    named("ctx-body", Role::Status),
-                ),
-            ]
-            .spacing(8)
-            .into(),
+            "context-menu" => {
+                let acts = self.context_actions();
+                column![
+                    widget::meta(
+                        "Right-click the window. This card is the same constructor.",
+                        tok,
+                        named("ctx-hint", Role::Status),
+                    ),
+                    container(pattern::context_menu(
+                        acts,
+                        icedtea::iced::Point::new(16.0, 16.0),
+                        icedtea::iced::Size::new(420.0, 240.0),
+                        Message::ContextDismiss,
+                        tok,
+                    ))
+                    .width(Length::Fill)
+                    .height(Length::Fixed(240.0)),
+                ]
+                .spacing(8)
+                .into()
+            }
             "scrollbar" => {
                 const LINES: &[&str] = &[
                     "Booted the gallery window",
@@ -3404,10 +3485,22 @@ impl Gallery {
                 container(pattern::workspace(
                     &self.ws,
                     center,
+                    icedtea::iced::Size::new(
+                        (self.window_width * (1.0 - self.nav_split.ratio) - 64.0).max(240.0),
+                        360.0,
+                    ),
+                    |i, ev| {
+                        if matches!(ev, SashEvent::Press) {
+                            Message::WsPress(i)
+                        } else {
+                            Message::Sash(ev)
+                        }
+                    },
+                    Message::WsTab,
                     tok,
                     named("workspace", Role::Group),
                 ))
-                .height(Length::Fixed(200.0))
+                .height(Length::Fixed(360.0))
                 .into()
             }
             "tool-panel" => container(pattern::tool_panel(
@@ -3743,14 +3836,27 @@ mod tests {
         let _ = g.view();
         g.page = "list";
         g.pointer = icedtea::iced::Point::new(400.0, 80.0);
+        let _ = g.update(super::Message::ListSel(3));
         let _ = g.update(super::Message::Cursor(
             icedtea::layout::CursorEvent::Context,
         ));
         assert!(g.context.is_some());
+        assert_eq!(g.sel.primary(), Some(3));
         let _ = g.view();
         let _ = g.update(super::Message::CopyValue);
         assert!(g.context.is_none());
         assert_eq!(g.note, "Copied");
+        g.page = "chrome-rows";
+        let _ = g.view();
+        let _ = g.update(super::Message::Cursor(
+            icedtea::layout::CursorEvent::Context,
+        ));
+        assert!(g.context.is_some());
+        let _ = g.update(super::Message::StatusNew);
+        assert!(g.context.is_none());
+        let src = include_str!("main.rs");
+        assert!(src.contains("pattern::context_menu"));
+        assert!(src.contains("pattern::workspace"));
         g.page = "fields";
         g.pointer = icedtea::iced::Point::new(400.0, 80.0);
         let _ = g.update(super::Message::Cursor(

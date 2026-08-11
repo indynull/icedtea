@@ -6,12 +6,12 @@ Guide lists every catalog id by group, with rustdoc, source, and
 crate links. Crate-root rustdoc is a teaching tour. The first
 window uses one `Action` and a toolbar (`examples/hello.rs`).
 
-Workspace docks, drawers, and tool panels. Variable-height lists,
-frozen columns, range selection, command contexts and sequences,
-palette prompts, cheatsheet, inspector, document tabs, and a job
-strip. `MarkdownDoc::item_offset` drives outline jump. A context menu
-sits under the pointer; gallery demos handle the messages their
-widgets emit.
+`pattern::workspace` paints a `DockNode` (splits, sash, tabs).
+`move_panel` takes a leaf out of a split by collapsing onto the
+sibling. `data_table` follows `ColumnLayout` order. Empty-query
+palette lists favorites, then recent.
+`context_menu` clamps to the card size. `DropAccept::Text` is text
+only. Gallery demos handle the messages their widgets emit.
 
 ## 0.2.0 — 2026-08-11
 

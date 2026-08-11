@@ -105,21 +105,36 @@ impl CommandPalette {
     }
 
     pub fn refresh<M: Clone>(&mut self, table: &ActionTable<M>) {
-        let blobs: Vec<(String, String)> = table
-            .iter()
-            .filter(|a| a.enabled)
-            .map(|a| (a.id.0.clone(), a.search_blob()))
-            .collect();
-        let ranked = fuzzy::rank(&self.query, blobs.iter().map(|(_, b)| b.as_str()));
-        self.hits = ranked
-            .into_iter()
-            .filter_map(|blob| {
-                blobs
-                    .iter()
-                    .find(|(_, b)| b == blob)
-                    .map(|(id, _)| id.clone())
-            })
-            .collect();
+        if self.query.trim().is_empty() {
+            let mut hits = Vec::new();
+            for id in self.favorites.iter().chain(self.recent.iter()) {
+                if table.get(id).is_some_and(|a| a.enabled) && !hits.iter().any(|h| h == id) {
+                    hits.push(id.clone());
+                }
+            }
+            for a in table.iter().filter(|a| a.enabled) {
+                if !hits.iter().any(|h| h == a.id.as_str()) {
+                    hits.push(a.id.as_str().to_string());
+                }
+            }
+            self.hits = hits;
+        } else {
+            let blobs: Vec<(String, String)> = table
+                .iter()
+                .filter(|a| a.enabled)
+                .map(|a| (a.id.0.clone(), a.search_blob()))
+                .collect();
+            let ranked = fuzzy::rank(&self.query, blobs.iter().map(|(_, b)| b.as_str()));
+            self.hits = ranked
+                .into_iter()
+                .filter_map(|blob| {
+                    blobs
+                        .iter()
+                        .find(|(_, b)| b == blob)
+                        .map(|(id, _)| id.clone())
+                })
+                .collect();
+        }
         if self.selected >= self.hits.len() {
             self.selected = 0;
         }
@@ -209,6 +224,9 @@ mod tests {
         pal.pin_favorite("file.save");
         pal.pin_favorite("file.save");
         assert_eq!(pal.favorites.len(), 1);
+        pal.set_query(&table, "");
+        let empty = pal.results(&table);
+        assert_eq!(empty[0].id.as_str(), "file.save");
         pal.ask("go.line", "Line");
         pal.prompt.as_mut().unwrap().value = "12".into();
         let p = pal.answer().unwrap();

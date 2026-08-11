@@ -2871,15 +2871,20 @@ pub fn item_grid<'a, M: Clone + 'a>(
         for _ in 0..cols {
             if i < labels.len() {
                 let s = labels[i].clone();
-                r = r.push(themed_button_sized(
+                let tile = themed_button_sized(
                     s.clone(),
                     a11y.apply_message(Some(on_select(i))),
                     tok,
                     Variant::Quiet,
                     Length::Fill,
                     Length::Fill,
-                    A11y::new(s, Role::ListItem).with_disabled(a11y.disabled),
-                ));
+                    A11y::new(s.clone(), Role::ListItem).with_disabled(a11y.disabled),
+                );
+                r = r.push(if a11y.disabled {
+                    tile
+                } else {
+                    mouse_area(tile).on_right_press(on_select(i)).into()
+                });
                 i += 1;
             } else {
                 r = r.push(Space::new().width(Length::Fill).height(Length::Fill));
@@ -2910,9 +2915,9 @@ pub fn item_grid<'a, M: Clone + 'a>(
 ///     sort_col: None,
 ///     sort_asc: true,
 /// };
-/// let widths = [120.0];
+/// let cols = icedtea::collection::ColumnLayout::new(vec![120.0]);
 /// let _: icedtea::Element<'_, ()> = widget::data_table(
-///     &table, &Selection::None, None, &widths, true, VisibleWindow::new(200.0),
+///     &table, &Selection::None, None, &cols, true, VisibleWindow::new(200.0),
 ///     32.0, 2, |_, _| (), |_| (), |_| (), tok, A11y::new("table", Role::Table),
 /// );
 /// ```
@@ -2920,7 +2925,7 @@ pub fn data_table<'a, M, T>(
     model: &'a T,
     selection: &'a Selection,
     cursor: Option<(usize, usize)>,
-    widths: &'a [f32],
+    columns: &'a crate::collection::ColumnLayout,
     zebra: bool,
     window: VisibleWindow,
     row_h: f32,
@@ -2937,17 +2942,19 @@ where
 {
     let cover = selection.primary();
     let n = model.row_count();
-    let cols = model.column_count();
+    let order = columns.display();
+    let last = order.last().copied();
     let h = row_h.max(0.0);
     let prev = window;
     let disabled = a11y.disabled;
     let mut header = Row::new().spacing(0);
-    for c in 0..cols {
+    for c in &order {
+        let c = *c;
         let title = model.header(c).to_string();
-        let w = if c + 1 == cols {
+        let w = if Some(c) == last {
             Length::Fill
         } else {
-            Length::Fixed(widths.get(c).copied().unwrap_or(96.0))
+            Length::Fixed(columns.width(c))
         };
         header = header.push(
             container(themed_button(
@@ -2978,13 +2985,14 @@ where
                         let selected = selection.contains(i);
                         let stripe = zebra && i % 2 == 1;
                         let mut line = Row::new().spacing(0);
-                        for c in 0..cols {
+                        for c in &order {
+                            let c = *c;
                             let focused = cursor == Some((i, c));
                             let value = model.cell(i, c).to_string();
-                            let w = if c + 1 == cols {
+                            let w = if Some(c) == last {
                                 Length::Fill
                             } else {
-                                Length::Fixed(widths.get(c).copied().unwrap_or(96.0))
+                                Length::Fixed(columns.width(c))
                             };
                             let bg = if focused {
                                 tok.selection
@@ -3959,7 +3967,7 @@ mod tests {
             sort_col: None,
             sort_asc: true,
         };
-        let widths = [80.0, 80.0];
+        let widths = crate::collection::ColumnLayout::new(vec![80.0, 80.0]);
         let _: Element<'_, ()> = data_table(
             &table,
             &Sel::Single(0),
@@ -3981,7 +3989,7 @@ mod tests {
             sort_col: None,
             sort_asc: true,
         };
-        let one = [96.0];
+        let one = crate::collection::ColumnLayout::new(vec![96.0]);
         let _: Element<'_, ()> = data_table(
             &big,
             &Sel::None,
@@ -4265,13 +4273,71 @@ mod tests {
             role("list", Role::List),
         );
         draw_once(&mut lv);
+        let empty_list = VecList::default();
+        let mut empty_lv = list_view(
+            &empty_list,
+            &Sel::None,
+            |_| (),
+            tok,
+            VisibleWindow::new(80.0),
+            24.0,
+            2,
+            |_| (),
+            "Empty",
+            |_| tok.muted,
+            None,
+            role("list-empty", Role::List),
+        );
+        draw_once(&mut empty_lv);
+        let two = VecList {
+            items: vec![
+                crate::collection::ListRow::new("a").with_meta("m"),
+                crate::collection::ListRow::new("b").with_meta("n"),
+            ],
+        };
+        let mut color_lv = list_view(
+            &two,
+            &Sel::Single(0),
+            |_| (),
+            tok,
+            VisibleWindow::new(80.0),
+            24.0,
+            2,
+            |_| (),
+            "Empty",
+            |i| {
+                if i == 0 {
+                    tok.danger
+                } else {
+                    tok.muted
+                }
+            },
+            None,
+            role("list-color", Role::List),
+        );
+        draw_once(&mut color_lv);
+        let mut dead_lv = list_view(
+            &list,
+            &Sel::Single(0),
+            |_| (),
+            tok,
+            VisibleWindow::new(80.0),
+            24.0,
+            2,
+            |_| (),
+            "Empty",
+            |_| tok.muted,
+            None,
+            role("list", Role::List).with_disabled(true),
+        );
+        draw_once(&mut dead_lv);
         let table = TableModel {
             headers: vec!["A".into()],
             rows: vec![vec!["1".into()]],
             sort_col: None,
             sort_asc: true,
         };
-        let widths = [80.0];
+        let widths = crate::collection::ColumnLayout::new(vec![80.0]);
         let mut dt = data_table(
             &table,
             &Sel::Single(0),
@@ -4288,6 +4354,38 @@ mod tests {
             role("table", Role::Table),
         );
         draw_once(&mut dt);
+        let mut dead_dt = data_table(
+            &table,
+            &Sel::Single(0),
+            Some((0, 0)),
+            &widths,
+            true,
+            VisibleWindow::new(80.0),
+            24.0,
+            2,
+            |_, _| (),
+            |_| (),
+            |_| (),
+            tok,
+            role("table", Role::Table).with_disabled(true),
+        );
+        draw_once(&mut dead_dt);
+        let mut dead_tree = tree_view(
+            &tree,
+            Some(1),
+            |_| (),
+            |_| (),
+            tok,
+            role("tree", Role::Tree).with_disabled(true),
+        );
+        draw_once(&mut dead_tree);
+        let mut dead_grid = item_grid(
+            &["A".into(), "B".into()],
+            |_| (),
+            tok,
+            role("grid", Role::List).with_disabled(true),
+        );
+        draw_once(&mut dead_grid);
         let disabled = A11y::button("off").with_disabled(true);
         let mut dead_link = hyperlink("l", (), tok, disabled.clone());
         draw_once(&mut dead_link);
@@ -4578,7 +4676,7 @@ mod tests {
             sort_col: None,
             sort_asc: true,
         };
-        let tw = [80.0, 80.0];
+        let tw = crate::collection::ColumnLayout::new(vec![80.0, 80.0]);
         let mut table_el: Element<'_, VisibleWindow> = data_table(
             &table,
             &Sel::Single(0),
@@ -4997,7 +5095,7 @@ mod tests {
             sort_col: None,
             sort_asc: true,
         };
-        let widths = [80.0];
+        let widths = crate::collection::ColumnLayout::new(vec![80.0]);
         let window = crate::collection::visible_window(scroll, viewport, row_h, n, overscan, None);
         let mut el: Element<'_, VisibleWindow> = data_table(
             &table,

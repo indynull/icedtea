@@ -249,7 +249,8 @@ pub fn status_bar<'a, M: Clone + 'a>(
 
 /// Fuzzy find over the action table.
 ///
-/// Empty query can show recent and favorites.
+/// Pass `CommandPalette::results`. An empty query lists favorites,
+/// then recent, then the rest.
 ///
 /// See also catalog id `palette`.
 ///
@@ -760,11 +761,34 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
     )
 }
 
-/// Place a context menu at `origin` in the window. Click-away dismisses.
+/// Card size for `n` actions inside `viewport`. Long lists cap and scroll.
+pub fn context_card_size(n: usize, viewport: Size) -> Size {
+    const MENU_W: f32 = 220.0;
+    const ROW: f32 = 34.0;
+    const PAD: f32 = 12.0;
+    let natural = PAD + (n.max(1) as f32) * ROW;
+    let max_h = (viewport.height * 0.5).max(ROW + PAD);
+    Size::new(MENU_W.min(viewport.width.max(1.0)), natural.min(max_h))
+}
+
+/// Clamp `origin` so a card of `size` stays inside `viewport`.
+pub fn context_origin(origin: Point, size: Size, viewport: Size) -> Point {
+    Point::new(
+        origin
+            .x
+            .min((viewport.width - size.width).max(0.0))
+            .max(0.0),
+        origin
+            .y
+            .min((viewport.height - size.height).max(0.0))
+            .max(0.0),
+    )
+}
+
+/// Place a context menu at `origin` in the window. Left click-away dismisses.
 ///
-/// Stack this on the window when the application holds a point. Empty
-/// `actions` still paints a card so click-away works. `viewport` clamps
-/// the card onto the window.
+/// Right-click is the application's (`listen_cursor`). Empty `actions`
+/// still paints a card. `viewport` clamps the card to its real size.
 ///
 /// See also catalog id `context-menu`.
 ///
@@ -775,10 +799,12 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
 /// let tok = theme::named("dark").tokens;
 /// let mut table = ActionTable::new();
 /// table.insert(Action::new("file.save", "Save", ()));
+/// let vp = icedtea::iced::Size::new(800.0, 600.0);
+/// assert!(pattern::context_card_size(2, vp).height < 120.0);
 /// let _: icedtea::Element<'_, ()> = pattern::context_menu(
 ///     table.iter().cloned(),
 ///     icedtea::iced::Point::new(24.0, 48.0),
-///     icedtea::iced::Size::new(800.0, 600.0),
+///     vp,
 ///     (),
 ///     tok,
 /// );
@@ -790,10 +816,10 @@ pub fn context_menu<'a, M: Clone + 'a>(
     on_dismiss: M,
     tok: Tokens,
 ) -> Element<'a, M> {
-    const MENU_W: f32 = 220.0;
-    const MENU_H: f32 = 280.0;
-    let x = origin.x.min((viewport.width - MENU_W).max(0.0)).max(0.0);
-    let y = origin.y.min((viewport.height - MENU_H).max(0.0)).max(0.0);
+    let actions: Vec<Action<M>> = actions.into_iter().collect();
+    let n = actions.len();
+    let size = context_card_size(n, viewport);
+    let at = context_origin(origin, size, viewport);
     let mut col = Column::new().spacing(2).padding(6);
     for a in actions {
         col = col.push(themed_button(
@@ -804,20 +830,33 @@ pub fn context_menu<'a, M: Clone + 'a>(
             A11y::new(a.title.clone(), Role::MenuItem).with_disabled(!a.enabled),
         ));
     }
-    let card = container(col)
-        .width(Length::Fixed(MENU_W))
-        .style(move |_| style::raised_card(tok));
+    let list: Element<'a, M> = col.into();
+    let inner = if size.height + 1.0 < 12.0 + (n.max(1) as f32) * 34.0 {
+        container(themed_scroll(
+            list,
+            tok,
+            A11y::new("context-scroll", Role::Group),
+            false,
+            None,
+            None::<fn(_) -> M>,
+        ))
+        .width(Length::Fixed(size.width))
+        .height(Length::Fixed(size.height))
+    } else {
+        container(list)
+            .width(Length::Fixed(size.width))
+            .height(Length::Fixed(size.height))
+    };
+    let card = container(inner).style(move |_| style::raised_card(tok));
     let placed = container(card).padding(Padding {
-        top: y,
+        top: at.y,
         right: 0.0,
         bottom: 0.0,
-        left: x,
+        left: at.x,
     });
     Stack::new()
         .push(
-            mouse_area(Space::new().width(Length::Fill).height(Length::Fill))
-                .on_press(on_dismiss.clone())
-                .on_right_press(on_dismiss),
+            mouse_area(Space::new().width(Length::Fill).height(Length::Fill)).on_press(on_dismiss),
         )
         .push(placed)
         .width(Length::Fill)
@@ -904,10 +943,12 @@ pub fn inspector<'a, M: 'a>(
     .into()
 }
 
-/// Nested dock slots as a labeled strip plus `center`.
+/// Nested dock tree: splits with a sash, tab groups, and leaf chrome.
 ///
-/// [`crate::workspace::DockNode`] is the layout tree. Applications own
-/// panel content.
+/// `center` fills the first leaf (depth-first). Other leaves show their
+/// title. `on_sash` is the split index then the grip event. `on_tab`
+/// is the depth-first tab-group index, then the selected tab
+/// (`DockNode::select_tab_group`).
 ///
 /// See also catalog id `workspace`.
 ///
@@ -922,6 +963,9 @@ pub fn inspector<'a, M: 'a>(
 /// let _: icedtea::Element<'_, ()> = pattern::workspace(
 ///     &root,
 ///     widget::label("src", tok, A11y::new("src", Role::Status)),
+///     icedtea::iced::Size::new(400.0, 240.0),
+///     |_, _| (),
+///     |_, _| (),
 ///     tok,
 ///     A11y::new("workspace", Role::Group),
 /// );
@@ -929,32 +973,148 @@ pub fn inspector<'a, M: 'a>(
 pub fn workspace<'a, M: Clone + 'a>(
     root: &crate::workspace::DockNode,
     center: Element<'a, M>,
+    viewport: Size,
+    on_sash: impl Fn(usize, layout::SashEvent) -> M + Copy + 'a,
+    on_tab: impl Fn(usize, usize) -> M + Copy + 'a,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let mut side = Column::new().spacing(4).padding(8);
-    for (id, title, active) in root.slots() {
-        let face = if active {
-            Variant::Primary
-        } else {
-            Variant::Quiet
-        };
-        side = side.push(label(
-            title.clone(),
-            tok,
-            A11y::new(id, Role::Status).with_checked(active),
-        ));
-        let _ = face;
-    }
+    let mut paint = DockPaint {
+        focus: first_leaf_id(root).unwrap_or_default(),
+        center: Some(center),
+        split_i: 0,
+        tab_i: 0,
+        on_sash,
+        on_tab,
+        tok,
+    };
     crate::a11y::attach(
-        list_detail(side.into(), center, layout::fixed(200.0), tok),
+        paint_dock(
+            root,
+            viewport.width.max(1.0),
+            viewport.height.max(1.0),
+            &mut paint,
+        ),
         &a11y,
     )
 }
 
-/// Overlay chrome for a floatable tool window.
+fn first_leaf_id(node: &crate::workspace::DockNode) -> Option<String> {
+    match node {
+        crate::workspace::DockNode::Leaf(p) => Some(p.id.clone()),
+        crate::workspace::DockNode::Split { first, .. } => first_leaf_id(first),
+        crate::workspace::DockNode::Tabs { panes, active, .. } => {
+            panes.get(*active).or(panes.first()).map(|p| p.id.clone())
+        }
+    }
+}
+
+struct DockPaint<'a, M, Sash, Tab>
+where
+    Sash: Fn(usize, layout::SashEvent) -> M + Copy + 'a,
+    Tab: Fn(usize, usize) -> M + Copy + 'a,
+{
+    focus: String,
+    center: Option<Element<'a, M>>,
+    split_i: usize,
+    tab_i: usize,
+    on_sash: Sash,
+    on_tab: Tab,
+    tok: Tokens,
+}
+
+fn paint_dock<'a, M, Sash, Tab>(
+    node: &crate::workspace::DockNode,
+    width: f32,
+    height: f32,
+    paint: &mut DockPaint<'a, M, Sash, Tab>,
+) -> Element<'a, M>
+where
+    M: Clone + 'a,
+    Sash: Fn(usize, layout::SashEvent) -> M + Copy + 'a,
+    Tab: Fn(usize, usize) -> M + Copy + 'a,
+{
+    let tok = paint.tok;
+    match node {
+        crate::workspace::DockNode::Leaf(p) => {
+            let body = if p.id == paint.focus {
+                paint.center.take().unwrap_or_else(|| {
+                    meta(p.title.clone(), tok, A11y::new(&p.title, Role::Status))
+                })
+            } else {
+                meta(p.title.clone(), tok, A11y::new(&p.title, Role::Status))
+            };
+            group_box(
+                p.title.clone(),
+                body,
+                tok,
+                A11y::new(p.id.clone(), Role::Group),
+            )
+        }
+        crate::workspace::DockNode::Tabs { panes, active } => {
+            let gi = paint.tab_i;
+            paint.tab_i += 1;
+            let titles: Vec<String> = panes.iter().map(|p| p.title.clone()).collect();
+            let mut tabs = Tabs::new(titles);
+            tabs.active = (*active).min(panes.len().saturating_sub(1));
+            let title = panes
+                .get(tabs.active)
+                .map(|p| p.title.clone())
+                .unwrap_or_default();
+            let id = panes.get(tabs.active).map(|p| p.id.as_str()).unwrap_or("");
+            let body = if id == paint.focus {
+                paint
+                    .center
+                    .take()
+                    .unwrap_or_else(|| meta(title.clone(), tok, A11y::new(&title, Role::Status)))
+            } else {
+                meta(title.clone(), tok, A11y::new(&title, Role::Status))
+            };
+            let on_tab = paint.on_tab;
+            tab_view(
+                &tabs,
+                body,
+                move |i| on_tab(gi, i),
+                move |i| on_tab(gi, i),
+                tok,
+            )
+        }
+        crate::workspace::DockNode::Split {
+            axis,
+            ratio,
+            first,
+            second,
+        } => {
+            let i = paint.split_i;
+            paint.split_i += 1;
+            let st = layout::SplitState::new(*axis, *ratio);
+            let total = match axis {
+                layout::Axis::Horizontal => width,
+                layout::Axis::Vertical => height,
+            };
+            let (fw, fh, sw, sh) = match axis {
+                layout::Axis::Horizontal => {
+                    let a = st.first_size(width);
+                    let b = st.second_size(width);
+                    (a, height, b, height)
+                }
+                layout::Axis::Vertical => {
+                    let a = st.first_size(height);
+                    let b = st.second_size(height);
+                    (width, a, width, b)
+                }
+            };
+            let left = paint_dock(first, fw, fh, paint);
+            let right = paint_dock(second, sw, sh, paint);
+            let on_sash = paint.on_sash;
+            layout::split_view(left, right, st, total, move |ev| on_sash(i, ev))
+        }
+    }
+}
+
+/// Title chrome plus a Dock control.
 ///
-/// Title plus body. `on_dock` is the Dock control.
+/// Title plus body. `on_dock` is the Dock button message.
 ///
 /// See also catalog id `tool-panel`.
 ///
@@ -998,9 +1158,9 @@ pub fn tool_panel<'a, M: Clone + 'a>(
     )
 }
 
-/// Compact-width slide-over for a collapsed dock.
+/// Compact-width side pane beside `content`.
 ///
-/// `open` shows the pane over `content`. Closed paints content only.
+/// `open` is `list_detail` with a fixed pane. Closed paints `content` only.
 ///
 /// See also catalog id `drawer`.
 ///
@@ -1108,6 +1268,9 @@ pub fn job_strip<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
+    if jobs.is_empty() {
+        return crate::a11y::attach(Space::new().into(), &a11y);
+    }
     let mut row = Row::new().spacing(12).padding([4, 8]);
     for j in jobs {
         let label_s = if let Some(p) = j.progress {
@@ -1168,11 +1331,7 @@ mod tests {
         } else {
             "ctrl+s"
         };
-        assert!(
-            menu_item_label(save).contains(host),
-            "Save row must show the host chord {host}, got {}",
-            menu_item_label(save)
-        );
+        assert!(menu_item_label(save).contains(host));
         let undo = table.iter().find(|a| a.id.as_str() == "edit.undo").unwrap();
         assert_eq!(menu_item_label(undo), "Undo");
         assert_eq!(
@@ -1209,10 +1368,7 @@ mod tests {
             .split("pub fn status_page")
             .next()
             .unwrap();
-        assert!(
-            !palette_src.contains("A11y::new(query"),
-            "query text is state; it must not be the node name"
-        );
+        assert!(!palette_src.contains("A11y::new(query"));
         assert!(palette_src.contains("A11y::new(\"palette-query\""));
         let pref_src = src
             .split("pub fn preferences_page")
@@ -1229,10 +1385,7 @@ mod tests {
             .split("pub fn drawer")
             .next()
             .unwrap();
-        assert!(
-            !tool_src.contains("label(title.clone()"),
-            "group_box already paints the title; the head row is Dock only"
-        );
+        assert!(!tool_src.contains("label(title.clone()"));
         assert!(tool_src.contains("\"Dock\""));
         let _: Element<'_, ()> = toolbar(acts.iter().copied(), tok, ltr);
         let _: Element<'_, ()> = toolbar(acts.iter().copied(), tok, rtl);
@@ -1315,10 +1468,18 @@ mod tests {
         paint(&mut prefs_el);
         let mut mw = main_window(lab("m"), lab("t"), lab("c"), lab("s"), tok);
         paint(&mut mw);
+        let vp = iced::Size::new(640.0, 400.0);
+        let two = context_card_size(2, vp);
+        assert!(two.height < 120.0);
+        assert!(two.height > 40.0);
+        let tall = context_card_size(40, vp);
+        assert!(tall.height <= vp.height * 0.5 + 0.1);
+        let pinned = context_origin(iced::Point::new(10.0, 390.0), two, vp);
+        assert!(pinned.y + two.height <= vp.height + 0.1);
         let mut cm = context_menu(
             table.iter().cloned(),
             iced::Point::new(12.0, 20.0),
-            iced::Size::new(640.0, 400.0),
+            vp,
             (),
             tok,
         );
@@ -1326,7 +1487,7 @@ mod tests {
         let mut edge = context_menu(
             table.iter().cloned(),
             iced::Point::new(800.0, 500.0),
-            iced::Size::new(640.0, 400.0),
+            vp,
             (),
             tok,
         );
@@ -1340,6 +1501,11 @@ mod tests {
             tok,
         );
         paint(&mut empty);
+        let many: Vec<Action<()>> = (0..30)
+            .map(|i| Action::new(format!("a.{i}"), format!("A{i}"), ()))
+            .collect();
+        let mut long = context_menu(many, iced::Point::new(8.0, 8.0), vp, (), tok);
+        paint(&mut long);
         let mut ld = list_detail(lab("l"), lab("d"), crate::layout::fixed(260.0), tok);
         paint(&mut ld);
         let mut nv = navigation_view(lab("s"), lab("c"), &nav, 900.0, (), tok, &cat);
@@ -1360,7 +1526,15 @@ mod tests {
         let mut insp = inspector(lab("l"), lab("d"), lab("p"), tok);
         paint(&mut insp);
         let root = crate::workspace::DockNode::leaf("edit", "Edit");
-        let mut ws = workspace(&root, lab("c"), tok, A11y::new("ws", Role::Group));
+        let mut ws = workspace(
+            &root,
+            lab("c"),
+            Size::new(400.0, 240.0),
+            |_, _| (),
+            |_, _| (),
+            tok,
+            A11y::new("ws", Role::Group),
+        );
         paint(&mut ws);
         let mut tp = tool_panel(
             "Outline",
@@ -1397,6 +1571,8 @@ mod tests {
         ];
         let mut js = job_strip(&jobs, tok, A11y::new("jobs", Role::Status));
         paint(&mut js);
+        let mut none_jobs = job_strip(&[], tok, A11y::new("jobs-empty", Role::Status));
+        paint(&mut none_jobs);
         let root = crate::workspace::DockNode::tabs(
             vec![
                 crate::workspace::Panel::new("a", "A"),
@@ -1404,7 +1580,80 @@ mod tests {
             ],
             0,
         );
-        let mut ws = workspace(&root, lab("c"), tok, A11y::new("ws", Role::Group));
+        let mut ws = workspace(
+            &root,
+            lab("c"),
+            Size::new(400.0, 240.0),
+            |_, _| (),
+            |_, _| (),
+            tok,
+            A11y::new("ws", Role::Group),
+        );
         paint(&mut ws);
+        let split_root = crate::workspace::DockNode::split(
+            crate::layout::Axis::Horizontal,
+            0.35,
+            crate::workspace::DockNode::leaf("ex", "Ex"),
+            crate::workspace::DockNode::tabs(
+                vec![
+                    crate::workspace::Panel::new("ed", "Ed"),
+                    crate::workspace::Panel::new("tm", "Tm"),
+                ],
+                0,
+            ),
+        );
+        let mut split_ws = workspace(
+            &split_root,
+            lab("c"),
+            Size::new(400.0, 240.0),
+            |_, _| (),
+            |_, _| (),
+            tok,
+            A11y::new("ws-split", Role::Group),
+        );
+        paint(&mut split_ws);
+        let vertical = crate::workspace::DockNode::split(
+            crate::layout::Axis::Vertical,
+            0.4,
+            crate::workspace::DockNode::leaf("top", "Top"),
+            crate::workspace::DockNode::leaf("bot", "Bot"),
+        );
+        let mut vws = workspace(
+            &vertical,
+            lab("c"),
+            Size::new(400.0, 240.0),
+            |_, _| (),
+            |_, _| (),
+            tok,
+            A11y::new("ws-v", Role::Group),
+        );
+        paint(&mut vws);
+        let twins = crate::workspace::DockNode::split(
+            crate::layout::Axis::Horizontal,
+            0.5,
+            crate::workspace::DockNode::leaf("same", "One"),
+            crate::workspace::DockNode::leaf("same", "Two"),
+        );
+        let mut tws = workspace(
+            &twins,
+            lab("c"),
+            Size::new(200.0, 120.0),
+            |_, _| (),
+            |_, _| (),
+            tok,
+            A11y::new("ws-twins", Role::Group),
+        );
+        paint(&mut tws);
+        let empty_tabs = crate::workspace::DockNode::tabs(vec![], 0);
+        let mut ews = workspace(
+            &empty_tabs,
+            lab("c"),
+            Size::new(200.0, 120.0),
+            |_, _| (),
+            |_, _| (),
+            tok,
+            A11y::new("ws-empty", Role::Group),
+        );
+        paint(&mut ews);
     }
 }
