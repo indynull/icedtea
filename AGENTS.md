@@ -16,6 +16,7 @@ rules file.
 
 ```bash
 just check          # format, clippy -D warnings, test, docs, coverage
+just clean          # cargo clean (debug, release, coverage trees)
 cargo run -p icedtea-gallery
 ```
 
@@ -83,6 +84,8 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   `themed_scroll`, keys subscribe with `key::listen`, sidebar recipe
   is `Breakpoint::from_width`.
 - One path per feature. Pick it and delete the other. Fallbacks re-grow.
+- Always drop `target/llvm-cov-target` after a passing coverage run.
+  `just clean` is `cargo clean`. Check recipes set `CARGO_INCREMENTAL=0`.
 - Always keep `TODO.md` current with shipped library and real
   consumer requests. Sort them into Do / Consider / discard in the
   same change. Never leave Order or Do pointing at finished work.
@@ -148,6 +151,9 @@ Rejected alternatives live once under Non-goals below. Do not add a
 workspace `-D warnings`, `cargo test --workspace --all-features`,
 `cargo doc` on `icedtea`, `cargo llvm-cov` on `icedtea` with
 `--fail-under-lines 99 --ignore-filename-regex 'src[/\\]host'`.
+Check/clippy/test/doc/cov set `CARGO_INCREMENTAL=0`. After a passing
+`just cov`, delete `target/llvm-cov-target` (and `target/llvm-cov`).
+`just clean` is `cargo clean`.
 
 - Coverage ignore is host glue only: `src/host.rs` (native dialogs,
   clipboard tasks) and `src/host_canvas.rs` (iced canvas stroke). Do not

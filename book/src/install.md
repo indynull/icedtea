@@ -31,13 +31,16 @@ Install [`just`](https://github.com/casey/just) and
 ```bash
 cargo install just cargo-llvm-cov
 just check
+just clean
 cargo run -p icedtea-gallery
 ```
 
 `just check` runs format, clippy (`-D warnings`), tests, rustdoc, and
 line coverage fail-under 99 on the `icedtea` package (host glue
 ignored; llvm-cov maps some const/macro lines as missed). The tests
-require a rustdoc example on each catalog constructor.
+require a rustdoc example on each catalog constructor. A passing
+coverage run deletes the instrumented `target/llvm-cov-target` tree.
+`just clean` is `cargo clean`.
 
 ## Publish
 

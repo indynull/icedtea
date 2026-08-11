@@ -11,18 +11,23 @@ fmt-check:
     cargo fmt --all -- --check
 
 clippy:
-    cargo clippy --workspace --all-targets --all-features -- -D warnings
+    CARGO_INCREMENTAL=0 cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 test:
-    cargo test --workspace --all-features
+    CARGO_INCREMENTAL=0 cargo test --workspace --all-features
 
 doc:
-    cargo doc --package icedtea --no-deps --document-private-items
+    CARGO_INCREMENTAL=0 cargo doc --package icedtea --no-deps --document-private-items
 
+# Drop target/llvm-cov-target after a passing report.
 cov:
-    cargo llvm-cov --package icedtea --all-features --fail-under-lines 99 --ignore-filename-regex 'src[/\\]host'
+    CARGO_INCREMENTAL=0 cargo llvm-cov --package icedtea --all-features --fail-under-lines 99 --ignore-filename-regex 'src[/\\]host'
+    rm -rf target/llvm-cov-target target/llvm-cov
 
 check: fmt-check clippy test doc cov
+
+clean:
+    cargo clean
 
 # Dry-run the published package (needs network for registry).
 publish-dry:
