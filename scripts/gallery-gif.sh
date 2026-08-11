@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Record the gallery tour into assets/gallery.gif and book/src/gallery.gif.
 # Needs a display, ffmpeg, xwininfo, wmctrl, import, and python3 (XTest).
-# Tiling window managers must float and place the window before capture.
+# Default: Xephyr + metacity so the live desktop cannot appear in a frame.
+# ICEDTEA_GALLERY_ISOLATED=0 records on the current display (float a tiler first).
 set -eu
 # pipefail is off: xdpyinfo | awk-exit and identify | awk-exit are SIGPIPE.
 
@@ -18,6 +19,75 @@ for cmd in ffmpeg xwininfo wmctrl import python3 xprop; do
     exit 1
   fi
 done
+
+# Isolated X server: no host windows, no host gsettings, no mosaic Super+g.
+if [[ "${ICEDTEA_GALLERY_ISOLATED:-1}" != "0" && -z "${ICEDTEA_GALLERY_NESTED:-}" ]]; then
+  if ! command -v Xephyr >/dev/null; then
+    echo "gallery-gif: Xephyr is missing; install xserver-xephyr or set ICEDTEA_GALLERY_ISOLATED=0" >&2
+    exit 1
+  fi
+  if ! command -v metacity >/dev/null; then
+    echo "gallery-gif: metacity is missing; install metacity or set ICEDTEA_GALLERY_ISOLATED=0" >&2
+    exit 1
+  fi
+  if ! command -v dbus-run-session >/dev/null; then
+    echo "gallery-gif: dbus-run-session is missing" >&2
+    exit 1
+  fi
+  display_n=""
+  for n in $(seq 3 20); do
+    if [[ ! -e /tmp/.X11-unix/X$n ]]; then
+      display_n=$n
+      break
+    fi
+  done
+  if [[ -z "$display_n" ]]; then
+    echo "gallery-gif: no free X display in :3-:20" >&2
+    exit 1
+  fi
+  # Client 1600x900 plus a title bar and a place origin.
+  Xephyr ":$display_n" -screen 1720x1080 -ac -nolisten tcp \
+    -title icedtea-gallery-record +extension RANDR +extension COMPOSITE +extension XTEST &
+  xephyr_pid=$!
+  isolated_cleanup() {
+    kill "$xephyr_pid" 2>/dev/null || true
+    wait "$xephyr_pid" 2>/dev/null || true
+  }
+  trap isolated_cleanup EXIT
+  for _ in $(seq 1 50); do
+    if [[ -e /tmp/.X11-unix/X$display_n ]]; then
+      break
+    fi
+    if ! kill -0 "$xephyr_pid" 2>/dev/null; then
+      echo "gallery-gif: Xephyr exited before the display came up" >&2
+      exit 1
+    fi
+    sleep 0.1
+  done
+  if [[ ! -e /tmp/.X11-unix/X$display_n ]]; then
+    echo "gallery-gif: Xephyr display :$display_n did not appear" >&2
+    exit 1
+  fi
+  echo "gallery-gif: recording inside Xephyr :$display_n"
+  export DISPLAY=":$display_n"
+  export ICEDTEA_GALLERY_NESTED=1
+  export ICEDTEA_GALLERY_ISOLATED=1
+  set +e
+  dbus-run-session -- bash "$0"
+  status=$?
+  set -e
+  isolated_cleanup
+  trap - EXIT
+  exit "$status"
+fi
+
+if [[ -n "${ICEDTEA_GALLERY_NESTED:-}" ]]; then
+  metacity --sm-disable &
+  sleep 0.4
+  if command -v xsetroot >/dev/null; then
+    xsetroot -solid '#1a1a1a' || true
+  fi
+fi
 
 # Must match Boot::size in the gallery tour path.
 client_w=1600
@@ -48,7 +118,10 @@ if [[ -z "${work_w:-}" || "$work_w" -lt 100 ]]; then
   work_h=$screen_h
 fi
 origin_x=$((work_x + 40))
-origin_y=$((work_y + 8))
+origin_y=$((work_y + 48))
+if [[ -z "${ICEDTEA_GALLERY_NESTED:-}" ]]; then
+  origin_y=$((work_y + 8))
+fi
 if (( origin_x + client_w > work_x + work_w )); then
   origin_x=$work_x
 fi
@@ -67,7 +140,7 @@ case "$(printf '%s' "$wm_name" | tr '[:upper:]' '[:lower:]')" in
   *herbst*) tiler=herbstluft ;;
 esac
 enabled_ext=""
-if command -v gnome-extensions >/dev/null; then
+if [[ -z "${ICEDTEA_GALLERY_NESTED:-}" ]] && command -v gnome-extensions >/dev/null; then
   enabled_ext="$(gnome-extensions list --enabled 2>/dev/null || true)"
 fi
 if grep -qi 'mosaic' <<<"$enabled_ext"; then
@@ -229,7 +302,7 @@ ensure_placed() {
 saved_scheme=""
 saved_gtk_theme=""
 last_host_face=""
-if command -v gsettings >/dev/null; then
+if [[ -z "${ICEDTEA_GALLERY_NESTED:-}" ]] && command -v gsettings >/dev/null; then
   saved_scheme="$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null || true)"
   saved_gtk_theme="$(gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null || true)"
 fi
@@ -265,7 +338,7 @@ apply_host_chrome() {
   if [[ -f "${ackfile}.face" ]]; then
     face="$(tr -d '[:space:]' <"${ackfile}.face")"
   fi
-  if command -v gsettings >/dev/null; then
+  if [[ -z "${ICEDTEA_GALLERY_NESTED:-}" ]] && command -v gsettings >/dev/null; then
     local theme="${saved_gtk_theme//\'/}"
     if [[ "$face" == "light" ]]; then
       gsettings set org.gnome.desktop.interface color-scheme prefer-light || true

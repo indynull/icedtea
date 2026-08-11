@@ -197,11 +197,10 @@ Check/clippy/test/doc/cov set `CARGO_INCREMENTAL=0`. After a passing
   `cargo run -p icedtea-gallery` and confirm iced starts without panic.
   A timeout after a clean start is a successful smoke. Compile + unit
   tests if there is no display. `just gallery-gif` records the tour
-  into `assets/gallery.gif` and `book/src/gallery.gif`. Run it when
-  the gallery shell changes. Do not hand-edit those files. A tiling
-  window manager must float and place the window on-screen before
-  capture; `import` only sees the visible region. Read the stills,
-  not the animation.
+  into `assets/gallery.gif` and `book/src/gallery.gif` inside Xephyr.
+  Run it when the gallery shell changes. Do not hand-edit those files.
+  `ICEDTEA_GALLERY_ISOLATED=0` records on the current display and must
+  float a tiled window first. Read the stills, not the animation.
 - Continuous integration runs `just check` on Linux, macOS, and Windows
   at Rust 1.89, plus `cargo test --workspace --all-features` on Ubuntu
   `stable` and `beta`. This environment proves Linux; do not invent

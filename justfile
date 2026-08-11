@@ -41,7 +41,7 @@ book-serve:
     mdbook serve
 
 # Record the gallery tour into assets/gallery.gif and book/src/gallery.gif.
-# Needs a display, ffmpeg, xwininfo, wmctrl, import, python3.
-# Floats a tiled window and places it before capture.
+# Needs a display, ffmpeg, xwininfo, wmctrl, import, python3, Xephyr, metacity.
+# Records inside Xephyr. ICEDTEA_GALLERY_ISOLATED=0 uses the current display.
 gallery-gif:
     bash scripts/gallery-gif.sh
