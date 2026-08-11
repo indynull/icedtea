@@ -1,5 +1,10 @@
 # icedtea
 
+[![Documentation](https://img.shields.io/docsrs/icedtea/latest)][documentation]
+[![Crates.io](https://img.shields.io/crates/v/icedtea.svg)][crates-io]
+[![License](https://img.shields.io/crates/l/icedtea)][license]
+[![check](https://github.com/indynull/icedtea/actions/workflows/ci.yml/badge.svg)][actions]
+
 Native desktop widgets and chrome for [iced](https://iced.rs/).
 
 `icedtea::run!` starts a themed window. One `Action` feeds the toolbar,
@@ -47,3 +52,8 @@ Xcode command-line tools. Windows needs the MSVC build tools.
 | iced | icedtea |
 | --- | --- |
 | 0.14 | 0.3 |
+
+[documentation]: https://docs.rs/icedtea
+[crates-io]: https://crates.io/crates/icedtea
+[license]: https://github.com/indynull/icedtea/blob/master/LICENSE
+[actions]: https://github.com/indynull/icedtea/actions
