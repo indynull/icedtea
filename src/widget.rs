@@ -3365,7 +3365,7 @@ pub fn expander<'a, M: Clone + 'a>(
     child: Element<'a, M>,
     collapsed: impl Into<Peek>,
     open: bool,
-    on_toggle: impl Fn(bool) -> M + Copy + 'a,
+    on_toggle: impl Fn(bool) -> M + 'a,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {

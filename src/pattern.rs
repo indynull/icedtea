@@ -182,6 +182,7 @@ pub fn toolbar<'a, M: Clone + 'a>(
 /// The toolbar row, denser.
 ///
 /// Same `Action` iterator as [`toolbar`]. Ghost, meta type, no panel.
+/// A light rail marks the group off the rest of the card.
 /// For a card footer or a tight chrome strip.
 ///
 /// See also catalog id `command-bar`.
@@ -203,8 +204,20 @@ pub fn command_bar<'a, M: Clone + 'a>(
     dir: Direction,
 ) -> Element<'a, M> {
     let owned: Vec<Action<M>> = actions.into_iter().map(|a| a.borrow().clone()).collect();
+    if owned.is_empty() {
+        return Space::new().width(0).height(0).into();
+    }
     let actions = order(dir, owned);
-    let mut r = Row::new().spacing(2).align_y(Alignment::Center);
+    let rail = container(Space::new().width(1).height(12)).style(move |_| style::hairline(tok));
+    let mut r = Row::new()
+        .spacing(2)
+        .align_y(Alignment::Center)
+        .push(container(rail).padding(Padding {
+            top: 1.0,
+            right: 6.0,
+            bottom: 1.0,
+            left: 2.0,
+        }));
     for a in actions {
         let face = text(a.title.clone()).size(typo::META).color(tok.muted);
         let mut b = button(face)
