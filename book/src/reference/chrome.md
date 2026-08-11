@@ -1,7 +1,6 @@
 # Chrome
 
-Theme, marks, rows, and feedback. Gallery pages `theme`, `colors`,
-`keys`, `marks`, `chrome-rows`, `feedback`.
+Theme, marks, rows, and feedback.
 [rustdoc](https://docs.rs/icedtea) ·
 [source](https://github.com/indynull/icedtea) ·
 [icedtea](https://crates.io/crates/icedtea) ·

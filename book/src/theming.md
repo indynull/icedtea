@@ -7,8 +7,7 @@ Tokens: `canvas`, `surface`, `panel`, `text`, `muted`, `primary`,
 `selection-text`. Washes (hover, pressed, chip) come from
 [`theme::mix`](https://docs.rs/icedtea/latest/icedtea/theme/fn.mix.html).
 `Tokens::faces` adds lighten/darken, text-on-wash, scrollbar, input,
-link, and focus. Constructors still take `Tokens`. The gallery Colors
-page shows the tree.
+link, and focus. Constructors still take `Tokens`.
 
 Built-in names are 40 palettes: `dark`, `light`, `high-contrast`, and
 community colorways (Solarized, Gruvbox, Catppuccin, Nord, Tokyo Night,
@@ -29,7 +28,6 @@ let _ = tokens.primary;
 
 Live switch: store a theme name on state and return
 `icedtea::theme::iced_theme(&name, tokens)` from the theme function.
-The gallery theme page registers `gallery-brand` and switches to it.
 
 Families are explicit pairs (`github` → `github-dark` / `github-light`,
 and the other real couples). A follow-OS preference selects the light

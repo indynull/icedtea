@@ -1,4 +1,4 @@
-//! Public widget and pattern ids. The gallery must page every entry.
+//! Public widget and pattern ids.
 //!
 //! Each id has one constructor. That `pub fn` takes [`crate::a11y::A11y`]
 //! and tokens. Chrome rows take an [`crate::action::ActionTable`].
@@ -376,6 +376,13 @@ mod tests {
             "README.md",
             "book/src/introduction.md",
             "book/src/first-window.md",
+            "book/src/architecture.md",
+            "book/src/actions.md",
+            "book/src/layout.md",
+            "book/src/theming.md",
+            "book/src/navigation.md",
+            "book/src/overlay-windows.md",
+            "book/src/compact-tools.md",
             "book/src/widgets.md",
             "book/src/reference/controls.md",
             "book/src/reference/fields.md",
@@ -399,6 +406,14 @@ mod tests {
                     "{rel} must not teach {needle}"
                 );
             }
+            let stripped = text
+                .to_ascii_lowercase()
+                .replace("gallery.gif", "")
+                .replace("assets/gallery.gif", "");
+            assert!(
+                !stripped.contains("gallery"),
+                "{rel} must not send readers to the gallery demo"
+            );
         }
         let root_rs = include_str!("lib.rs");
         let tour = root_rs.split("#![cfg_attr").next().unwrap_or(root_rs);
@@ -407,6 +422,7 @@ mod tests {
             "one constructor",
             "llvm-cov",
             "fail-under",
+            "gallery",
         ] {
             assert!(
                 !tour.contains(needle),

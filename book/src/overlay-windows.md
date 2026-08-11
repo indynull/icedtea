@@ -13,10 +13,6 @@ field or result list) suppresses only `HideEvent::FocusLoss`. Escape
 still hides. Subscribe with `key::listen` and pass Escape into
 `should_hide`.
 
-The gallery Command palette page is the overlay card: inner size,
-pointer place on two fake displays, and Escape / focus loss with a
-focused field.
-
 `window::retarget` turns overlay settings into a decorated, resizable
 application window at `Level::Normal` (Dock / task switcher). Size and
 position stay. The application chooses when to summon, hide, or pop

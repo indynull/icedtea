@@ -7,8 +7,7 @@ node identity; live values go in `with_value`, not the name. Disabled
 drops handlers. Composite fields use `A11y::child` so the inner editor
 keeps that name and disabled flag.
 
-The gallery (`cargo run -p icedtea-gallery`) pages every catalog id.
-Related controls share a page. This reference uses the same groups.
+This reference groups the public constructors.
 
 | Group | Page |
 | --- | --- |

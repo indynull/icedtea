@@ -53,9 +53,7 @@
 //! | [`catalog`] | Closed list of public ids |
 //!
 //! The [guide](https://indynull.github.io/icedtea/) walks composition
-//! and lists every catalog id. The
-//! [gallery](https://github.com/indynull/icedtea/tree/master/icedtea-gallery)
-//! shows them live.
+//! and lists every catalog id.
 //! [crates.io](https://crates.io/crates/icedtea) ·
 //! [source](https://github.com/indynull/icedtea).
 
@@ -165,7 +163,6 @@ mod tests {
         assert!(tour.contains("pattern"));
         assert!(tour.contains("count.inc"));
         assert!(readme.contains("icedtea::run!"));
-        assert!(readme.contains("icedtea-gallery"));
         assert!(readme.contains("example hello"));
         assert!(readme.contains("count.inc"));
         assert!(readme.contains("pattern::toolbar"));

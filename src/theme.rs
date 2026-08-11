@@ -1,7 +1,6 @@
 //! Semantic color tokens, mixing rules, and the named community catalog.
 //!
-//! `named` picks a colorway. `mix` builds washes. The gallery Colors
-//! page shows the token tree.
+//! `named` picks a colorway. `mix` builds washes.
 //!
 //! ```
 //! let dark = icedtea::theme::named("dark");

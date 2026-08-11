@@ -6,7 +6,7 @@ Native desktop widgets and chrome for [iced](https://iced.rs/).
 menus, and shortcuts. Constructors return iced `Element`s and emit
 your messages.
 
-![The icedtea gallery](https://github.com/indynull/icedtea/raw/master/assets/gallery.gif)
+![A themed icedtea window](https://github.com/indynull/icedtea/raw/master/assets/gallery.gif)
 
 ## First window
 
@@ -110,8 +110,6 @@ impl Hello {
   layout, theming, and a reference for every control
 - [Crate docs](https://docs.rs/icedtea) — `widget`, `theme`, `action`,
   `layout`, `window`, `pattern`
-- [Gallery](https://github.com/indynull/icedtea/tree/master/icedtea-gallery)
-  — every public control (`cargo run -p icedtea-gallery`)
 - [crates.io](https://crates.io/crates/icedtea) ·
   [source](https://github.com/indynull/icedtea)
 

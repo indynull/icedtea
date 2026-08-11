@@ -1,7 +1,6 @@
 # Content
 
-Type, icons, documents, and images. Gallery pages `type`, `markdown`,
-`code`, `image`.
+Type, icons, documents, and images.
 [rustdoc](https://docs.rs/icedtea/latest/icedtea/widget/index.html) ·
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·

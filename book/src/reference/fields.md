@@ -1,6 +1,6 @@
 # Fields
 
-Text, numbers, dates, and picks. Gallery pages `fields`.
+Text, numbers, dates, and picks.
 [rustdoc](https://docs.rs/icedtea/latest/icedtea/widget/index.html) ·
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·

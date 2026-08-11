@@ -1,8 +1,6 @@
 # Patterns
 
-Composed chrome. Gallery pages `dialogs`, `list-detail`, `workspace`,
-`navigation`, `tab-view`, `preferences`, `about`, `status-page`,
-`palette`, `main-window`.
+Composed chrome.
 [rustdoc](https://docs.rs/icedtea/latest/icedtea/pattern/index.html) ·
 [source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·

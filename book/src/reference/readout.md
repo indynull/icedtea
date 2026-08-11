@@ -1,6 +1,6 @@
 # Readout
 
-Progress, sparks, and a large reading. Gallery page `readout`.
+Progress, sparks, and a large reading.
 [rustdoc](https://docs.rs/icedtea/latest/icedtea/widget/index.html) ·
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·

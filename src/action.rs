@@ -1,8 +1,7 @@
 //! One action type for menus, toolbars, shortcuts, and the command palette.
 //!
 //! An action carries the application's message; `update` applies it.
-//! The gallery Menu, Toolbar, and Command palette pages show the same
-//! table in each chrome.
+//! The same table feeds menus, toolbars, and the command palette.
 //!
 //! ```
 //! use icedtea::action::{Action, ActionTable};

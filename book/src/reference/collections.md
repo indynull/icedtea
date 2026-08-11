@@ -1,7 +1,6 @@
 # Collections
 
-Lists, tables, trees, tabs, and pages. Gallery pages `list`, `log`,
-`grid`, `table`, `tree`, `sections`.
+Lists, tables, trees, tabs, and pages.
 [rustdoc](https://docs.rs/icedtea/latest/icedtea/widget/index.html) ·
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
