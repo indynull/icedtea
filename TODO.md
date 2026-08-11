@@ -3,26 +3,24 @@
 ## Do
 
 - `pattern::workspace` paints application content only in the first
-  leaf (depth-first). Other leaves show their title. A 1.0.0beta1
-  workspace constructor takes content per leaf.
+  leaf (depth-first). Other leaves show their title. The public
+  constructor takes content per leaf.
 
 ## Consider
 
 - `list_view` from `visible_range_var` (variable row heights). Fixed
-  `row_h` is the shipped contract; extend list, do not add a second
-  collection widget.
+  `row_h` is the shipped contract. The application supplies heights;
+  do not add a second collection widget.
 - Frozen leading columns on `data_table` (`ColumnLayout` order stays
   the scroll order; pin the first *n* so they stay in view).
 - A parameter field on the command palette (go to line, rename) that
   `command_palette_view` paints.
 - Plugin surfaces and extension host chrome.
 - Multi-monitor overlay pin beyond `window::place` / `Boot::displays`.
-- Estimated-height virtualization from a measure callback (today the
-  application supplies heights).
 - Touch density as a fourth named preset beyond compact / default /
   comfortable.
 
-## discard
+## Discard
 
 Not library API. Applications own these, or they contradict icedtea
 Non-goals:
