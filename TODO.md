@@ -2,17 +2,6 @@
 
 ## Do
 
-- `pattern::workspace` paints application content only in the first
-  leaf (depth-first). Other leaves show their title. The public
-  constructor takes content per leaf.
-- `list_view` from `visible_range_var` (variable row heights). The
-  application supplies heights.
-- Frozen leading columns on `data_table`. `ColumnLayout` order stays
-  the scroll order; pin the first *n* so they stay in view.
-- A parameter field on the command palette (go to line, rename) that
-  `command_palette_view` paints.
-- Multi-monitor overlay pin beyond `window::place` / `Boot::displays`.
-
 ## Consider
 
 - Plugin surfaces and extension host chrome.

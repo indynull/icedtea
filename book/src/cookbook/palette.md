@@ -19,6 +19,7 @@ struct App {
 enum Message {
     Query(String),
     Pick(usize),
+    Prompt(String),
     Save,
 }
 
@@ -31,6 +32,11 @@ impl App {
                     if let Some(next) = action.invoke() {
                         return self.update(next);
                     }
+                }
+            }
+            Message::Prompt(s) => {
+                if let Some(p) = self.palette.prompt.as_mut() {
+                    p.value = s;
                 }
             }
             Message::Save => {}
@@ -47,6 +53,9 @@ impl App {
             self.palette.selected(),
             Message::Query,
             Message::Pick,
+            self.palette.prompt.as_ref(),
+            Message::Prompt,
+            None,
             tok,
         )
     }
@@ -54,5 +63,6 @@ impl App {
 ```
 
 `CommandPalette` owns the query and the highlight. Empty query lists
-favorites, then recent. An overlay window uses `Boot` with an overlay
-kind; the constructor itself is the card.
+favorites, then recent. `ask` opens a parameter field that
+`command_palette_view` paints. An overlay window uses `Boot` with an
+overlay kind; `window::place_pinned` keeps it on a chosen display.

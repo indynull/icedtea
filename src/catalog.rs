@@ -625,8 +625,8 @@ mod tests {
         let at = find_pub_fn(pattern, "workspace").expect("workspace constructor");
         let rustdoc = rustdoc_block_above(&pattern[..at]);
         assert!(
-            rustdoc.contains("first leaf"),
-            "workspace rustdoc must name the first-leaf content limit"
+            rustdoc.contains("each leaf id"),
+            "workspace rustdoc must say each leaf id gets a pane"
         );
     }
 

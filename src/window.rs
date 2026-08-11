@@ -128,6 +128,42 @@ pub fn place_centered(pointer: (f32, f32), size: Size, displays: &[DisplayBounds
     )
 }
 
+/// Display under `pointer`, or `pin` when that index exists.
+pub fn chosen_display(
+    pin: Option<usize>,
+    pointer: (f32, f32),
+    displays: &[DisplayBounds],
+) -> Option<DisplayBounds> {
+    if let Some(i) = pin {
+        if let Some(d) = displays.get(i).copied() {
+            return Some(d);
+        }
+    }
+    display_at(pointer, displays)
+}
+
+/// Place `size` on a pinned display. `prefer` is clamped onto that
+/// display even when the pointer has moved to another screen.
+///
+/// ```
+/// use icedtea::window::{place_pinned, DisplayBounds};
+/// let left = DisplayBounds { x: 0.0, y: 0.0, width: 1920.0, height: 1080.0 };
+/// let right = DisplayBounds { x: 1920.0, y: 0.0, width: 1280.0, height: 800.0 };
+/// let p = place_pinned(Some(1), (10.0, 10.0), iced::Size::new(400.0, 300.0), &[left, right]);
+/// assert!(p.x >= 1920.0);
+/// ```
+pub fn place_pinned(
+    pin: Option<usize>,
+    pointer: (f32, f32),
+    size: Size,
+    displays: &[DisplayBounds],
+) -> Point {
+    let Some(d) = chosen_display(pin, pointer, displays) else {
+        return Point::new(pointer.0, pointer.1);
+    };
+    clamp_on_display(pointer.0, pointer.1, size, d)
+}
+
 fn display_at(pointer: (f32, f32), displays: &[DisplayBounds]) -> Option<DisplayBounds> {
     displays
         .iter()
@@ -289,6 +325,19 @@ mod tests {
         assert_eq!(fallback.y, other.y);
         assert!(d.contains((10.0, 10.0)));
         assert!(!d.contains((2000.0, 10.0)));
+        let pinned = place_pinned(Some(1), (10.0, 10.0), Size::new(400.0, 300.0), &[d, other]);
+        assert!(pinned.x >= 1920.0);
+        assert_eq!(
+            chosen_display(Some(1), (10.0, 10.0), &[d, other]),
+            Some(other)
+        );
+        assert_eq!(chosen_display(None, (100.0, 80.0), &[d, other]), Some(d));
+        let miss_pin = place_pinned(Some(9), (100.0, 80.0), Size::new(10.0, 10.0), &[d, other]);
+        assert_eq!(miss_pin, Point::new(100.0, 80.0));
+        let empty_pin = place_pinned(Some(0), (3.0, 4.0), Size::new(10.0, 10.0), &[]);
+        assert_eq!(empty_pin, Point::new(3.0, 4.0));
+        let none_pin = place_pinned(None, (3.0, 4.0), Size::new(10.0, 10.0), &[]);
+        assert_eq!(none_pin, Point::new(3.0, 4.0));
     }
 
     #[test]

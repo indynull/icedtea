@@ -38,8 +38,9 @@ use crate::scroll::ScrollRail;
 
 use crate::a11y::{self, A11y, Role};
 use crate::collection::{
-    page_range, virtual_pads, visible_window, window_after_scroll, Accordion, ListModel, Selection,
-    Tabs, TreeNode, VisibleWindow,
+    page_range, virtual_pads, visible_window, visible_window_var, window_after_scroll,
+    window_after_scroll_var, Accordion, ListModel, RowHeights, Selection, Tabs, TreeNode,
+    VisibleWindow,
 };
 use crate::i18n::Direction;
 use crate::icon::Icon;
@@ -594,6 +595,14 @@ pub fn scroll_delta_pixels(delta: iced::mouse::ScrollDelta, row_h: f32) -> f32 {
     match delta {
         iced::mouse::ScrollDelta::Lines { y, .. } => -y * row_h.max(0.0),
         iced::mouse::ScrollDelta::Pixels { y, .. } => -y,
+    }
+}
+
+/// Horizontal wheel delta (right is positive content offset).
+pub fn scroll_delta_x(delta: iced::mouse::ScrollDelta) -> f32 {
+    match delta {
+        iced::mouse::ScrollDelta::Lines { x, .. } => -x * 32.0,
+        iced::mouse::ScrollDelta::Pixels { x, .. } => -x,
     }
 }
 
@@ -2680,11 +2689,11 @@ pub fn log_view<'a, M: Clone + 'a>(
 }
 
 /// Clip pane + rail. `scroll` is the only offset. `rows` paints the
-/// mounted window; this shifts by `start * h - scroll`.
+/// mounted window; this shifts by row offset minus `scroll`.
 #[allow(clippy::too_many_arguments)]
 fn virtual_clip<'a, M, F, G>(
     prev: VisibleWindow,
-    h: f32,
+    heights: RowHeights<'a>,
     len: usize,
     overscan: usize,
     cover: Option<usize>,
@@ -2698,19 +2707,32 @@ where
     F: Fn(VisibleWindow) -> M + Copy + 'a,
     G: Fn(VisibleWindow) -> Column<'a, M> + 'a,
 {
-    let content = len as f32 * h;
+    let content = heights.total(len);
+    let step = heights.at(0).max(1.0);
     iced::widget::responsive(move |size| {
         let viewport = if size.height > 0.0 {
             size.height
         } else {
             prev.viewport.max(1.0)
         };
-        let win = visible_window(prev.scroll, viewport, h, len, overscan, cover);
-        let shift = win.start as f32 * h - prev.scroll;
+        let win = match heights {
+            RowHeights::Uniform(h) => {
+                visible_window(prev.scroll, viewport, h.max(0.0), len, overscan, cover)
+            }
+            RowHeights::PerRow(hs) => {
+                visible_window_var(prev.scroll, viewport, hs, overscan, cover)
+            }
+        };
+        let shift = heights.offset(win.start) - prev.scroll;
         let emit = move |y: f32| {
-            on_scroll(window_after_scroll(
-                prev, y, viewport, h, len, overscan, cover,
-            ))
+            on_scroll(match heights {
+                RowHeights::Uniform(h) => {
+                    window_after_scroll(prev, y, viewport, h.max(0.0), len, overscan, cover)
+                }
+                RowHeights::PerRow(hs) => {
+                    window_after_scroll_var(prev, y, viewport, hs, overscan, cover)
+                }
+            })
         };
         let mut frame = container(rows(win))
             .width(crate::layout::FILL)
@@ -2727,7 +2749,7 @@ where
         }
         let pane = mouse_area(frame).on_scroll(move |delta| {
             let max_s = (content - viewport).max(0.0);
-            emit((prev.scroll + scroll_delta_pixels(delta, h)).clamp(0.0, max_s))
+            emit((prev.scroll + scroll_delta_pixels(delta, step)).clamp(0.0, max_s))
         });
         row![
             pane,
@@ -2768,7 +2790,8 @@ fn two_line_row<'a, M: 'a>(
 ///
 /// `empty` is the copy when `model` has no rows. `meta_color` paints
 /// the second line. `scroll` is the only offset: the rail and the
-/// wheel write it, and each row `i` is painted at `i * row_h - scroll`.
+/// wheel write it. Uniform rows sit at `i * row_h - scroll`. Variable
+/// rows use [`RowHeights::PerRow`] and [`visible_window_var`].
 /// `scroll_id` names the clip pane. The 24px rail sits beside it.
 ///
 ///
@@ -2806,7 +2829,7 @@ pub fn list_view<'a, M, L>(
     on_select: impl Fn(usize) -> M + Copy + 'a,
     tok: Tokens,
     window: VisibleWindow,
-    row_h: f32,
+    row_h: impl Into<RowHeights<'a>>,
     overscan: usize,
     on_scroll: impl Fn(VisibleWindow) -> M + Copy + 'a,
     empty: &'a str,
@@ -2819,14 +2842,14 @@ where
     L: ListModel + ?Sized,
 {
     let cover = selection.primary();
-    let h = row_h.max(0.0);
+    let heights = row_h.into();
     let len = model.len();
     let prev = window;
     let disabled = a11y.disabled;
     a11y::attach(
         virtual_clip(
             prev,
-            h,
+            heights,
             len,
             overscan,
             cover,
@@ -2839,6 +2862,7 @@ where
                     col = col.push(meta(empty, tok, A11y::new(empty, Role::Status)));
                 } else {
                     for i in win.range() {
+                        let h = heights.at(i);
                         if model.is_separator(i) {
                             col = col.push(
                                 container(rule_h(tok, A11y::new("sep", Role::Separator)))
@@ -2939,7 +2963,8 @@ pub fn item_grid<'a, M: Clone + 'a>(
 /// A virtualized table. Last column fills.
 ///
 /// `on_cell` is (row, column). `on_sort` is the header click. Empty
-/// rows still paint headers.
+/// rows still paint headers. `columns.frozen` stays in view;
+/// `on_h_scroll` is the unfrozen strip.
 ///
 ///
 /// ```
@@ -2960,10 +2985,12 @@ pub fn item_grid<'a, M: Clone + 'a>(
 ///     Cell(usize, usize),
 ///     Sort(usize),
 ///     Scroll(VisibleWindow),
+///     HScroll(f32),
 /// }
 /// let on_cell = Msg::Cell;
 /// let on_sort = Msg::Sort;
 /// let on_scroll = Msg::Scroll;
+/// let on_h_scroll = Msg::HScroll;
 /// let _: icedtea::Element<'_, Msg> = widget::data_table(
 ///     &table,
 ///     &Selection::None,
@@ -2976,6 +3003,7 @@ pub fn item_grid<'a, M: Clone + 'a>(
 ///     on_cell,
 ///     on_sort,
 ///     on_scroll,
+///     on_h_scroll,
 ///     tok,
 ///     A11y::new("table", Role::Table),
 /// );
@@ -2992,6 +3020,7 @@ pub fn data_table<'a, M, T>(
     on_cell: impl Fn(usize, usize) -> M + Copy + 'a,
     on_sort: impl Fn(usize) -> M + Copy + 'a,
     on_scroll: impl Fn(VisibleWindow) -> M + Copy + 'a,
+    on_h_scroll: impl Fn(f32) -> M + Copy + 'a,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M>
@@ -3006,16 +3035,23 @@ where
     let h = row_h.max(0.0);
     let prev = window;
     let disabled = a11y.disabled;
-    let mut header = Row::new().spacing(0);
-    for c in &order {
-        let c = *c;
-        let title = model.header(c).to_string();
-        let w = if Some(c) == last {
+    let frozen_n = columns.frozen.min(order.len());
+    let pin = order[..frozen_n].to_vec();
+    let rest = order[frozen_n..].to_vec();
+    let h_scroll = columns.h_scroll.max(0.0);
+    let last_col = last;
+    let col_w = move |c: usize| {
+        if Some(c) == last_col {
             Length::Fill
         } else {
             Length::Fixed(columns.width(c))
-        };
-        header = header.push(
+        }
+    };
+    let mut pin_head = Row::new().spacing(0);
+    for c in &pin {
+        let c = *c;
+        let title = model.header(c).to_string();
+        pin_head = pin_head.push(
             container(themed_button(
                 title.clone(),
                 a11y.apply_message(Some(on_sort(c))),
@@ -3023,15 +3059,43 @@ where
                 Variant::Ghost,
                 A11y::button(title).with_disabled(disabled),
             ))
-            .width(w),
+            .width(col_w(c)),
         );
     }
+    let mut rest_head = Row::new().spacing(0);
+    for c in &rest {
+        let c = *c;
+        let title = model.header(c).to_string();
+        rest_head = rest_head.push(
+            container(themed_button(
+                title.clone(),
+                a11y.apply_message(Some(on_sort(c))),
+                tok,
+                Variant::Ghost,
+                A11y::button(title).with_disabled(disabled),
+            ))
+            .width(col_w(c)),
+        );
+    }
+    let rest_head = mouse_area(
+        container(rest_head)
+            .width(Length::Fill)
+            .padding(Padding {
+                top: 0.0,
+                right: 0.0,
+                bottom: 0.0,
+                left: -h_scroll,
+            })
+            .clip(true),
+    )
+    .on_scroll(move |delta| on_h_scroll((h_scroll + scroll_delta_x(delta)).max(0.0)));
+    let header = row![pin_head, rest_head].width(crate::layout::FILL);
     a11y::attach(
         column![
             header,
             virtual_clip(
                 prev,
-                h,
+                RowHeights::Uniform(h),
                 n,
                 overscan,
                 cover,
@@ -3043,16 +3107,10 @@ where
                     for i in win.range() {
                         let selected = selection.contains(i);
                         let stripe = zebra && i % 2 == 1;
-                        let mut line = Row::new().spacing(0);
-                        for c in &order {
-                            let c = *c;
+                        let paint_cell = |line: Row<'a, M>, c: usize| {
                             let focused = cursor == Some((i, c));
                             let value = model.cell(i, c).to_string();
-                            let w = if Some(c) == last {
-                                Length::Fill
-                            } else {
-                                Length::Fixed(columns.width(c))
-                            };
+                            let w = col_w(c);
                             let bg = if focused {
                                 tok.selection
                             } else if selected {
@@ -3076,15 +3134,32 @@ where
                                     .on_right_press(on_cell(i, c))
                                     .into()
                             };
-                            line = line.push(a11y::attach(
+                            line.push(a11y::attach(
                                 cell,
                                 &A11y::new(format!("{i}:{c}"), Role::ListItem)
                                     .with_value(value)
                                     .with_checked(focused)
                                     .with_disabled(disabled),
-                            ));
+                            ))
+                        };
+                        let mut pin_line = Row::new().spacing(0);
+                        for c in &pin {
+                            pin_line = paint_cell(pin_line, *c);
                         }
-                        body = body.push(line);
+                        let mut rest_line = Row::new().spacing(0);
+                        for c in &rest {
+                            rest_line = paint_cell(rest_line, *c);
+                        }
+                        let rest_line = container(rest_line)
+                            .width(Length::Fill)
+                            .padding(Padding {
+                                top: 0.0,
+                                right: 0.0,
+                                bottom: 0.0,
+                                left: -h_scroll,
+                            })
+                            .clip(true);
+                        body = body.push(row![pin_line, rest_line].width(crate::layout::FILL));
                     }
                     body
                 },
@@ -3761,6 +3836,14 @@ mod tests {
             scroll_delta_pixels(iced::mouse::ScrollDelta::Pixels { x: 0.0, y: 8.0 }, 20.0),
             -8.0
         );
+        assert_eq!(
+            scroll_delta_x(iced::mouse::ScrollDelta::Lines { x: 1.0, y: 0.0 }),
+            -32.0
+        );
+        assert_eq!(
+            scroll_delta_x(iced::mouse::ScrollDelta::Pixels { x: 8.0, y: 0.0 }),
+            -8.0
+        );
         let _: Element<'_, ()> = themed_slider(
             0.0..=1.0,
             0.5,
@@ -4211,6 +4294,7 @@ mod tests {
             |_, _| (),
             |_| (),
             |_| (),
+            |_| (),
             tok,
             role("table", Role::Table),
         );
@@ -4236,6 +4320,7 @@ mod tests {
             20.0,
             2,
             |_, _| (),
+            |_| (),
             |_| (),
             |_| (),
             tok,
@@ -4601,6 +4686,7 @@ mod tests {
             |_, _| (),
             |_| (),
             |_| (),
+            |_| (),
             tok,
             role("table", Role::Table),
         );
@@ -4615,6 +4701,7 @@ mod tests {
             24.0,
             2,
             |_, _| (),
+            |_| (),
             |_| (),
             |_| (),
             tok,
@@ -4970,6 +5057,7 @@ mod tests {
             |_, _| window,
             |_| window,
             |w| w,
+            |_| window,
             tok,
             A11y::new("table", Role::Table),
         );
@@ -5212,6 +5300,247 @@ mod tests {
     }
 
     #[test]
+    fn list_view_variable_row_is_not_index_times_uniform() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+
+        let tok = named("dark").tokens;
+        let heights = [20.0_f32, 50.0, 20.0];
+        let list = VecList {
+            items: vec![
+                crate::collection::ListRow::new("a"),
+                crate::collection::ListRow::new("b"),
+                crate::collection::ListRow::new("c"),
+            ],
+        };
+        let window = crate::collection::visible_window_var(0.0, 200.0, &heights, 0, None);
+        let mut el: Element<'_, f32> = list_view(
+            &list,
+            &Sel::None,
+            |_| 0.0,
+            tok,
+            window,
+            crate::collection::RowHeights::PerRow(&heights),
+            0,
+            |w| w.scroll,
+            "Empty",
+            |_| tok.muted,
+            None,
+            A11y::new("var-list", Role::List),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(320.0, 200.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let origin = layout.bounds();
+        let mut boxes = Vec::new();
+        walk_bounds(layout, &mut boxes);
+        let tall: Vec<f32> = boxes
+            .iter()
+            .filter(|b| (b.height - 50.0).abs() < 1.0 && b.width > 40.0)
+            .map(|b| b.y - origin.y)
+            .collect();
+        assert!(
+            tall.iter().any(|y| (*y - 20.0).abs() < 2.0),
+            "second row starts at 20px, not 2*uniform, got {tall:?}"
+        );
+        let _ = drive_scroll(&mut el);
+        let mut tree0 = Tree::new(el.as_widget());
+        let renderer0 = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let _ = el.as_widget_mut().layout(
+            &mut tree0,
+            &renderer0,
+            &Limits::new(Size::ZERO, Size::new(320.0, 0.0)),
+        );
+    }
+
+    #[test]
+    fn data_table_frozen_column_stays_when_unfrozen_scrolls() {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::mouse;
+        use iced::{Event, Font, Pixels, Point, Rectangle, Size};
+
+        let tok = named("dark").tokens;
+        let table = TableModel {
+            headers: vec!["A".into(), "B".into(), "C".into()],
+            rows: vec![vec!["1".into(), "2".into(), "3".into()]],
+            sort_col: None,
+            sort_asc: true,
+        };
+        let mut cols = crate::collection::ColumnLayout::new(vec![80.0, 80.0, 80.0]).with_frozen(1);
+        cols.set_h_scroll(0.0);
+        let window = VisibleWindow::new(80.0);
+        let leading = |cols: &crate::collection::ColumnLayout| {
+            let mut el: Element<'_, ()> = data_table(
+                &table,
+                &Sel::None,
+                None,
+                cols,
+                false,
+                window,
+                24.0,
+                0,
+                |_, _| (),
+                |_| (),
+                |_| (),
+                |_| (),
+                tok,
+                A11y::new("pin", Role::Table),
+            );
+            let mut tree = Tree::new(el.as_widget());
+            let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+                Font::DEFAULT,
+                Pixels::from(16u32),
+            ));
+            let limits = Limits::new(Size::ZERO, Size::new(200.0, 80.0));
+            let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+            let layout = Layout::new(&node);
+            let mut boxes = Vec::new();
+            walk_bounds(layout, &mut boxes);
+            let xs: Vec<f32> = boxes
+                .iter()
+                .filter(|b| (b.width - 80.0).abs() < 1.0)
+                .map(|b| b.x)
+                .collect();
+            xs
+        };
+        let x0 = leading(&cols);
+        assert!(
+            x0.iter().any(|x| x.abs() < 1.0),
+            "frozen column missing at x=0: {x0:?}"
+        );
+        cols.set_h_scroll(90.0);
+        let x1 = leading(&cols);
+        assert!(
+            x1.iter().any(|x| x.abs() < 1.0),
+            "frozen column left the leading edge: {x1:?}"
+        );
+        assert!(
+            x1.iter().any(|x| *x < -1.0),
+            "unfrozen columns did not scroll: {x1:?}"
+        );
+        let mut el: Element<'_, f32> = data_table(
+            &table,
+            &Sel::None,
+            None,
+            &cols,
+            false,
+            window,
+            24.0,
+            0,
+            |_, _| 0.0,
+            |_| 0.0,
+            |_| 0.0,
+            |x| x,
+            tok,
+            A11y::new("pin-h", Role::Table),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(200.0, 80.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let vp = Rectangle::new(Point::ORIGIN, Size::new(200.0, 80.0));
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::WheelScrolled {
+                    delta: mouse::ScrollDelta::Pixels { x: 20.0, y: 0.0 },
+                }),
+                layout,
+                mouse::Cursor::Available(Point::new(120.0, 12.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::WheelScrolled {
+                    delta: mouse::ScrollDelta::Lines { x: 1.0, y: 0.0 },
+                }),
+                layout,
+                mouse::Cursor::Available(Point::new(120.0, 12.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+        }
+        assert!(!messages.is_empty());
+    }
+
+    #[test]
+    fn data_table_disabled_zebra_and_cursor_still_layout() {
+        let tok = named("dark").tokens;
+        let table = TableModel {
+            headers: vec!["A".into(), "B".into()],
+            rows: vec![vec!["1".into(), "2".into()], vec!["3".into(), "4".into()]],
+            sort_col: None,
+            sort_asc: true,
+        };
+        let cols = crate::collection::ColumnLayout::new(vec![80.0, 80.0]);
+        let window = VisibleWindow::new(80.0);
+        let mut el: Element<'_, ()> = data_table(
+            &table,
+            &Sel::Single(1),
+            Some((1, 1)),
+            &cols,
+            true,
+            window,
+            24.0,
+            0,
+            |_, _| (),
+            |_| (),
+            |_| (),
+            |_| (),
+            tok,
+            A11y::new("zebra", Role::Table).with_disabled(true),
+        );
+        draw_once(&mut el);
+        let empty = TableModel {
+            headers: vec!["A".into()],
+            rows: vec![],
+            sort_col: None,
+            sort_asc: true,
+        };
+        let one = crate::collection::ColumnLayout::new(vec![80.0]);
+        let mut headers_only: Element<'_, ()> = data_table(
+            &empty,
+            &Sel::None,
+            None,
+            &one,
+            false,
+            window,
+            24.0,
+            0,
+            |_, _| (),
+            |_| (),
+            |_| (),
+            |_| (),
+            tok,
+            A11y::new("empty-table", Role::Table),
+        );
+        draw_once(&mut headers_only);
+    }
+
+    #[test]
     fn log_view_wheel_forwards_scroll_offset() {
         let tok = named("dark").tokens;
         let lines: Vec<String> = (0..80).map(|i| format!("line {i}")).collect();
@@ -5390,6 +5719,7 @@ mod tests {
             |_, _| window,
             |_| window,
             |w| w,
+            |_| window,
             tok,
             A11y::new("table", Role::Table),
         );

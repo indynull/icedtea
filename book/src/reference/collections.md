@@ -21,7 +21,8 @@ Constructor: [`widget::list_view`](https://docs.rs/icedtea/latest/icedtea/widget
 
 `empty` is the copy when the model has no rows. Selection stays on
 indices. Disabled drops row messages. `on_scroll` reports the window
-after a wheel or rail move.
+after a wheel or rail move. Pass `RowHeights::PerRow` for variable
+row heights (`visible_range_var`).
 
 ### Log
 
@@ -57,8 +58,9 @@ Constructor: [`widget::data_table`](https://docs.rs/icedtea/latest/icedtea/widge
 [icedtea](https://crates.io/crates/icedtea)
 
 `TableModel` holds headers and rows. `on_cell` is (row, column).
-`on_sort` is the header click. `ColumnLayout` orders, freezes, and
-resizes columns. Empty rows still paint headers.
+`on_sort` is the header click. `ColumnLayout` order is scroll order;
+`frozen` keeps the first *n* columns in view. `on_h_scroll` moves
+the rest. Empty rows still paint headers.
 
 ### Tree
 

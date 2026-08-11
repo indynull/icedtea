@@ -252,6 +252,14 @@ fn sample_mail(i: usize) -> ListRow {
     })
 }
 
+fn list_row_heights(list: &VecList) -> Vec<f32> {
+    list.items
+        .iter()
+        .enumerate()
+        .map(|(i, _)| if i % 3 == 0 { 72.0 } else { 40.0 })
+        .collect()
+}
+
 /// One README beat. The walk is every `catalog::ENTRIES` page, plus
 /// one Light flip on the Theme page.
 struct TourBeat {
@@ -428,6 +436,12 @@ enum Message {
     ConfirmCancel,
     PaletteQuery(String),
     PalettePick(usize),
+    PalettePrompt(String),
+    PaletteApply,
+    AskLine,
+    TableHScroll(f32),
+    OverlayPin(Option<usize>),
+    OptScroll(VisibleWindow),
     FocusName,
     Secret(String),
     RevealSecret,
@@ -571,6 +585,9 @@ struct Gallery {
     ws: icedtea::workspace::DockNode,
     drawer_open: bool,
     cheat_q: String,
+    overlay_pin: Option<usize>,
+    opt_window: VisibleWindow,
+    list_heights: Vec<f32>,
 }
 
 impl Gallery {
@@ -611,9 +628,12 @@ impl Gallery {
             Action::new("help.about", "About", Message::Select("about"))
                 .with_shortcut(Shortcut::parse("f1").unwrap()),
         );
+        actions.insert(Action::new("go.line", "Go to line", Message::AskLine));
         let mut palette = CommandPalette::new();
         palette.open();
         palette.set_query(&actions, "");
+        palette.ask("go.line", "Line");
+        palette.prompt.as_mut().unwrap().value = "42".into();
         let md = MarkdownDoc::parse(samples::MARKDOWN);
         let md_heads = md.headings();
         let mut gallery = Self {
@@ -725,7 +745,13 @@ impl Gallery {
             list_window: VisibleWindow::new(400.0),
             table_window: VisibleWindow::new(360.0),
             table_cursor: (0, 0),
-            table_cols: icedtea::collection::ColumnLayout::new(vec![220.0, 140.0, 120.0, 280.0]),
+            table_cols: {
+                let mut cols =
+                    icedtea::collection::ColumnLayout::new(vec![220.0, 140.0, 120.0, 280.0])
+                        .with_frozen(1);
+                cols.set_h_scroll(140.0);
+                cols
+            },
             log_lines: (0..200)
                 .map(|i| {
                     let lvl = ["info", "warn", "error"][i % 3];
@@ -817,7 +843,11 @@ impl Gallery {
             ),
             drawer_open: true,
             cheat_q: String::new(),
+            overlay_pin: None,
+            opt_window: VisibleWindow::new(140.0),
+            list_heights: Vec::new(),
         };
+        gallery.list_heights = list_row_heights(&gallery.list);
         gallery.clamp_nav();
         if tour_wanted() {
             gallery.apply_tour_beat(&tour_beat(0));
@@ -1323,6 +1353,23 @@ impl Gallery {
                     }
                 }
             }
+            Message::AskLine => {
+                self.palette.ask("go.line", "Line");
+                self.page = "palette";
+            }
+            Message::PalettePrompt(s) => {
+                if let Some(p) = self.palette.prompt.as_mut() {
+                    p.value = s;
+                }
+            }
+            Message::PaletteApply => {
+                if let Some(p) = self.palette.answer() {
+                    self.note = format!("{} → {}", p.action, p.value);
+                }
+            }
+            Message::TableHScroll(x) => self.table_cols.set_h_scroll(x),
+            Message::OverlayPin(p) => self.overlay_pin = p,
+            Message::OptScroll(w) => self.opt_window = w,
             Message::FocusName => {
                 return icedtea::iced::widget::operation::focus(icedtea::iced::widget::Id::new(
                     "gallery-name",
@@ -2626,7 +2673,7 @@ impl Gallery {
                     Message::ListSel,
                     tok,
                     self.list_window,
-                    48.0,
+                    icedtea::collection::RowHeights::PerRow(&self.list_heights),
                     OVERSCAN,
                     Message::ListScroll,
                     "No rows",
@@ -2640,10 +2687,10 @@ impl Gallery {
                     &self.opt_sel,
                     Message::OptSel,
                     tok,
-                    VisibleWindow::new(140.0),
+                    self.opt_window,
                     36.0,
                     1,
-                    |_| Message::Nop,
+                    Message::OptScroll,
                     "No options",
                     move |_| tok.muted,
                     None,
@@ -2688,21 +2735,29 @@ impl Gallery {
                 .height(Length::Fill)
                 .into()
             }
-            "table" => column![widget::data_table(
-                &self.table,
-                &self.sel,
-                Some(self.table_cursor),
-                &self.table_cols,
-                true,
-                self.table_window,
-                48.0,
-                OVERSCAN,
-                Message::TableCell,
-                Message::Sort,
-                Message::TableScroll,
-                tok,
-                named("table", Role::Table),
-            ),]
+            "table" => column![
+                widget::meta(
+                    "Name is pinned. Role, Status, and Path follow horizontal scroll.",
+                    tok,
+                    named("table-pin", Role::Status),
+                ),
+                widget::data_table(
+                    &self.table,
+                    &self.sel,
+                    Some(self.table_cursor),
+                    &self.table_cols,
+                    true,
+                    self.table_window,
+                    48.0,
+                    OVERSCAN,
+                    Message::TableCell,
+                    Message::Sort,
+                    Message::TableScroll,
+                    Message::TableHScroll,
+                    tok,
+                    named("table", Role::Table),
+                ),
+            ]
             .spacing(8)
             .height(Length::Fill)
             .into(),
@@ -3384,7 +3439,7 @@ impl Gallery {
                     backdrop.into(),
                     container(pattern::about_page(
                         "icedtea",
-                        "0.2.0",
+                        "0.4.0",
                         "MIT",
                         "Gallery",
                         tok,
@@ -3417,18 +3472,67 @@ impl Gallery {
             }
             "palette" => {
                 let res = self.palette.results(&self.actions);
-                container(pattern::command_palette_view(
-                    self.palette.query(),
-                    &res,
-                    self.palette.selected(),
-                    Message::PaletteQuery,
-                    Message::PalettePick,
-                    tok,
-                ))
-                .width(Length::Fill)
+                let displays = [
+                    icedtea::window::DisplayBounds {
+                        x: 0.0,
+                        y: 0.0,
+                        width: 1920.0,
+                        height: 1080.0,
+                    },
+                    icedtea::window::DisplayBounds {
+                        x: 1920.0,
+                        y: 0.0,
+                        width: 1280.0,
+                        height: 800.0,
+                    },
+                ];
+                let at = icedtea::window::place_pinned(
+                    self.overlay_pin,
+                    (self.pointer.x, self.pointer.y),
+                    icedtea::iced::Size::new(480.0, 320.0),
+                    &displays,
+                );
+                column![
+                    widget::meta(
+                        format!("pin {:?} → ({:.0},{:.0})", self.overlay_pin, at.x, at.y),
+                        tok,
+                        named("pin-status", Role::Status),
+                    ),
+                    row![
+                        widget::themed_button(
+                            "Pin display 1",
+                            Some(Message::OverlayPin(Some(1))),
+                            tok,
+                            Variant::Quiet,
+                            btn("pin-1"),
+                        ),
+                        widget::themed_button(
+                            "Follow pointer",
+                            Some(Message::OverlayPin(None)),
+                            tok,
+                            Variant::Ghost,
+                            btn("pin-none"),
+                        ),
+                    ]
+                    .spacing(8),
+                    container(pattern::command_palette_view(
+                        self.palette.query(),
+                        &res,
+                        self.palette.selected(),
+                        Message::PaletteQuery,
+                        Message::PalettePick,
+                        self.palette.prompt.as_ref(),
+                        Message::PalettePrompt,
+                        Some(Message::PaletteApply),
+                        tok,
+                    ))
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .center_x(Length::Fill)
+                    .center_y(Length::Fill),
+                ]
+                .spacing(8)
                 .height(Length::Fill)
-                .center_x(Length::Fill)
-                .center_y(Length::Fill)
                 .into()
             }
             "document-tabs" => {
@@ -3496,56 +3600,59 @@ impl Gallery {
                     tok,
                 )
             }
-            "workspace" => {
-                let slots = self.ws.slots();
-                let active = slots
-                    .iter()
-                    .find(|(_, _, on)| *on)
-                    .map(|(id, _, _)| id.as_str())
-                    .unwrap_or("edit");
-                let center = column![
-                    widget::themed_button(
-                        "Move terminal beside explorer",
-                        Some(Message::WsMove),
+            "workspace" => container(pattern::workspace(
+                &self.ws,
+                move |id| match id {
+                    "explorer" => widget::label(
+                        "src/\n  lib.rs\n  main.rs",
                         tok,
-                        Variant::Quiet,
-                        btn("Move terminal beside explorer"),
+                        named("ws-explorer", Role::List),
                     ),
-                    widget::meta(
-                        format!("Active pane: {active}"),
+                    "term" => widget::meta(
+                        "$ cargo test -p icedtea",
                         tok,
-                        named("ws-active", Role::Status),
+                        named("ws-term", Role::Status),
                     ),
-                    widget::label(
-                        "fn main() {\n    icedtea::run!(...)\n}",
-                        tok,
-                        named("ws-center", Role::Status),
-                    ),
-                ]
-                .spacing(8)
-                .padding(12)
-                .into();
-                container(pattern::workspace(
-                    &self.ws,
-                    center,
-                    icedtea::iced::Size::new(
-                        (self.window_width * (1.0 - self.nav_split.ratio) - 64.0).max(240.0),
-                        360.0,
-                    ),
-                    |i, ev| {
-                        if matches!(ev, SashEvent::Press) {
-                            Message::WsPress(i)
-                        } else {
-                            Message::Sash(ev)
-                        }
-                    },
-                    Message::WsTab,
-                    tok,
-                    named("workspace", Role::Group),
-                ))
-                .height(Length::Fixed(360.0))
-                .into()
-            }
+                    _ => column![
+                        widget::themed_button(
+                            "Move terminal beside explorer",
+                            Some(Message::WsMove),
+                            tok,
+                            Variant::Quiet,
+                            btn("Move terminal beside explorer"),
+                        ),
+                        widget::meta(
+                            format!("Active pane: {id}"),
+                            tok,
+                            named("ws-active", Role::Status),
+                        ),
+                        widget::label(
+                            "fn main() {\n    icedtea::run!(...)\n}",
+                            tok,
+                            named("ws-center", Role::Status),
+                        ),
+                    ]
+                    .spacing(8)
+                    .padding(12)
+                    .into(),
+                },
+                icedtea::iced::Size::new(
+                    (self.window_width * (1.0 - self.nav_split.ratio) - 64.0).max(240.0),
+                    360.0,
+                ),
+                |i, ev| {
+                    if matches!(ev, SashEvent::Press) {
+                        Message::WsPress(i)
+                    } else {
+                        Message::Sash(ev)
+                    }
+                },
+                Message::WsTab,
+                tok,
+                named("workspace", Role::Group),
+            ))
+            .height(Length::Fixed(360.0))
+            .into(),
             "tool-panel" => container(pattern::tool_panel(
                 if self.on {
                     "Outline (docked)"

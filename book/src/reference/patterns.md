@@ -62,7 +62,8 @@ Constructor: [`pattern::workspace`](https://docs.rs/icedtea/latest/icedtea/patte
 [icedtea](https://crates.io/crates/icedtea)
 
 `DockNode` is the layout tree (save, restore, `move_panel`).
-`center` fills the first leaf. Other leaves show their title.
+`pane` is called with each leaf id so every leaf can hold application
+content.
 
 ### Tool panel
 

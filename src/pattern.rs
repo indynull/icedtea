@@ -276,7 +276,7 @@ pub fn status_bar<'a, M: Clone + 'a>(
 /// Fuzzy find over the action table.
 ///
 /// Pass `CommandPalette::results`. An empty query lists favorites,
-/// then recent, then the rest.
+/// then recent, then the rest. `prompt` paints the parameter field.
 ///
 ///
 /// ```
@@ -296,15 +296,22 @@ pub fn status_bar<'a, M: Clone + 'a>(
 ///     0,
 ///     on_query,
 ///     on_pick,
+///     None,
+///     |_s| (),
+///     None,
 ///     tok,
 /// );
 /// ```
+#[allow(clippy::too_many_arguments)]
 pub fn command_palette_view<'a, M: Clone + 'a>(
     query: &str,
     results: &[&Action<M>],
     selected: usize,
     on_query: impl Fn(String) -> M + 'a,
     on_pick: impl Fn(usize) -> M + Copy + 'a,
+    prompt: Option<&crate::palette::Prompt>,
+    on_prompt: impl Fn(String) -> M + 'a,
+    on_done: Option<M>,
     tok: Tokens,
 ) -> Element<'a, M> {
     let mut list = Column::new().spacing(2);
@@ -323,17 +330,39 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
                 .with_disabled(!a.enabled),
         ));
     }
+    let field: Element<'a, M> = if let Some(p) = prompt {
+        column![
+            meta(
+                p.label.clone(),
+                tok,
+                A11y::new(p.label.clone(), Role::Status)
+            ),
+            themed_text_input(
+                p.label.as_str(),
+                &p.value,
+                on_prompt,
+                on_done,
+                tok,
+                A11y::new("palette-arg", Role::TextBox),
+                Some(iced::widget::Id::new("palette-arg")),
+            ),
+        ]
+        .spacing(6)
+        .into()
+    } else {
+        themed_text_input(
+            "Type a command",
+            query,
+            on_query,
+            None,
+            tok,
+            A11y::new("palette-query", Role::TextBox),
+            Some(iced::widget::Id::new("palette-query")),
+        )
+    };
     container(
         column![
-            themed_text_input(
-                "Type a command",
-                query,
-                on_query,
-                None,
-                tok,
-                A11y::new("palette-query", Role::TextBox),
-                Some(iced::widget::Id::new("palette-query")),
-            ),
+            field,
             themed_scroll(
                 list.into(),
                 tok,
@@ -983,10 +1012,9 @@ pub fn inspector<'a, M: 'a>(
 
 /// Nested dock tree: splits with a sash, tab groups, and leaf chrome.
 ///
-/// `center` fills the first leaf (depth-first). Other leaves show their
-/// title. `on_sash` is the split index then the grip event. `on_tab`
-/// is the depth-first tab-group index, then the selected tab
-/// (`DockNode::select_tab_group`).
+/// `pane` is called with each leaf id (and the active tab id). `on_sash`
+/// is the split index then the grip event. `on_tab` is the depth-first
+/// tab-group index, then the selected tab (`DockNode::select_tab_group`).
 ///
 ///
 /// ```
@@ -996,7 +1024,12 @@ pub fn inspector<'a, M: 'a>(
 /// use icedtea::widget;
 /// use icedtea::workspace::DockNode;
 /// let tok = theme::named("dark").tokens;
-/// let root = DockNode::leaf("edit", "Edit");
+/// let root = DockNode::split(
+///     icedtea::layout::Axis::Horizontal,
+///     0.4,
+///     DockNode::leaf("nav", "Nav"),
+///     DockNode::leaf("edit", "Edit"),
+/// );
 /// #[derive(Clone, Copy)]
 /// enum Msg {
 ///     Sash(usize, icedtea::layout::SashEvent),
@@ -1006,7 +1039,9 @@ pub fn inspector<'a, M: 'a>(
 /// let on_tab = Msg::Tab;
 /// let _: icedtea::Element<'_, Msg> = pattern::workspace(
 ///     &root,
-///     widget::label("src", tok, A11y::new("src", Role::Status)),
+///     |id| {
+///         widget::label(id, tok, A11y::new(id, Role::Status))
+///     },
 ///     icedtea::iced::Size::new(400.0, 240.0),
 ///     on_sash,
 ///     on_tab,
@@ -1016,7 +1051,7 @@ pub fn inspector<'a, M: 'a>(
 /// ```
 pub fn workspace<'a, M: Clone + 'a>(
     root: &crate::workspace::DockNode,
-    center: Element<'a, M>,
+    pane: impl Fn(&str) -> Element<'a, M> + Copy + 'a,
     viewport: Size,
     on_sash: impl Fn(usize, layout::SashEvent) -> M + Copy + 'a,
     on_tab: impl Fn(usize, usize) -> M + Copy + 'a,
@@ -1024,8 +1059,7 @@ pub fn workspace<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let mut paint = DockPaint {
-        focus: first_leaf_id(root).unwrap_or_default(),
-        center: Some(center),
+        pane,
         split_i: 0,
         tab_i: 0,
         on_sash,
@@ -1043,23 +1077,13 @@ pub fn workspace<'a, M: Clone + 'a>(
     )
 }
 
-fn first_leaf_id(node: &crate::workspace::DockNode) -> Option<String> {
-    match node {
-        crate::workspace::DockNode::Leaf(p) => Some(p.id.clone()),
-        crate::workspace::DockNode::Split { first, .. } => first_leaf_id(first),
-        crate::workspace::DockNode::Tabs { panes, active, .. } => {
-            panes.get(*active).or(panes.first()).map(|p| p.id.clone())
-        }
-    }
-}
-
-struct DockPaint<'a, M, Sash, Tab>
+struct DockPaint<'a, M, Pane, Sash, Tab>
 where
+    Pane: Fn(&str) -> Element<'a, M> + Copy + 'a,
     Sash: Fn(usize, layout::SashEvent) -> M + Copy + 'a,
     Tab: Fn(usize, usize) -> M + Copy + 'a,
 {
-    focus: String,
-    center: Option<Element<'a, M>>,
+    pane: Pane,
     split_i: usize,
     tab_i: usize,
     on_sash: Sash,
@@ -1067,27 +1091,22 @@ where
     tok: Tokens,
 }
 
-fn paint_dock<'a, M, Sash, Tab>(
+fn paint_dock<'a, M, Pane, Sash, Tab>(
     node: &crate::workspace::DockNode,
     width: f32,
     height: f32,
-    paint: &mut DockPaint<'a, M, Sash, Tab>,
+    paint: &mut DockPaint<'a, M, Pane, Sash, Tab>,
 ) -> Element<'a, M>
 where
     M: Clone + 'a,
+    Pane: Fn(&str) -> Element<'a, M> + Copy + 'a,
     Sash: Fn(usize, layout::SashEvent) -> M + Copy + 'a,
     Tab: Fn(usize, usize) -> M + Copy + 'a,
 {
     let tok = paint.tok;
     match node {
         crate::workspace::DockNode::Leaf(p) => {
-            let body = if p.id == paint.focus {
-                paint.center.take().unwrap_or_else(|| {
-                    meta(p.title.clone(), tok, A11y::new(&p.title, Role::Status))
-                })
-            } else {
-                meta(p.title.clone(), tok, A11y::new(&p.title, Role::Status))
-            };
+            let body = (paint.pane)(&p.id);
             group_box(
                 p.title.clone(),
                 body,
@@ -1101,19 +1120,8 @@ where
             let titles: Vec<String> = panes.iter().map(|p| p.title.clone()).collect();
             let mut tabs = Tabs::new(titles);
             tabs.active = (*active).min(panes.len().saturating_sub(1));
-            let title = panes
-                .get(tabs.active)
-                .map(|p| p.title.clone())
-                .unwrap_or_default();
             let id = panes.get(tabs.active).map(|p| p.id.as_str()).unwrap_or("");
-            let body = if id == paint.focus {
-                paint
-                    .center
-                    .take()
-                    .unwrap_or_else(|| meta(title.clone(), tok, A11y::new(&title, Role::Status)))
-            } else {
-                meta(title.clone(), tok, A11y::new(&title, Role::Status))
-            };
+            let body = (paint.pane)(id);
             let on_tab = paint.on_tab;
             let pick = move |i| on_tab(gi, i);
             tab_view(&tabs, body, pick, pick, tok)
@@ -1436,9 +1444,11 @@ mod tests {
         let loc = crate::i18n::Locale::new("ar");
         assert_eq!(loc.direction, Direction::Rtl);
         let res: Vec<&Action<()>> = table.iter().collect();
-        let _: Element<'_, ()> = command_palette_view("", &res, 0, |_| (), |_| (), tok);
+        let _: Element<'_, ()> =
+            command_palette_view("", &res, 0, |_| (), |_| (), None, |_| (), None, tok);
         let dead_res: Vec<&Action<()>> = disabled.iter().collect();
-        let _: Element<'_, ()> = command_palette_view("q", &dead_res, 0, |_| (), |_| (), tok);
+        let _: Element<'_, ()> =
+            command_palette_view("q", &dead_res, 0, |_| (), |_| (), None, |_| (), None, tok);
         let _: Element<'_, ()> = status_page("Empty", "Nothing", Some(("New".into(), ())), tok);
         let _: Element<'_, ()> = status_page("Empty", "Nothing", None, tok);
         let _: Element<'_, ()> = about_page("App", "0.1.0", "MIT", "us", tok, &cat);
@@ -1495,8 +1505,25 @@ mod tests {
         paint(&mut tb);
         let mut sb = status_bar("ready", &table, tok, ltr);
         paint(&mut sb);
-        let mut pal = command_palette_view("", &res, 0, |_| (), |_| (), tok);
+        let mut pal = command_palette_view("", &res, 0, |_| (), |_| (), None, |_| (), None, tok);
         paint(&mut pal);
+        let ask = crate::palette::Prompt {
+            action: "go.line".into(),
+            label: "Line".into(),
+            value: "12".into(),
+        };
+        let mut asked = command_palette_view(
+            "",
+            &res,
+            0,
+            |_| (),
+            |_| (),
+            Some(&ask),
+            |_| (),
+            Some(()),
+            tok,
+        );
+        paint(&mut asked);
         let mut page = status_page("Empty", "Nothing", Some(("New".into(), ())), tok);
         paint(&mut page);
         let mut about = about_page("App", "0.1.0", "MIT", "us", tok, &cat);
@@ -1565,7 +1592,7 @@ mod tests {
         let root = crate::workspace::DockNode::leaf("edit", "Edit");
         let mut ws = workspace(
             &root,
-            lab("c"),
+            |_| lab("c"),
             Size::new(400.0, 240.0),
             |_, _| (),
             |_, _| (),
@@ -1619,7 +1646,7 @@ mod tests {
         );
         let mut ws = workspace(
             &root,
-            lab("c"),
+            |_| lab("c"),
             Size::new(400.0, 240.0),
             |_, _| (),
             |_, _| (),
@@ -1641,7 +1668,13 @@ mod tests {
         );
         let mut split_ws = workspace(
             &split_root,
-            lab("c"),
+            |id| {
+                lab(if id == "ex" {
+                    "explorer-body"
+                } else {
+                    "edit-body"
+                })
+            },
             Size::new(400.0, 240.0),
             |_, _| (),
             |_, _| (),
@@ -1657,7 +1690,7 @@ mod tests {
         );
         let mut vws = workspace(
             &vertical,
-            lab("c"),
+            |_| lab("c"),
             Size::new(400.0, 240.0),
             |_, _| (),
             |_, _| (),
@@ -1673,7 +1706,7 @@ mod tests {
         );
         let mut tws = workspace(
             &twins,
-            lab("c"),
+            |_| lab("c"),
             Size::new(200.0, 120.0),
             |_, _| (),
             |_, _| (),
@@ -1684,7 +1717,7 @@ mod tests {
         let empty_tabs = crate::workspace::DockNode::tabs(vec![], 0);
         let mut ews = workspace(
             &empty_tabs,
-            lab("c"),
+            |_| lab("c"),
             Size::new(200.0, 120.0),
             |_, _| (),
             |_, _| (),

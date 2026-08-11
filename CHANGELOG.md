@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.4.0 — 2026-08-11
+
+`pattern::workspace` calls `pane` with each leaf id. `list_view`
+takes `RowHeights` so rows can be `visible_range_var` heights.
+`data_table` keeps `ColumnLayout.frozen` leading columns in view;
+`on_h_scroll` moves the rest. `command_palette_view` paints a
+parameter field when `CommandPalette::ask` is set.
+`window::place_pinned` clamps an overlay onto a chosen display.
+
 ## 0.3.0 — 2026-08-11
 
 The first window is a Save tool (`examples/hello.rs`). Crate-root

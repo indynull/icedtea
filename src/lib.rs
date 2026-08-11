@@ -289,7 +289,7 @@ mod tests {
                 .find("icedtea =")
                 .expect("install story names the crate");
             assert!(
-                src[at..].starts_with("icedtea = \"0.3\""),
+                src[at..].starts_with("icedtea = \"0.4\""),
                 "first icedtea line is the crates.io version"
             );
         }

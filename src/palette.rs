@@ -24,6 +24,15 @@ pub struct CommandPalette {
     hits: Vec<String>,
     pub recent: Vec<String>,
     pub favorites: Vec<String>,
+    pub prompt: Option<Prompt>,
+}
+
+/// Parameter the palette asks for after a command (go to line, rename).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Prompt {
+    pub action: String,
+    pub label: String,
+    pub value: String,
 }
 
 impl Default for CommandPalette {
@@ -41,7 +50,20 @@ impl CommandPalette {
             hits: Vec::new(),
             recent: Vec::new(),
             favorites: Vec::new(),
+            prompt: None,
         }
+    }
+
+    pub fn ask(&mut self, action: impl Into<String>, label: impl Into<String>) {
+        self.prompt = Some(Prompt {
+            action: action.into(),
+            label: label.into(),
+            value: String::new(),
+        });
+    }
+
+    pub fn answer(&mut self) -> Option<Prompt> {
+        self.prompt.take()
     }
 
     pub fn pin_favorite(&mut self, id: impl Into<String>) {
@@ -205,5 +227,11 @@ mod tests {
         pal.set_query(&table, "");
         let empty = pal.results(&table);
         assert_eq!(empty[0].id.as_str(), "file.save");
+        pal.ask("go.line", "Line");
+        pal.prompt.as_mut().unwrap().value = "12".into();
+        let p = pal.answer().unwrap();
+        assert_eq!(p.action, "go.line");
+        assert_eq!(p.value, "12");
+        assert!(pal.answer().is_none());
     }
 }

@@ -5,7 +5,8 @@ undecorated, always-on-top palette window. `Boot::size(w, h)` is the
 inner size; there is no 720x480 maximum. `Boot::pointer` plus
 `Boot::displays` place the window on the display under the pointer.
 `window::place` is pointer-origin (menus). `window::place_centered`
-centers `size` on that display (else the first).
+centers `size` on that display (else the first). `window::place_pinned`
+clamps onto `pin` even when the pointer has moved to another screen.
 
 Hide policy (`HidePolicy::EscapeOrFocusLoss`, and friends) is
 evaluated with `should_hide(policy, event, in_card)`. `in_card` (search

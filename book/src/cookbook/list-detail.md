@@ -61,4 +61,5 @@ impl App {
 ```
 
 `layout::fixed` sizes the sidebar. The detail child fills. Selection
-stays on indices.
+stays on indices. Pass `RowHeights::PerRow` when rows are not one
+height.

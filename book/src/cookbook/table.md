@@ -48,6 +48,7 @@ impl App {
             Message::Cell,
             Message::Sort,
             Message::Scroll,
+            |_| 0.0,
             tok,
             A11y::new("files", Role::Table),
         )
@@ -55,5 +56,6 @@ impl App {
 }
 ```
 
-`ColumnLayout` holds widths and display order. `on_sort` and
-`on_scroll` must land in `update` or the table will not move.
+`ColumnLayout` holds widths, display order, and `frozen` leading
+columns. `on_sort`, `on_scroll`, and `on_h_scroll` must land in
+`update` or the table will not move.

@@ -453,6 +453,67 @@ pub fn visible_window_var(
     }
 }
 
+/// How tall each virtual row is.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RowHeights<'a> {
+    Uniform(f32),
+    PerRow(&'a [f32]),
+}
+
+impl From<f32> for RowHeights<'_> {
+    fn from(h: f32) -> Self {
+        Self::Uniform(h)
+    }
+}
+
+impl RowHeights<'_> {
+    pub fn at(self, i: usize) -> f32 {
+        match self {
+            Self::Uniform(h) => h.max(0.0),
+            Self::PerRow(hs) => hs.get(i).copied().unwrap_or(0.0).max(0.0),
+        }
+    }
+
+    pub fn total(self, n: usize) -> f32 {
+        match self {
+            Self::Uniform(h) => n as f32 * h.max(0.0),
+            Self::PerRow(hs) => hs.iter().take(n).copied().sum(),
+        }
+    }
+
+    pub fn offset(self, i: usize) -> f32 {
+        match self {
+            Self::Uniform(h) => i as f32 * h.max(0.0),
+            Self::PerRow(hs) => hs.iter().take(i).copied().sum(),
+        }
+    }
+}
+
+/// After a scroll, remount using [`visible_window_var`].
+pub fn window_after_scroll_var(
+    prev: VisibleWindow,
+    scroll: f32,
+    viewport: f32,
+    heights: &[f32],
+    overscan: usize,
+    cover: Option<usize>,
+) -> VisibleWindow {
+    let viewport = if viewport > 0.0 {
+        viewport
+    } else {
+        prev.viewport
+    };
+    let total: f32 = heights.iter().copied().sum();
+    let max_scroll = (total - viewport).max(0.0);
+    visible_window_var(
+        scroll.clamp(0.0, max_scroll),
+        viewport,
+        heights,
+        overscan,
+        cover,
+    )
+}
+
 /// Pads for a variable-height virtual list.
 pub fn virtual_pads_var(
     heights: &[f32],
@@ -494,13 +555,31 @@ pub fn transfer_index(
 pub struct ColumnLayout {
     pub widths: Vec<f32>,
     pub order: Vec<usize>,
+    /// First *n* columns in `order` stay in view; the rest scroll.
+    pub frozen: usize,
+    /// Horizontal pixel offset of the unfrozen columns.
+    pub h_scroll: f32,
 }
 
 impl ColumnLayout {
     pub fn new(widths: impl Into<Vec<f32>>) -> Self {
         let widths = widths.into();
         let order: Vec<usize> = (0..widths.len()).collect();
-        Self { widths, order }
+        Self {
+            widths,
+            order,
+            frozen: 0,
+            h_scroll: 0.0,
+        }
+    }
+
+    pub fn with_frozen(mut self, n: usize) -> Self {
+        self.frozen = n.min(self.order.len());
+        self
+    }
+
+    pub fn set_h_scroll(&mut self, x: f32) {
+        self.h_scroll = x.max(0.0);
     }
 
     pub fn resize(&mut self, col: usize, delta: f32, min: f32) {
@@ -1112,7 +1191,41 @@ mod tests {
         assert_eq!(transfer_index(&mut from, &mut to, 2, 0), 0);
         assert_eq!(from, vec![1, 3]);
         assert_eq!(to, vec![2, 9]);
-        let mut cols = ColumnLayout::new(vec![80.0, 120.0, 60.0]);
+        let ext = RowHeights::PerRow(&h);
+        assert_eq!(ext.at(1), 40.0);
+        assert_eq!(ext.offset(2), 60.0);
+        assert_eq!(ext.total(5), 180.0);
+        assert_eq!(RowHeights::from(20.0).at(3), 20.0);
+        assert_eq!(RowHeights::from(20.0).offset(4), 80.0);
+        assert_eq!(RowHeights::from(20.0).total(3), 60.0);
+        assert_eq!(RowHeights::from(-4.0).total(3), 0.0);
+        assert_eq!(RowHeights::from(-4.0).offset(2), 0.0);
+        let after = window_after_scroll_var(win, 40.0, 60.0, &h, 0, None);
+        assert!(after.scroll >= 20.0);
+        let zero_vp = window_after_scroll_var(win, 10.0, 0.0, &h, 0, None);
+        assert!(zero_vp.viewport > 0.0);
+        assert_eq!(RowHeights::PerRow(&[8.0]).at(9), 0.0);
+        let _u0 = RowHeights::Uniform(20.0).total(0);
+        let _u1 = RowHeights::Uniform(20.0).total(1);
+        let _u2 = RowHeights::Uniform(0.0).offset(5);
+        let _p0 = RowHeights::PerRow(&h).total(0);
+        let _p1 = RowHeights::PerRow(&h).offset(0);
+        let _p2 = RowHeights::PerRow(&[]).total(3);
+        let _p3 = RowHeights::PerRow(&[]).offset(3);
+        let _v0 = visible_window_var(0.0, 10.0, &h, 2, Some(99));
+        let _v1 = visible_window_var(0.0, 10.0, &h, 0, Some(4));
+        let _v2 = window_after_scroll_var(win, 999.0, 10.0, &h, 0, Some(0));
+        let _v3 = virtual_pads_var(&h, 0.0, 0.0, 0, None);
+        let _v4 = virtual_pads_var(&[10.0], 50.0, 10.0, 0, None);
+        let _v5 = visible_range_var(-5.0, 10.0, &h);
+        let _v6 = row_offsets(&[]);
+        let mut cols = ColumnLayout::new(vec![80.0, 120.0, 60.0]).with_frozen(1);
+        assert_eq!(cols.frozen, 1);
+        assert_eq!(ColumnLayout::new(vec![10.0]).with_frozen(9).frozen, 1);
+        cols.set_h_scroll(40.0);
+        assert_eq!(cols.h_scroll, 40.0);
+        cols.set_h_scroll(-3.0);
+        assert_eq!(cols.h_scroll, 0.0);
         cols.reorder(2, 1);
         assert_eq!(cols.display()[0], 0);
         assert_eq!(cols.display()[1], 2);
