@@ -586,7 +586,9 @@ pub fn preferences_page<'a, M: Clone + 'a>(
 /// A sidebar list beside a filling detail pane.
 ///
 /// `sidebar` is [`crate::layout::fixed`] or [`crate::layout::FILL`].
-/// Children fill their panes.
+/// The list sits on a padded panel; a hairline separates the panes;
+/// the detail pane gets the same 12px inset on every side so text and
+/// the list rail are not flush to the outer edge.
 ///
 ///
 /// ```
@@ -608,24 +610,34 @@ pub fn list_detail<'a, M: 'a>(
     sidebar: Length,
     tok: Tokens,
 ) -> Element<'a, M> {
-    row![
-        container(list)
-            .width(sidebar)
-            .height(Length::Fill)
-            .style(move |_| style::panel(tok)),
-        container(detail)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .padding(iced::Padding {
-                top: 8.0,
-                right: 16.0,
-                bottom: 0.0,
-                left: 16.0,
-            }),
-    ]
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .into()
+    // 8 on the list so the virtual rail and first/last rows clear the
+    // panel edge; 4 on the rail side keeps the 12px rail from kissing
+    // the hairline. Detail uses a full 12 all around (was bottom: 0).
+    let list_pad = iced::Padding {
+        top: 8.0,
+        right: 4.0,
+        bottom: 8.0,
+        left: 8.0,
+    };
+    let detail_pad = iced::Padding::from(12);
+    let list_pane = container(list)
+        .width(sidebar)
+        .height(Length::Fill)
+        .padding(list_pad)
+        .clip(true)
+        .style(move |_| style::panel(tok));
+    let rule = container(Space::new().width(1).height(Length::Fill))
+        .width(1)
+        .height(Length::Fill)
+        .style(move |_| style::hairline(tok));
+    let detail_pane = container(detail)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .padding(detail_pad);
+    row![list_pane, rule, detail_pane]
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .into()
 }
 
 /// Sidebar beside content, or a stack with Back.
@@ -721,7 +733,11 @@ pub fn tab_view<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     column![
         tab_bar(tabs, on_select, on_close, tok, A11y::new("tabs", Role::Tab)),
-        body
+        container(body)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .padding(12)
+            .style(move |_| style::fill(tok.surface, tok.text)),
     ]
     .spacing(0)
     .width(Length::Fill)
@@ -851,14 +867,118 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
     )
 }
 
-/// Card size for `n` actions inside `viewport`. Long lists cap and scroll.
+const CONTEXT_MENU_W: f32 = 220.0;
+/// Row face height (items and submenu titles). Matches `control_height`-class faces.
+const CONTEXT_ROW: f32 = 30.0;
+const CONTEXT_SEP: f32 = 9.0;
+/// Total vertical pad on the column (6 top + 6 bottom).
+const CONTEXT_PAD: f32 = 12.0;
+const CONTEXT_COL_PAD: f32 = 6.0;
+/// Gap between root card and flyout — never overlap the parent.
+const CONTEXT_FLY_GAP: f32 = 4.0;
+
+/// One row in a context menu: action, separator, or nested submenu.
+#[derive(Debug, Clone)]
+pub enum ContextEntry<M> {
+    Item(Action<M>),
+    Separator,
+    /// Title opens a flyout. Children are items and separators (one level).
+    Menu {
+        title: String,
+        entries: Vec<ContextEntry<M>>,
+    },
+}
+
+impl<M> ContextEntry<M> {
+    pub fn item(action: Action<M>) -> Self {
+        Self::Item(action)
+    }
+
+    pub fn menu(
+        title: impl Into<String>,
+        entries: impl IntoIterator<Item = ContextEntry<M>>,
+    ) -> Self {
+        Self::Menu {
+            title: title.into(),
+            entries: entries.into_iter().collect(),
+        }
+    }
+}
+
+impl<M> From<Action<M>> for ContextEntry<M> {
+    fn from(action: Action<M>) -> Self {
+        Self::Item(action)
+    }
+}
+
+fn context_entry_height<M>(entry: &ContextEntry<M>) -> f32 {
+    match entry {
+        ContextEntry::Separator => CONTEXT_SEP,
+        ContextEntry::Item(_) | ContextEntry::Menu { .. } => CONTEXT_ROW,
+    }
+}
+
+fn context_entries_height<M>(entries: &[ContextEntry<M>]) -> f32 {
+    CONTEXT_PAD + entries.iter().map(context_entry_height).sum::<f32>()
+}
+
+/// Y of the top of `entries[index]` relative to the outer card origin.
+fn context_offset_before<M>(entries: &[ContextEntry<M>], index: usize) -> f32 {
+    CONTEXT_COL_PAD
+        + entries
+            .iter()
+            .take(index)
+            .map(context_entry_height)
+            .sum::<f32>()
+}
+
+/// Place a flyout beside the root card, top-aligned with the parent row.
+/// Prefers the right edge; falls to the left when the right side overflows.
+/// Does not overlap the root card. Clamps into `viewport` only after that.
+pub fn context_flyout_origin(
+    root_at: Point,
+    root_size: Size,
+    row_top_in_root: f32,
+    fly_size: Size,
+    viewport: Size,
+) -> Point {
+    let right_x = root_at.x + root_size.width + CONTEXT_FLY_GAP;
+    let left_x = root_at.x - fly_size.width - CONTEXT_FLY_GAP;
+    let x = if right_x + fly_size.width <= viewport.width + 0.5 {
+        right_x
+    } else if left_x >= 0.0 {
+        left_x
+    } else {
+        // Both sides tight: prefer right, then clamp.
+        right_x
+            .min((viewport.width - fly_size.width).max(0.0))
+            .max(0.0)
+    };
+    let y_ideal = root_at.y + row_top_in_root;
+    let y = y_ideal
+        .min((viewport.height - fly_size.height).max(0.0))
+        .max(0.0);
+    Point::new(x, y)
+}
+
+/// Card size for `n` flat action rows inside `viewport`. Long lists cap and scroll.
 pub fn context_card_size(n: usize, viewport: Size) -> Size {
-    const MENU_W: f32 = 220.0;
-    const ROW: f32 = 34.0;
-    const PAD: f32 = 12.0;
-    let natural = PAD + (n.max(1) as f32) * ROW;
-    let max_h = (viewport.height * 0.5).max(ROW + PAD);
-    Size::new(MENU_W.min(viewport.width.max(1.0)), natural.min(max_h))
+    let natural = CONTEXT_PAD + (n.max(1) as f32) * CONTEXT_ROW;
+    let max_h = (viewport.height * 0.5).max(CONTEXT_ROW + CONTEXT_PAD);
+    Size::new(
+        CONTEXT_MENU_W.min(viewport.width.max(1.0)),
+        natural.min(max_h),
+    )
+}
+
+/// Card size for a tree of [`ContextEntry`] rows.
+pub fn context_card_size_entries<M>(entries: &[ContextEntry<M>], viewport: Size) -> Size {
+    let natural = context_entries_height(entries).max(CONTEXT_PAD + CONTEXT_ROW);
+    let max_h = (viewport.height * 0.5).max(CONTEXT_ROW + CONTEXT_PAD);
+    Size::new(
+        CONTEXT_MENU_W.min(viewport.width.max(1.0)),
+        natural.min(max_h),
+    )
 }
 
 /// Clamp `origin` so a card of `size` stays inside `viewport`.
@@ -875,52 +995,172 @@ pub fn context_origin(origin: Point, size: Size, viewport: Size) -> Point {
     )
 }
 
+fn context_item_row<'a, M: Clone + 'a>(action: &Action<M>, tok: Tokens) -> Element<'a, M> {
+    themed_button(
+        menu_item_label(action),
+        action.invoke(),
+        tok,
+        Variant::Ghost,
+        A11y::new(action.title.clone(), Role::MenuItem).with_disabled(!action.enabled),
+    )
+}
+
+fn context_menu_column<'a, M: Clone + 'a>(
+    entries: &[ContextEntry<M>],
+    open_submenu: Option<usize>,
+    on_submenu: impl Fn(Option<usize>) -> M + Copy + 'a,
+    allow_submenu: bool,
+    tok: Tokens,
+) -> Element<'a, M> {
+    // Pad and row heights must match `context_offset_before` / card size.
+    let mut col = Column::new()
+        .spacing(0)
+        .padding(CONTEXT_COL_PAD)
+        .width(Length::Fill);
+    for (i, entry) in entries.iter().enumerate() {
+        match entry {
+            ContextEntry::Separator => {
+                col = col.push(
+                    container(Space::new().width(Length::Fill).height(1))
+                        .width(Length::Fill)
+                        .height(CONTEXT_SEP)
+                        .center_y(CONTEXT_SEP)
+                        .padding(Padding {
+                            top: 0.0,
+                            right: 8.0,
+                            bottom: 0.0,
+                            left: 8.0,
+                        })
+                        .style(move |_| style::hairline(tok)),
+                );
+            }
+            ContextEntry::Item(action) => {
+                let row = context_item_row(action, tok);
+                let row = if allow_submenu {
+                    mouse_area(row).on_enter(on_submenu(None)).into()
+                } else {
+                    row
+                };
+                col = col.push(
+                    container(row)
+                        .width(Length::Fill)
+                        .height(CONTEXT_ROW)
+                        .center_y(CONTEXT_ROW),
+                );
+            }
+            ContextEntry::Menu { title, .. } => {
+                if !allow_submenu {
+                    col = col.push(
+                        container(meta(
+                            title.clone(),
+                            tok,
+                            A11y::new(title.clone(), Role::MenuItem),
+                        ))
+                        .width(Length::Fill)
+                        .height(CONTEXT_ROW)
+                        .center_y(CONTEXT_ROW)
+                        .padding(Padding {
+                            top: 0.0,
+                            right: 8.0,
+                            bottom: 0.0,
+                            left: 10.0,
+                        }),
+                    );
+                    continue;
+                }
+                let open = open_submenu == Some(i);
+                let title_el: Element<'a, M> = label(
+                    title.clone(),
+                    tok,
+                    A11y::new(title.clone(), Role::MenuItem),
+                );
+                let cue: Element<'a, M> =
+                    meta("›", tok, A11y::new("submenu", Role::Status));
+                let face = row![title_el, Space::new().width(Length::Fill), cue]
+                    .spacing(8)
+                    .align_y(Alignment::Center)
+                    .width(Length::Fill)
+                    .padding(Padding {
+                        top: 0.0,
+                        right: 8.0,
+                        bottom: 0.0,
+                        left: 10.0,
+                    });
+                let shell = container(face)
+                    .width(Length::Fill)
+                    .height(CONTEXT_ROW)
+                    .center_y(CONTEXT_ROW)
+                    .style(move |_| {
+                        if open {
+                            style::list_row(tok, true)
+                        } else {
+                            style::fill(iced::Color::TRANSPARENT, tok.text)
+                        }
+                    });
+                let row: Element<'a, M> = mouse_area(shell)
+                    .on_enter(on_submenu(Some(i)))
+                    .on_press(on_submenu(Some(i)))
+                    .into();
+                col = col.push(row);
+            }
+        }
+    }
+    col.into()
+}
+
 /// Place a context menu at `origin` in the window. Left click-away dismisses.
 ///
-/// Right-click is the application's (`listen_cursor`). Empty `actions`
-/// still paints a card. `viewport` clamps the card to its real size.
+/// Right-click is the application's (`listen_cursor`). Entries may nest one
+/// flyout level via [`ContextEntry::Menu`]. `open_submenu` is the root index
+/// of the open flyout (`None` when closed). Hovering a submenu row posts
+/// `on_submenu`; hovering an item posts `on_submenu(None)`.
 ///
 ///
 /// ```
-/// use icedtea::action::{Action, ActionTable};
-/// use icedtea::pattern;
+/// use icedtea::action::Action;
+/// use icedtea::pattern::{self, ContextEntry};
 /// use icedtea::theme;
 /// let tok = theme::named("dark").tokens;
-/// let mut table = ActionTable::new();
-/// table.insert(Action::new("file.save", "Save", ()));
+/// #[derive(Clone)]
+/// enum Msg {
+///     Submenu(Option<usize>),
+///     Dismiss,
+///     Copy,
+/// }
+/// let entries = [
+///     ContextEntry::from(Action::new("edit.copy", "Copy", Msg::Copy)),
+///     ContextEntry::Separator,
+///     ContextEntry::menu(
+///         "Share",
+///         [ContextEntry::from(Action::new("share.link", "Copy link", Msg::Copy))],
+///     ),
+/// ];
 /// let vp = icedtea::iced::Size::new(800.0, 600.0);
-/// assert!(pattern::context_card_size(2, vp).height < 120.0);
-/// let _: icedtea::Element<'_, ()> = pattern::context_menu(
-///     table.iter().cloned(),
+/// let _: icedtea::Element<'_, Msg> = pattern::context_menu(
+///     entries,
 ///     icedtea::iced::Point::new(24.0, 48.0),
 ///     vp,
-///     (),
+///     None,
+///     Msg::Submenu,
+///     Msg::Dismiss,
 ///     tok,
 /// );
 /// ```
 pub fn context_menu<'a, M: Clone + 'a>(
-    actions: impl IntoIterator<Item = Action<M>>,
+    entries: impl IntoIterator<Item = ContextEntry<M>>,
     origin: Point,
     viewport: Size,
+    open_submenu: Option<usize>,
+    on_submenu: impl Fn(Option<usize>) -> M + Copy + 'a,
     on_dismiss: M,
     tok: Tokens,
 ) -> Element<'a, M> {
-    let actions: Vec<Action<M>> = actions.into_iter().collect();
-    let n = actions.len();
-    let size = context_card_size(n, viewport);
+    let entries: Vec<ContextEntry<M>> = entries.into_iter().collect();
+    let size = context_card_size_entries(&entries, viewport);
     let at = context_origin(origin, size, viewport);
-    let mut col = Column::new().spacing(2).padding(6);
-    for a in actions {
-        col = col.push(themed_button(
-            a.title.clone(),
-            a.invoke(),
-            tok,
-            Variant::Ghost,
-            A11y::new(a.title.clone(), Role::MenuItem).with_disabled(!a.enabled),
-        ));
-    }
-    let list: Element<'a, M> = col.into();
-    let inner = if size.height + 1.0 < 12.0 + (n.max(1) as f32) * 34.0 {
+    let list = context_menu_column(&entries, open_submenu, on_submenu, true, tok);
+    let natural = context_entries_height(&entries);
+    let inner = if size.height + 1.0 < natural {
         container(themed_scroll(
             list,
             tok,
@@ -934,7 +1174,7 @@ pub fn context_menu<'a, M: Clone + 'a>(
     } else {
         container(list)
             .width(Length::Fixed(size.width))
-            .height(Length::Fixed(size.height))
+            .height(Length::Shrink)
     };
     let card = container(inner).style(move |_| style::raised_card(tok));
     let placed = container(card).padding(Padding {
@@ -943,11 +1183,52 @@ pub fn context_menu<'a, M: Clone + 'a>(
         bottom: 0.0,
         left: at.x,
     });
-    Stack::new()
+
+    let mut stack = Stack::new()
         .push(
             mouse_area(Space::new().width(Length::Fill).height(Length::Fill)).on_press(on_dismiss),
         )
-        .push(placed)
+        .push(placed);
+
+    if let Some(i) = open_submenu {
+        if let Some(ContextEntry::Menu { entries: kids, .. }) = entries.get(i) {
+            let kids = kids.clone();
+            let fly_size = context_card_size_entries(&kids, viewport);
+            let row_top = context_offset_before(&entries, i);
+            let fly_at =
+                context_flyout_origin(at, size, row_top, fly_size, viewport);
+            let fly_list = context_menu_column(&kids, None, on_submenu, false, tok);
+            let fly_natural = context_entries_height(&kids);
+            // Same cap + scroll as the root card so placement size matches paint.
+            let fly_inner: Element<'a, M> = if fly_size.height + 1.0 < fly_natural {
+                container(themed_scroll(
+                    fly_list,
+                    tok,
+                    A11y::new("context-fly-scroll", Role::Group),
+                    false,
+                    None,
+                    None::<fn(_) -> M>,
+                ))
+                .width(Length::Fixed(fly_size.width))
+                .height(Length::Fixed(fly_size.height))
+                .into()
+            } else {
+                container(fly_list)
+                    .width(Length::Fixed(fly_size.width))
+                    .height(Length::Shrink)
+                    .into()
+            };
+            let fly_card = container(fly_inner).style(move |_| style::raised_card(tok));
+            stack = stack.push(container(fly_card).padding(Padding {
+                top: fly_at.y,
+                right: 0.0,
+                bottom: 0.0,
+                left: fly_at.x,
+            }));
+        }
+    }
+
+    stack
         .width(Length::Fill)
         .height(Length::Fill)
         .into()
@@ -1020,12 +1301,33 @@ pub fn inspector<'a, M: 'a>(
     props: Element<'a, M>,
     tok: Tokens,
 ) -> Element<'a, M> {
+    // Same inset rules as list_detail: list rail clears the edge; hairlines
+    // separate panes; props and detail share a 12px pad.
+    let list_pad = iced::Padding {
+        top: 8.0,
+        right: 4.0,
+        bottom: 8.0,
+        left: 8.0,
+    };
+    let rule = || {
+        container(Space::new().width(1).height(Length::Fill))
+            .width(1)
+            .height(Length::Fill)
+            .style(move |_| style::hairline(tok))
+    };
     row![
         container(list)
             .width(layout::fixed(200.0))
             .height(Length::Fill)
+            .padding(list_pad)
+            .clip(true)
             .style(move |_| style::panel(tok)),
-        container(detail).width(Length::Fill).height(Length::Fill),
+        rule(),
+        container(detail)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .padding(12),
+        rule(),
         container(props)
             .width(layout::fixed(280.0))
             .height(Length::Fill)
@@ -1501,9 +1803,11 @@ mod tests {
         let _: Element<'_, ()> = main_window(lab("m"), lab("t"), lab("c"), lab("s"), tok);
         let _: Element<'_, ()> = modal_card(lab("b"), lab("c"));
         let _: Element<'_, ()> = context_menu(
-            table.iter().cloned(),
+            table.iter().cloned().map(ContextEntry::from),
             iced::Point::ORIGIN,
             iced::Size::new(640.0, 400.0),
+            None,
+            |_| (),
             (),
             tok,
         );
@@ -1574,35 +1878,134 @@ mod tests {
         let pinned = context_origin(iced::Point::new(10.0, 390.0), two, vp);
         assert!(pinned.y + two.height <= vp.height + 0.1);
         let mut cm = context_menu(
-            table.iter().cloned(),
+            table.iter().cloned().map(ContextEntry::from),
             iced::Point::new(12.0, 20.0),
             vp,
+            None,
+            |_| (),
             (),
             tok,
         );
         paint(&mut cm);
         let mut edge = context_menu(
-            table.iter().cloned(),
+            table.iter().cloned().map(ContextEntry::from),
             iced::Point::new(800.0, 500.0),
             vp,
+            None,
+            |_| (),
             (),
             tok,
         );
         paint(&mut edge);
-        let none: [Action<()>; 0] = [];
+        let none: [ContextEntry<()>; 0] = [];
         let mut empty = context_menu(
             none,
             iced::Point::new(-8.0, -4.0),
             iced::Size::new(10.0, 10.0),
+            None,
+            |_| (),
             (),
             tok,
         );
         paint(&mut empty);
-        let many: Vec<Action<()>> = (0..30)
-            .map(|i| Action::new(format!("a.{i}"), format!("A{i}"), ()))
+        let many: Vec<ContextEntry<()>> = (0..30)
+            .map(|i| ContextEntry::from(Action::new(format!("a.{i}"), format!("A{i}"), ())))
             .collect();
-        let mut long = context_menu(many, iced::Point::new(8.0, 8.0), vp, (), tok);
+        let mut long =
+            context_menu(many, iced::Point::new(8.0, 8.0), vp, None, |_| (), (), tok);
         paint(&mut long);
+        let nested = [
+            ContextEntry::from(Action::new("edit.copy", "Copy", ())),
+            ContextEntry::Separator,
+            ContextEntry::menu(
+                "Share",
+                [
+                    ContextEntry::from(Action::new("share.link", "Copy link", ())),
+                    ContextEntry::from(Action::new("share.mail", "Mail", ())),
+                ],
+            ),
+        ];
+        let mut nested_el = context_menu(
+            nested.clone(),
+            iced::Point::new(20.0, 20.0),
+            vp,
+            Some(2),
+            |_| (),
+            (),
+            tok,
+        );
+        paint(&mut nested_el);
+        // Flyout sits beside the root card (no X overlap) and top-aligns
+        // with the parent submenu row.
+        let root_size = context_card_size_entries(&nested, vp);
+        let root_at = context_origin(iced::Point::new(20.0, 20.0), root_size, vp);
+        let row_top = context_offset_before(&nested, 2);
+        let kids = match &nested[2] {
+            ContextEntry::Menu { entries, .. } => entries.as_slice(),
+            _ => panic!("expected menu"),
+        };
+        let fly_size = context_card_size_entries(kids, vp);
+        let fly = context_flyout_origin(root_at, root_size, row_top, fly_size, vp);
+        assert!(
+            fly.x >= root_at.x + root_size.width - 0.5
+                || fly.x + fly_size.width <= root_at.x + 0.5,
+            "flyout must not overlap root card: root=({}..{}) fly=({}..{})",
+            root_at.x,
+            root_at.x + root_size.width,
+            fly.x,
+            fly.x + fly_size.width
+        );
+        assert!(
+            (fly.y - (root_at.y + row_top)).abs() < 1.0
+                || fly.y + fly_size.height >= vp.height - 1.0
+                || fly.y <= 1.0,
+            "flyout top should match parent row when space allows, got fly.y={} want {}",
+            fly.y,
+            root_at.y + row_top
+        );
+        // Room on the right → place to the right with a gap.
+        let roomy = context_flyout_origin(
+            Point::new(40.0, 40.0),
+            Size::new(200.0, 120.0),
+            20.0,
+            Size::new(180.0, 80.0),
+            Size::new(800.0, 600.0),
+        );
+        assert!((roomy.x - (40.0 + 200.0 + CONTEXT_FLY_GAP)).abs() < 0.5);
+        assert!((roomy.y - (40.0 + 20.0)).abs() < 0.5);
+        // Tall submenu: placement size is capped; paint path must scroll when
+        // natural height exceeds that cap (same rule as the root menu).
+        let tall_kids: Vec<ContextEntry<()>> = (0..40)
+            .map(|i| ContextEntry::from(Action::new(format!("k.{i}"), format!("Kid {i}"), ())))
+            .collect();
+        let fly_cap = context_card_size_entries(&tall_kids, vp);
+        let natural = context_entries_height(&tall_kids);
+        assert!(
+            natural > fly_cap.height + 1.0,
+            "fixture must exceed cap: natural={natural} cap={}",
+            fly_cap.height
+        );
+        let src = include_str!("pattern.rs");
+        let fly_branch = src
+            .split("if let Some(i) = open_submenu")
+            .nth(1)
+            .unwrap()
+            .split("stack")
+            .next()
+            .unwrap();
+        assert!(
+            fly_branch.contains("themed_scroll") && fly_branch.contains("fly_size.height"),
+            "tall flyouts must height-cap and scroll like the root menu"
+        );
+        assert!(context_card_size_entries(
+            &[
+                ContextEntry::from(Action::new("a", "A", ())),
+                ContextEntry::Separator,
+            ],
+            vp
+        )
+        .height
+            < context_card_size(3, vp).height);
         let mut ld = list_detail(lab("l"), lab("d"), crate::layout::fixed(260.0), tok);
         paint(&mut ld);
         let mut nv = navigation_view(lab("s"), lab("c"), &nav, 900.0, (), tok, &cat);
