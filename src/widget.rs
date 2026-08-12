@@ -242,15 +242,45 @@ pub fn meta<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Element
     a11y::attach(text(s).size(typo::META).color(tok.muted).into(), &a11y)
 }
 
-pub fn code_block<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
-    let s = a11y.apply_name(s);
-    a11y::attach(
-        container(text(s).size(typo::CODE).font(typo::MONO).color(tok.text))
-            .padding(12)
-            .style(move |_| style::panel(tok))
-            .into(),
-        &a11y,
-    )
+/// A monospace panel the user can drag-select and copy.
+///
+/// The application owns the buffer and posts `Content::selection()`
+/// with [`crate::copy_text`]. Typing does not change the text.
+/// Disabled still allows select-and-copy.
+///
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let content = icedtea::iced::widget::text_editor::Content::with_text("fn main() {}");
+/// let on_select = |action| action;
+/// let _: icedtea::Element<'_, _> = widget::code_block(
+///     &content,
+///     on_select,
+///     tok,
+///     A11y::new("src", Role::TextBox),
+/// );
+/// ```
+pub fn code_block<'a, M: Clone + 'a>(
+    content: &'a Content,
+    on_action: impl Fn(text_editor::Action) -> M + 'a,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let e = text_editor(content)
+        .height(Length::Shrink)
+        .padding(12)
+        .font(typo::MONO)
+        .wrapping(iced::widget::text::Wrapping::Word)
+        .style(editor_style(tok))
+        .on_action(move |a| on_action(select_only(a)));
+    container(e)
+        .width(Length::Fill)
+        .style(move |_| editor_frame(tok))
+        .id(Id::from(a11y.node_id()))
+        .into()
 }
 
 /// A text link that sends a message.
@@ -1269,6 +1299,81 @@ pub fn secret_field<'a, M: Clone + 'a>(
     a11y::attach(r.into(), &a11y)
 }
 
+/// A labeled read-only value the user can select and copy.
+///
+/// Meta label, then [`selectable`], then an optional Copy
+/// [`crate::action::Action`]. The application posts
+/// [`crate::field::Selectables::copy`] with [`crate::copy_text`].
+/// Mono face for paths and ids; UI face for prose. Disabled still
+/// allows select-and-copy.
+///
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::action::Action;
+/// use icedtea::i18n::Direction;
+/// use icedtea::theme;
+/// use icedtea::typo::FontFace;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let content = icedtea::iced::widget::text_editor::Content::with_text("a/b");
+/// #[derive(Clone)]
+/// enum Msg {
+///     Select(icedtea::iced::widget::text_editor::Action),
+///     Copy,
+/// }
+/// let on_select = Msg::Select;
+/// let copy = Action::new("value.copy", "Copy", Msg::Copy);
+/// let _: icedtea::Element<'_, Msg> = widget::value_field(
+///     "Path",
+///     &content,
+///     on_select,
+///     Some(&copy),
+///     FontFace::Mono,
+///     tok,
+///     Direction::Ltr,
+///     A11y::new("Path", Role::Group),
+/// );
+/// ```
+#[allow(clippy::too_many_arguments)]
+pub fn value_field<'a, M: Clone + 'a>(
+    title: impl Into<String>,
+    content: &'a Content,
+    on_action: impl Fn(text_editor::Action) -> M + 'a,
+    copy: Option<&crate::action::Action<M>>,
+    face: typo::FontFace,
+    tok: Tokens,
+    dir: Direction,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let title = title.into();
+    let label = meta(
+        title.clone(),
+        tok,
+        a11y.child(Role::Status).with_value(title.clone()),
+    );
+    let value = selectable(content, on_action, tok, face, a11y.child(Role::TextBox));
+    let mut kids: Vec<Element<'a, M>> = vec![label, value];
+    if let Some(copy) = copy {
+        kids.push(themed_button(
+            copy.title.clone(),
+            copy.invoke(),
+            tok,
+            Variant::Quiet,
+            A11y::button(copy.title.clone()).with_disabled(!copy.enabled || a11y.disabled),
+        ));
+    }
+    let kids = crate::i18n::order(dir, kids);
+    let mut r = Row::new()
+        .spacing(8)
+        .align_y(Alignment::Center)
+        .width(Length::Fill);
+    for k in kids {
+        r = r.push(k);
+    }
+    a11y::attach(r.into(), &a11y)
+}
+
 /// Multiline editor. `height` is icedtea size language ([`crate::layout::FILL`]
 /// or [`crate::layout::fixed`]).
 /// A multi-line editor.
@@ -1316,6 +1421,74 @@ pub fn textarea<'a, M: Clone + 'a>(
         .into()
 }
 
+/// Keep selection, click, drag, and scroll. Typing, paste, and delete
+/// become a zero scroll so `Content::perform` does not change the text.
+pub fn select_only(action: text_editor::Action) -> text_editor::Action {
+    if action.is_edit() {
+        text_editor::Action::Scroll { lines: 0 }
+    } else {
+        action
+    }
+}
+
+/// Body the user can drag-select and copy.
+///
+/// Looks like body text: zero pad, no border, canvas fill. The
+/// application owns the buffer and posts `Content::selection()` with
+/// [`crate::copy_text`]. Height shrinks to the text. Disabled still
+/// allows select-and-copy. Use [`typo::FontFace::Ui`] for prose and
+/// [`typo::FontFace::Mono`] for paths or raw values.
+///
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::typo::FontFace;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let content = icedtea::iced::widget::text_editor::Content::with_text("Hello");
+/// let on_select = |action| action;
+/// let _: icedtea::Element<'_, _> = widget::selectable(
+///     &content,
+///     on_select,
+///     tok,
+///     FontFace::Ui,
+///     A11y::new("body", Role::TextBox),
+/// );
+/// ```
+pub fn selectable<'a, M: Clone + 'a>(
+    content: &'a Content,
+    on_action: impl Fn(text_editor::Action) -> M + 'a,
+    tok: Tokens,
+    face: typo::FontFace,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let e = text_editor(content)
+        .height(Length::Shrink)
+        .padding(0)
+        .font(face.font())
+        .wrapping(iced::widget::text::Wrapping::Word)
+        .style(selectable_style(tok))
+        .on_action(move |a| on_action(select_only(a)));
+    a11y::attach(e.into(), &a11y)
+}
+
+fn selectable_style(
+    tok: Tokens,
+) -> impl Fn(&iced::Theme, iced::widget::text_editor::Status) -> iced::widget::text_editor::Style {
+    move |_t, _s| iced::widget::text_editor::Style {
+        background: iced::Background::Color(tok.canvas),
+        border: iced::Border {
+            color: Color::TRANSPARENT,
+            width: 0.0,
+            radius: 0.0.into(),
+        },
+        placeholder: tok.muted,
+        value: tok.text,
+        selection: tok.selection,
+    }
+}
+
 /// Syntax-highlighted code. `syntax` is an iced highlighter token (`rs`, `py`, …).
 /// `theme_name` picks a highlighter face that fits the UI colorway.
 /// `height` is icedtea size language ([`crate::layout::FILL`] or
@@ -1323,7 +1496,8 @@ pub fn textarea<'a, M: Clone + 'a>(
 /// Highlighted source.
 ///
 /// The application owns the buffer and the language name. Highlighter
-/// face follows the active colorway.
+/// face follows the active colorway. Typing does not change the
+/// buffer. Disabled still allows select-and-copy.
 ///
 ///
 /// ```
@@ -1353,15 +1527,13 @@ pub fn highlighted_code<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let theme = crate::theme::code_highlight(theme_name);
-    let mut e = text_editor(content)
+    let e = text_editor(content)
         .height(height)
         .padding(8)
         .style(editor_style(tok))
         .highlight(syntax, theme)
-        .font(typo::MONO);
-    if !a11y.disabled {
-        e = e.on_action(on_action);
-    }
+        .font(typo::MONO)
+        .on_action(move |a| on_action(select_only(a)));
     container(e)
         .width(Length::Fill)
         .height(height)
@@ -2047,7 +2219,8 @@ pub fn parse(source: &str) -> MarkdownDoc {
 /// A parsed markdown document.
 ///
 /// Parse with [`parse`], then view the items. Truncate by slicing the
-/// source before parse.
+/// source before parse. Copy the source with [`crate::copy_text`] on
+/// [`MarkdownDoc::source`]. The painted tree has no drag selection.
 ///
 ///
 /// ```
@@ -3838,7 +4011,8 @@ mod tests {
         let _: Element<'_, ()> = rich_cell(&link, Some(()), tok, role("go", Role::Link));
         let _: Element<'_, ()> = rich_cell(&link, None, tok, role("go2", Role::Link));
         let _: Element<'_, ()> = meta("m", tok, role("m", Role::Status));
-        let _: Element<'_, ()> = code_block("fn", tok, role("fn", Role::Group));
+        let snippet = Content::with_text("fn");
+        let _: Element<'_, ()> = code_block(&snippet, |_| (), tok, role("fn", Role::Group));
         let _: Element<'_, ()> = hyperlink("l", (), tok, role("l", Role::Link));
         let _: Element<'_, ()> = themed_button("B", Some(()), tok, Variant::Primary, btn("B"));
         let _: Element<'_, ()> = themed_button_sized(
@@ -4107,6 +4281,41 @@ mod tests {
             tok,
             crate::layout::fixed(120.0),
             role("ta", Role::TextBox),
+        );
+        let _: Element<'_, ()> = selectable(
+            &content,
+            |_| (),
+            tok,
+            typo::FontFace::Ui,
+            role("body", Role::TextBox),
+        );
+        let _: Element<'_, ()> = selectable(
+            &content,
+            |_| (),
+            tok,
+            typo::FontFace::Mono,
+            role("path", Role::TextBox).with_disabled(true),
+        );
+        let copy = crate::action::Action::new("value.copy", "Copy", ());
+        let _: Element<'_, ()> = value_field(
+            "Path",
+            &content,
+            |_| (),
+            Some(&copy),
+            typo::FontFace::Mono,
+            tok,
+            Direction::Ltr,
+            role("vf", Role::Group),
+        );
+        let _: Element<'_, ()> = value_field(
+            "Id",
+            &content,
+            |_| (),
+            None,
+            typo::FontFace::Ui,
+            tok,
+            Direction::Rtl,
+            role("vf-off", Role::Group).with_disabled(true),
         );
         let _: Element<'_, ()> = search_input("q", |_| (), tok, role("q", Role::TextBox));
         let hints = ["save".into(), "open".into()];
@@ -4612,7 +4821,7 @@ mod tests {
         let role = |n: &str, r: Role| A11y::new(n, r);
         let code = Content::with_text("fn main() {}\n");
         let mut painted: Vec<Element<'_, ()>> = vec![
-            code_block("fn", tok, role("fn", Role::Group)),
+            code_block(&code, |_| (), tok, role("fn", Role::Group)),
             hyperlink("l", (), tok, role("l", Role::Link)),
             busy_overlay(
                 label("Body", tok, role("Body", Role::Status)),
@@ -4844,6 +5053,33 @@ mod tests {
             role("ta", Role::TextBox).with_disabled(true),
         );
         draw_once(&mut dead_ta);
+        let mut dead_sel = selectable(
+            &code,
+            |_| (),
+            tok,
+            typo::FontFace::Ui,
+            role("sel", Role::TextBox).with_disabled(true),
+        );
+        draw_once(&mut dead_sel);
+        let copy = crate::action::Action::new("value.copy", "Copy", ());
+        let mut dead_vf = value_field(
+            "Path",
+            &code,
+            |_| (),
+            Some(&copy),
+            typo::FontFace::Mono,
+            tok,
+            Direction::Ltr,
+            role("vf", Role::Group).with_disabled(true),
+        );
+        draw_once(&mut dead_vf);
+        let mut dead_block = code_block(
+            &code,
+            |_| (),
+            tok,
+            role("blk", Role::TextBox).with_disabled(true),
+        );
+        draw_once(&mut dead_block);
         let mut dead_code = highlighted_code(
             &code,
             "rs",
@@ -5072,6 +5308,58 @@ mod tests {
             A11y::new("body", Role::TextBox),
         );
         assert_eq!(fixed.as_widget().size().height, Length::Fixed(120.0));
+        let body = selectable(
+            &content,
+            |_| (),
+            tok,
+            typo::FontFace::Ui,
+            A11y::new("body", Role::TextBox),
+        );
+        assert_eq!(body.as_widget().size().height, Length::Shrink);
+        assert_eq!(body.as_widget().size().width, Length::Fill);
+        let block = code_block(&content, |_| (), tok, A11y::new("src", Role::TextBox));
+        assert_eq!(block.as_widget().size().height, Length::Shrink);
+        let src = include_str!("widget.rs");
+        let hl = src
+            .split("pub fn highlighted_code")
+            .nth(1)
+            .unwrap()
+            .split("fn editor_frame")
+            .next()
+            .unwrap();
+        assert!(hl.contains("select_only"));
+        assert!(!hl.contains("if !a11y.disabled"));
+    }
+
+    #[test]
+    fn select_only_keeps_selection_and_drops_edits() {
+        use iced::widget::text_editor::{Action, Edit, Motion};
+        assert_eq!(
+            select_only(Action::Edit(Edit::Insert('x'))),
+            Action::Scroll { lines: 0 }
+        );
+        assert_eq!(
+            select_only(Action::Edit(Edit::Delete)),
+            Action::Scroll { lines: 0 }
+        );
+        assert_eq!(select_only(Action::SelectAll), Action::SelectAll);
+        assert_eq!(
+            select_only(Action::Select(Motion::Right)),
+            Action::Select(Motion::Right)
+        );
+        assert_eq!(
+            select_only(Action::Scroll { lines: 3 }),
+            Action::Scroll { lines: 3 }
+        );
+        assert_eq!(
+            select_only(Action::Move(Motion::Left)),
+            Action::Move(Motion::Left)
+        );
+        let click = Action::Click(iced::Point::new(1.0, 2.0));
+        assert_eq!(select_only(click.clone()), click);
+        let drag = Action::Drag(iced::Point::new(4.0, 5.0));
+        assert_eq!(select_only(drag.clone()), drag);
+        let _ = selectable_style(named("dark").tokens);
     }
 
     #[test]

@@ -76,7 +76,9 @@ Constructor: [`widget::markdown_view`](https://docs.rs/icedtea/latest/icedtea/wi
 [iced](https://crates.io/crates/iced)
 
 Parse with `MarkdownDoc::parse`, then view the items. Truncate by
-slicing the source before parse. Links use `Tokens.accent`.
+slicing the source before parse. Links use `Tokens.accent`. Copy
+posts `doc.source` with `icedtea::copy_text`. The painted tree has
+no drag selection.
 
 ### Code
 
@@ -89,7 +91,8 @@ Constructor: [`widget::highlighted_code`](https://docs.rs/icedtea/latest/icedtea
 [iced](https://crates.io/crates/iced)
 
 The application owns the buffer and the language name. Highlighter
-face follows the active colorway (`theme::code_highlight`).
+face follows the active colorway (`theme::code_highlight`). Typing
+does not change the buffer. Select and copy like `selectable`.
 
 ### Image
 
@@ -103,3 +106,18 @@ Constructor: [`widget::image_slot`](https://docs.rs/icedtea/latest/icedtea/widge
 
 Ready keeps the requested width and height. Missing bytes show the
 empty slot, not a collapsed layout.
+
+### Selectable
+
+**`selectable`** — Body the user can drag-select and copy.
+
+Constructor: [`widget::selectable`](https://docs.rs/icedtea/latest/icedtea/widget/fn.selectable.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea) ·
+[iced](https://crates.io/crates/iced)
+
+Looks like body text. The application owns `text_editor::Content` and
+posts `Content::selection()` with `icedtea::copy_text`. `FontFace::Ui`
+is prose; `FontFace::Mono` is a path or raw value. Disabled still
+allows select-and-copy.

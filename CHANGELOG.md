@@ -13,7 +13,11 @@ the rest. `command_palette_view` paints a parameter field when
 overlay onto a chosen display. `daemon!` starts `iced::daemon` with
 the same `Prepared` settings; `Prepared::open` maps a window and
 `Prepared::open_desktop` maps a decorated pop-out. `expander` title
-and body share the 12px card inset.
+and body share the 12px card inset. `selectable` is body text the
+user can drag-select and copy. `field::Selectables` binds those
+buffers by id; `value_field` is the labeled row. `highlighted_code`
+and `code_block` use the same select-and-copy contract. Markdown
+copy posts `MarkdownDoc.source`.
 
 ## 0.3.0 — 2026-08-11
 

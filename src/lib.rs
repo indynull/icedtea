@@ -182,6 +182,7 @@ pub mod collection;
 pub mod density;
 pub mod dialog;
 pub mod dnd;
+pub mod field;
 pub mod focus;
 pub mod fuzzy;
 pub mod host;

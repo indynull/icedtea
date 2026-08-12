@@ -36,6 +36,23 @@ pub const META: u32 = 12;
 /// Code / monospace.
 pub const CODE: u32 = 13;
 
+/// Platform sans or mono for a body that paints as text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FontFace {
+    Ui,
+    Mono,
+}
+
+impl FontFace {
+    /// Font for this face.
+    pub fn font(self) -> Font {
+        match self {
+            Self::Ui => UI,
+            Self::Mono => MONO,
+        }
+    }
+}
+
 /// Named step on the type scale.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TypeRole {
@@ -99,6 +116,8 @@ mod tests {
         assert_eq!(TypeRole::Page.font(), UI_BOLD);
         assert_eq!(TypeRole::Body.font(), UI);
         assert_eq!(TypeRole::Meta.font(), UI);
+        assert_eq!(FontFace::Ui.font(), UI);
+        assert_eq!(FontFace::Mono.font(), MONO);
         let _ = UI_ITALIC;
     }
 }

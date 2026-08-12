@@ -481,6 +481,8 @@ enum Message {
     Sounds(bool),
     Radio(u8),
     Editor(icedtea::iced::widget::text_editor::Action),
+    Field(&'static str, icedtea::iced::widget::text_editor::Action),
+    CopyFields,
     ToggleGroup(&'static str),
     Sash(SashEvent),
     #[allow(dead_code)]
@@ -508,6 +510,7 @@ fn wants_context(page: &str) -> bool {
             | "grid"
             | "markdown"
             | "type"
+            | "selectable"
             | "chrome-rows"
             | "list-detail"
             | "context-menu"
@@ -550,6 +553,7 @@ struct Gallery {
     nav: NavStack,
     prefs: Vec<PrefGroup>,
     editor: Content,
+    fields: icedtea::field::Selectables,
     md: MarkdownDoc,
     list_window: VisibleWindow,
     table_window: VisibleWindow,
@@ -759,6 +763,24 @@ impl Gallery {
             editor: Content::with_text(
                 "A longer textarea so the page is not an empty box.\nSecond line.\nThird line.\n",
             ),
+            fields: {
+                let mut fields = icedtea::field::Selectables::new();
+                fields.bind("path", "sessions/019feef7/transcript.jsonl");
+                fields.bind("id", "019feef7");
+                fields.bind("host", "hub.example");
+                fields.bind(
+                    "body",
+                    "The assistant wrote the list card meter and the expander inset. \
+                     Drag any of this text, then Copy. Typing does not change it.\n\n\
+                     Follow-up is waiting on the owner.",
+                );
+                fields.bind("clock", "idle");
+                fields.bind(
+                    "snippet",
+                    "plain monospace block — see Code for highlighting",
+                );
+                fields
+            },
             md,
             list_window: VisibleWindow::new(400.0),
             table_window: VisibleWindow::new(360.0),
@@ -916,6 +938,8 @@ impl Gallery {
     fn edit_content(&self) -> &Content {
         if self.page == "code" {
             &self.code_editor
+        } else if self.page == "selectable" {
+            self.fields.get("body")
         } else {
             &self.editor
         }
@@ -924,6 +948,8 @@ impl Gallery {
     fn edit_content_mut(&mut self) -> &mut Content {
         if self.page == "code" {
             &mut self.code_editor
+        } else if self.page == "selectable" {
+            self.fields.get_mut("body")
         } else {
             &mut self.editor
         }
@@ -979,7 +1005,8 @@ impl Gallery {
             return self.actions.iter().cloned().collect();
         }
         let mut v = Vec::new();
-        let editor = self.page == "fields" || self.page == "code";
+        let editor = self.page == "fields";
+        let select_body = self.page == "selectable" || self.page == "code";
         if editor {
             let has = self.edit_selection().is_some();
             v.push(
@@ -996,6 +1023,18 @@ impl Gallery {
                 Action::new("edit.paste", "Paste", Message::EditPaste)
                     .with_shortcut(Shortcut::parse("ctrl+v").unwrap()),
             );
+            v.push(Action::new(
+                "edit.select-all",
+                "Select all",
+                Message::EditSelectAll,
+            ));
+        } else if select_body {
+            let has = self.edit_selection().is_some();
+            v.push(
+                Action::new("edit.copy", "Copy", Message::EditCopy)
+                    .with_shortcut(Shortcut::parse("ctrl+c").unwrap()),
+            );
+            v.last_mut().unwrap().enabled = has;
             v.push(Action::new(
                 "edit.select-all",
                 "Select all",
@@ -1067,6 +1106,17 @@ impl Gallery {
             Message::Slide(v) => self.value = v,
             Message::Editor(action) => {
                 self.editor.perform(action);
+            }
+            Message::Field(id, action) => {
+                self.fields.perform(id, action);
+            }
+            Message::CopyFields => {
+                let s = self
+                    .fields
+                    .first_selection()
+                    .unwrap_or_else(|| self.fields.copy("body"));
+                self.note = "Copied".into();
+                return icedtea::copy_text(s);
             }
             Message::ToggleGroup(name) => {
                 if !self.collapsed.remove(name) {
@@ -1235,7 +1285,15 @@ impl Gallery {
             Message::Submit => {
                 self.dialog_note = format!("submit: {}", self.query);
             }
-            Message::Tick => self.tick = self.tick.saturating_add(1),
+            Message::Tick => {
+                self.tick = self.tick.saturating_add(1);
+                let clock = if self.tick % 8 == 0 {
+                    format!("refresh {}", self.tick)
+                } else {
+                    "idle".into()
+                };
+                self.fields.bind("clock", clock);
+            }
             Message::Family(id) => {
                 self.family = id;
                 self.apply_theme_pref();
@@ -1419,7 +1477,14 @@ impl Gallery {
             },
             Message::ContextDismiss => self.context = None,
             Message::EditCopy => {
-                if let Some(s) = self.edit_selection() {
+                let s = self.edit_selection().unwrap_or_else(|| {
+                    if self.page == "code" {
+                        self.code_editor.text()
+                    } else {
+                        String::new()
+                    }
+                });
+                if !s.is_empty() {
                     self.note = "Copied".into();
                     self.context = None;
                     return icedtea::copy_text(s);
@@ -2162,6 +2227,38 @@ impl Gallery {
             ]
             .spacing(8)
             .into(),
+            "value-field" => {
+                let copy = Action::new("value.copy", "Copy", Message::CopyFields);
+                column![
+                    widget::meta(
+                        "Labeled value. Select, then Copy.",
+                        tok,
+                        named("value-hint", Role::Status),
+                    ),
+                    widget::value_field(
+                        "Path",
+                        self.fields.get("path"),
+                        |a| Message::Field("path", a),
+                        Some(&copy),
+                        icedtea::typo::FontFace::Mono,
+                        tok,
+                        self.direction,
+                        named("value-path", Role::Group),
+                    ),
+                    widget::value_field(
+                        "Id",
+                        self.fields.get("id"),
+                        |a| Message::Field("id", a),
+                        None,
+                        icedtea::typo::FontFace::Mono,
+                        tok,
+                        self.direction,
+                        named("value-id", Role::Group).with_disabled(true),
+                    ),
+                ]
+                .spacing(8)
+                .into()
+            }
             "textarea" => widget::textarea(
                 &self.editor,
                 Message::Editor,
@@ -2279,13 +2376,74 @@ impl Gallery {
                 tok,
                 btn("color"),
             ),
+            "selectable" => {
+                let copy = Action::new("edit.copy", "Copy", Message::CopyFields);
+                column![
+                    widget::meta(
+                        "Inspector rows and a transcript. Copy posts the first selection.",
+                        tok,
+                        named("select-hint", Role::Status),
+                    ),
+                    widget::value_field(
+                        "Path",
+                        self.fields.get("path"),
+                        |a| Message::Field("path", a),
+                        Some(&copy),
+                        icedtea::typo::FontFace::Mono,
+                        tok,
+                        self.direction,
+                        named("path", Role::Group),
+                    ),
+                    widget::value_field(
+                        "Id",
+                        self.fields.get("id"),
+                        |a| Message::Field("id", a),
+                        Some(&copy),
+                        icedtea::typo::FontFace::Mono,
+                        tok,
+                        self.direction,
+                        named("id", Role::Group),
+                    ),
+                    widget::value_field(
+                        "Host",
+                        self.fields.get("host"),
+                        |a| Message::Field("host", a),
+                        None,
+                        icedtea::typo::FontFace::Mono,
+                        tok,
+                        self.direction,
+                        named("host", Role::Group),
+                    ),
+                    widget::value_field(
+                        "Clock",
+                        self.fields.get("clock"),
+                        |a| Message::Field("clock", a),
+                        None,
+                        icedtea::typo::FontFace::Ui,
+                        tok,
+                        self.direction,
+                        named("clock", Role::Group),
+                    ),
+                    widget::selectable(
+                        self.fields.get("body"),
+                        |a| Message::Field("body", a),
+                        tok,
+                        icedtea::typo::FontFace::Ui,
+                        named("body", Role::TextBox),
+                    ),
+                    pattern::command_bar([copy], tok, self.direction),
+                ]
+                .spacing(12)
+                .into()
+            }
             "label" => column![
                 widget::label("Page title", tok, named("page", Role::Header)),
                 widget::meta("Meta / caption", tok, named("meta", Role::Status)),
                 widget::code_block(
-                    "plain monospace block — see Code for highlighting",
+                    self.fields.get("snippet"),
+                    |a| Message::Field("snippet", a),
                     tok,
-                    named("plain", Role::Group)
+                    named("plain", Role::TextBox),
                 ),
             ]
             .spacing(8)
@@ -2346,6 +2504,11 @@ impl Gallery {
                         }),
                     tok,
                     named("md-hash", Role::Status),
+                ),
+                pattern::command_bar(
+                    [Action::new("edit.copy", "Copy source", Message::CopyValue)],
+                    tok,
+                    self.direction,
                 ),
                 row![
                     container(widget::themed_scroll(
@@ -2409,7 +2572,12 @@ impl Gallery {
                         tok,
                         &self.theme,
                         layout::FILL,
-                        named(lang.name, Role::Group),
+                        named(lang.name, Role::TextBox),
+                    ),
+                    pattern::command_bar(
+                        [Action::new("edit.copy", "Copy", Message::EditCopy)],
+                        tok,
+                        self.direction,
                     ),
                 ]
                 .spacing(8)
@@ -3846,6 +4014,7 @@ fn handled_ids() -> &'static [&'static str] {
         "text-input",
         "password",
         "secret",
+        "value-field",
         "textarea",
         "search",
         "suggest",
@@ -3862,6 +4031,7 @@ fn handled_ids() -> &'static [&'static str] {
         "image",
         "tooltip",
         "link",
+        "selectable",
         "list",
         "log",
         "grid",
@@ -4035,6 +4205,12 @@ mod tests {
         let _ = g.update(super::Message::NavBack);
         assert_eq!(g.nav.current(), "home");
         let _ = g.update(super::Message::PinTab(1));
+        let _ = g.update(super::Message::Field(
+            "body",
+            icedtea::iced::widget::text_editor::Action::SelectAll,
+        ));
+        let _ = g.update(super::Message::CopyFields);
+        assert_eq!(g.note, "Copied");
         assert_eq!(g.pinned.active, 1);
         let _ = g.update(super::Message::StatusNew);
         assert_eq!(g.status_n, 1);
@@ -4046,6 +4222,15 @@ mod tests {
         let _ = g.view();
         g.page = "markdown";
         let _ = g.view();
+        g.page = "selectable";
+        let _ = g.view();
+        let _ = g.update(super::Message::Field(
+            "path",
+            icedtea::iced::widget::text_editor::Action::SelectAll,
+        ));
+        for _ in 0..8 {
+            let _ = g.update(super::Message::Tick);
+        }
         g.page = "list";
         g.pointer = icedtea::iced::Point::new(400.0, 80.0);
         let _ = g.update(super::Message::ListSel(3));

@@ -44,6 +44,18 @@ Constructor: [`widget::secret_field`](https://docs.rs/icedtea/latest/icedtea/wid
 Reveal toggles the mask. Copy is an `Action` whose message the
 application handles with `icedtea::copy_text`.
 
+### Value field
+
+**`value-field`** — A labeled read-only value the user can select and copy.
+
+Constructor: [`widget::value_field`](https://docs.rs/icedtea/latest/icedtea/widget/fn.value_field.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea)
+
+Meta label, selectable value, optional Copy `Action`. Bind the text
+with `field::Selectables`. Mono face for paths and ids.
+
 ### Text area
 
 **`textarea`** — A multi-line editor.
