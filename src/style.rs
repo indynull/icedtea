@@ -214,13 +214,7 @@ pub fn tab_style(
         let hover = matches!(status, button::Status::Hovered | button::Status::Pressed);
         button::Style {
             background: None,
-            text_color: if active {
-                tok.text
-            } else if hover {
-                tok.text
-            } else {
-                tok.muted
-            },
+            text_color: if active || hover { tok.text } else { tok.muted },
             border: Border {
                 color: Color::TRANSPARENT,
                 width: 0.0,
