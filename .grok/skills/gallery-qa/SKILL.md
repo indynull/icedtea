@@ -1,170 +1,105 @@
 ---
 name: gallery-qa
 description: >
-  High-quality manual UI QA for icedtea: capture the gallery with the
-  harness, inspect every shot with vision, score against a design
-  rubric, run a live pointer pass when needed, and fix library or demo
-  defects. Use for gallery visual QA, pixel polish, "is the gallery
-  broken", design review of widgets, or post-change polish.
+  Catch and fix icedtea gallery and constructor defects before release:
+  capture shots, inspect with vision, live-pass when needed, fix library
+  or demos, re-verify. Use for gallery QA, pixel polish, "is the gallery
+  broken", or pre-release polish.
 metadata:
-  short-description: "Manual UI QA for icedtea gallery"
+  short-description: "Find and fix icedtea gallery bugs"
 ---
 
 # Gallery QA
 
-You are a **design QA reviewer** for a desktop UI library, not a
-screenshot bot. icedtea is chrome and widgets so apps can stay on data
-and message flow (Textual-like for iced). Success is: every catalog
-demo looks intentional, behaves like a real control, and would not
-embarrass a third-party app that only imports icedtea.
+**Objective:** find visual and interaction defects in shipped constructors
+and gallery demos, **fix them in source**, and re-verify until the release
+bar is met. A markdown report is optional scratch — not the deliverable.
+Clean tree + green checks + fixed defects is the deliverable.
 
-**Capture tool:** `scripts/gallery_qa.py` via `just gallery-qa`.
-**Scoring:** `references/rubric.md`.
+icedtea is chrome and widgets so apps can stay on data and message flow.
+A third-party app that only imports icedtea should not inherit broken
+clip, dead overflow, empty first paint, or stub demos from the gallery.
+
+**Capture:** `scripts/gallery_qa.py` via `just gallery-qa`.  
+**Score:** `references/rubric.md`.  
 **Live walk:** `references/manual-pass.md`.
 
 ```bash
-just gallery-qa --interact                   # full tour + inject pairs
-just gallery-qa --interact --beats 0,8       # iterate one page
-just gallery-qa --backend host --interact    # real display (fonts/OS)
-just gallery-gif                             # ship README/book GIF only
+just gallery-qa --interact                   # full tour + inject
+just gallery-qa --interact --beats 0,8       # iterate a fix
+just gallery-qa --backend host --interact    # fonts / OS chrome
+just gallery-gif                             # only if public chrome shipped
 ```
 
-Output: `tmp/gallery-qa/<timestamp>/` (or `--out DIR`) with `shots/`,
-`steps.jsonl`, `timings.json`, `CAPTURE.md`.
+Shots land under `tmp/gallery-qa/<timestamp>/` (or `--out DIR`).
 
 ## Posture
 
-1. **Library first.** Broken paint, clip, layout, or control behavior →
-   fix `src/`. Gallery only for packing, seeds, grouping, and honest
-   job copy. Never shrink a demo to hide a library clip bug.
-2. **Whole product, not one widget.** Same page rhythm, type, and
-   spacing across the tour. One perfect page next to a stub is a fail.
-3. **Prove states.** Idle beauty is not enough. Selected, disabled,
-   open, empty, loading, and error must be visible or injectable.
-4. **Inject ≠ pointer.** Message inject proves `update`. Slider drag,
-   wheel scroll clip, menu open, flyout placement need a live pass
-   (or a unit/layout test that actually covers that path).
-5. **Say what you cannot prove.** Xephyr does not prove macOS type or
-   OS chrome. Note residual risk; do not claim green for untested hosts.
-6. **Never fake evidence.** No `image_gen` UI, no hand-edited PNGs, no
-   dual gallery paths.
+1. **Fix is the goal.** Do not stop at “found ugly list.” Patch `src/`
+   or `icedtea-gallery/`, recapture, confirm the defect is gone.
+2. **Library first.** Clip, Fill, icons, control behavior, tokens, type →
+   `src/`. Packing, seeds, job copy, page group → gallery. Never hide a
+   library bug by shrinking the demo.
+3. **Severity order.** Fix every **broken** before batching **ugly**.
+   Cap **3** fix→recapture cycles per defect; then residual only if truly
+   blocked (need human pointer, other host).
+4. **Inject ≠ pointer.** Inject proves `update`. Scroll clip, slider
+   drag, menu/flyout need live pass or a real unit/layout test.
+5. **Prove what you claim.** Xephyr ≠ macOS type. Do not call a font
+   path done without a host/Mac pass when those files changed.
+6. **No fake evidence.** No `image_gen` UI, no hand-edited PNGs.
 
-## Two modes
+## Loop (do this)
 
-| Mode | When | How |
-|------|------|-----|
-| **Shot pass** | Default polish, regressions, PR visual proof | `just gallery-qa --interact` → `read_file` every PNG |
-| **Live pass** | Clip on scroll, menus, sliders, split overflow, fonts, “feels broken” | Launch gallery; follow `references/manual-pass.md` |
+1. Capture: `just gallery-qa --interact` (release if paint is slow).
+2. `read_file` **every** `shots/*.png`. Score with the rubric.
+3. For each **broken** / clear **ugly**: implement the fix, run cheap
+   tests on touched modules, recapture affected beats, re-read shots.
+4. Full cut / pre-release: also run the **live pass**
+   (`references/manual-pass.md`) on collections, overlays, and pages
+   you touched. Fix as you go.
+5. When no broken remains and uglies are fixed or explicitly residual:
+   `just check` (or targeted tests + full check before release claim).
+6. `just gallery-gif` only if public gallery chrome shipped.
+7. Commit fixes. Working tree clean for the work you finished.
 
-A **full cut** (feature complete / “polish the gallery”) does **both**:
-shot pass on all beats, then live pass on collections, overlays, and
-any page you touched. A **narrow fix** may shot-pass only the affected
-beats plus one neighbor page for rhythm.
+Narrow change: shot-pass affected beats + one neighbor for rhythm; live
+only if pointer classes apply.
 
-## Shot pass loop
+## Release bar
 
-1. Capture: `just gallery-qa --interact` (release if paint is sluggish).
-2. Open **every** `shots/*.png` with `read_file` (multimodal vision).
-   Do not score by filename alone.
-3. Score each shot **ok / ugly / broken** using `references/rubric.md`.
-   For each defect write: **class**, **where** (page + control),
-   **evidence** (what you see), **layer** (library vs demo).
-4. Fix highest severity first (`broken` → `ugly`). Cap **3**
-   fix→recapture cycles per defect; then residual in the report.
-5. Re-capture affected beats (or full tour if chrome/tokens/type changed).
-6. Tests for modules you touched; `just check` before calling a full
-   cut done. `just gallery-gif` if public gallery chrome shipped.
-7. Write `VISUAL_REPORT.md` in the out dir (template below).
+| Bar | Meaning |
+|-----|---------|
+| **Ready** | No broken on shipped constructors/demos; uglies fixed or listed residual with reason; checks green |
+| **Not ready** | Any broken left, or pointer/platform residual on paths you changed without a pass |
 
-## Live pass loop
-
-Use when the rubric’s **pointer-only** classes are in play, or the
-human is doing manual QA with you.
-
-1. Launch `cargo run -p icedtea-gallery` (or release) on a real display
-   when possible; Xephyr is fine for Linux layout.
-2. Walk every nav page per `references/manual-pass.md` (state matrix +
-   pointer scripts). Prefer fixing as you go on **broken**; batch
-   **ugly** only if they share one cause.
-3. After fixes, re-run shot pass on those beats so the report has
-   durable PNGs.
-
-If you cannot drive the pointer (headless-only agent), document the
-live checklist for the human and still complete the shot pass.
-
-## What “high quality” looks like on a page
-
-Before scoring ok, answer yes to all:
-
-- **Job clear** — In five seconds, what is this control for?
-- **Story complete** — Idle + at least one non-idle state (selected,
-  open, disabled, or loading) is visible or proven by inject.
-- **Honest** — Job text matches the page; controls that look live work.
-- **Rhythmic** — Padding, gaps, and type match sibling pages (4px grid).
-- **Layered** — Hierarchy: page title → section → control → meta. No
-  equal-weight noise.
-- **Contained** — Scroll and overscan stay inside the pane; nothing
-  paints through chrome.
-- **Native-feeling** — Icons readable, buttons aligned, dim on modals,
-  selection obvious, disabled obvious.
-
-## Report template (`VISUAL_REPORT.md`)
-
-```markdown
-# Gallery QA — <date or topic>
-
-**Environment:** <release|debug>, <xephyr|host>, git `<sha>`, flags
-**Out:** `<path>` · N shots · boot/mean step if known
-**Modes:** shot | shot+live
-**Verdict:** SHIP | POLISH | BLOCKED
-
-## Shot table
-| Area | Score | Notes |
-|------|-------|-------|
-| … | ok/ugly/broken | one sentence |
-
-## Defects (priority)
-1. **[broken|ugly] class — page/control** — evidence → fix layer
-
-## Fix log
-- `<sha or "local">` — what changed
-
-## Residual / live-only
-- What inject cannot prove; host/platform gaps
-
-## Next
-- Concrete follow-up or “none”
-```
-
-Verdict: **BLOCKED** if any broken remains on a shipped constructor or
-its demo; **POLISH** if only ugly; **SHIP** if ok across the tour (with
-honest residual for untested platforms).
+Chat the human a **short** status: what you fixed, what residual remains
+(if any), command evidence. Do not produce a long `VISUAL_REPORT.md`
+unless they ask for a written audit.
 
 ## Knobs
 
 | Flag | Use when |
 |------|----------|
-| `--interact` | Full polish (default intent) |
-| `--beats` | Iterate a fix |
+| `--interact` | Pre-release / full polish |
+| `--beats` | Iterate one defect |
 | `--backend host` | Fonts, OS chrome, no Xephyr |
-| `--release` | Snappier paint for demos |
+| `--release` | Snappier paint |
 | `--no-build` | Binary already current |
 | `--settle-ms` | Slow GPU |
 
-Inject command table: `DEFAULT_INTERACT` in `scripts/gallery_qa.py`.
-After-inject paint must match `expect` and be **on screen**.
+Inject table: `DEFAULT_INTERACT` in `scripts/gallery_qa.py`. After-inject
+state must be **visible on screen**.
 
 ## Not this skill
 
-- App domain widgets or business logic
-- Shipping crates / tags
-- Replacing unit tests or `just check`
-- Inventing baselines with generative images
+- Writing reports as the product of the work
+- App domain logic, shipping tags, replacing unit tests
+- Dual gallery paths or generative UI fakes
 
 ## Related
 
-- Rubric: `references/rubric.md`
-- Live walk: `references/manual-pass.md`
-- Harness: `scripts/gallery_qa.py`
-- Contract: `AGENTS.md`
-- Ship GIF: `just gallery-gif`
+- `references/rubric.md` — what counts as broken/ugly  
+- `references/manual-pass.md` — pointer / live protocol  
+- `scripts/gallery_qa.py` — capture harness  
+- `AGENTS.md` — library contract  

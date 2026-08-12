@@ -124,6 +124,6 @@ Batch pure density/alignment uglies after the broken set is green.
 ## After the live pass
 
 1. Recapture shot pass for pages you changed (`--beats` or full).
-2. Update `VISUAL_REPORT.md` residual section (what live proved).
-3. Commit library/demo fixes; do not commit shot PNGs unless the repo
-   already stores them as product assets (`just gallery-gif` path).
+2. Confirm each fixed defect is gone in the new shots (or live recheck).
+3. Commit library/demo fixes; do not commit harness PNGs. Ship GIF only
+   via `just gallery-gif` when public chrome changed.

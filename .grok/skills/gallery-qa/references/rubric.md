@@ -128,4 +128,7 @@ fixed heights so inject targets sit above the fold.
 | Packing, seeds, page group, job copy, multi-host heights | `icedtea-gallery/` |
 | Both | Library for mechanism, gallery for story |
 
+**Outcome:** patch source, recapture, confirm the defect is gone. Scoring
+is only to prioritize work — not a report-writing exercise.
+
 Never edit PNGs. Never generative-fake the UI.
