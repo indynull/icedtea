@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-labelledby="title desc">
+  <title id="title">How an icedtea window is put together</title>
+  <desc id="desc">Boot opens the iced window. Tokens color every face. One Action feeds the menu, toolbar, shortcuts, and palette. Constructors and patterns paint the body and send messages back to the application.</desc>
+  <defs>
+    <filter id="lift" x="-8%" y="-8%" width="116%" height="120%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#0a0c10" flood-opacity="0.55"/>
+    </filter>
+    <linearGradient id="bar" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2A3844"/>
+      <stop offset="1" stop-color="#242F38"/>
+    </linearGradient>
+    <linearGradient id="select" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0178D4" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#0178D4" stop-opacity="0.12"/>
+    </linearGradient>
+    <clipPath id="win">
+      <rect x="96" y="36" width="608" height="372" rx="14"/>
+    </clipPath>
+  </defs>
+
+  <rect width="800" height="500" rx="18" fill="#14181C"/>
+
+  <!-- Tokens rail -->
+  <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="10" letter-spacing="0.14em">
+    <text x="40" y="28" fill="#8A93A0" text-anchor="middle">TOKENS</text>
+    <circle cx="40" cy="56" r="9" fill="#1E1E1E" stroke="#33424E"/>
+    <circle cx="40" cy="84" r="9" fill="#242F38" stroke="#33424E"/>
+    <circle cx="40" cy="112" r="9" fill="#0178D4"/>
+    <circle cx="40" cy="140" r="9" fill="#FEA62B"/>
+    <circle cx="40" cy="168" r="9" fill="#E0E0E0"/>
+    <text x="40" y="196" fill="#6B7480" text-anchor="middle" letter-spacing="0" font-size="9">mix</text>
+  </g>
+
+  <!-- Window -->
+  <g filter="url(#lift)">
+    <rect x="96" y="36" width="608" height="372" rx="14" fill="#1E1E1E" stroke="#33424E"/>
+    <g clip-path="url(#win)">
+      <!-- titlebar: Boot -->
+      <rect x="96" y="36" width="608" height="44" fill="url(#bar)"/>
+      <circle cx="120" cy="58" r="5" fill="#3D4A55"/>
+      <circle cx="138" cy="58" r="5" fill="#3D4A55"/>
+      <circle cx="156" cy="58" r="5" fill="#3D4A55"/>
+      <text x="400" y="63" text-anchor="middle" fill="#E0E0E0" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="600">Notes</text>
+      <text x="668" y="62" text-anchor="end" fill="#0178D4" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10" letter-spacing="0.08em">BOOT · run!</text>
+
+      <!-- menu: Action -->
+      <rect x="96" y="80" width="608" height="32" fill="#1E1E1E"/>
+      <text x="116" y="101" fill="#E0E0E0" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">File</text>
+      <text x="156" y="101" fill="#B6B6B6" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">Edit</text>
+      <text x="200" y="101" fill="#B6B6B6" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">View</text>
+      <rect x="560" y="86" width="124" height="20" rx="4" fill="#0178D4" fill-opacity="0.16" stroke="#0178D4"/>
+      <text x="622" y="100" text-anchor="middle" fill="#7EC4F5" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10">one Action</text>
+
+      <!-- toolbar -->
+      <rect x="96" y="112" width="608" height="36" fill="#242F38"/>
+      <rect x="116" y="120" width="56" height="20" rx="4" fill="#0178D4"/>
+      <text x="144" y="134" text-anchor="middle" fill="#FFFFFF" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11" font-weight="600">Save</text>
+      <rect x="180" y="120" width="56" height="20" rx="4" fill="#1E1E1E" stroke="#33424E"/>
+      <text x="208" y="134" text-anchor="middle" fill="#B6B6B6" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11">Open</text>
+      <text x="668" y="134" text-anchor="end" fill="#6B7480" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11">ctrl+s</text>
+
+      <!-- pattern: list / detail -->
+      <rect x="96" y="148" width="188" height="220" fill="#1A232B"/>
+      <text x="116" y="172" fill="#8A93A0" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10" letter-spacing="0.12em">PATTERN</text>
+      <rect x="112" y="184" width="156" height="48" rx="6" fill="url(#select)" stroke="#0178D4"/>
+      <text x="124" y="204" fill="#E0E0E0" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="600">Quarterly notes</text>
+      <text x="124" y="220" fill="#B6B6B6" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10">This morning</text>
+      <rect x="112" y="240" width="156" height="40" rx="6" fill="#242F38" stroke="#33424E"/>
+      <text x="124" y="258" fill="#E0E0E0" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">Lisbon itinerary</text>
+      <text x="124" y="272" fill="#8A93A0" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10">Yesterday</text>
+      <rect x="112" y="288" width="156" height="40" rx="6" fill="#242F38" stroke="#33424E"/>
+      <text x="124" y="306" fill="#E0E0E0" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">Design review</text>
+      <text x="124" y="320" fill="#8A93A0" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10">Last week</text>
+
+      <!-- sash -->
+      <rect x="284" y="148" width="6" height="220" fill="#242F38"/>
+      <rect x="286" y="236" width="2" height="44" rx="1" fill="#4A5A68"/>
+
+      <!-- constructors: editor -->
+      <rect x="290" y="148" width="414" height="220" fill="#1E1E1E"/>
+      <text x="310" y="172" fill="#8A93A0" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10" letter-spacing="0.12em">CONSTRUCTORS</text>
+      <text x="310" y="200" fill="#6B7480" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12">textarea · list_view · toolbar</text>
+      <text x="310" y="228" fill="#E0E0E0" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14">A longer notes buffer.</text>
+      <text x="310" y="250" fill="#B6B6B6" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14">The application owns this text.</text>
+      <text x="310" y="286" fill="#6B7480" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12">Element → your messages</text>
+
+      <!-- status -->
+      <rect x="96" y="368" width="608" height="40" fill="#242F38"/>
+      <text x="116" y="392" fill="#8A93A0" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11">ready</text>
+      <text x="668" y="392" text-anchor="end" fill="#6B7480" font-family="ui-sans-serif, system-ui, sans-serif" font-size="11">ctrl+s save</text>
+    </g>
+  </g>
+
+  <!-- caption -->
+  <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" fill="#8A93A0">
+    <text x="96" y="444">Boot starts the window.</text>
+    <text x="96" y="464">Tokens color every face. One Action feeds every chrome row.</text>
+    <text x="96" y="484">Patterns compose constructors. Your state stays in the application.</text>
+  </g>
+</svg>
