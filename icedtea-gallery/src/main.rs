@@ -238,10 +238,10 @@ fn page_fills(page: &str) -> bool {
 
 fn sample_mail(i: usize) -> ListRow {
     const TITLES: &[&str] = &[
-        "Quarterly notes",
+        "Quarterly notes for Lisbon and the Berlin office",
         "Lisbon itinerary",
         "Design review",
-        "Release checklist",
+        "Release checklist for the 0.4 cut",
         "Team standup",
         "Invoice March",
     ];
@@ -252,11 +252,27 @@ fn sample_mail(i: usize) -> ListRow {
     })
 }
 
-fn list_row_heights(list: &VecList) -> Vec<f32> {
+fn list_meter(i: usize) -> f32 {
+    ((i % 5) as f32 + 1.0) / 5.0
+}
+
+fn list_row_heights(list: &VecList, card: bool) -> Vec<f32> {
     list.items
         .iter()
         .enumerate()
-        .map(|(i, _)| if i % 3 == 0 { 72.0 } else { 40.0 })
+        .map(|(i, _)| {
+            if card {
+                if i % 3 == 0 {
+                    80.0
+                } else {
+                    72.0
+                }
+            } else if i % 3 == 0 {
+                72.0
+            } else {
+                40.0
+            }
+        })
         .collect()
 }
 
@@ -441,6 +457,7 @@ enum Message {
     AskLine,
     TableHScroll(f32),
     OverlayPin(Option<usize>),
+    ListFace(bool),
     OptScroll(VisibleWindow),
     FocusName,
     Secret(String),
@@ -588,6 +605,7 @@ struct Gallery {
     overlay_pin: Option<usize>,
     opt_window: VisibleWindow,
     list_heights: Vec<f32>,
+    list_card: bool,
 }
 
 impl Gallery {
@@ -846,8 +864,9 @@ impl Gallery {
             overlay_pin: None,
             opt_window: VisibleWindow::new(140.0),
             list_heights: Vec::new(),
+            list_card: true,
         };
-        gallery.list_heights = list_row_heights(&gallery.list);
+        gallery.list_heights = list_row_heights(&gallery.list, gallery.list_card);
         gallery.clamp_nav();
         if tour_wanted() {
             gallery.apply_tour_beat(&tour_beat(0));
@@ -1368,6 +1387,10 @@ impl Gallery {
                 }
             }
             Message::TableHScroll(x) => self.table_cols.set_h_scroll(x),
+            Message::ListFace(card) => {
+                self.list_card = card;
+                self.list_heights = list_row_heights(&self.list, card);
+            }
             Message::OverlayPin(p) => self.overlay_pin = p,
             Message::OptScroll(w) => self.opt_window = w,
             Message::FocusName => {
@@ -2667,6 +2690,31 @@ impl Gallery {
                 named("docs", Role::Link),
             ),
             "list" => column![
+                row![
+                    widget::themed_button(
+                        "Flush",
+                        Some(Message::ListFace(false)),
+                        tok,
+                        if self.list_card {
+                            Variant::Ghost
+                        } else {
+                            Variant::Quiet
+                        },
+                        btn("list-flush"),
+                    ),
+                    widget::themed_button(
+                        "Card",
+                        Some(Message::ListFace(true)),
+                        tok,
+                        if self.list_card {
+                            Variant::Quiet
+                        } else {
+                            Variant::Ghost
+                        },
+                        btn("list-card"),
+                    ),
+                ]
+                .spacing(8),
                 widget::list_view(
                     &self.list,
                     &self.sel,
@@ -2679,6 +2727,13 @@ impl Gallery {
                     "No rows",
                     move |_| tok.muted,
                     Some(icedtea::iced::widget::Id::from("gallery-list")),
+                    if self.list_card {
+                        icedtea::collection::RowFace::Card {
+                            meter: Some(list_meter as fn(usize) -> f32),
+                        }
+                    } else {
+                        icedtea::collection::RowFace::FLUSH
+                    },
                     named("list", Role::List),
                 ),
                 widget::meta("Filter", tok, named("opt-hint", Role::Status),),
@@ -2694,6 +2749,7 @@ impl Gallery {
                     "No options",
                     move |_| tok.muted,
                     None,
+                    icedtea::collection::RowFace::FLUSH,
                     named("options", Role::List),
                 ))
                 .height(140),
@@ -3300,6 +3356,7 @@ impl Gallery {
                     "No rows",
                     move |_| tok.muted,
                     Some(icedtea::iced::widget::Id::from("gallery-list-detail")),
+                    icedtea::collection::RowFace::FLUSH,
                     named("list", Role::List),
                 ),
                 {
@@ -3576,6 +3633,7 @@ impl Gallery {
                         "No rows",
                         move |_| tok.muted,
                         Some(icedtea::iced::widget::Id::from("gallery-insp-list")),
+                        icedtea::collection::RowFace::FLUSH,
                         named("insp-list", Role::List),
                     ),
                     column![

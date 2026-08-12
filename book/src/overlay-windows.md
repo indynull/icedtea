@@ -1,8 +1,13 @@
 # Overlay windows
 
-`Boot::overlay()` starts iced's application builder with an
-undecorated, always-on-top palette window. `Boot::size(w, h)` is the
-inner size; there is no 720x480 maximum. `Boot::pointer` plus
+`Boot::overlay()` prepares an undecorated, always-on-top palette
+window. `icedtea::run!` starts iced's application builder and ends
+when the last window closes. `icedtea::daemon!` starts `iced::daemon`
+with the same `Prepared` settings and stays up with no window mapped.
+`Prepared::open` maps the overlay; `Prepared::open_desktop` maps a
+decorated pop-out after `window::retarget`. Quit with `iced::exit`.
+`Boot::size(w, h)` is the inner size; there is no 720x480 maximum.
+`Boot::pointer` plus
 `Boot::displays` place the window on the display under the pointer.
 `window::place` is pointer-origin (menus). `window::place_centered`
 centers `size` on that display (else the first). `window::place_pinned`

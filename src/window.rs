@@ -1,7 +1,8 @@
 //! Window kinds, overlay placement, and hide policy.
 //!
 //! `Boot::overlay` plus [`place`] or [`place_centered`] position a
-//! palette. Subscribe with [`crate::key::listen`] and pass Escape to
+//! palette. [`crate::daemon!`] keeps the process up; [`crate::app::Prepared::open`]
+//! maps the window. Subscribe with [`crate::key::listen`] and pass Escape to
 //! [`should_hide`].
 //!
 //! ```

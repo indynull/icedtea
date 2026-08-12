@@ -466,6 +466,30 @@ impl From<f32> for RowHeights<'_> {
     }
 }
 
+/// How each list row is painted.
+///
+/// [`Self::Flush`] is one clipped line and a selection wash.
+/// [`Self::Card`] is a surface, wrapped title, and an optional meter.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum RowFace<F = fn(usize) -> f32> {
+    Flush,
+    Card {
+        /// Fill from 0.0 to 1.0 along a 3px bar under the meta.
+        meter: Option<F>,
+    },
+}
+
+impl Default for RowFace<fn(usize) -> f32> {
+    fn default() -> Self {
+        Self::Flush
+    }
+}
+
+impl RowFace<fn(usize) -> f32> {
+    /// Compact clipped row. Same as [`Self::Flush`] with a known `F`.
+    pub const FLUSH: Self = Self::Flush;
+}
+
 impl RowHeights<'_> {
     pub fn at(self, i: usize) -> f32 {
         match self {
@@ -1196,6 +1220,11 @@ mod tests {
         assert_eq!(ext.offset(2), 60.0);
         assert_eq!(ext.total(5), 180.0);
         assert_eq!(RowHeights::from(20.0).at(3), 20.0);
+        assert_eq!(RowFace::<fn(usize) -> f32>::default(), RowFace::Flush);
+        let card = RowFace::Card {
+            meter: Some((|_| 0.5) as fn(usize) -> f32),
+        };
+        assert!(matches!(card, RowFace::Card { .. }));
         assert_eq!(RowHeights::from(20.0).offset(4), 80.0);
         assert_eq!(RowHeights::from(20.0).total(3), 60.0);
         assert_eq!(RowHeights::from(-4.0).total(3), 0.0);

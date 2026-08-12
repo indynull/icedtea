@@ -18,5 +18,7 @@ A compact tool sets size on `Boot` (`.size(380.0, 560.0).min_size(...)`)
 instead of calling iced window resize. See [Compact tools](compact-tools.md).
 
 `bootstrap(&boot)` is the same path without opening a window — use it
-in tests. Crate docs: [`run!`](https://docs.rs/icedtea/latest/icedtea/macro.run.html),
+in tests. An overlay that hides and pops out uses [`daemon!`](https://docs.rs/icedtea/latest/icedtea/macro.daemon.html)
+plus [`Prepared::open`](https://docs.rs/icedtea/latest/icedtea/app/struct.Prepared.html).
+Crate docs: [`run!`](https://docs.rs/icedtea/latest/icedtea/macro.run.html),
 [`Boot`](https://docs.rs/icedtea/latest/icedtea/app/struct.Boot.html).

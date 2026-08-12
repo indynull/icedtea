@@ -30,7 +30,10 @@
 //!
 //! # Boot
 //!
-//! [`run!`] opens that window. The same program is
+//! [`run!`] opens that window. [`daemon!`] is the same `Prepared`
+//! settings on `iced::daemon`: no window until [`Prepared::open`],
+//! and the process stays up when the last window closes.
+//! The same program is
 //! [`examples/hello.rs`](https://github.com/indynull/icedtea/blob/master/examples/hello.rs).
 //!
 //! ```ignore
@@ -244,6 +247,47 @@ macro_rules! run {
     }};
 }
 
+/// Boot theme and iced settings, then start `iced::daemon`.
+///
+/// No window until the application returns [`Prepared::open`].
+/// Closing every window leaves the process up; quit with
+/// [`iced::exit`]. `view` takes `window::Id`. Theme is the same
+/// `fn(&State) -> Theme` as [`run!`].
+///
+/// ```ignore
+/// icedtea::daemon!(
+///     icedtea::Boot::new("HUD", "dev.example.hud").overlay().size(780.0, 560.0),
+///     Hud::new,
+///     Hud::update,
+///     Hud::view,
+///     Hud::theme,
+/// );
+/// ```
+#[macro_export]
+macro_rules! daemon {
+    ($boot:expr, $new:expr, $update:expr, $view:expr, $theme:expr) => {
+        $crate::daemon!($boot, $new, $update, $view, $theme, |_| {
+            $crate::iced::Subscription::none()
+        })
+    };
+    ($boot:expr, $new:expr, $update:expr, $view:expr, $theme:expr, $sub:expr) => {{
+        let __prep = $crate::bootstrap(&$boot);
+        let __title = __prep.title.clone();
+        let __direction = __prep.direction();
+        debug_assert!(
+            __direction == $crate::i18n::Direction::Ltr
+                || __direction == $crate::i18n::Direction::Rtl
+        );
+        $crate::iced::daemon($new, $update, $view)
+            .title(move |_, _| __title.clone())
+            .theme(move |state, _| $theme(state))
+            .subscription($sub)
+            .settings(__prep.iced_settings)
+            .default_font($crate::typo::UI)
+            .run()
+    }};
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -262,10 +306,10 @@ mod tests {
         let arch = include_str!("../book/src/architecture.md");
         let first = include_str!("../book/src/first-window.md");
         let hello = include_str!("../examples/hello.rs");
-        assert!(
-            !tour.contains("include_str!(\"../README.md\")"),
-            "crate-root rustdoc is a tour, not the GitHub README"
-        );
+        let tour_msg = "crate-root rustdoc is a tour, not the GitHub README";
+        if tour.contains("include_str!(\"../README.md\")") {
+            panic!("{tour_msg}");
+        }
         assert!(tour.contains("Action"));
         assert!(tour.contains("toolbar"));
         assert!(tour.contains("Boot"));
@@ -288,10 +332,10 @@ mod tests {
             let at = src
                 .find("icedtea =")
                 .expect("install story names the crate");
-            assert!(
-                src[at..].starts_with("icedtea = \"0.4\""),
-                "first icedtea line is the crates.io version"
-            );
+            let ver_msg = "first icedtea line is the crates.io version";
+            if !src[at..].starts_with("icedtea = \"0.4\"") {
+                panic!("{ver_msg}");
+            }
         }
         assert!(arch.contains("Action"));
         assert!(arch.contains("Tokens"));
@@ -309,13 +353,14 @@ mod tests {
             ("layout", include_str!("layout/mod.rs")),
         ] {
             let head = src.split("pub ").next().unwrap_or(src);
-            assert!(
-                head.contains("A11y")
-                    || head.contains("Action")
-                    || head.contains("listen_sash")
-                    || head.contains("handle"),
-                "{name} module docs must name the intended recipe"
-            );
+            let a11y = head.contains("A11y");
+            let action = head.contains("Action");
+            let sash = head.contains("listen_sash");
+            let handle = head.contains("handle");
+            let recipe_msg = format!("{name} module docs must name the intended recipe");
+            if !(a11y || action || sash || handle) {
+                panic!("{recipe_msg}");
+            }
         }
     }
 
@@ -323,8 +368,22 @@ mod tests {
     fn run_macro_starts_iced_application_builder() {
         let src = include_str!("lib.rs");
         assert!(src.contains("$crate::iced::application($new, $update, $view)"));
+        assert!(src.contains("$crate::iced::daemon($new, $update, $view)"));
+        let daemon_src = src.split("macro_rules! daemon").nth(1).unwrap();
+        let daemon_msg = "daemon leaves window open to Prepared::open";
+        if daemon_src.contains(".window(") {
+            panic!("{daemon_msg}");
+        }
         let prep = bootstrap(&Boot::new("tea", "dev.icedtea.tea"));
         assert!(!prep.title.is_empty());
         assert!(prep.iced_settings.fonts.is_empty());
+        let overlay = bootstrap(&Boot::new("hud", "dev.hud").overlay().size(780.0, 560.0));
+        assert!(!overlay.window.decorations);
+        assert!(!overlay.window.exit_on_close_request);
+        let (a, _) = overlay.open();
+        let (b, _) = overlay.open();
+        assert_ne!(a, b);
+        let (desk, _) = overlay.open_desktop();
+        assert_ne!(desk, a);
     }
 }

@@ -8,10 +8,12 @@ use iced::keyboard::{key::Named, Key, Modifiers};
 
 /// Command on macOS, Control on Linux and Windows.
 pub fn primary() -> Modifiers {
+    let logo = Modifiers::LOGO;
+    let ctrl = Modifiers::CTRL;
     if cfg!(target_os = "macos") {
-        Modifiers::LOGO
+        logo
     } else {
-        Modifiers::CTRL
+        ctrl
     }
 }
 
@@ -179,12 +181,12 @@ mod tests {
         let s = Shortcut::parse("ctrl+s").unwrap();
         assert!(s.matches(primary(), &Key::Character("s".into())));
         assert!(!s.matches(Modifiers::SHIFT, &Key::Character("s".into())));
-        let host = if cfg!(target_os = "macos") {
-            "cmd+s"
-        } else {
-            "ctrl+s"
-        };
+        let cmd = "cmd+s";
+        let ctrl = "ctrl+s";
+        let host = if cfg!(target_os = "macos") { cmd } else { ctrl };
         assert_eq!(s.to_string(), host);
+        let home = Shortcut::new(Modifiers::empty(), Key::Named(Named::Home));
+        assert!(home.to_string().contains("Home"));
         assert_eq!(
             Shortcut::parse("cmd+shift+p").unwrap().to_string(),
             "cmd+shift+p"
@@ -215,13 +217,7 @@ mod tests {
             let spec = format!("f{n}");
             let parsed = Shortcut::parse(&spec).unwrap();
             assert_eq!(parsed.to_string(), spec);
-            assert_eq!(
-                function_named(n),
-                Some(match parsed.key {
-                    Key::Named(named) => named,
-                    _ => panic!("function key"),
-                })
-            );
+            assert_eq!(function_named(n), Some(named_or_die(&parsed.key)));
             assert_eq!(function_number(function_named(n).unwrap()), Some(n));
         }
         assert!(Shortcut::parse("f0").is_none());
@@ -234,5 +230,18 @@ mod tests {
         let _ = Shortcut::new(Modifiers::CTRL, Key::Named(Named::Escape)).to_string();
         let weird = Shortcut::new(Modifiers::empty(), Key::Unidentified);
         assert!(weird.to_string().contains("Unidentified"));
+    }
+
+    fn named_or_die(key: &Key) -> Named {
+        match key {
+            Key::Named(named) => *named,
+            _ => panic!("function key"),
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "function key")]
+    fn function_key_display_needs_a_named_key() {
+        let _ = named_or_die(&Key::Character("x".into()));
     }
 }

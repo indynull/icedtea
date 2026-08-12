@@ -158,6 +158,18 @@ pub fn page_title(page: &str) -> &'static str {
 mod tests {
     use super::*;
 
+    fn must(ok: bool, msg: impl std::fmt::Display) {
+        if !ok {
+            panic!("{msg}");
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "cover-must")]
+    fn must_rejects_a_failed_check() {
+        must(false, "cover-must");
+    }
+
     #[test]
     fn catalog_covers_public_surfaces() {
         assert!(get("button").is_some());
@@ -330,9 +342,9 @@ mod tests {
         assert_eq!(ctors.len(), ENTRIES.len());
         for (group, rel) in group_file {
             let text = std::fs::read_to_string(root.join(rel)).unwrap();
-            assert!(
+            must(
                 text.contains(&format!("# {group}")),
-                "{rel} must be the {group} handbook page"
+                format!("{rel} must be the {group} handbook page"),
             );
             for e in ENTRIES.iter().filter(|e| e.group == group) {
                 let marker = format!("**`{}`**", e.id);
@@ -351,21 +363,19 @@ mod tests {
                     .map(|(_, n)| *n)
                     .unwrap();
                 assert!(section.contains(ctor), "{} section must name {ctor}", e.id);
-                assert!(
+                must(
                     section.contains("docs.rs/icedtea"),
-                    "{} section must link rustdoc",
-                    e.id
+                    format!("{} section must link rustdoc", e.id),
                 );
-                assert!(
+                must(
                     section.contains("github.com/indynull/icedtea/blob/master"),
-                    "{} section must link source",
-                    e.id
+                    format!("{} section must link source", e.id),
                 );
-                assert!(
-                    section.contains("crates.io/crates/icedtea")
-                        || section.contains("crates.io/crates/iced"),
-                    "{} section must link the published crate",
-                    e.id
+                let tea = section.contains("crates.io/crates/icedtea");
+                let iced = section.contains("crates.io/crates/iced");
+                must(
+                    tea || iced,
+                    format!("{} section must link the published crate", e.id),
                 );
             }
         }
@@ -409,18 +419,18 @@ mod tests {
                 "catalog id",
                 "see also catalog",
             ] {
-                assert!(
+                must(
                     !text.to_ascii_lowercase().contains(needle),
-                    "{rel} must not teach {needle}"
+                    format!("{rel} must not teach {needle}"),
                 );
             }
             let stripped = text
                 .to_ascii_lowercase()
                 .replace("gallery.gif", "")
                 .replace("assets/gallery.gif", "");
-            assert!(
+            must(
                 !stripped.contains("gallery"),
-                "{rel} must not send readers to the gallery demo"
+                format!("{rel} must not send readers to the gallery demo"),
             );
         }
         let root_rs = include_str!("lib.rs");
@@ -433,9 +443,9 @@ mod tests {
             "gallery",
             "catalog id",
         ] {
-            assert!(
+            must(
                 !tour.contains(needle),
-                "crate-root tour must not teach {needle}"
+                format!("crate-root tour must not teach {needle}"),
             );
         }
     }
@@ -535,22 +545,24 @@ mod tests {
             let (_, name, src) = hit.expect(e.id);
             let at = find_pub_fn(src, name)
                 .unwrap_or_else(|| panic!("{} missing constructor pub fn {}(", e.id, name));
-            assert!(
+            must(
                 rustdoc_example_immediately_above(&src[..at]),
-                "{} constructor pub fn {} needs a rustdoc example immediately above it",
-                e.id,
-                name
+                format!(
+                    "{} constructor pub fn {} needs a rustdoc example immediately above it",
+                    e.id, name
+                ),
             );
             let rustdoc = rustdoc_block_above(&src[..at]);
-            assert!(
+            must(
                 !rustdoc.contains("catalog id") && !rustdoc.contains("Catalog `"),
-                "{} rustdoc must not teach catalog id",
-                e.id
+                format!("{} rustdoc must not teach catalog id", e.id),
             );
-            assert!(
+            must(
                 !rustdoc.contains("|_| ()") && !rustdoc.contains("|_, _| ()"),
-                "{} rustdoc must name the message, not a dummy closure",
-                e.id
+                format!(
+                    "{} rustdoc must name the message, not a dummy closure",
+                    e.id
+                ),
             );
         }
     }
@@ -624,10 +636,14 @@ mod tests {
         let pattern = include_str!("pattern.rs");
         let at = find_pub_fn(pattern, "workspace").expect("workspace constructor");
         let rustdoc = rustdoc_block_above(&pattern[..at]);
-        assert!(
+        must(
             rustdoc.contains("each leaf id"),
-            "workspace rustdoc must say each leaf id gets a pane"
+            "workspace rustdoc must say each leaf id gets a pane",
         );
+        assert_eq!(rustdoc_block_above("\n\n"), "");
+        assert!(rustdoc_block_above("/// hi\n/// there").contains("/// hi"));
+        assert!(rustdoc_block_above("code\n\n/// doc").contains("/// doc"));
+        assert!(rustdoc_block_above("fn other()\n/// doc").contains("/// doc"));
     }
 
     #[test]
@@ -718,23 +734,23 @@ mod tests {
     #[test]
     fn collapsed_dual_paths_are_not_public() {
         let widget = include_str!("widget.rs");
-        assert!(
+        must(
             !widget.contains("pub fn image<"),
-            "image_slot is the image constructor"
+            "image_slot is the image constructor",
         );
         let key = include_str!("key.rs");
-        assert!(
+        must(
             !key.contains("pub fn listen_raw"),
-            "listen is the keyboard subscription"
+            "listen is the keyboard subscription",
         );
         let recipes = include_str!("layout/recipes.rs");
-        assert!(
+        must(
             !recipes.contains("pub fn scroll_y<"),
-            "themed_scroll is the scroll constructor"
+            "themed_scroll is the scroll constructor",
         );
-        assert!(
+        must(
             !recipes.contains("pub fn sidebar_mode"),
-            "Breakpoint::from_width picks the sidebar recipe"
+            "Breakpoint::from_width picks the sidebar recipe",
         );
     }
 }

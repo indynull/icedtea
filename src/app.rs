@@ -177,6 +177,37 @@ impl Prepared {
     pub fn direction(&self) -> crate::i18n::Direction {
         self.locale.direction
     }
+
+    /// Open a window with these settings. Used from [`crate::daemon!`].
+    ///
+    /// The process stays up when the window closes. Map the [`Task`]
+    /// to store the id, then [`iced::window::close`] to hide.
+    ///
+    /// ```
+    /// let prep = icedtea::bootstrap(&icedtea::Boot::new("hud", "dev.hud").overlay());
+    /// let (id, _open) = prep.open();
+    /// let (again, _) = prep.open();
+    /// assert_ne!(id, again);
+    /// ```
+    pub fn open(&self) -> (iced::window::Id, iced::Task<iced::window::Id>) {
+        iced::window::open(self.window.clone())
+    }
+
+    /// Open a decorated desktop window from the same settings.
+    ///
+    /// [`crate::window::retarget`] first. Pop-out from an overlay.
+    ///
+    /// ```
+    /// let prep = icedtea::bootstrap(&icedtea::Boot::new("hud", "dev.hud").overlay());
+    /// let (id, _open) = prep.open_desktop();
+    /// let _ = id;
+    /// ```
+    pub fn open_desktop(&self) -> (iced::window::Id, iced::Task<iced::window::Id>) {
+        let mut win = self.window.clone();
+        let app_id = self.iced_settings.id.as_deref().unwrap_or("");
+        crate::window::retarget(&mut win, app_id);
+        iced::window::open(win)
+    }
 }
 
 /// Default UI font after bootstrap.

@@ -1370,11 +1370,9 @@ mod tests {
         assert_eq!(menu_heading(&cat, "custom"), "Custom");
         assert_eq!(menu_heading(&cat, ""), "");
         let save = table.iter().find(|a| a.id.as_str() == "file.save").unwrap();
-        let host = if cfg!(target_os = "macos") {
-            "cmd+s"
-        } else {
-            "ctrl+s"
-        };
+        let cmd = "cmd+s";
+        let ctrl = "ctrl+s";
+        let host = if cfg!(target_os = "macos") { cmd } else { ctrl };
         assert!(menu_item_label(save).contains(host));
         let undo = table.iter().find(|a| a.id.as_str() == "edit.undo").unwrap();
         assert_eq!(menu_item_label(undo), "Undo");

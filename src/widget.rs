@@ -39,7 +39,7 @@ use crate::scroll::ScrollRail;
 use crate::a11y::{self, A11y, Role};
 use crate::collection::{
     page_range, virtual_pads, visible_window, visible_window_var, window_after_scroll,
-    window_after_scroll_var, Accordion, ListModel, RowHeights, Selection, Tabs, TreeNode,
+    window_after_scroll_var, Accordion, ListModel, RowFace, RowHeights, Selection, Tabs, TreeNode,
     VisibleWindow,
 };
 use crate::i18n::Direction;
@@ -2773,16 +2773,69 @@ fn two_line_row<'a, M: 'a>(
     let mut col = column![text(title.to_string())
         .size(typo::BODY)
         .color(tok.text)
-        .font(typo::UI)]
+        .font(typo::UI)
+        .wrapping(iced::widget::text::Wrapping::None)]
     .spacing(2);
     if let Some(m) = meta_s.filter(|s| !s.is_empty()) {
-        col = col.push(text(m.to_string()).size(typo::META).color(meta_color));
+        col = col.push(
+            text(m.to_string())
+                .size(typo::META)
+                .color(meta_color)
+                .wrapping(iced::widget::text::Wrapping::None),
+        );
     }
     container(col)
         .width(Length::Fill)
         .height(row_h)
         .padding(8)
+        .clip(true)
         .style(move |_| style::list_row(tok, selected))
+        .into()
+}
+
+fn card_row<'a, M: 'a>(
+    title: &str,
+    meta_s: Option<&str>,
+    meta_color: iced::Color,
+    selected: bool,
+    row_h: f32,
+    meter: Option<f32>,
+    tok: Tokens,
+) -> Element<'a, M> {
+    let mut col = column![text(title.to_string())
+        .size(typo::BODY)
+        .color(tok.text)
+        .font(if selected { typo::UI_BOLD } else { typo::UI })
+        .width(Length::Fill)
+        .wrapping(iced::widget::text::Wrapping::Word)]
+    .spacing(2)
+    .width(Length::Fill);
+    if let Some(m) = meta_s.filter(|s| !s.is_empty()) {
+        col = col.push(
+            text(m.to_string())
+                .size(typo::META)
+                .color(meta_color)
+                .width(Length::Fill),
+        );
+    }
+    if let Some(v) = meter {
+        col = col.push(
+            progress_bar(0.0..=1.0, v.clamp(0.0, 1.0))
+                .girth(3)
+                .style(style::progress_style(tok)),
+        );
+    }
+    container(col)
+        .width(Length::Fill)
+        .height(row_h)
+        .padding(Padding {
+            top: 8.0,
+            right: 12.0,
+            bottom: 8.0,
+            left: 12.0,
+        })
+        .clip(true)
+        .style(move |_| style::card(tok, selected))
         .into()
 }
 
@@ -2792,7 +2845,9 @@ fn two_line_row<'a, M: 'a>(
 /// the second line. `scroll` is the only offset: the rail and the
 /// wheel write it. Uniform rows sit at `i * row_h - scroll`. Variable
 /// rows use [`RowHeights::PerRow`] and [`visible_window_var`].
-/// `scroll_id` names the clip pane. The 24px rail sits beside it.
+/// `face` is [`RowFace::Flush`] (clipped line) or [`RowFace::Card`]
+/// (wrapped title, 2px gap, optional meter). `scroll_id` names the
+/// clip pane. The 24px rail sits beside it.
 ///
 ///
 /// ```
@@ -2819,6 +2874,7 @@ fn two_line_row<'a, M: 'a>(
 ///     "No rows",
 ///     |_| tok.danger,
 ///     None,
+///     icedtea::collection::RowFace::FLUSH,
 ///     A11y::new("list", Role::List),
 /// );
 /// ```
@@ -2835,6 +2891,7 @@ pub fn list_view<'a, M, L>(
     empty: &'a str,
     meta_color: impl Fn(usize) -> iced::Color + Copy + 'a,
     scroll_id: Option<Id>,
+    face: RowFace<impl Fn(usize) -> f32 + Copy + 'a>,
     a11y: A11y,
 ) -> Element<'a, M>
 where
@@ -2857,7 +2914,11 @@ where
             scroll_id,
             tok,
             move |win| {
-                let mut col = Column::new().spacing(0);
+                let gap = match face {
+                    RowFace::Flush => 0.0,
+                    RowFace::Card { .. } => 2.0,
+                };
+                let mut col = Column::new().spacing(gap);
                 if model.is_empty() {
                     col = col.push(meta(empty, tok, A11y::new(empty, Role::Status)));
                 } else {
@@ -2876,11 +2937,24 @@ where
                         let title = model.title(i);
                         let meta_s = model.meta(i);
                         let name = title.to_string();
-                        let face = two_line_row(title, meta_s, meta_color(i), selected, h, tok);
+                        let painted = match face {
+                            RowFace::Flush => {
+                                two_line_row(title, meta_s, meta_color(i), selected, h, tok)
+                            }
+                            RowFace::Card { meter } => card_row(
+                                title,
+                                meta_s,
+                                meta_color(i),
+                                selected,
+                                h,
+                                meter.map(|m| m(i)),
+                                tok,
+                            ),
+                        };
                         let row: Element<'a, M> = if disabled {
-                            face
+                            painted
                         } else {
-                            mouse_area(face)
+                            mouse_area(painted)
                                 .on_press(on_select(i))
                                 .on_right_press(on_select(i))
                                 .into()
@@ -3601,6 +3675,18 @@ mod tests {
     use crate::density::Density;
     use crate::theme::named;
 
+    fn must(ok: bool, msg: impl std::fmt::Display) {
+        if !ok {
+            panic!("{msg}");
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "cover-must")]
+    fn must_rejects_a_failed_check() {
+        must(false, "cover-must");
+    }
+
     fn draw_once<M: Clone>(el: &mut Element<'_, M>) {
         use iced::advanced::layout::{Layout, Limits};
         use iced::advanced::renderer::Style;
@@ -4185,6 +4271,7 @@ mod tests {
             "Empty",
             |_| tok.muted,
             Some(Id::from("list-host")),
+            RowFace::FLUSH,
             role("list", Role::List),
         );
         let _: Element<'_, ()> = list_view(
@@ -4199,6 +4286,7 @@ mod tests {
             "No sessions",
             |_| tok.muted,
             None,
+            RowFace::FLUSH,
             role("list", Role::List),
         );
         let mut striped: Element<'_, ()> = list_view(
@@ -4219,6 +4307,7 @@ mod tests {
                 }
             },
             None,
+            RowFace::FLUSH,
             role("list", Role::List),
         );
         draw_once(&mut striped);
@@ -4234,6 +4323,7 @@ mod tests {
             "Empty",
             |_| tok.muted,
             None,
+            RowFace::FLUSH,
             role("list-sep", Role::List),
         );
         let lines = ["boot".into(), "ready".into()];
@@ -4606,6 +4696,7 @@ mod tests {
             "Empty",
             |_| tok.muted,
             None,
+            RowFace::FLUSH,
             role("list", Role::List),
         );
         draw_once(&mut lv);
@@ -4622,6 +4713,7 @@ mod tests {
             "Empty",
             |_| tok.muted,
             None,
+            RowFace::FLUSH,
             role("list-empty", Role::List),
         );
         draw_once(&mut empty_lv);
@@ -4649,6 +4741,7 @@ mod tests {
                 }
             },
             None,
+            RowFace::FLUSH,
             role("list-color", Role::List),
         );
         draw_once(&mut color_lv);
@@ -4664,6 +4757,7 @@ mod tests {
             "Empty",
             |_| tok.muted,
             None,
+            RowFace::FLUSH,
             role("list", Role::List).with_disabled(true),
         );
         draw_once(&mut dead_lv);
@@ -5033,6 +5127,7 @@ mod tests {
             "Empty",
             |_| tok.muted,
             Some(Id::from("list-scroll")),
+            RowFace::FLUSH,
             A11y::new("list", Role::List),
         );
         let _ = drive(&mut list_el);
@@ -5120,6 +5215,7 @@ mod tests {
             "Empty",
             |_| tok.muted,
             Some(Id::from("list-rail")),
+            RowFace::FLUSH,
             A11y::new("list", Role::List),
         );
         let mut tree = Tree::new(el.as_widget());
@@ -5226,6 +5322,7 @@ mod tests {
             "Empty",
             |_| tok.muted,
             None,
+            RowFace::FLUSH,
             A11y::new("list", Role::List),
         );
         let mut tree = Tree::new(el.as_widget());
@@ -5244,16 +5341,16 @@ mod tests {
             .filter(|b| (b.height - row_h).abs() < 0.6 && b.width > 40.0)
             .map(|b| b.y - origin.y)
             .collect();
-        assert!(
+        must(
             rows.iter().any(|y| y.abs() < 1.0),
-            "row 10 must sit at the clip top, got {rows:?}"
+            format!("row 10 must sit at the clip top, got {rows:?}"),
         );
         for y in &rows {
             let along = y + scroll;
             let i = (along / row_h).round();
-            assert!(
+            must(
                 (along - i * row_h).abs() < 1.0,
-                "painted y {y} is not k*{row_h} - {scroll}"
+                format!("painted y {y} is not k*{row_h} - {scroll}"),
             );
         }
         let sep_list = VecList {
@@ -5277,6 +5374,7 @@ mod tests {
             "Empty",
             |_| tok.muted,
             None,
+            RowFace::FLUSH,
             A11y::new("sep-list", Role::List),
         );
         let mut sep_tree = Tree::new(sep_el.as_widget());
@@ -5293,9 +5391,9 @@ mod tests {
             .filter(|b| (b.height - sep_h).abs() < 0.6 && b.width > 40.0)
             .map(|b| b.y - sep_origin.y)
             .collect();
-        assert!(
+        must(
             sep_rows.iter().any(|y| (*y - sep_h).abs() < 1.0),
-            "separator index 1 must sit at y={sep_h}, got {sep_rows:?}"
+            format!("separator index 1 must sit at y={sep_h}, got {sep_rows:?}"),
         );
     }
 
@@ -5309,8 +5407,8 @@ mod tests {
         let heights = [20.0_f32, 50.0, 20.0];
         let list = VecList {
             items: vec![
-                crate::collection::ListRow::new("a"),
-                crate::collection::ListRow::new("b"),
+                crate::collection::ListRow::new("a").with_meta("this morning"),
+                crate::collection::ListRow::new("b").with_meta("yesterday"),
                 crate::collection::ListRow::new("c"),
             ],
         };
@@ -5327,6 +5425,7 @@ mod tests {
             "Empty",
             |_| tok.muted,
             None,
+            RowFace::FLUSH,
             A11y::new("var-list", Role::List),
         );
         let mut tree = Tree::new(el.as_widget());
@@ -5345,11 +5444,69 @@ mod tests {
             .filter(|b| (b.height - 50.0).abs() < 1.0 && b.width > 40.0)
             .map(|b| b.y - origin.y)
             .collect();
-        assert!(
+        must(
             tall.iter().any(|y| (*y - 20.0).abs() < 2.0),
-            "second row starts at 20px, not 2*uniform, got {tall:?}"
+            format!("second row starts at 20px, not 2*uniform, got {tall:?}"),
         );
         let _ = drive_scroll(&mut el);
+        let mut cards: Element<'_, ()> = list_view(
+            &list,
+            &Sel::Single(0),
+            |_| (),
+            tok,
+            window,
+            crate::collection::RowHeights::PerRow(&heights),
+            0,
+            |_| (),
+            "Empty",
+            |_| tok.muted,
+            None,
+            RowFace::Card {
+                meter: Some(|i| if i == 0 { 0.8 } else { 0.2 }),
+            },
+            A11y::new("card-list", Role::List),
+        );
+        let mut tree_c = Tree::new(cards.as_widget());
+        let node_c = cards.as_widget_mut().layout(
+            &mut tree_c,
+            &renderer,
+            &Limits::new(Size::ZERO, Size::new(320.0, 200.0)),
+        );
+        let layout_c = Layout::new(&node_c);
+        let origin_c = layout_c.bounds();
+        let mut boxes_c = Vec::new();
+        walk_bounds(layout_c, &mut boxes_c);
+        let cards_y: Vec<f32> = boxes_c
+            .iter()
+            .filter(|b| (b.height - 50.0).abs() < 1.0 && b.width > 40.0)
+            .map(|b| b.y - origin_c.y)
+            .collect();
+        must(
+            cards_y.iter().any(|y| (*y - 22.0).abs() < 3.0),
+            format!("card gap is 2px so the 50px row starts at 22, got {cards_y:?}"),
+        );
+        draw_once(&mut cards);
+        let bare = VecList {
+            items: vec![crate::collection::ListRow::new("only")],
+        };
+        let mut no_meter: Element<'_, ()> = list_view(
+            &bare,
+            &Sel::None,
+            |_| (),
+            tok,
+            VisibleWindow::new(80.0),
+            72.0,
+            0,
+            |_| (),
+            "Empty",
+            |_| tok.muted,
+            None,
+            RowFace::Card {
+                meter: None::<fn(usize) -> f32>,
+            },
+            A11y::new("card-bare", Role::List).with_disabled(true),
+        );
+        draw_once(&mut no_meter);
         let mut tree0 = Tree::new(el.as_widget());
         let renderer0 = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
             Font::DEFAULT,
@@ -5415,19 +5572,19 @@ mod tests {
             xs
         };
         let x0 = leading(&cols);
-        assert!(
+        must(
             x0.iter().any(|x| x.abs() < 1.0),
-            "frozen column missing at x=0: {x0:?}"
+            format!("frozen column missing at x=0: {x0:?}"),
         );
         cols.set_h_scroll(90.0);
         let x1 = leading(&cols);
-        assert!(
+        must(
             x1.iter().any(|x| x.abs() < 1.0),
-            "frozen column left the leading edge: {x1:?}"
+            format!("frozen column left the leading edge: {x1:?}"),
         );
-        assert!(
+        must(
             x1.iter().any(|x| *x < -1.0),
-            "unfrozen columns did not scroll: {x1:?}"
+            format!("unfrozen columns did not scroll: {x1:?}"),
         );
         let mut el: Element<'_, f32> = data_table(
             &table,
@@ -5744,16 +5901,16 @@ mod tests {
             .filter(|b| (b.height - row_h).abs() < 0.6 && b.width > 40.0)
             .map(|b| b.y - clip_top)
             .collect();
-        assert!(
+        must(
             rows.iter().any(|y| y.abs() < 1.0),
-            "row 10 must sit at the clip top, got {rows:?}"
+            format!("row 10 must sit at the clip top, got {rows:?}"),
         );
         for y in &rows {
             let along = y + scroll;
             let i = (along / row_h).round();
-            assert!(
+            must(
                 (along - i * row_h).abs() < 1.0,
-                "painted y {y} is not k*{row_h} - {scroll}"
+                format!("painted y {y} is not k*{row_h} - {scroll}"),
             );
         }
     }
@@ -5906,9 +6063,9 @@ mod tests {
         assert_eq!(widths.len(), 3);
         assert!((widths[0] - widths[1]).abs() < 1.0);
         assert!((widths[1] - widths[2]).abs() < 1.0);
-        assert!(
+        must(
             (widths[0] * 3.0 + 16.0 - 300.0).abs() < 4.0,
-            "cells {widths:?} should share the 300px row"
+            format!("cells {widths:?} should share the 300px row"),
         );
     }
 
@@ -5936,10 +6093,12 @@ mod tests {
         let max = iced::Size::new(300.0, 400.0);
         let closed_h = layout_size(&mut closed, max).height;
         let open_size = layout_size(&mut open, max);
-        assert!(
+        must(
             open_size.height > closed_h + 8.0,
-            "open {0} must include the body above closed {closed_h}",
-            open_size.height
+            format!(
+                "open {} must include the body above closed {closed_h}",
+                open_size.height
+            ),
         );
         assert!((open_size.width - 300.0).abs() < 1.0);
     }

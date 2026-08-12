@@ -47,6 +47,7 @@ impl App {
             "No rows",
             |_| tok.muted,
             None,
+            icedtea::collection::RowFace::FLUSH,
             A11y::new("files", Role::List),
         );
         let title = self
@@ -62,4 +63,5 @@ impl App {
 
 `layout::fixed` sizes the sidebar. The detail child fills. Selection
 stays on indices. Pass `RowHeights::PerRow` when rows are not one
-height.
+height. `RowFace::Card` wraps the title on a surface; `Flush` is one
+clipped line.

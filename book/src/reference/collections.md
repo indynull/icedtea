@@ -22,7 +22,9 @@ Constructor: [`widget::list_view`](https://docs.rs/icedtea/latest/icedtea/widget
 `empty` is the copy when the model has no rows. Selection stays on
 indices. Disabled drops row messages. `on_scroll` reports the window
 after a wheel or rail move. Pass `RowHeights::PerRow` for variable
-row heights (`visible_range_var`).
+row heights (`visible_range_var`). `RowFace::Flush` is one clipped
+line. `RowFace::Card` is a surface, wrapped title, and an optional
+3px meter.
 
 ### Log
 
