@@ -204,21 +204,23 @@ pub fn button_style(
     }
 }
 
+/// Title control inside a [`tab_shell`]. Transparent chrome; the shell
+/// owns fill and border.
 pub fn tab_style(
     tok: Tokens,
     active: bool,
 ) -> impl Fn(&iced::Theme, button::Status) -> button::Style {
     move |_theme, status| {
-        let bg = if active {
-            Some(Background::Color(mix(tok.primary, tok.canvas, 0.28)))
-        } else if matches!(status, button::Status::Hovered | button::Status::Pressed) {
-            Some(Background::Color(hover_fill(tok)))
-        } else {
-            None
-        };
+        let hover = matches!(status, button::Status::Hovered | button::Status::Pressed);
         button::Style {
-            background: bg,
-            text_color: if active { tok.text } else { tok.muted },
+            background: None,
+            text_color: if active {
+                tok.text
+            } else if hover {
+                tok.text
+            } else {
+                tok.muted
+            },
             border: Border {
                 color: Color::TRANSPARENT,
                 width: 0.0,
@@ -228,6 +230,40 @@ pub fn tab_style(
             snap: false,
         }
     }
+}
+
+/// One document/section tab: top radius, border, surface when active.
+pub fn tab_shell(tok: Tokens, active: bool) -> container::Style {
+    let r = Corner::Tight.radius_px();
+    container::Style {
+        background: Some(Background::Color(if active {
+            tok.surface
+        } else {
+            mix(tok.text, tok.panel, 0.04)
+        })),
+        text_color: Some(if active { tok.text } else { tok.muted }),
+        border: Border {
+            color: if active {
+                tok.border
+            } else {
+                mix(tok.border, tok.panel, 0.55)
+            },
+            width: 1.0,
+            radius: iced::border::Radius {
+                top_left: r,
+                top_right: r,
+                bottom_left: 0.0,
+                bottom_right: 0.0,
+            },
+        },
+        shadow: Shadow::default(),
+        snap: false,
+    }
+}
+
+/// Rail behind the tab row (panel + bottom edge via the hairline under it).
+pub fn tab_strip(tok: Tokens) -> container::Style {
+    fill(tok.panel, tok.text)
 }
 
 pub fn search_style(tok: Tokens) -> impl Fn(&iced::Theme, text_input::Status) -> text_input::Style {
@@ -365,7 +401,8 @@ pub fn slider_style(tok: Tokens) -> impl Fn(&iced::Theme, slider::Status) -> sli
 
 pub fn progress_style(tok: Tokens) -> impl Fn(&iced::Theme) -> progress_bar::Style {
     move |_theme| progress_bar::Style {
-        background: Background::Color(tok.panel),
+        // Track against surface/card (panel is often the same fill as the card).
+        background: Background::Color(mix(tok.text, tok.surface, 0.12)),
         bar: Background::Color(tok.primary),
         border: Border {
             color: tok.border,
@@ -467,6 +504,9 @@ mod tests {
         let _ = tab(&theme, button::Status::Active);
         let _ = tab2(&theme, button::Status::Hovered);
         let _ = tab2(&theme, button::Status::Active);
+        let _ = tab_shell(tok, true);
+        let _ = tab_shell(tok, false);
+        let _ = tab_strip(tok);
         let s = search_style(tok);
         let _ = s(&theme, text_input::Status::Active);
         let _ = s(&theme, text_input::Status::Hovered);
