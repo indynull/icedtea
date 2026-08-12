@@ -79,11 +79,27 @@ fn index(layer: KeyLayer) -> usize {
     }
 }
 
+/// Unmodified keys that still match the action table while a field is focused.
+///
+/// Modifier chords (`ctrl`/`alt`/`logo`) always match. Plain typing never
+/// does. Use [`WhileInput::Chrome`] so Escape, Enter, and F1–F24 still
+/// reach the table (pane focus, activate selection, chrome shortcuts).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum WhileInput {
+    /// Only chords with control, alt, or logo (default).
+    #[default]
+    ChordsOnly,
+    /// Chords plus Escape, Enter, and F1–F24 without modifiers.
+    Chrome,
+}
+
 /// Which chrome currently owns keys.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct KeyContext {
     pub text_input_focused: bool,
     pub modal_open: bool,
+    /// Which bare keys still match while [`Self::text_input_focused`].
+    pub while_input: WhileInput,
 }
 
 impl KeyContext {
@@ -100,6 +116,66 @@ impl KeyContext {
         } else {
             Some(KeyLayer::Application)
         }
+    }
+
+    /// Escape, Enter, and function keys still match the table while typing.
+    ///
+    /// ```
+    /// use icedtea::key::{KeyContext, WhileInput};
+    /// let ctx = KeyContext {
+    ///     text_input_focused: true,
+    ///     ..KeyContext::default()
+    /// }
+    /// .chrome_over_input();
+    /// assert_eq!(ctx.while_input, WhileInput::Chrome);
+    /// ```
+    pub fn chrome_over_input(mut self) -> Self {
+        self.while_input = WhileInput::Chrome;
+        self
+    }
+}
+
+fn passes_while_input(while_input: WhileInput, key: &iced::keyboard::Key, chord: bool) -> bool {
+    if chord {
+        return true;
+    }
+    match while_input {
+        WhileInput::ChordsOnly => false,
+        WhileInput::Chrome => match key {
+            iced::keyboard::Key::Named(n) => {
+                use iced::keyboard::key::Named;
+                matches!(
+                    n,
+                    Named::Enter
+                        | Named::Escape
+                        | Named::F1
+                        | Named::F2
+                        | Named::F3
+                        | Named::F4
+                        | Named::F5
+                        | Named::F6
+                        | Named::F7
+                        | Named::F8
+                        | Named::F9
+                        | Named::F10
+                        | Named::F11
+                        | Named::F12
+                        | Named::F13
+                        | Named::F14
+                        | Named::F15
+                        | Named::F16
+                        | Named::F17
+                        | Named::F18
+                        | Named::F19
+                        | Named::F20
+                        | Named::F21
+                        | Named::F22
+                        | Named::F23
+                        | Named::F24
+                )
+            }
+            _ => false,
+        },
     }
 }
 
@@ -307,7 +383,7 @@ pub fn handle_in<M: Clone>(
         return None;
     }
     let chord = modifiers.control() || modifiers.alt() || modifiers.logo();
-    if ctx.text_input_focused && !chord {
+    if ctx.text_input_focused && !passes_while_input(ctx.while_input, key, chord) {
         return None;
     }
     let sc = Shortcut {
@@ -453,7 +529,7 @@ mod tests {
         let ev = press(Key::Character("s".into()), crate::shortcut::primary());
         let focused = KeyContext {
             text_input_focused: true,
-            modal_open: false,
+            ..KeyContext::default()
         };
         assert_eq!(handle(focused, &table, &ev), Some(1));
         assert_eq!(focused.capturing_layer(), Some(KeyLayer::TextInput));
@@ -473,11 +549,44 @@ mod tests {
         };
         assert_eq!(handle(idle, &table, &rel), None);
         let modal = KeyContext {
-            text_input_focused: false,
             modal_open: true,
+            ..KeyContext::default()
         };
         assert_eq!(handle(modal, &table, &ev), None);
         assert_eq!(modal.capturing_layer(), Some(KeyLayer::Modal));
+    }
+
+    #[test]
+    fn chrome_over_input_passes_enter_and_escape() {
+        use iced::keyboard::key::Named;
+        let mut table = ActionTable::new();
+        table.insert(
+            Action::new("list.activate", "Activate", 2u8)
+                .with_shortcut(Shortcut::parse("enter").unwrap()),
+        );
+        table.insert(
+            Action::new("ui.escape", "Escape", 3u8)
+                .with_shortcut(Shortcut::parse("escape").unwrap()),
+        );
+        let focused = KeyContext {
+            text_input_focused: true,
+            ..KeyContext::default()
+        };
+        let enter = press(Key::Named(Named::Enter), Modifiers::empty());
+        let esc = press(Key::Named(Named::Escape), Modifiers::empty());
+        assert_eq!(handle(focused, &table, &enter), None);
+        assert_eq!(handle(focused, &table, &esc), None);
+        let chrome = focused.chrome_over_input();
+        assert_eq!(handle(chrome, &table, &enter), Some(2));
+        assert_eq!(handle(chrome, &table, &esc), Some(3));
+        let typing = press(Key::Character("x".into()), Modifiers::empty());
+        assert_eq!(handle(chrome, &table, &typing), None);
+        table.insert(
+            Action::new("help.f1", "Help", 4u8).with_shortcut(Shortcut::parse("f1").unwrap()),
+        );
+        let f1 = press(Key::Named(Named::F1), Modifiers::empty());
+        assert_eq!(handle(chrome, &table, &f1), Some(4));
+        assert_eq!(handle(focused, &table, &f1), None);
     }
 
     #[test]
@@ -491,6 +600,7 @@ mod tests {
         let both = KeyContext {
             text_input_focused: true,
             modal_open: true,
+            ..KeyContext::default()
         };
         assert_eq!(both.capturing_layer(), Some(KeyLayer::Modal));
         assert_eq!(handle(both, &table, &save), None);
@@ -498,7 +608,7 @@ mod tests {
 
         let text = KeyContext {
             text_input_focused: true,
-            modal_open: false,
+            ..KeyContext::default()
         };
         assert_eq!(text.capturing_layer(), Some(KeyLayer::TextInput));
         assert_eq!(handle(text, &table, &typing), None);

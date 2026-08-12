@@ -26,6 +26,20 @@ row heights (`visible_range_var`). `RowFace::Flush` is one clipped
 line. `RowFace::Card` is a surface, wrapped title, and an optional
 3px meter.
 
+### Virtual column
+
+**`virtual-column`** — Virtualized free-form rows with known heights.
+
+Constructor: [`widget::virtual_column`](https://docs.rs/icedtea/latest/icedtea/widget/fn.virtual_column.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea)
+
+Same windowing as list (overscan, rail, wheel) for app-built faces —
+expand cards, custom bodies. Build heights with
+`collection::expand_card_heights` (closed estimate plus open-row
+heights). Title/meta model lists stay on `list_view`.
+
 ### Log
 
 **`log`** — Append-only lines that stick to the end.

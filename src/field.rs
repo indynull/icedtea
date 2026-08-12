@@ -51,6 +51,31 @@ impl Selectables {
         self.items.push((id, Content::with_text(text)));
     }
 
+    /// Bind `id` if missing or the text changed; return the buffer.
+    ///
+    /// For expand cards: call when a row opens so load is not O(n) on
+    /// every id up front.
+    pub fn ensure(&mut self, id: impl Into<String>, text: impl AsRef<str>) -> &Content {
+        let id = id.into();
+        self.bind(id.clone(), text);
+        self.get(&id).expect("ensure just bound id")
+    }
+
+    /// Drop ids for which `keep` returns false (closed cards, recycled rows).
+    pub fn retain(&mut self, mut keep: impl FnMut(&str) -> bool) {
+        self.items.retain(|(k, _)| keep(k.as_str()));
+    }
+
+    /// Remove one id. Returns whether it was bound.
+    pub fn unbind(&mut self, id: &str) -> bool {
+        if let Some(i) = self.items.iter().position(|(k, _)| k == id) {
+            self.items.remove(i);
+            true
+        } else {
+            false
+        }
+    }
+
     /// Whether `id` is bound.
     pub fn contains(&self, id: &str) -> bool {
         self.items.iter().any(|(k, _)| k == id)
@@ -163,5 +188,21 @@ mod tests {
         fields.perform("missing", Action::SelectAll);
         assert_eq!(fields.copy("missing"), "");
         assert!(fields.is_empty());
+    }
+
+    #[test]
+    fn ensure_binds_lazily_and_retain_drops_closed() {
+        let mut fields = Selectables::new();
+        assert_eq!(fields.ensure("card.3", "body three").text(), "body three");
+        assert!(fields.contains("card.3"));
+        fields.ensure("card.1", "one");
+        fields.ensure("card.9", "nine");
+        fields.retain(|id| id == "card.3" || id == "card.1");
+        assert!(fields.contains("card.3"));
+        assert!(fields.contains("card.1"));
+        assert!(!fields.contains("card.9"));
+        assert!(fields.unbind("card.1"));
+        assert!(!fields.unbind("card.1"));
+        assert_eq!(fields.len(), 1);
     }
 }

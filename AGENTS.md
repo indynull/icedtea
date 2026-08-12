@@ -62,7 +62,9 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
 - Lists and tables virtualize when row counts leave the hundreds
   (`collection::visible_range` + scroll offset). Their rail uses
   `collection::scroller_span` with a 24px minimum handle. `themed_scroll`
-  still uses iced's scroller (2px floor).
+  still uses iced's scroller (2px floor). Free-form expand cards use
+  `virtual_column` + `expand_card_heights` (extend list windowing; do
+  not add a second list model).
 - Split sash: grip emits `SashEvent::Press` only. Move and release come
   from `layout::listen_sash` (window-space pointer) into
   `SashDrag::apply`. `mouse_area::on_move` is local hover on the 6px

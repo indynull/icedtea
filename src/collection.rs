@@ -554,6 +554,26 @@ pub fn virtual_pads_var(
     (top, win, (total - mounted_end).max(0.0))
 }
 
+/// Per-row heights for expand cards: closed face unless listed open.
+///
+/// `open` is `(index, open_height)`. Indices out of range are ignored.
+/// Use with [`visible_window_var`] / [`widget::virtual_column`](crate::widget::virtual_column).
+///
+/// ```
+/// let h = icedtea::collection::expand_card_heights(4, 48.0, &[(1, 160.0)]);
+/// assert_eq!(h, vec![48.0, 160.0, 48.0, 48.0]);
+/// ```
+pub fn expand_card_heights(n: usize, closed: f32, open: &[(usize, f32)]) -> Vec<f32> {
+    let closed = closed.max(0.0);
+    let mut heights = vec![closed; n];
+    for &(i, open_h) in open {
+        if i < n {
+            heights[i] = open_h.max(0.0);
+        }
+    }
+    heights
+}
+
 /// True when `index` is in the mounted window (lazy / recycle).
 pub fn row_is_mounted(window: VisibleWindow, index: usize) -> bool {
     index >= window.start && index < window.end
@@ -1195,6 +1215,11 @@ mod tests {
         let past = visible_window_var(0.0, 10.0, &[], 2, Some(0));
         assert_eq!(past.end, 0);
         let (top, win, bot) = virtual_pads_var(&h, 20.0, 60.0, 0, None);
+        let cards = expand_card_heights(5, 40.0, &[(2, 120.0), (9, 50.0)]);
+        assert_eq!(cards.len(), 5);
+        assert_eq!(cards[0], 40.0);
+        assert_eq!(cards[2], 120.0);
+        assert_eq!(cards[4], 40.0);
         assert!((top - 20.0).abs() < 0.01);
         assert_eq!(win.start, 1);
         assert!(bot > 0.0);

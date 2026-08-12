@@ -14,7 +14,7 @@ use icedtea::collection::{
 use icedtea::i18n::Catalog;
 use icedtea::i18n::Direction;
 use icedtea::iced::widget::text_editor::Content;
-use icedtea::iced::widget::{button, column, container, row, text, Space};
+use icedtea::iced::widget::{button, column, container, mouse_area, row, text, Space};
 use icedtea::iced::{Alignment, Length, Padding, Subscription, Theme};
 use icedtea::key::KeyContext;
 use icedtea::layout;
@@ -247,6 +247,7 @@ fn page_job(page: &str) -> &'static str {
         "image" => "The slot keeps its box while loading or on error.",
         "selectable" => "Body text the user can drag-select and copy.",
         "list" => "Virtualized rows. Cards wrap a long title; flush rows are one line.",
+        "virtual-column" => "App-built expand cards; only the viewport slice mounts.",
         "log" => "Virtualized lines for a growing log.",
         "grid" => "Tiles that share a row height.",
         "table" => "Columns stay in layout order. Frozen leading columns stay in view.",
@@ -529,6 +530,8 @@ enum Message {
     ListScroll(VisibleWindow),
     TableScroll(VisibleWindow),
     ListSel(usize),
+    VcScroll(VisibleWindow),
+    ExpandCard(usize),
     TableCell(usize, usize),
     OptSel(usize),
     MdJump(usize),
@@ -728,6 +731,9 @@ struct Gallery {
     opt_window: VisibleWindow,
     list_heights: Vec<f32>,
     list_card: bool,
+    vc_window: VisibleWindow,
+    vc_heights: Vec<f32>,
+    expand_open: Option<usize>,
 }
 
 impl Gallery {
@@ -1006,8 +1012,13 @@ impl Gallery {
             opt_window: VisibleWindow::new(140.0),
             list_heights: Vec::new(),
             list_card: true,
+            vc_window: VisibleWindow::new(220.0),
+            vc_heights: Vec::new(),
+            expand_open: None,
         };
         gallery.list_heights = list_row_heights(&gallery.list, gallery.list_card);
+        gallery.vc_heights =
+            icedtea::collection::expand_card_heights(gallery.list.len(), 52.0, &[]);
         gallery.apply_theme_pref();
         gallery.clamp_nav();
         if tour_wanted() {
@@ -1364,6 +1375,18 @@ impl Gallery {
             }
             Message::TreeSelect(id) => self.tree_sel = Some(id),
             Message::ListScroll(w) => self.list_window = w,
+            Message::VcScroll(w) => self.vc_window = w,
+            Message::ExpandCard(i) => {
+                self.expand_open = if self.expand_open == Some(i) {
+                    None
+                } else {
+                    Some(i)
+                };
+                let open: Vec<(usize, f32)> =
+                    self.expand_open.map(|j| (j, 140.0)).into_iter().collect();
+                self.vc_heights =
+                    icedtea::collection::expand_card_heights(self.list.len(), 52.0, &open);
+            }
             Message::TableScroll(w) => self.table_window = w,
             Message::ListSel(i) => self.sel.select_single(i),
             Message::LogScroll(w) => self.log_window = w,
@@ -1526,10 +1549,7 @@ impl Gallery {
                     for a in self.context_actions() {
                         menu.insert(a);
                     }
-                    let ctx = KeyContext {
-                        text_input_focused: false,
-                        modal_open: false,
-                    };
+                    let ctx = KeyContext::default();
                     if let Some(msg) = icedtea::key::handle(ctx, &menu, &ev) {
                         self.context = None;
                         return self.update(msg);
@@ -1540,7 +1560,9 @@ impl Gallery {
                     text_input_focused: self.page == "search"
                         || (self.page == "palette" && self.palette_focus),
                     modal_open: self.page == "dialogs",
-                };
+                    ..KeyContext::default()
+                }
+                .chrome_over_input();
                 if let Some(msg) = icedtea::key::handle(ctx, &self.actions, &ev) {
                     return self.update(msg);
                 }
@@ -3103,6 +3125,56 @@ impl Gallery {
             .spacing(8)
             .height(Length::Fill)
             .into(),
+            "virtual-column" => {
+                let titles: Vec<String> = (0..self.list.len())
+                    .map(|i| self.list.title(i).to_string())
+                    .collect();
+                let open_at = self.expand_open;
+                column![
+                    widget::meta(
+                        "Expand cards via virtual_column (viewport mount).",
+                        tok,
+                        named("vc-hint", Role::Status),
+                    ),
+                    container(widget::virtual_column(
+                        &self.vc_heights,
+                        self.vc_window,
+                        OVERSCAN,
+                        open_at,
+                        Message::VcScroll,
+                        Some(icedtea::iced::widget::Id::from("gallery-vc")),
+                        tok,
+                        move |i| {
+                            let title =
+                                titles.get(i).cloned().unwrap_or_else(|| format!("row {i}"));
+                            let open = open_at == Some(i);
+                            let body = if open {
+                                format!("{title}\n\nOpen face. Only this slice is mounted.")
+                            } else {
+                                title
+                            };
+                            mouse_area(
+                                container(widget::label(
+                                    body,
+                                    tok,
+                                    named(&format!("vc-{i}"), Role::ListItem),
+                                ))
+                                .width(Length::Fill)
+                                .height(Length::Fill)
+                                .padding(8)
+                                .style(move |_| icedtea::style::card(tok, open)),
+                            )
+                            .on_press(Message::ExpandCard(i))
+                            .into()
+                        },
+                        named("vc", Role::List),
+                    ))
+                    .height(Length::Fill),
+                ]
+                .spacing(8)
+                .height(Length::Fill)
+                .into()
+            }
             "log" => column![widget::log_view(
                 &self.log_lines,
                 self.log_window,
@@ -4239,6 +4311,7 @@ fn handled_ids() -> &'static [&'static str] {
         "link",
         "selectable",
         "list",
+        "virtual-column",
         "log",
         "grid",
         "table",

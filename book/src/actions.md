@@ -55,6 +55,13 @@ on right-click, then the application opens the menu.
 Subscribe with `key::listen` and map events into `update`, as
 `examples/hello.rs` does.
 
+When a text field is focused, plain typing is not matched against the
+action table. Modifier chords (`ctrl`/`alt`/`logo`) still are. For
+Enter, Escape, and F1–F24 while typing (activate selection, cancel,
+function chords), set
+`KeyContext { text_input_focused: true, ..Default::default() }.chrome_over_input()`
+so those bare keys match too (`key::WhileInput::Chrome`).
+
 - [`Action`](https://docs.rs/icedtea/latest/icedtea/action/struct.Action.html)
 - [`ActionTable`](https://docs.rs/icedtea/latest/icedtea/action/struct.ActionTable.html)
 - [`key::handle`](https://docs.rs/icedtea/latest/icedtea/key/fn.handle.html)

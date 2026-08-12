@@ -3043,6 +3043,73 @@ fn card_row<'a, M: 'a>(
         .into()
 }
 
+/// A virtualized column of app-built rows with known heights.
+///
+/// Use for expand cards and other free-form faces: pass
+/// [`collection::expand_card_heights`](crate::collection::expand_card_heights)
+/// (or any per-row slice), keep a [`VisibleWindow`], and build each
+/// mounted index. This reuses list windowing (overscan, rail, wheel);
+/// it is not a second list model — title/meta lists stay on
+/// [`list_view`].
+///
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::collection::{expand_card_heights, VisibleWindow};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let heights = expand_card_heights(3, 48.0, &[(1, 120.0)]);
+/// let win = VisibleWindow::new(200.0);
+/// let on_scroll = |w| w;
+/// let _: icedtea::Element<'_, _> = widget::virtual_column(
+///     &heights,
+///     win,
+///     2,
+///     None,
+///     on_scroll,
+///     None,
+///     tok,
+///     |i| widget::label(format!("row {i}"), tok, A11y::new("r", Role::ListItem)),
+///     A11y::new("cards", Role::List),
+/// );
+/// ```
+#[allow(clippy::too_many_arguments)]
+pub fn virtual_column<'a, M: Clone + 'a>(
+    heights: &'a [f32],
+    window: VisibleWindow,
+    overscan: usize,
+    cover: Option<usize>,
+    on_scroll: impl Fn(VisibleWindow) -> M + Copy + 'a,
+    scroll_id: Option<Id>,
+    tok: Tokens,
+    row: impl Fn(usize) -> Element<'a, M> + 'a,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let len = heights.len();
+    let prev = window;
+    a11y::attach(
+        virtual_clip(
+            prev,
+            RowHeights::PerRow(heights),
+            len,
+            overscan,
+            cover,
+            on_scroll,
+            scroll_id,
+            tok,
+            move |win| {
+                let mut col = Column::new();
+                for i in win.range() {
+                    col = col.push(row(i));
+                }
+                col
+            },
+        ),
+        &a11y,
+    )
+}
+
 /// A virtualized row list.
 ///
 /// `empty` is the copy when `model` has no rows. `meta_color` paints
@@ -5391,6 +5458,52 @@ mod tests {
         let drag = Action::Drag(iced::Point::new(4.0, 5.0));
         assert_eq!(select_only(drag.clone()), drag);
         let _ = selectable_style(named("dark").tokens);
+    }
+
+    #[test]
+    fn virtual_column_mounts_only_window_range() {
+        let tok = named("dark").tokens;
+        let heights = crate::collection::expand_card_heights(20, 40.0, &[(2, 100.0)]);
+        let win = VisibleWindow {
+            start: 1,
+            end: 5,
+            scroll: 40.0,
+            viewport: 120.0,
+        };
+        let mut el: Element<'_, ()> = virtual_column(
+            &heights,
+            win,
+            2,
+            Some(2),
+            |_| (),
+            Some(Id::from("vc-scroll")),
+            tok,
+            |i| label(format!("r{i}"), tok, A11y::new("r", Role::ListItem)),
+            A11y::new("vc", Role::List),
+        );
+        draw_once(&mut el);
+        let empty_h: [f32; 0] = [];
+        let mut empty: Element<'_, ()> = virtual_column(
+            &empty_h,
+            VisibleWindow::new(80.0),
+            0,
+            None,
+            |_| (),
+            None,
+            tok,
+            |_| label("x", tok, A11y::new("x", Role::ListItem)),
+            A11y::new("vc0", Role::List),
+        );
+        draw_once(&mut empty);
+        let src = include_str!("widget.rs");
+        let body = src
+            .split("pub fn virtual_column")
+            .nth(1)
+            .unwrap()
+            .split("/// A virtualized row list.")
+            .next()
+            .unwrap();
+        assert!(body.contains("virtual_clip") && body.contains("RowHeights::PerRow"));
     }
 
     #[test]

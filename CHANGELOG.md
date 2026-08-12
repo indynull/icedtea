@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+`widget::virtual_column` virtualizes app-built rows (expand cards)
+with known heights; `collection::expand_card_heights` builds the
+closed/open slice. Same rail and overscan as `list_view`.
+`key::WhileInput::Chrome` / `KeyContext::chrome_over_input` still
+match Escape, Enter, and F1–F24 while a field is focused (chords
+already did). `Selectables::ensure` / `retain` / `unbind` bind bodies
+lazily for open cards.
+
 `light` and `dark` are a neutral desktop pair. Persist defaults
 `follow_os` on. When follow-OS is on, `OsChrome` /
 `os_chrome` / `listen_os_chrome` / `apply_os_chrome` layer optional
