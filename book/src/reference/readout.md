@@ -44,7 +44,7 @@ Pass a slice of numbers. Empty data paints an empty box.
 
 ### Spinner
 
-**`spinner`** — An indeterminate quarter-arc.
+**`spinner`** — Eight dots around a circle. Phase lights them in turn.
 
 Constructor: [`widget::spinner`](https://docs.rs/icedtea/latest/icedtea/widget/fn.spinner.html)
 

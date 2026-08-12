@@ -33,7 +33,7 @@ use iced::widget::{
 use iced::{Alignment, Background, Color, Element, Length, Padding, Radians};
 
 use crate::chrome::SCROLL_RAIL_WIDTH;
-use crate::host_canvas::ArcRing;
+use crate::host_canvas::{ArcRing, SpinnerDots};
 use crate::scroll::ScrollRail;
 
 use crate::a11y::{self, A11y, Role};
@@ -733,7 +733,7 @@ pub fn ring_angles(value: f32) -> (f32, f32) {
 pub fn spinner_angles(phase: f32) -> (f32, f32) {
     let p = phase.rem_euclid(1.0);
     let start = p * std::f32::consts::TAU - std::f32::consts::FRAC_PI_2;
-    (start, start + std::f32::consts::FRAC_PI_2)
+    (start, start + std::f32::consts::PI * 1.5)
 }
 
 /// Whether the determinate/indeterminate arc is long enough to stroke.
@@ -872,7 +872,7 @@ pub fn sparkline<'a, M: 'a>(values: &'a [f32], tok: Tokens, a11y: A11y) -> Eleme
     )
 }
 
-/// An indeterminate quarter-arc at `phase` (0..=1).
+/// Eight dots around a circle. `phase` (0..=1) lights them in turn.
 ///
 /// Advance `phase` each frame while work is running.
 ///
@@ -886,13 +886,10 @@ pub fn sparkline<'a, M: 'a>(values: &'a [f32], tok: Tokens, a11y: A11y) -> Eleme
 ///     widget::spinner(tok, 0.2, A11y::new("spin", Role::Progress));
 /// ```
 pub fn spinner<'a, M: 'a>(tok: Tokens, phase: f32, a11y: A11y) -> Element<'a, M> {
-    let (start, end) = spinner_angles(phase);
     a11y::attach(
-        Canvas::new(ArcRing {
-            start,
-            end,
+        Canvas::new(SpinnerDots {
+            phase: phase.rem_euclid(1.0),
             color: tok.accent,
-            track: tok.panel,
         })
         .width(56)
         .height(56)
@@ -4184,7 +4181,7 @@ mod tests {
         );
         assert!(ring_angles(1.0).1 > ring_angles(0.2).1);
         assert!(
-            (spinner_angles(0.0).1 - spinner_angles(0.0).0 - std::f32::consts::FRAC_PI_2).abs()
+            (spinner_angles(0.0).1 - spinner_angles(0.0).0 - std::f32::consts::PI * 1.5).abs()
                 < 0.01
         );
         assert!(ring_should_stroke(0.0, 1.0));

@@ -228,12 +228,87 @@ fn page_fills(page: &str) -> bool {
             | "main-window"
             | "preferences"
             | "dialogs"
-            | "about"
-            | "palette"
+            | "workspace"
+            | "inspector"
             | "keys"
             | "image"
             | "markdown"
     )
+}
+
+fn page_job(page: &str) -> &'static str {
+    match page {
+        "controls" => "Press a control. The status bar records the message.",
+        "fields" => "Typed values the application owns. Select-and-copy is on for labeled rows.",
+        "readout" => "Progress, a ring, a sparkline, and an indeterminate spinner.",
+        "type" => "Labels, icons, links, and a tooltip.",
+        "markdown" => "A full document. Drag to select; copy posts the source.",
+        "code" => "Highlighted source. Select a range and copy.",
+        "image" => "The slot keeps its box while loading or on error.",
+        "selectable" => "Body text the user can drag-select and copy.",
+        "list" => "Virtualized rows. Cards wrap a long title; flush rows are one line.",
+        "log" => "Virtualized lines for a growing log.",
+        "grid" => "Tiles that share a row height.",
+        "table" => "Columns stay in layout order. Frozen leading columns stay in view.",
+        "tree" => "Folders expand in place. Leaves select.",
+        "sections" => "Tabs, an accordion, an expander, and pagination.",
+        "theme" => "Named colorways. Follow the desktop light/dark pair and accent.",
+        "colors" => "Semantic tokens and mixes. These are the paints widgets use.",
+        "keys" => "The action table drives shortcuts. The cheatsheet lists them.",
+        "marks" => "Cards, chips, badges, rules, and a teaching tip.",
+        "chrome-rows" => "Menu, toolbar, status, breadcrumb, and the command bar.",
+        "feedback" => "Toasts, a job strip, scroll, and a busy overlay on a child.",
+        "dialogs" => "An in-window confirm sheet on a dim backdrop.",
+        "list-detail" => "A list beside a detail pane. Pick a row; the right side is that row.",
+        "inspector" => "Pick a file. The middle is the document. The right column is properties.",
+        "workspace" => "Editor split. Dock pins the outline as a third pane. Drag the sash.",
+        "navigation" => "Places on the left. Narrow windows stack with Back.",
+        "tab-view" => {
+            "A tab strip plus the body for the active tab. The application paints that body."
+        }
+        "preferences" => {
+            "Searchable settings groups. The application owns the rows; this is the page chrome."
+        }
+        "about" => "Name, version, license, credits. Apps put this on Help → About.",
+        "status-page" => "Empty or error pane. Use when a list has no rows, or a host is down.",
+        "palette" => "Fuzzy find over the action table. Type to filter; pick a row.",
+        "main-window" => "Menu, toolbar, center, and status docked as one window.",
+        _ => "",
+    }
+}
+
+fn widget_job(id: &str) -> Option<&'static str> {
+    Some(match id {
+        "spinner" => "Indeterminate work. Eight dots light in turn.",
+        "progress-ring" => {
+            "Determinate fraction as a ring. The slider on this page drives the value."
+        }
+        "progress" => "Determinate bar. Same fraction as the ring.",
+        "sparkline" => "One-row series. Domain plots stay in the application.",
+        "display" => "A large value for a compact tool.",
+        "busy" => "The switch is the busy flag. On, the child dims and eight dots spin.",
+        "toast" => "Transient notice. The application owns the queue.",
+        "jobs" => "Background jobs. Progress ticks while the gallery is open.",
+        "scrollbar" => "Themed scroller for panes that are not a list or table.",
+        "skeleton" => "Placeholder bars while content loads.",
+        "teaching-tip" => "A one-shot hint with a go action.",
+        "workspace" => "Editor split: files on the left, Edit and Terminal as tabs. Drag the sash.",
+        "drawer" => "A side pane that hides. Closed paints the content only.",
+        "tool-panel" => {
+            "Press Dock to pin this outline as a pane on the right of the workspace above."
+        }
+        "inspector" => "Pick a file. Middle is the document. Right is name, kind, and path.",
+        "list-detail" => "Sidebar list plus a filling detail pane.",
+        "tab-view" => "The strip is the constructor. The body below is application content.",
+        "preferences" => "Filter groups by the search field. Rows are title plus key/value text.",
+        "about" => "Four strings in a group box. The application supplies the copy.",
+        "status-page" => "Centered title, body, and an optional action.",
+        "palette" => "Query field plus hits from the action table. Not a full-page layout.",
+        "navigation" => "Wide: sidebar beside content. Narrow: a stack with Back.",
+        "main-window" => "The four regions are arguments. This page is that compose.",
+        "dialogs" => "Primary and optional cancel. Native file pickers go through native_dialog.",
+        _ => return None,
+    })
 }
 
 fn sample_mail(i: usize) -> ListRow {
@@ -341,17 +416,18 @@ fn tour_caption_for(page: &str) -> &'static str {
         "keys" => "Keys: shortcuts and cheatsheet",
         "marks" => "Marks: cards, chips, badges",
         "chrome-rows" => "Chrome: menu, toolbar, status",
-        "feedback" => "Feedback: toasts and banners",
-        "dialogs" => "Dialogs",
-        "list-detail" => "List and detail",
-        "workspace" => "Workspace: dock and sash",
+        "feedback" => "Feedback: busy overlay, toasts, jobs",
+        "dialogs" => "Dialogs: confirm on a dim card",
+        "list-detail" => "List and detail: pick a row",
+        "inspector" => "Inspector: list, body, properties",
+        "workspace" => "Workspace: dock, sash, drawer",
         "navigation" => "Navigation stack",
-        "tab-view" => "Tab view",
-        "preferences" => "Preferences",
-        "about" => "About",
-        "status-page" => "Status page",
-        "palette" => "Command palette",
-        "main-window" => "Main window",
+        "tab-view" => "Tab view: strip plus a body",
+        "preferences" => "Preferences: searchable groups",
+        "about" => "About: name, version, license",
+        "status-page" => "Status page: empty or error",
+        "palette" => "Command palette: filter actions",
+        "main-window" => "Main window: menu, tools, status",
         _ => catalog::page_title(page),
     }
 }
@@ -478,6 +554,7 @@ enum Message {
     Family(String),
     Follow(bool),
     SelectCopy(bool),
+    Spin,
     OsMode(icedtea::iced::theme::Mode),
     OsAccent(Option<icedtea::iced::Color>),
     Appearance(Appearance),
@@ -497,7 +574,6 @@ enum Message {
     PaletteApply,
     AskLine,
     TableHScroll(f32),
-    OverlayPin(Option<usize>),
     ListFace(bool),
     OptScroll(VisibleWindow),
     FocusName,
@@ -623,6 +699,7 @@ struct Gallery {
     family: String,
     follow_os: bool,
     select_copy: bool,
+    spin: f32,
     appearance: Appearance,
     os_accent: Option<icedtea::iced::Color>,
     tick: u64,
@@ -649,7 +726,7 @@ struct Gallery {
     ws: icedtea::workspace::DockNode,
     drawer_open: bool,
     cheat_q: String,
-    overlay_pin: Option<usize>,
+    last_sel: Option<String>,
     opt_window: VisibleWindow,
     list_heights: Vec<f32>,
     list_card: bool,
@@ -697,8 +774,6 @@ impl Gallery {
         let mut palette = CommandPalette::new();
         palette.open();
         palette.set_query(&actions, "");
-        palette.ask("go.line", "Line");
-        palette.prompt.as_mut().unwrap().value = "42".into();
         let md = MarkdownDoc::parse(samples::MARKDOWN);
         let md_heads = md.headings();
         let mut gallery = Self {
@@ -886,6 +961,7 @@ impl Gallery {
             family: "default".into(),
             follow_os: true,
             select_copy: true,
+            spin: 0.0,
             appearance: Appearance::Dark,
             os_accent: theme::os_accent(),
             tick: 0,
@@ -929,7 +1005,7 @@ impl Gallery {
             ),
             drawer_open: true,
             cheat_q: String::new(),
-            overlay_pin: None,
+            last_sel: None,
             opt_window: VisibleWindow::new(140.0),
             list_heights: Vec::new(),
             list_card: true,
@@ -1043,15 +1119,16 @@ impl Gallery {
         }
     }
 
+    fn live_selection(&self) -> Option<String> {
+        self.edit_selection().or_else(|| self.last_sel.clone())
+    }
+
     fn context_actions(&self) -> Vec<Action<Message>> {
-        if self.page == "chrome-rows" {
-            return self.actions.iter().cloned().collect();
-        }
         let mut v = Vec::new();
         let editor = self.page == "fields";
         let select_body = self.select_copy && (self.page == "selectable" || self.page == "code");
         if editor {
-            let has = self.edit_selection().is_some();
+            let has = self.live_selection().is_some();
             v.push(
                 Action::new("edit.cut", "Cut", Message::EditCut)
                     .with_shortcut(Shortcut::parse("ctrl+x").unwrap()),
@@ -1072,7 +1149,7 @@ impl Gallery {
                 Message::EditSelectAll,
             ));
         } else if select_body {
-            let has = self.edit_selection().is_some();
+            let has = self.live_selection().is_some();
             v.push(
                 Action::new("edit.copy", "Copy", Message::EditCopy)
                     .with_shortcut(Shortcut::parse("ctrl+c").unwrap()),
@@ -1168,7 +1245,13 @@ impl Gallery {
             }
             Message::Field(id, action) => {
                 if self.select_copy {
+                    let before = self.fields.get(id).selection();
                     self.fields.perform(id, action);
+                    if let Some(s) = self.fields.get(id).selection() {
+                        self.last_sel = Some(s);
+                    } else if before.is_some() {
+                        self.last_sel = before;
+                    }
                 }
             }
             Message::CopyFields => {
@@ -1204,7 +1287,40 @@ impl Gallery {
                 let _ = self.tabs.close(i);
             }
             Message::DockTool => {
-                self.on = !self.on;
+                if self.ws.find("outline").is_some() {
+                    self.ws = icedtea::workspace::DockNode::split(
+                        Axis::Horizontal,
+                        0.22,
+                        icedtea::workspace::DockNode::leaf("explorer", "Explorer"),
+                        icedtea::workspace::DockNode::tabs(
+                            vec![
+                                icedtea::workspace::Panel::new("edit", "Edit"),
+                                icedtea::workspace::Panel::new("term", "Terminal"),
+                            ],
+                            0,
+                        ),
+                    );
+                    self.note = "Outline undocked".into();
+                } else {
+                    self.ws = icedtea::workspace::DockNode::split(
+                        Axis::Horizontal,
+                        0.22,
+                        icedtea::workspace::DockNode::leaf("explorer", "Explorer"),
+                        icedtea::workspace::DockNode::split(
+                            Axis::Horizontal,
+                            0.72,
+                            icedtea::workspace::DockNode::tabs(
+                                vec![
+                                    icedtea::workspace::Panel::new("edit", "Edit"),
+                                    icedtea::workspace::Panel::new("term", "Terminal"),
+                                ],
+                                0,
+                            ),
+                            icedtea::workspace::DockNode::leaf("outline", "Outline"),
+                        ),
+                    );
+                    self.note = "Outline docked on the right".into();
+                }
             }
             Message::DocSel(i) => self.docs.tabs.select(i),
             Message::DocClose(i) => {
@@ -1364,6 +1480,7 @@ impl Gallery {
                 self.apply_theme_pref();
             }
             Message::SelectCopy(on) => self.select_copy = on,
+            Message::Spin => self.spin = (self.spin + 0.07) % 1.0,
             Message::OsMode(mode) => {
                 self.appearance = Appearance::from_mode(mode);
                 if self.follow_os {
@@ -1461,7 +1578,13 @@ impl Gallery {
             }
             Message::CodeEdit(action) => {
                 if self.select_copy {
+                    let before = self.code_editor.selection();
                     self.code_editor.perform(action);
+                    if let Some(s) = self.code_editor.selection() {
+                        self.last_sel = Some(s);
+                    } else if before.is_some() {
+                        self.last_sel = before;
+                    }
                 }
             }
             Message::FileOpen => {
@@ -1519,7 +1642,6 @@ impl Gallery {
                 self.list_card = card;
                 self.list_heights = list_row_heights(&self.list, card);
             }
-            Message::OverlayPin(p) => self.overlay_pin = p,
             Message::OptScroll(w) => self.opt_window = w,
             Message::FocusName => {
                 return icedtea::iced::widget::operation::focus(icedtea::iced::widget::Id::new(
@@ -1547,7 +1669,7 @@ impl Gallery {
             },
             Message::ContextDismiss => self.context = None,
             Message::EditCopy => {
-                let s = self.edit_selection().unwrap_or_else(|| {
+                let s = self.live_selection().unwrap_or_else(|| {
                     if self.page == "code" {
                         self.code_editor.text()
                     } else {
@@ -1696,6 +1818,12 @@ impl Gallery {
             layout::listen_sash().map(nav_sash),
             layout::listen_cursor().map(Message::Cursor),
         ];
+        if matches!(self.page, "feedback" | "readout") {
+            subs.push(
+                icedtea::iced::time::every(std::time::Duration::from_millis(50))
+                    .map(|_| Message::Spin),
+            );
+        }
         if tour_cmd_path().is_some() {
             subs.push(
                 icedtea::iced::time::every(std::time::Duration::from_millis(50))
@@ -1868,22 +1996,18 @@ impl Gallery {
         .width(Length::Fill)
         .height(Length::Fill)
         .style(move |_| icedtea::style::fill(tok.canvas, tok.text));
-        if let Some(origin) = self.context {
-            let acts = self.context_actions();
-            icedtea::iced::widget::stack![
-                shell,
-                pattern::context_menu(
-                    acts,
-                    origin,
-                    icedtea::iced::Size::new(self.window_width, self.window_height),
-                    Message::ContextDismiss,
-                    tok,
-                ),
-            ]
-            .into()
+        let overlay: Element<'_, Message> = if let Some(origin) = self.context {
+            pattern::context_menu(
+                self.context_actions(),
+                origin,
+                icedtea::iced::Size::new(self.window_width, self.window_height),
+                Message::ContextDismiss,
+                tok,
+            )
         } else {
-            shell.into()
-        }
+            Space::new().width(0).height(0).into()
+        };
+        icedtea::iced::widget::stack![shell, overlay].into()
     }
 
     fn page_view(&self) -> Element<'_, Message> {
@@ -1906,14 +2030,7 @@ impl Gallery {
                 .size(icedtea::typo::PAGE)
                 .font(icedtea::typo::UI_BOLD)
                 .color(tok.text),
-            widget::meta(
-                catalog::page_entries(self.page)
-                    .next()
-                    .map(|e| e.group)
-                    .unwrap_or(""),
-                tok,
-                named("page-group", Role::Status),
-            ),
+            widget::meta(page_job(self.page), tok, named("page-job", Role::Status),),
             card,
         ]
         .spacing(12);
@@ -1934,7 +2051,11 @@ impl Gallery {
             return self.demo_widget(hosted[0].id);
         }
         let tok = self.tokens;
+        let fill = page_fills(page);
         let mut col = icedtea::iced::widget::Column::new().spacing(28);
+        if fill {
+            col = col.height(Length::Fill);
+        }
         for e in hosted {
             col = col.push(
                 text(e.title)
@@ -1942,6 +2063,13 @@ impl Gallery {
                     .font(icedtea::typo::UI_BOLD)
                     .color(tok.text),
             );
+            if let Some(job) = widget_job(e.id) {
+                col = col.push(widget::meta(
+                    job,
+                    tok,
+                    named(&format!("{}-job", e.id), Role::Status),
+                ));
+            }
             col = col.push(self.demo_widget(e.id));
         }
         col.into()
@@ -2600,75 +2728,56 @@ impl Gallery {
             .spacing(8)
             .into(),
             "markdown" => {
-                let hint = if self.select_copy {
-                    "Formatted view plus selectable source. Copy posts the source."
-                } else {
-                    "Painted document. The pointer cannot select."
-                };
-                let mut col = column![widget::meta(
-                    self.md_jump
-                        .and_then(|i| self.md_heads.iter().find(|h| h.index == i))
-                        .map(|h| format!("Showing {}", h.title))
-                        .unwrap_or_else(|| hint.into()),
-                    tok,
-                    named("md-hash", Role::Status),
-                ),]
-                .spacing(8);
-                if self.select_copy {
-                    col = col.push(pattern::command_bar(
+                let showing = self
+                    .md_jump
+                    .and_then(|i| self.md_heads.iter().find(|h| h.index == i))
+                    .map(|h| format!("Showing {}", h.title))
+                    .unwrap_or_else(|| {
+                        "Rendered document. Outline jumps. Copy source posts the markdown.".into()
+                    });
+                column![
+                    widget::meta(showing, tok, named("md-hash", Role::Status)),
+                    pattern::command_bar(
                         [Action::new("edit.copy", "Copy source", Message::CopyValue)],
                         tok,
                         self.direction,
-                    ));
-                }
-                let painted = row![
-                    container(widget::themed_scroll(
-                        widget::markdown_outline(
-                            &self.md_heads,
-                            self.md_jump,
-                            Message::MdJump,
-                            tok,
-                            named("md-outline", Role::List),
-                        ),
-                        tok,
-                        named("md-outline-scroll", Role::Group),
-                        false,
-                        None,
-                        None::<fn(_) -> Message>,
-                    ))
-                    .width(Length::Fixed(220.0)),
-                    widget::themed_scroll(
-                        widget::markdown_view(
-                            &self.md.items,
-                            tok,
-                            Message::MdLink,
-                            named("md", Role::Group)
-                        ),
-                        tok,
-                        named("md-scroll", Role::Group),
-                        false,
-                        Some(icedtea::iced::widget::Id::new("gallery-md")),
-                        None::<fn(_) -> Message>,
                     ),
+                    row![
+                        container(widget::themed_scroll(
+                            widget::markdown_outline(
+                                &self.md_heads,
+                                self.md_jump,
+                                Message::MdJump,
+                                tok,
+                                named("md-outline", Role::List),
+                            ),
+                            tok,
+                            named("md-outline-scroll", Role::Group),
+                            false,
+                            None,
+                            None::<fn(_) -> Message>,
+                        ))
+                        .width(Length::Fixed(220.0)),
+                        widget::themed_scroll(
+                            widget::markdown_view(
+                                &self.md.items,
+                                tok,
+                                Message::MdLink,
+                                named("md", Role::Group)
+                            ),
+                            tok,
+                            named("md-scroll", Role::Group),
+                            false,
+                            Some(icedtea::iced::widget::Id::new("gallery-md")),
+                            None::<fn(_) -> Message>,
+                        ),
+                    ]
+                    .spacing(12)
+                    .height(Length::Fill),
                 ]
-                .spacing(12)
-                .height(Length::Fill);
-                col = col.push(painted);
-                if self.select_copy {
-                    col = col.push(widget::meta(
-                        "Source",
-                        tok,
-                        named("md-src-label", Role::Status),
-                    ));
-                    col = col.push(widget::selectable(
-                        self.fields.get("md"),
-                        |a| Message::Field("md", a),
-                        tok,
-                        icedtea::typo::FontFace::Ui,
-                        named("md-src", Role::TextBox),
-                    ));
-                }
-                col.height(Length::Fill).into()
+                .spacing(8)
+                .height(Length::Fill)
+                .into()
             }
             "code" => {
                 let lang = CodeLang::named(&self.code_lang).unwrap_or(&samples::CODE_LANGS[0]);
@@ -3404,22 +3513,26 @@ impl Gallery {
             }
             "command-bar" => pattern::command_bar(self.actions.iter(), tok, self.direction),
             "context-menu" => {
-                let acts = self.context_actions();
+                let acts = [
+                    Action::new("edit.copy", "Copy", Message::EditCopy),
+                    Action::new("edit.select-all", "Select all", Message::EditSelectAll),
+                    Action::new("edit.paste", "Paste", Message::EditPaste),
+                ];
                 column![
                     widget::meta(
-                        "Right-click the window. This card is the same constructor.",
+                        "A short menu at the pointer. Right-click the page for a live one.",
                         tok,
                         named("ctx-hint", Role::Status),
                     ),
                     container(pattern::context_menu(
                         acts,
                         icedtea::iced::Point::new(16.0, 16.0),
-                        icedtea::iced::Size::new(420.0, 240.0),
-                        Message::ContextDismiss,
+                        icedtea::iced::Size::new(480.0, 280.0),
+                        Message::Nop,
                         tok,
                     ))
                     .width(Length::Fill)
-                    .height(Length::Fixed(240.0)),
+                    .height(Length::Fixed(160.0)),
                 ]
                 .spacing(8)
                 .into()
@@ -3549,20 +3662,20 @@ impl Gallery {
             ]
             .spacing(8)
             .into(),
-            "spinner" => widget::spinner(tok, 0.2, named("spinner", Role::Progress)),
+            "spinner" => widget::spinner(tok, self.spin, named("spinner", Role::Progress)),
             "busy" => column![
                 widget::themed_switch(
                     "Busy",
                     self.on,
-                    Message::Toggle,
+                    Message::Switch,
                     tok,
                     named("busy-flag", Role::Switch).with_checked(self.on),
                 ),
-                widget::busy_overlay(
+                container(widget::busy_overlay(
                     widget::group_box(
-                        "Document",
+                        "notes.txt",
                         widget::meta(
-                            "The overlay dims this card and shows a spinner.",
+                            "The overlay dims this card. Eight dots spin while work runs.",
                             tok,
                             named("busy-body", Role::Status),
                         ),
@@ -3570,10 +3683,12 @@ impl Gallery {
                         named("busy-card", Role::Group),
                     ),
                     self.on,
-                    (self.tick % 20) as f32 / 20.0,
+                    self.spin,
                     tok,
                     named("busy", Role::Group),
-                ),
+                ))
+                .width(Length::Fill)
+                .height(Length::Fixed(180.0)),
             ]
             .spacing(12)
             .into(),
@@ -3769,14 +3884,22 @@ impl Gallery {
                 };
                 pattern::tab_view(
                     &self.tabs,
-                    column![
-                        widget::label(title, tok, named(title, Role::Header)),
-                        widget::meta(body, tok, named("tab-body", Role::Status)),
-                    ]
-                    .spacing(8)
-                    .padding(16)
+                    container(
+                        column![
+                            widget::label(title, tok, named(title, Role::Header)),
+                            widget::meta(body, tok, named("tab-body", Role::Status)),
+                            widget::meta(
+                                "Close a tab with the ×. Selecting another tab swaps this body.",
+                                tok,
+                                named("tab-how", Role::Status),
+                            ),
+                        ]
+                        .spacing(8)
+                        .padding(16),
+                    )
                     .width(Length::Fill)
                     .height(Length::Fill)
+                    .style(move |_| icedtea::style::panel(tok))
                     .into(),
                     Message::Tab,
                     Message::CloseTab,
@@ -3790,93 +3913,41 @@ impl Gallery {
                 tok,
                 &self.catalog,
             ),
-            "about" => {
-                let backdrop = container(Space::new().width(Length::Fill).height(Length::Fill))
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-                    .style(move |_| {
-                        icedtea::style::fill(theme::mix(tok.text, tok.canvas, 0.14), tok.text)
-                    });
-                pattern::modal_card(
-                    backdrop.into(),
-                    container(pattern::about_page(
-                        "icedtea",
-                        "0.4.0",
-                        "MIT",
-                        "Gallery",
-                        tok,
-                        &self.catalog,
-                    ))
-                    .width(Length::Fixed(420.0))
-                    .into(),
-                )
-            }
+            "about" => container(pattern::about_page(
+                "icedtea",
+                "0.4.0",
+                "MIT",
+                "Widgets and chrome for iced 0.14 desktop applications.",
+                tok,
+                &self.catalog,
+            ))
+            .width(Length::Fixed(420.0))
+            .into(),
             "status-page" => {
                 if self.status_n == 0 {
                     pattern::status_page(
-                        "Nothing here",
-                        "Create an item to begin.",
-                        Some(("New".into(), Message::StatusNew)),
+                        "No sessions",
+                        "Is the host running?",
+                        Some(("Retry".into(), Message::StatusNew)),
                         tok,
                     )
                 } else {
                     pattern::status_page(
-                        format!(
-                            "{} item{}",
-                            self.status_n,
-                            if self.status_n == 1 { "" } else { "s" }
-                        ),
-                        "New adds another item.",
-                        Some(("New".into(), Message::StatusNew)),
+                        "Could not reach the host",
+                        "Retry shows the error face of the same constructor.",
+                        Some(("Retry".into(), Message::StatusNew)),
                         tok,
                     )
                 }
             }
             "palette" => {
                 let res = self.palette.results(&self.actions);
-                let displays = [
-                    icedtea::window::DisplayBounds {
-                        x: 0.0,
-                        y: 0.0,
-                        width: 1920.0,
-                        height: 1080.0,
-                    },
-                    icedtea::window::DisplayBounds {
-                        x: 1920.0,
-                        y: 0.0,
-                        width: 1280.0,
-                        height: 800.0,
-                    },
-                ];
-                let at = icedtea::window::place_pinned(
-                    self.overlay_pin,
-                    (self.pointer.x, self.pointer.y),
-                    icedtea::iced::Size::new(480.0, 320.0),
-                    &displays,
-                );
                 column![
                     widget::meta(
-                        format!("pin {:?} → ({:.0},{:.0})", self.overlay_pin, at.x, at.y),
+                        "Type to filter the action table. Pick a row, or choose Go to line for a parameter.",
                         tok,
-                        named("pin-status", Role::Status),
+                        named("pal-job", Role::Status),
                     ),
-                    row![
-                        widget::themed_button(
-                            "Pin display 1",
-                            Some(Message::OverlayPin(Some(1))),
-                            tok,
-                            Variant::Quiet,
-                            btn("pin-1"),
-                        ),
-                        widget::themed_button(
-                            "Follow pointer",
-                            Some(Message::OverlayPin(None)),
-                            tok,
-                            Variant::Ghost,
-                            btn("pin-none"),
-                        ),
-                    ]
-                    .spacing(8),
                     container(pattern::command_palette_view(
                         self.palette.query(),
                         &res,
@@ -3889,12 +3960,9 @@ impl Gallery {
                         tok,
                     ))
                     .width(Length::Fill)
-                    .height(Length::Fill)
-                    .center_x(Length::Fill)
-                    .center_y(Length::Fill),
+                    .center_x(Length::Fill),
                 ]
-                .spacing(8)
-                .height(Length::Fill)
+                .spacing(12)
                 .into()
             }
             "document-tabs" => {
@@ -3922,40 +3990,75 @@ impl Gallery {
                 .into()
             }
             "inspector" => {
-                let row = self.sel.primary().and_then(|i| self.list.items.get(i));
-                let title = row.map(|r| r.title.as_str()).unwrap_or("Select a message");
-                let when = row.and_then(|r| r.meta.as_deref()).unwrap_or("No date");
+                let id = self.tree_sel.unwrap_or(3);
+                let (name, kind, path, body) = match id {
+                    2 => ("src", "Folder", "src/", "Library sources."),
+                    3 => (
+                        "lib.rs",
+                        "Rust",
+                        "src/lib.rs",
+                        "pub use widget::label;\npub use pattern::list_detail;",
+                    ),
+                    4 => (
+                        "catalog.rs",
+                        "Rust",
+                        "src/catalog.rs",
+                        "pub const ENTRIES: &[Entry] = &[...];",
+                    ),
+                    5 => (
+                        "widget.rs",
+                        "Rust",
+                        "src/widget.rs",
+                        "pub fn spinner(tok, phase, a11y) { ... }",
+                    ),
+                    7 => (
+                        "install.md",
+                        "Markdown",
+                        "book/src/install.md",
+                        "# Install\n\ncargo add icedtea",
+                    ),
+                    8 => (
+                        "introduction.md",
+                        "Markdown",
+                        "book/src/introduction.md",
+                        "Widgets and chrome for iced.",
+                    ),
+                    9 => ("assets", "Folder", "assets/", "Icons and the tour GIF."),
+                    _ => ("icedtea", "Folder", ".", "Crate root."),
+                };
                 pattern::inspector(
-                    widget::list_view(
-                        &self.list,
-                        &self.sel,
-                        Message::ListSel,
+                    widget::tree_view(
+                        &self.tree,
+                        self.tree_sel.or(Some(3)),
+                        Message::Tree,
+                        Message::TreeSelect,
                         tok,
-                        self.list_window,
-                        40.0,
-                        OVERSCAN,
-                        Message::ListScroll,
-                        "No rows",
-                        move |_| tok.muted,
-                        Some(icedtea::iced::widget::Id::from("gallery-insp-list")),
-                        icedtea::collection::RowFace::FLUSH,
-                        named("insp-list", Role::List),
+                        named("insp-tree", Role::Tree),
                     ),
                     column![
-                        widget::label(title, tok, named("insp-body", Role::Header)),
-                        widget::meta(
-                            "Thanks for the notes. I will follow up after lunch.",
-                            tok,
-                            named("insp-text", Role::Status),
-                        ),
+                        widget::label(name, tok, named("insp-body", Role::Header)),
+                        widget::meta(body, tok, named("insp-text", Role::Status)),
                     ]
                     .spacing(8)
                     .padding(8)
                     .into(),
                     column![
                         widget::label("Properties", tok, named("insp-props", Role::Header)),
-                        widget::meta(when, tok, named("insp-when", Role::Status)),
-                        widget::meta("From Ada · Inbox", tok, named("insp-from", Role::Status)),
+                        widget::meta(
+                            format!("Name  {name}"),
+                            tok,
+                            named("insp-name", Role::Status)
+                        ),
+                        widget::meta(
+                            format!("Kind  {kind}"),
+                            tok,
+                            named("insp-kind", Role::Status)
+                        ),
+                        widget::meta(
+                            format!("Path  {path}"),
+                            tok,
+                            named("insp-path", Role::Status)
+                        ),
                     ]
                     .spacing(6)
                     .padding(8)
@@ -3963,61 +4066,65 @@ impl Gallery {
                     tok,
                 )
             }
-            "workspace" => container(pattern::workspace(
-                &self.ws,
-                move |id| match id {
-                    "explorer" => widget::label(
-                        "src/\n  lib.rs\n  main.rs",
-                        tok,
-                        named("ws-explorer", Role::List),
-                    ),
-                    "term" => widget::meta(
-                        "$ cargo test -p icedtea",
-                        tok,
-                        named("ws-term", Role::Status),
-                    ),
-                    _ => column![
-                        widget::themed_button(
-                            "Move terminal beside explorer",
-                            Some(Message::WsMove),
+            "workspace" => {
+                let width = (self.window_width * (1.0 - self.nav_split.ratio) - 96.0).max(280.0);
+                let height = (self.window_height - 280.0).max(280.0);
+                container(pattern::workspace(
+                    &self.ws,
+                    move |id| match id {
+                        "explorer" => widget::meta(
+                            "src/\n  lib.rs\n  catalog.rs",
                             tok,
-                            Variant::Quiet,
-                            btn("Move terminal beside explorer"),
+                            named("ws-explorer", Role::List),
                         ),
-                        widget::meta(
-                            format!("Active pane: {id}"),
+                        "term" => widget::meta(
+                            "$ cargo test -p icedtea",
                             tok,
-                            named("ws-active", Role::Status),
+                            named("ws-term", Role::Status),
                         ),
-                        widget::label(
-                            "fn main() {\n    icedtea::run!(...)\n}",
+                        "outline" => widget::tree_view(
+                            &self.tree,
+                            self.tree_sel,
+                            Message::Tree,
+                            Message::TreeSelect,
                             tok,
-                            named("ws-center", Role::Status),
+                            named("ws-outline", Role::Tree),
                         ),
-                    ]
-                    .spacing(8)
-                    .padding(12)
-                    .into(),
-                },
-                icedtea::iced::Size::new(
-                    (self.window_width * (1.0 - self.nav_split.ratio) - 64.0).max(240.0),
-                    360.0,
-                ),
-                |i, ev| {
-                    if matches!(ev, SashEvent::Press) {
-                        Message::WsPress(i)
-                    } else {
-                        Message::Sash(ev)
-                    }
-                },
-                Message::WsTab,
-                tok,
-                named("workspace", Role::Group),
-            ))
-            .height(Length::Fixed(360.0))
-            .into(),
+                        _ => column![
+                            widget::meta(
+                                "Edit pane. Tabs above switch Edit and Terminal. Drag the sash to resize.",
+                                tok,
+                                named("ws-center", Role::Status),
+                            ),
+                            widget::themed_button(
+                                "Move terminal beside explorer",
+                                Some(Message::WsMove),
+                                tok,
+                                Variant::Quiet,
+                                btn("Move terminal beside explorer"),
+                            ),
+                        ]
+                        .spacing(8)
+                        .padding(12)
+                        .into(),
+                    },
+                    icedtea::iced::Size::new(width, height),
+                    |i, ev| {
+                        if matches!(ev, SashEvent::Press) {
+                            Message::WsPress(i)
+                        } else {
+                            Message::Sash(ev)
+                        }
+                    },
+                    Message::WsTab,
+                    tok,
+                    named("workspace", Role::Group),
+                ))
+                .height(Length::Fixed(300.0))
+                .into()
+            }
             "tool-panel" => container(pattern::tool_panel(
-                if self.on {
+                if self.ws.find("outline").is_some() {
                     "Outline (docked)"
                 } else {
                     "Outline"
@@ -4034,7 +4141,7 @@ impl Gallery {
                 tok,
                 named("tool-panel", Role::Group),
             ))
-            .height(Length::Fixed(200.0))
+            .height(Length::Fixed(220.0))
             .into(),
             "drawer" => column![
                 widget::themed_button(
@@ -4240,6 +4347,16 @@ mod tests {
     }
 
     #[test]
+    fn every_page_has_a_job() {
+        for page in icedtea::catalog::pages() {
+            assert!(
+                !super::page_job(page).is_empty(),
+                "page {page} needs a job sentence"
+            );
+        }
+    }
+
+    #[test]
     fn parse_tour_beat_rejects_wrap_and_junk() {
         assert_eq!(super::parse_tour_beat("0", 29), Some(0));
         assert_eq!(super::parse_tour_beat("28\n", 29), Some(28));
@@ -4432,6 +4549,25 @@ mod tests {
         let src = include_str!("main.rs");
         assert!(src.contains("pattern::context_menu"));
         assert!(src.contains("pattern::workspace"));
+        assert!(src.contains("page_job"));
+        g.page = "inspector";
+        let _ = g.view();
+        g.page = "workspace";
+        let _ = g.view();
+        g.page = "about";
+        let _ = g.view();
+        g.page = "palette";
+        let _ = g.view();
+        g.page = "status-page";
+        let _ = g.view();
+        g.page = "tab-view";
+        let _ = g.view();
+        g.page = "feedback";
+        let _ = g.view();
+        let _ = g.update(super::Message::Switch(false));
+        assert!(!g.on);
+        let _ = g.update(super::Message::Spin);
+        assert!(g.spin > 0.0);
         g.page = "fields";
         g.pointer = icedtea::iced::Point::new(400.0, 80.0);
         let _ = g.update(super::Message::Cursor(

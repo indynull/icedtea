@@ -330,6 +330,7 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
                 .with_disabled(!a.enabled),
         ));
     }
+    let n = results.len();
     let field: Element<'a, M> = if let Some(p) = prompt {
         column![
             meta(
@@ -360,24 +361,26 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
             Some(iced::widget::Id::new("palette-query")),
         )
     };
-    container(
-        column![
-            field,
-            themed_scroll(
-                list.into(),
-                tok,
-                A11y::new("palette-list", Role::List),
-                false,
-                None,
-                None::<fn(_) -> M>,
-            ),
-        ]
-        .spacing(8),
-    )
-    .padding(12)
-    .width(480)
-    .style(move |_| style::raised_card(tok))
-    .into()
+    let hits: Element<'a, M> = if n > 12 {
+        container(themed_scroll(
+            list.into(),
+            tok,
+            A11y::new("palette-list", Role::List),
+            false,
+            None,
+            None::<fn(_) -> M>,
+        ))
+        .height(Length::Fixed(260.0))
+        .into()
+    } else {
+        list.into()
+    };
+    container(column![field, hits].spacing(8))
+        .padding(12)
+        .width(480)
+        .max_height(360.0)
+        .style(move |_| style::raised_card(tok))
+        .into()
 }
 
 /// Centered empty or error state.
@@ -699,6 +702,8 @@ pub fn tab_view<'a, M: Clone + 'a>(
         body
     ]
     .spacing(0)
+    .width(Length::Fill)
+    .height(Length::Fill)
     .into()
 }
 
