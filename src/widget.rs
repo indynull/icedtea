@@ -3410,6 +3410,7 @@ fn disclosure_header<'a, M: Clone + 'a>(
     msg: Option<M>,
     tok: Tokens,
     a11y: A11y,
+    inset: Padding,
 ) -> Element<'a, M> {
     let title = title.into();
     let angle = if open { std::f32::consts::PI } else { 0.0 };
@@ -3430,7 +3431,7 @@ fn disclosure_header<'a, M: Clone + 'a>(
     .align_y(Alignment::Center)
     .width(Length::Fill);
     let mut b = button(face)
-        .padding(pad())
+        .padding(inset)
         .width(Length::Fill)
         .style(style::button_style(tok, Variant::Ghost));
     if let Some(m) = a11y.apply_message(msg) {
@@ -3481,6 +3482,7 @@ pub fn accordion_view<'a, M: Clone + 'a>(
             A11y::button(title.clone())
                 .with_checked(open)
                 .with_disabled(a11y.disabled),
+            pad(),
         ));
         if open {
             col = col.push(
@@ -3562,8 +3564,8 @@ fn peek_clip<'a, M: 'a>(child: Element<'a, M>, h: f32, tok: Tokens) -> Element<'
 ///
 /// The application owns `open`. The header toggles. Closed shows a
 /// [`Peek`] of the child (pixels or whole body lines) and fades the
-/// cut. Open paints the full child. Title starts; the chevron sits on
-/// the trailing edge.
+/// cut. Open paints the full child. Title and body share the card
+/// inset. The chevron sits on the trailing edge.
 ///
 ///
 /// ```
@@ -3600,6 +3602,12 @@ pub fn expander<'a, M: Clone + 'a>(
         A11y::button(title.clone())
             .with_checked(open)
             .with_disabled(a11y.disabled),
+        Padding {
+            top: 8.0,
+            right: 0.0,
+            bottom: 8.0,
+            left: 0.0,
+        },
     );
     let h = collapsed.into().height();
     let body: Element<'a, M> = if open {
@@ -5964,6 +5972,50 @@ mod tests {
         assert!(head.contains("Icon::Chevron"));
         assert!(head.contains("Length::Fill"));
         assert!(!head.contains("▾"));
+    }
+
+    #[test]
+    fn expander_title_shares_the_card_inset() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, bool> = expander(
+            "Notes",
+            label("body-line", tok, A11y::new("body-line", Role::Status)),
+            Peek::Lines(2),
+            true,
+            |open| open,
+            tok,
+            A11y::new("exp", Role::Group),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let node = el.as_widget_mut().layout(
+            &mut tree,
+            &renderer,
+            &Limits::new(Size::ZERO, Size::new(320.0, 400.0)),
+        );
+        let layout = Layout::new(&node);
+        let mut boxes = Vec::new();
+        walk_bounds(layout, &mut boxes);
+        let lefts: Vec<f32> = boxes
+            .iter()
+            .filter(|b| b.x > 1.0 && b.x < 40.0 && b.width > 24.0 && b.width < 280.0)
+            .map(|b| b.x)
+            .collect();
+        assert!(
+            lefts.iter().any(|x| (*x - 12.0).abs() < 2.0),
+            "title and body should sit on the 12px card inset, got {lefts:?}"
+        );
+        assert!(
+            !lefts.iter().any(|x| (*x - 24.0).abs() < 2.0),
+            "header must not add a second 12px inset, got {lefts:?}"
+        );
     }
 
     #[test]
