@@ -502,6 +502,36 @@ if ! png_ok "$workdir/probe.png"; then
 fi
 echo "gallery-gif: probe $(identify -format '%wx%h' "$workdir/probe.png")"
 
+caption_font=""
+for f in \
+  /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf \
+  /usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf; do
+  if [[ -f "$f" ]]; then
+    caption_font=$f
+    break
+  fi
+done
+if [[ -z "$caption_font" ]]; then
+  echo "gallery-gif: no caption font (DejaVu or Liberation Bold)" >&2
+  exit 1
+fi
+
+burn_caption() {
+  local src=$1
+  local text=$2
+  local out=$3
+  local wh w h band
+  wh="$(identify -format '%wx%h' "$src")"
+  w="${wh%x*}"
+  h="${wh#*x}"
+  band=72
+  convert "$src" \
+    -fill 'rgba(12,12,12,0.78)' -draw "rectangle 0,$((h - band)) $w,$h" \
+    -font "$caption_font" -pointsize 28 -fill white \
+    -gravity SouthWest -annotate +28+22 "$text" \
+    "$out"
+}
+
 hold_s="$(awk "BEGIN { print $hold_ms / 1000 }")"
 # 0-based beats. Script seeks; gallery does not auto-advance or wrap.
 for i in $(seq 0 $((pages - 1))); do
@@ -527,8 +557,13 @@ for i in $(seq 0 $((pages - 1))); do
   else
     sleep 0.35
   fi
-  capture_window "$wid" "$workdir/$((i + 1)).png"
-  png_ok "$workdir/$((i + 1)).png"
+  capture_window "$wid" "$workdir/raw-$((i + 1)).png"
+  png_ok "$workdir/raw-$((i + 1)).png"
+  cap="$(tr -d '\r' <"${ackfile}.caption" 2>/dev/null || true)"
+  if [[ -z "$cap" ]]; then
+    cap="Beat $i"
+  fi
+  burn_caption "$workdir/raw-$((i + 1)).png" "$cap" "$workdir/$((i + 1)).png"
 done
 
 ffmpeg -y -hide_banner -loglevel error \

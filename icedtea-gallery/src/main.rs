@@ -304,7 +304,7 @@ fn tour_beat(index: usize) -> TourBeat {
             page: "theme",
             theme: "light",
             appearance: Appearance::Light,
-            caption: "Light — window chrome",
+            caption: "Light: paper canvas and window chrome",
         };
     }
     let page = if index < light_at {
@@ -316,7 +316,43 @@ fn tour_beat(index: usize) -> TourBeat {
         page,
         theme: "dark",
         appearance: Appearance::Dark,
-        caption: catalog::page_title(page),
+        caption: tour_caption_for(page),
+    }
+}
+
+fn tour_caption_for(page: &str) -> &'static str {
+    match page {
+        "controls" => "Controls: buttons, checks, radios",
+        "fields" => "Fields: text, numbers, dates",
+        "readout" => "Readout: progress and meters",
+        "type" => "Type: labels and icons",
+        "markdown" => "Markdown: copy posts the source",
+        "code" => "Code: select and copy",
+        "image" => "Image: slot keeps its box",
+        "selectable" => "Selectable: drag to copy",
+        "list" => "List: cards and variable height",
+        "log" => "Log: virtualized lines",
+        "grid" => "Item grid: shared row tiles",
+        "table" => "Table: frozen leading columns",
+        "tree" => "Tree: folders and leaves",
+        "sections" => "Tabs, accordion, expander",
+        "theme" => "Theme: named colorways, follow OS",
+        "colors" => "Colors: tokens and mixes",
+        "keys" => "Keys: shortcuts and cheatsheet",
+        "marks" => "Marks: cards, chips, badges",
+        "chrome-rows" => "Chrome: menu, toolbar, status",
+        "feedback" => "Feedback: toasts and banners",
+        "dialogs" => "Dialogs",
+        "list-detail" => "List and detail",
+        "workspace" => "Workspace: dock and sash",
+        "navigation" => "Navigation stack",
+        "tab-view" => "Tab view",
+        "preferences" => "Preferences",
+        "about" => "About",
+        "status-page" => "Status page",
+        "palette" => "Command palette",
+        "main-window" => "Main window",
+        _ => catalog::page_title(page),
     }
 }
 
@@ -346,9 +382,12 @@ fn read_tour_cmd() -> Option<usize> {
 fn write_tour_ack(beat: usize) {
     if let Some(path) = tour_ack_path() {
         let _ = std::fs::write(&path, beat.to_string());
-        let mut face = path;
+        let mut face = path.clone();
         face.set_extension("face");
         let _ = std::fs::write(face, tour_beat(beat).theme);
+        let mut caption = path;
+        caption.set_extension("caption");
+        let _ = std::fs::write(caption, tour_beat(beat).caption);
     }
 }
 
@@ -1626,25 +1665,6 @@ impl Gallery {
         )
     }
 
-    fn tour_caption<'a>(&self, tok: Tokens) -> Element<'a, Message> {
-        let line = tour_beat(self.tour_at).caption;
-        container(
-            row![
-                text("Showing").size(icedtea::typo::META).color(tok.muted),
-                text(line)
-                    .size(icedtea::typo::PAGE)
-                    .font(icedtea::typo::UI_BOLD)
-                    .color(tok.text),
-            ]
-            .spacing(10)
-            .align_y(Alignment::Center),
-        )
-        .width(Length::Fill)
-        .padding([14, 24])
-        .style(move |_| icedtea::style::fill(icedtea::theme::selection_fill(tok), tok.text))
-        .into()
-    }
-
     fn subscription(&self) -> Subscription<Message> {
         let mut subs = vec![
             icedtea::key::listen().map(Message::Key),
@@ -1805,14 +1825,11 @@ impl Gallery {
         .style(move |_| icedtea::style::panel(tok));
         let shell = container(layout::dock(
             Some({
-                let mut top = column![
+                column![
                     pattern::menu_bar(&self.actions, tok, self.direction, &self.catalog),
                     themes,
-                ];
-                if tour_wanted() {
-                    top = top.push(self.tour_caption(tok));
-                }
-                top.into()
+                ]
+                .into()
             }),
             Some(pattern::status_bar(
                 if self.note.is_empty() {
@@ -4176,7 +4193,7 @@ mod tests {
             );
             assert_eq!(icedtea::theme::named(beat.theme).name, beat.theme);
             assert!(!beat.caption.is_empty());
-            if !beat.caption.starts_with("Light") {
+            if !beat.caption.starts_with("Light:") {
                 seen.insert(beat.page);
             }
         }

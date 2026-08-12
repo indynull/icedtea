@@ -42,6 +42,7 @@ book-serve:
 
 # Record the gallery tour into assets/gallery.gif and book/src/gallery.gif.
 # Needs a display, ffmpeg, xwininfo, wmctrl, import, python3, Xephyr, metacity.
-# Records inside Xephyr. ICEDTEA_GALLERY_ISOLATED=0 uses the current display.
+# Records inside Xephyr. Burns a step caption on each frame.
+# ICEDTEA_GALLERY_ISOLATED=0 uses the current display.
 gallery-gif:
     bash scripts/gallery-gif.sh
