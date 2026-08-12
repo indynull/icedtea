@@ -55,7 +55,11 @@ Constructor: [`widget::value_field`](https://docs.rs/icedtea/latest/icedtea/widg
 
 Meta label, selectable value, optional Copy `Action`. Bind the text
 with `field::Selectables` (`get` is `Option`, unbound `perform` is a
-no-op). Mono face for paths and ids.
+no-op). Mono face for paths and ids. Same select-and-copy contract as
+body and code: app-owned buffer, `select_only`, range via
+`Content::selection()` and `icedtea::copy_text`. See
+[Content: Select and copy](content.md#select-and-copy) and
+[`select`](https://docs.rs/icedtea/latest/icedtea/select/index.html).
 
 ### Text area
 

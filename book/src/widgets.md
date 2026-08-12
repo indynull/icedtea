@@ -18,3 +18,7 @@ Each entry names the job, the shipped constructor, and links to
 [rustdoc](https://docs.rs/icedtea),
 [source](https://github.com/indynull/icedtea), and
 [crates.io](https://crates.io/crates/icedtea).
+
+Body, code, markdown, and value fields share one
+[select-and-copy](reference/content.md#select-and-copy) contract
+([`select`](https://docs.rs/icedtea/latest/icedtea/select/index.html)).

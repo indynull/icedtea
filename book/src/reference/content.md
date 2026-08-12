@@ -6,6 +6,24 @@ Type, icons, documents, and images.
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
+## Select and copy
+
+Readable body, code, and markdown share one contract (module
+[`select`](https://docs.rs/icedtea/latest/icedtea/select/index.html)):
+drag a contiguous range of **visible** text, then host copy (Ctrl+C /
+Cmd+C or `icedtea::copy_text`). Typing does not apply on these
+surfaces.
+
+| Surface | Who owns the text | Range copy | Full document |
+| --- | --- | --- | --- |
+| [`selectable`](#selectable), code | App `text_editor::Content` via `select_only` | `Content::selection()` → `copy_text` | whole buffer |
+| [`markdown`](#markdown) | Paint-side document (layout stays real) | Ctrl/Cmd+C within a block | `copy_text` on `MarkdownDoc::source` |
+
+Labeled values use the same editor path under [Fields](fields.md#value-field)
+and `field::Selectables`. Chrome (menus, buttons, status meta) is not
+drag-selectable. Continuous select across markdown headings and
+paragraphs is not shipped yet.
+
 ### Label
 
 **`label`** — A line of body text.
