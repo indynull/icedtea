@@ -1,12 +1,21 @@
 //! Semantic color tokens, mixing rules, and the named community catalog.
 //!
-//! `named` picks a colorway. `mix` builds washes.
+//! `named` picks a colorway. `mix` builds washes. With `follow_os`,
+//! [`apply_os_chrome`] layers optional desktop colors ([`OsChrome`])
+//! onto that colorway; leave fields unset or pass [`OsChrome::empty`]
+//! to keep the palette as authored.
 //!
 //! ```
 //! let dark = icedtea::theme::named("dark");
 //! assert_eq!(dark.name, "dark");
 //! let mixed = icedtea::theme::mix(dark.tokens.primary, dark.tokens.canvas, 0.28);
 //! assert_eq!(mixed, dark.tokens.selection);
+//! let pure = icedtea::theme::apply_os_chrome(
+//!     dark.tokens,
+//!     false,
+//!     icedtea::theme::OsChrome::empty(),
+//! );
+//! assert_eq!(pure, dark.tokens);
 //! ```
 
 use std::collections::BTreeMap;
@@ -612,73 +621,156 @@ pub fn resolve_pref(
     }
 }
 
-/// Desktop accent, if the host reports one.
+/// Optional desktop chrome colors layered onto a named colorway.
 ///
-/// Linux: settings portal, or Yaru `gtk-theme` on Ubuntu. Windows:
-/// system accent. macOS: control accent (`once_blocking` on the main
-/// thread). `None` when the host has no color or the read times out.
+/// **Default / opt-out:** leave every field `None` (or call
+/// [`OsChrome::empty`]) and set `follow_os` to `false` when applying —
+/// the colorway is used as authored.
 ///
-/// Prefer [`listen_os_accent`] from the application; call this only on
-/// the UI thread at boot when a one-shot is enough.
+/// **Opt-in:** when `follow_os` is true, [`apply_os_chrome`] overwrites
+/// only fields that are `Some`. Hosts fill what they can:
 ///
+/// | Field | Typical host source |
+/// | --- | --- |
+/// | `primary` | Accent (portal, Windows accent, macOS control accent) |
+/// | `canvas` | Window / content background (macOS, Windows) |
+/// | `surface` | Text / content fill (macOS, Windows) |
+/// | `panel` | Control / chrome strip fill (macOS, Windows) |
+/// | `text` | Primary label (macOS, Windows) |
+/// | `muted` | Secondary label / gray text (macOS, Windows) |
+/// | `border` | Separator / shadow edge (macOS, Windows) |
+///
+/// Linux (Wayland and X11 via the settings portal) currently provides
+/// `primary` when the desktop publishes an accent. Other fields stay
+/// unset so the colorway keeps surfaces and ink. Success, warning, and
+/// danger always stay on the colorway.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct OsChrome {
+    /// System accent → [`Tokens::primary`].
+    pub primary: Option<Color>,
+    /// Window / content background → [`Tokens::canvas`].
+    pub canvas: Option<Color>,
+    /// Raised content fill → [`Tokens::surface`].
+    pub surface: Option<Color>,
+    /// Chrome strip / control fill → [`Tokens::panel`].
+    pub panel: Option<Color>,
+    /// Primary label → [`Tokens::text`].
+    pub text: Option<Color>,
+    /// Secondary label → [`Tokens::muted`].
+    pub muted: Option<Color>,
+    /// Separator → [`Tokens::border`].
+    pub border: Option<Color>,
+}
+
+impl OsChrome {
+    /// No host colors — applying this with `follow_os` is a no-op.
+    pub const fn empty() -> Self {
+        Self {
+            primary: None,
+            canvas: None,
+            surface: None,
+            panel: None,
+            text: None,
+            muted: None,
+            border: None,
+        }
+    }
+
+    /// True when at least one field would change tokens under follow-OS.
+    pub fn any(self) -> bool {
+        self.primary.is_some()
+            || self.canvas.is_some()
+            || self.surface.is_some()
+            || self.panel.is_some()
+            || self.text.is_some()
+            || self.muted.is_some()
+            || self.border.is_some()
+    }
+}
+
+/// One-shot desktop chrome. Prefer [`listen_os_chrome`] in a running
+/// app. On macOS call this on the main thread only (same as system
+/// accent reads).
 ///
 /// ```
-/// // Boot path only (main thread on macOS):
-/// // let accent = icedtea::theme::os_accent();
-/// let _ = icedtea::theme::listen_os_accent();
+/// let chrome = icedtea::theme::os_chrome();
+/// let _ = chrome.primary;
 /// ```
-pub fn os_accent() -> Option<Color> {
-    // mundy panics off the main thread on macOS. Unit tests and some
-    // boot paths are not on that thread; return None instead of aborting.
-    let prefs = std::panic::catch_unwind(|| {
-        mundy::Preferences::once_blocking(
-            mundy::Interest::AccentColor,
-            std::time::Duration::from_millis(80),
-        )
-    })
-    .ok()??;
-    prefs.accent_color.0.map(color_from_srgba)
+pub fn os_chrome() -> OsChrome {
+    crate::host_chrome::snapshot()
 }
 
-/// Emits the desktop accent when it changes. First item is the current
-/// value (`None` if the host has no color).
-pub fn listen_os_accent() -> iced::Subscription<Option<Color>> {
-    iced::Subscription::run(os_accent_stream)
+/// Emits a full [`OsChrome`] when the desktop accent or color-scheme
+/// changes. First item is the current snapshot.
+pub fn listen_os_chrome() -> iced::Subscription<OsChrome> {
+    iced::Subscription::run(crate::host_chrome::listen)
 }
 
-fn os_accent_stream() -> impl iced::futures::Stream<Item = Option<Color>> {
-    use iced::futures::StreamExt;
-    mundy::Preferences::stream(mundy::Interest::AccentColor)
-        .map(|prefs| prefs.accent_color.0.map(color_from_srgba))
-}
-
-fn color_from_srgba(c: mundy::Srgba) -> Color {
-    Color::from_rgba(c.red as f32, c.green as f32, c.blue as f32, c.alpha as f32)
-}
-
-/// When `follow_os` is on, fill [`Tokens::primary`] from the desktop
-/// accent ([`os_accent`], [`listen_os_accent`]). Canvas and text stay.
-/// Decorated windows keep the native title bar.
+/// Layer host chrome onto a colorway.
+///
+/// - `follow_os == false`: returns `tokens` unchanged (opt out).
+/// - `follow_os == true`: each `Some` field in `chrome` replaces the
+///   matching token; then selection is rebuilt from primary + canvas.
+///
+/// Decorated windows keep the native title bar. High-contrast colorways
+/// are not special-cased here — turn `follow_os` off if the catalog face
+/// must stay absolute.
 ///
 /// ```
 /// use iced::Color;
-/// let tok = icedtea::theme::named("dark").tokens;
-/// let accent = Color::from_rgb8(0, 122, 255);
-/// let out = icedtea::theme::apply_os_accent(tok, true, Some(accent));
-/// assert_eq!(out.primary, accent);
-/// assert_eq!(out.canvas, tok.canvas);
+/// use icedtea::theme::{self, OsChrome};
+/// let tok = theme::named("dark").tokens;
+/// let chrome = OsChrome {
+///     primary: Some(Color::from_rgb8(0, 122, 255)),
+///     canvas: Some(Color::from_rgb8(30, 30, 30)),
+///     ..OsChrome::empty()
+/// };
+/// let out = theme::apply_os_chrome(tok, true, chrome);
+/// assert_eq!(out.primary, chrome.primary.unwrap());
+/// assert_eq!(out.canvas, chrome.canvas.unwrap());
 /// assert_eq!(out.text, tok.text);
+/// let off = theme::apply_os_chrome(tok, false, chrome);
+/// assert_eq!(off, tok);
 /// ```
-pub fn apply_os_accent(tokens: Tokens, follow_os: bool, os_accent: Option<Color>) -> Tokens {
-    match (follow_os, os_accent) {
-        (true, Some(accent)) => {
-            let mut tokens = tokens;
-            tokens.primary = accent;
-            tokens.selection = selection_fill(tokens);
-            tokens
-        }
-        _ => tokens,
+pub fn apply_os_chrome(tokens: Tokens, follow_os: bool, chrome: OsChrome) -> Tokens {
+    if !follow_os {
+        return tokens;
     }
+    let mut tokens = tokens;
+    let mut dirty = false;
+    if let Some(c) = chrome.primary {
+        tokens.primary = c;
+        dirty = true;
+    }
+    if let Some(c) = chrome.canvas {
+        tokens.canvas = c;
+        dirty = true;
+    }
+    if let Some(c) = chrome.surface {
+        tokens.surface = c;
+        dirty = true;
+    }
+    if let Some(c) = chrome.panel {
+        tokens.panel = c;
+        dirty = true;
+    }
+    if let Some(c) = chrome.text {
+        tokens.text = c;
+        tokens.selection_text = c;
+        dirty = true;
+    }
+    if let Some(c) = chrome.muted {
+        tokens.muted = c;
+        dirty = true;
+    }
+    if let Some(c) = chrome.border {
+        tokens.border = c;
+        dirty = true;
+    }
+    if dirty {
+        tokens.selection = selection_fill(tokens);
+    }
+    tokens
 }
 
 #[cfg(test)]
@@ -842,32 +934,35 @@ mod tests {
     }
 
     #[test]
-    fn os_accent_fills_primary_when_follow_os() {
+    fn os_chrome_fills_only_set_fields_when_follow_os() {
         let tok = named("dark").tokens;
         let accent = Color::from_rgb8(0, 122, 255);
-        let on = apply_os_accent(tok, true, Some(accent));
+        let canvas = Color::from_rgb8(40, 40, 40);
+        let text = Color::from_rgb8(240, 240, 240);
+        let chrome = OsChrome {
+            primary: Some(accent),
+            canvas: Some(canvas),
+            text: Some(text),
+            ..OsChrome::empty()
+        };
+        assert!(chrome.any());
+        assert!(!OsChrome::empty().any());
+        let on = apply_os_chrome(tok, true, chrome);
         assert_eq!(on.primary, accent);
-        assert_eq!(on.canvas, tok.canvas);
-        assert_eq!(on.text, tok.text);
+        assert_eq!(on.canvas, canvas);
+        assert_eq!(on.text, text);
+        assert_eq!(on.selection_text, text);
+        assert_eq!(on.muted, tok.muted);
+        assert_eq!(on.panel, tok.panel);
         assert_ne!(on.selection, tok.selection);
+        assert_eq!(apply_os_chrome(tok, false, chrome), tok);
         assert_eq!(
-            apply_os_accent(tok, false, Some(accent)).primary,
+            apply_os_chrome(tok, true, OsChrome::empty()).primary,
             tok.primary
         );
-        assert_eq!(apply_os_accent(tok, true, None).primary, tok.primary);
-        let mapped = color_from_srgba(mundy::Srgba {
-            red: 1.0,
-            green: 0.0,
-            blue: 0.5,
-            alpha: 1.0,
-        });
-        assert!((mapped.r - 1.0).abs() < 0.01);
-        assert!(mapped.g.abs() < 0.01);
-        assert!((mapped.b - 0.5).abs() < 0.01);
-        assert_eq!(mapped.a, 1.0);
-        let _ = listen_os_accent();
-        // Safe off the main thread (macOS once_blocking panics otherwise).
-        let _ = apply_os_accent(tok, true, os_accent());
+        let _ = listen_os_chrome();
+        // Snapshot is safe off the main thread (returns empty fields if host panics).
+        let _ = apply_os_chrome(tok, true, os_chrome());
     }
 
     #[test]

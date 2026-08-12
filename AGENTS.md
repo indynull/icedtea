@@ -194,8 +194,9 @@ Check/clippy/test/doc/cov set `CARGO_INCREMENTAL=0`. After a passing
 `just clean` is `cargo clean`.
 
 - Coverage ignore is host glue only: `src/host.rs` (native dialogs,
-  clipboard tasks) and `src/host_canvas.rs` (iced canvas stroke). Do not
-  grow that prefix for convenience.
+  clipboard tasks), `src/host_canvas.rs` (iced canvas stroke), and
+  other `src/host*` host readers. Do not grow that prefix for
+  convenience.
 - Fail-under is 99: `llvm-cov` still counts some macro-mapped lines
   as missed while the HTML report shows 0 uncovered. Do not claim
   100 while the tool prints less. Exercise every real branch; do

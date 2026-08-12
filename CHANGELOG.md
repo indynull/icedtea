@@ -3,22 +3,26 @@
 ## Unreleased
 
 `light` and `dark` are a neutral desktop pair. Persist defaults
-`follow_os` on. `os_accent` / `listen_os_accent` read the desktop
-accent; `apply_os_accent` puts it in primary. Canvas and text stay.
-The spinner is eight dots around a circle. `chip` takes optional
-press and dismiss. `Selectables::get` is `Option`; unbound
-`perform` is a no-op. `status_bar` takes an optional tone and
-caption. `markdown_view` keeps structured markdown layout with
-paint-side select within each block. Code and fields stay select-only
-editors with clean multi-line highlight. Contract: `select` module.
-Gallery content pages always demo those constructors (no paint-only
-toggle).
+`follow_os` on. When follow-OS is on, `OsChrome` /
+`os_chrome` / `listen_os_chrome` / `apply_os_chrome` layer optional
+desktop colors onto the active colorway: accent as `primary` on every
+host; `canvas`, `surface`, `panel`, `text`, `muted`, and `border` on
+macOS and Windows; Linux (settings portal) supplies accent only.
+Unset fields and follow-OS off leave the colorway unchanged. Success,
+warning, and danger stay on the colorway.
 
 `run!` and `daemon!` call `typo::install_platform_faces` so SansSerif
 and Monospace bind to installed faces (UI needs normal and bold weight
 700). Apps that start iced without those macros call it before the
 first frame.
 
+The spinner is eight dots around a circle. `chip` takes optional press
+and dismiss. `Selectables::get` is `Option`; unbound `perform` is a
+no-op. `status_bar` takes an optional tone and caption.
+`markdown_view` keeps structured markdown layout with paint-side
+select within each block. Code and fields stay select-only editors
+with clean multi-line highlight. Contract: `select` module. Gallery
+content pages always demo those constructors (no paint-only toggle).
 
 ## 0.4.0 — 2026-08-11
 

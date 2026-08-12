@@ -188,6 +188,7 @@ pub mod focus;
 pub mod fuzzy;
 pub mod host;
 mod host_canvas;
+mod host_chrome;
 mod host_font;
 pub mod i18n;
 pub mod icon;

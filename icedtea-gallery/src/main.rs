@@ -24,7 +24,7 @@ use icedtea::nav::NavStack;
 use icedtea::palette::CommandPalette;
 use icedtea::pattern::{self, PrefGroup};
 use icedtea::shortcut::Shortcut;
-use icedtea::theme::{self, Appearance, ThemeCatalog, Tokens};
+use icedtea::theme::{self, Appearance, OsChrome, ThemeCatalog, Tokens};
 use icedtea::toast::{ToastKind, ToastQueue};
 use icedtea::variant::Variant;
 use icedtea::widget;
@@ -555,7 +555,7 @@ enum Message {
     Follow(bool),
     Spin,
     OsMode(icedtea::iced::theme::Mode),
-    OsAccent(Option<icedtea::iced::Color>),
+    OsChrome(OsChrome),
     Appearance(Appearance),
     Key(icedtea::iced::keyboard::Event),
     Drop(icedtea::dnd::DragPayload),
@@ -699,7 +699,7 @@ struct Gallery {
     follow_os: bool,
     spin: f32,
     appearance: Appearance,
-    os_accent: Option<icedtea::iced::Color>,
+    os_chrome: OsChrome,
     tick: u64,
     direction: Direction,
     catalog_query: String,
@@ -960,7 +960,7 @@ impl Gallery {
             follow_os: true,
             spin: 0.0,
             appearance: Appearance::Dark,
-            os_accent: theme::os_accent(),
+            os_chrome: theme::os_chrome(),
             tick: 0,
             direction,
             catalog_query: String::new(),
@@ -1034,7 +1034,7 @@ impl Gallery {
             .get(&name)
             .map(|t| t.tokens)
             .unwrap_or_else(|| theme::named(&name).tokens);
-        self.tokens = theme::apply_os_accent(tokens, self.follow_os, self.os_accent);
+        self.tokens = theme::apply_os_chrome(tokens, self.follow_os, self.os_chrome);
     }
 
     fn clamp_nav(&mut self) {
@@ -1485,12 +1485,14 @@ impl Gallery {
             Message::Spin => self.spin = (self.spin + 0.07) % 1.0,
             Message::OsMode(mode) => {
                 self.appearance = Appearance::from_mode(mode);
+                // Surfaces track light/dark; re-read when appearance changes.
+                self.os_chrome = theme::os_chrome();
                 if self.follow_os {
                     self.apply_theme_pref();
                 }
             }
-            Message::OsAccent(color) => {
-                self.os_accent = color;
+            Message::OsChrome(chrome) => {
+                self.os_chrome = chrome;
                 if self.follow_os {
                     self.apply_theme_pref();
                 }
@@ -1812,7 +1814,7 @@ impl Gallery {
             icedtea::dnd::listen_files().map(Message::Drop),
             icedtea::iced::time::every(std::time::Duration::from_secs(1)).map(|_| Message::Tick),
             icedtea::iced::system::theme_changes().map(Message::OsMode),
-            theme::listen_os_accent().map(Message::OsAccent),
+            theme::listen_os_chrome().map(Message::OsChrome),
             icedtea::iced::window::resize_events().map(window_width),
             icedtea::iced::window::resize_events().map(window_height),
             layout::listen_sash().map(nav_sash),
@@ -4341,23 +4343,38 @@ mod tests {
         let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
         assert!(g.follow_os);
         assert_eq!(g.family, "default");
+        // Off the UI thread the host snapshot is empty; keep it empty so
+        // assertions see pure colorway tokens.
+        g.os_chrome = icedtea::theme::OsChrome::empty();
         let _ = g.update(super::Message::OsMode(icedtea::iced::theme::Mode::None));
+        g.os_chrome = icedtea::theme::OsChrome::empty();
+        g.apply_theme_pref();
         assert_eq!(g.theme, "light");
         assert_eq!(
             g.tokens.canvas,
             icedtea::theme::named("light").tokens.canvas
         );
         let _ = g.update(super::Message::OsMode(icedtea::iced::theme::Mode::Dark));
+        g.os_chrome = icedtea::theme::OsChrome::empty();
+        g.apply_theme_pref();
         assert_eq!(g.theme, "dark");
         assert_eq!(g.tokens.canvas, icedtea::theme::named("dark").tokens.canvas);
         let accent = icedtea::iced::Color::from_rgb8(0, 122, 255);
-        let _ = g.update(super::Message::OsAccent(Some(accent)));
+        let canvas = icedtea::iced::Color::from_rgb8(32, 32, 32);
+        let chrome = icedtea::theme::OsChrome {
+            primary: Some(accent),
+            canvas: Some(canvas),
+            ..icedtea::theme::OsChrome::empty()
+        };
+        let _ = g.update(super::Message::OsChrome(chrome));
         assert_eq!(g.tokens.primary, accent);
+        assert_eq!(g.tokens.canvas, canvas);
         let _ = g.update(super::Message::Follow(false));
         assert_eq!(
             g.tokens.primary,
             icedtea::theme::named("dark").tokens.primary
         );
+        assert_eq!(g.tokens.canvas, icedtea::theme::named("dark").tokens.canvas);
     }
 
     #[test]

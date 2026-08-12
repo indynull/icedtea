@@ -37,11 +37,54 @@ High-contrast is its own name. Names without a pair do not follow the
 OS. Persist stores `theme` plus optional `family` and `follow_os`
 (`follow_os` defaults on). Mode changes come from iced
 (`system::theme` / `theme_changes`).
-When follow-OS is on, `theme::os_accent` / `theme::listen_os_accent`
-read the desktop accent (settings portal, Windows accent, macOS
-control accent). `theme::apply_os_accent` puts that color in
-`Tokens.primary` and rebuilds selection. Canvas and text stay the
-family's tokens. Decorated windows keep the native title bar.
+
+## Follow-OS chrome
+
+**Default:** a named colorway only. Set `follow_os` to false, or pass
+[`OsChrome::empty`](https://docs.rs/icedtea/latest/icedtea/theme/struct.OsChrome.html),
+and no desktop colors are applied.
+
+**Opt-in:** with `follow_os` true:
+
+1. Resolve the family light/dark member from OS appearance (as above).
+2. Read host chrome via [`theme::os_chrome`](https://docs.rs/icedtea/latest/icedtea/theme/fn.os_chrome.html)
+   (boot, main thread on macOS) or
+   [`theme::listen_os_chrome`](https://docs.rs/icedtea/latest/icedtea/theme/fn.listen_os_chrome.html)
+   (live updates when accent or color-scheme changes).
+3. Apply with
+   [`theme::apply_os_chrome`](https://docs.rs/icedtea/latest/icedtea/theme/fn.apply_os_chrome.html).
+   Each `Some` field overwrites the matching token; the rest of the
+   colorway stays. Selection is rebuilt from primary + canvas.
+
+What the host fills (missing fields stay on the colorway):
+
+| Token | macOS | Windows | Linux (portal, Wayland or X11) |
+| --- | --- | --- | --- |
+| `primary` | control accent | system accent | portal accent when published |
+| `canvas` | window background (system gray, not paper white) | `COLOR_WINDOW` | — |
+| `surface` | text background (often white in light mode) | button face | — |
+| `panel` | control background | button face | — |
+| `text` | label | window text | — |
+| `muted` | secondary label | gray text | — |
+| `border` | separator | button shadow | — |
+
+Success, warning, and danger always stay on the colorway. Decorated
+windows keep the native title bar. Turn follow-OS off for high-contrast
+or a fixed brand palette.
+
+```rust
+use icedtea::theme::{self, OsChrome};
+
+let base = theme::named("dark").tokens;
+// Opt out: colorway only
+let pure = theme::apply_os_chrome(base, false, OsChrome::empty());
+assert_eq!(pure, base);
+
+// Opt in: layer whatever the host reported
+let live = theme::os_chrome();
+let tok = theme::apply_os_chrome(base, true, live);
+let _ = tok.canvas;
+```
 
 - [`theme`](https://docs.rs/icedtea/latest/icedtea/theme/index.html)
 - [source](https://github.com/indynull/icedtea/blob/master/src/theme.rs)
