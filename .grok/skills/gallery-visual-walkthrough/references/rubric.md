@@ -44,6 +44,16 @@ Score from the frame; then confirm in code when fixing.
 | Empty state | Blank void without meta/status copy when page should explain |
 | Motion of focus | Active nav page does not match caption (wrong beat paint) |
 
+## Interaction shots (`kind=after-interact`)
+
+Compare to the preceding **idle** shot on the same beat.
+
+| Tag | Meaning |
+|-----|---------|
+| **ok** | Expected state change is obvious in the frame |
+| **ugly** | State changed but hard to see (weak selection, no checked paint) |
+| **broken** | Inject applied (or claimed) but paint matches idle / wrong control |
+
 ## Auto-fix eligibility
 
 | Fix now (in source) | Defer / report only |

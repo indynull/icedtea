@@ -445,6 +445,51 @@ fn tour_ack_path() -> Option<std::path::PathBuf> {
     std::env::var_os("ICEDTEA_GALLERY_TOUR_ACK").map(std::path::PathBuf::from)
 }
 
+/// File the walkthrough writes: one inject command per line, then clears.
+fn inject_path() -> Option<std::path::PathBuf> {
+    std::env::var_os("ICEDTEA_GALLERY_INJECT").map(std::path::PathBuf::from)
+}
+
+fn inject_ack_path() -> Option<std::path::PathBuf> {
+    inject_path().map(|p| p.with_extension("ack"))
+}
+
+/// Parse one inject line into a gallery message. Unknown lines are ignored.
+fn parse_inject_line(line: &str) -> Option<Message> {
+    let line = line.trim();
+    if line.is_empty() || line.starts_with('#') {
+        return None;
+    }
+    let mut parts = line.split_whitespace();
+    let cmd = parts.next()?.to_ascii_lowercase();
+    match cmd.as_str() {
+        "check" => Some(Message::Check(parts.next()? == "true")),
+        "optional" => Some(Message::Optional(parts.next()? == "true")),
+        "switch" => Some(Message::Switch(parts.next()? == "true")),
+        "sounds" => Some(Message::Sounds(parts.next()? == "true")),
+        "radio" => Some(Message::Radio(parts.next()?.parse().ok()?)),
+        "slide" => Some(Message::Slide(parts.next()?.parse().ok()?)),
+        "list" => Some(Message::ListSel(parts.next()?.parse().ok()?)),
+        "opt" => Some(Message::OptSel(parts.next()?.parse().ok()?)),
+        "expand-card" | "expand_card" => {
+            Some(Message::ExpandCard(parts.next()?.parse().ok()?))
+        }
+        "face" | "list-face" | "list_face" => {
+            let v = parts.next()?.to_ascii_lowercase();
+            Some(Message::ListFace(v == "card" || v == "true"))
+        }
+        "expand" => Some(Message::Expand(parts.next()? == "true")),
+        "acc" => Some(Message::Acc(parts.next()?.parse().ok()?)),
+        "page" => Some(Message::Page(parts.next()?.parse().ok()?)),
+        "tab" => Some(Message::Tab(parts.next()?.parse().ok()?)),
+        "grid" => Some(Message::Grid(parts.next()?.parse().ok()?)),
+        "tree" => Some(Message::Tree(parts.next()?.parse().ok()?)),
+        "tree-sel" | "tree_sel" => Some(Message::TreeSelect(parts.next()?.parse().ok()?)),
+        "swatch" => Some(Message::Swatch),
+        _ => None,
+    }
+}
+
 fn parse_tour_beat(text: &str, len: usize) -> Option<usize> {
     let n: usize = text.trim().parse().ok()?;
     (n < len).then_some(n)
@@ -607,6 +652,8 @@ enum Message {
     #[allow(dead_code)]
     Tour,
     TourPoll,
+    /// Drain `ICEDTEA_GALLERY_INJECT` script lines (walkthrough / QA).
+    InjectPoll,
     Nop,
 }
 
@@ -1802,6 +1849,30 @@ impl Gallery {
                     write_tour_ack(n);
                 }
             }
+            Message::InjectPoll => {
+                let Some(path) = inject_path() else {
+                    return Task::none();
+                };
+                let Ok(text) = std::fs::read_to_string(&path) else {
+                    return Task::none();
+                };
+                if text.trim().is_empty() {
+                    return Task::none();
+                }
+                let _ = std::fs::write(&path, "");
+                let mut tasks = Vec::new();
+                let mut applied = 0usize;
+                for line in text.lines() {
+                    if let Some(msg) = parse_inject_line(line) {
+                        applied += 1;
+                        tasks.push(self.update(msg));
+                    }
+                }
+                if let Some(ack) = inject_ack_path() {
+                    let _ = std::fs::write(ack, format!("{applied}\n"));
+                }
+                return Task::batch(tasks);
+            }
             Message::Nop => {}
         }
         Task::none()
@@ -1852,6 +1923,12 @@ impl Gallery {
             subs.push(
                 icedtea::iced::time::every(std::time::Duration::from_millis(50))
                     .map(|_| Message::TourPoll),
+            );
+        }
+        if inject_path().is_some() {
+            subs.push(
+                icedtea::iced::time::every(std::time::Duration::from_millis(50))
+                    .map(|_| Message::InjectPoll),
             );
         }
         Subscription::batch(subs)
@@ -4520,6 +4597,43 @@ mod tests {
         assert!(g.note.starts_with("Jump to "));
         let _ = g.update(super::Message::MdLink("https://example.com".into()));
         assert!(g.note.contains("example.com"));
+    }
+
+    #[test]
+    fn inject_lines_drive_control_state() {
+        assert!(matches!(
+            super::parse_inject_line("check true"),
+            Some(super::Message::Check(true))
+        ));
+        assert!(matches!(
+            super::parse_inject_line("switch false"),
+            Some(super::Message::Switch(false))
+        ));
+        assert!(matches!(
+            super::parse_inject_line("list 3"),
+            Some(super::Message::ListSel(3))
+        ));
+        assert!(matches!(
+            super::parse_inject_line("expand-card 1"),
+            Some(super::Message::ExpandCard(1))
+        ));
+        assert!(matches!(
+            super::parse_inject_line("face card"),
+            Some(super::Message::ListFace(true))
+        ));
+        assert!(super::parse_inject_line("# comment").is_none());
+        assert!(super::parse_inject_line("unknown x").is_none());
+
+        let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
+        for line in ["check true", "switch true", "list 2", "expand true"] {
+            if let Some(msg) = super::parse_inject_line(line) {
+                let _ = g.update(msg);
+            }
+        }
+        assert!(g.checked);
+        assert!(g.on);
+        assert_eq!(g.sel.primary(), Some(2));
+        assert!(g.expander_open);
     }
 
     #[test]

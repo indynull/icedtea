@@ -68,6 +68,7 @@ Matches `scripts/gallery-gif.sh`:
 | `--release` | Build/use `target/release/icedtea-gallery` |
 | `--no-build` | Use existing binary only |
 | `--gif PATH` | Optional ffmpeg GIF from shots (relative to `--out` unless absolute) |
+| `--interact` | After each idle page shot, inject control messages and capture **after** state |
 
 ## Agent procedure
 
@@ -94,6 +95,55 @@ tools) and re-run. **Do not invent screenshots.**
 
 `timings.json`: `boot_ms`, `total_ms`, `mean_step_ms`, `settle_ms`.
 Report as printed — do not invent. `mean_step_ms` includes settle sleep.
+
+### 2b. Interactions (`--interact`)
+
+**What already exists outside the skill**
+
+| Layer | What it proves |
+|-------|----------------|
+| Library unit tests | Constructors build; `select_only`, selection, list scroll math |
+| Gallery unit tests | `Message` updates change state (`gallery_clicks_update_visible_state`, inject parser) |
+| Visual walk **without** `--interact` | Idle paint of each tour page only — **no** click/toggle proof |
+
+**What `--interact` adds**
+
+1. After each tour beat’s **idle** shot, the harness writes lines to
+   `ICEDTEA_GALLERY_INJECT` (gallery polls `InjectPoll`).
+2. Gallery applies `check` / `switch` / `list` / `expand-card` / … and
+   acks the count on `inject.ack`.
+3. A second shot is stored as `kind=after-interact` with `inject` +
+   `expect` fields in `steps.jsonl`.
+
+```bash
+python3 .grok/skills/gallery-visual-walkthrough/scripts/gallery_walkthrough.py \
+  --interact --beats 0,8,13 --out tmp/gallery-walk/interact
+```
+
+Built-in scripts (caption match) live in `DEFAULT_INTERACT` inside the
+harness: Controls toggles, List select + expand-card, sections expander,
+tree toggle, grid pick. Extend that table when adding demos.
+
+Inject language (one command per line):
+
+| Line | Effect |
+|------|--------|
+| `check true` / `switch true` / `optional true` / `sounds true` | Toggle state |
+| `radio N` / `slide 0.75` | Radio index / slider value |
+| `list N` / `opt N` / `grid N` | Selection |
+| `expand-card N` / `face card` | Virtual column open + list card face |
+| `expand true` / `acc N` / `tab N` / `page N` | Expander / accordion / tabs |
+| `tree ID` / `tree-sel ID` / `swatch` | Tree + color swatch |
+
+Agent review for interact pairs:
+
+1. `read_file` the **idle** and **after-interact** shots for the same beat.
+2. Confirm the `expect` string is visible (e.g. checked box, selected row,
+   open expander). If not → **broken** interaction or inject miss.
+3. Usability: state change must be obvious without reading `steps.jsonl`.
+
+This is **message-level** interaction (same as app `update`), not synthetic
+pointer hit-testing. Prefer it over brittle xdotool coordinates for icedtea.
 
 ### 3. Visual review (mandatory — every shot)
 

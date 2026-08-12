@@ -362,6 +362,90 @@ def slug(s: str) -> str:
     return slug_s or "step"
 
 
+# Built-in interactions keyed by tour caption prefix (case-insensitive).
+# Script is drained by the gallery via ICEDTEA_GALLERY_INJECT (not xdotool).
+DEFAULT_INTERACT: list[dict[str, str]] = [
+    {
+        "match": "controls:",
+        "name": "controls-toggles",
+        "script": "check true\nswitch true\nradio 1\nslide 0.75\n",
+        "expect": "Accept/Sounds toggled on; radio and slider moved",
+    },
+    {
+        "match": "list:",
+        "name": "list-select",
+        "script": "list 2\nface card\n",
+        "expect": "third list row selected; card face",
+    },
+    {
+        "match": "list:",
+        "name": "list-expand-card",
+        "script": "expand-card 1\n",
+        "expect": "second expand-card row open (virtual_column)",
+        "page_hint": "virtual",  # optional; gallery list page hosts both
+    },
+    {
+        "match": "accordion",
+        "name": "sections-expand",
+        "script": "expand true\nacc 0\n",
+        "expect": "expander open; first accordion open",
+    },
+    {
+        "match": "tree:",
+        "name": "tree-toggle",
+        "script": "tree 1\ntree-sel 1\n",
+        "expect": "tree node toggled/selected when ids exist",
+    },
+    {
+        "match": "item grid",
+        "name": "grid-pick",
+        "script": "grid 2\n",
+        "expect": "grid tile 2 selected",
+    },
+]
+
+
+def interactions_for_caption(caption: str) -> list[dict[str, str]]:
+    c = caption.casefold()
+    return [x for x in DEFAULT_INTERACT if x["match"].casefold() in c]
+
+
+def inject_script(inject_path: Path, script: str, timeout_s: float = 6.0) -> int:
+    """Write inject script; wait for gallery to clear and ack applied count."""
+    ack = inject_path.with_suffix(".ack")
+    if ack.exists():
+        ack.unlink()
+    lines = [
+        ln
+        for ln in script.splitlines()
+        if ln.strip() and not ln.strip().startswith("#")
+    ]
+    inject_path.write_text(
+        script if script.endswith("\n") else script + "\n", encoding="utf-8"
+    )
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        if ack.is_file():
+            try:
+                n = int(ack.read_text(encoding="utf-8").strip() or "0")
+                if n >= 0:
+                    return n
+            except ValueError:
+                pass
+        # also succeed if inject file was emptied
+        try:
+            if (
+                inject_path.is_file()
+                and not inject_path.read_text(encoding="utf-8").strip()
+            ):
+                if ack.is_file():
+                    return int(ack.read_text(encoding="utf-8").strip() or "0")
+        except OSError:
+            pass
+        time.sleep(0.05)
+    raise TimeoutError(f"inject not acknowledged ({len(lines)} lines): {script!r}")
+
+
 def write_capture_md(
     out: Path,
     *,
@@ -393,14 +477,18 @@ def write_capture_md(
         "",
         "## Shots",
         "",
-        "| # | beat | page | caption | file | capture_ms | geometry |",
-        "| --- | --- | --- | --- | --- | --- | --- |",
+        "| # | beat | kind | page | caption | file | inject | expect |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for s in steps:
+        if s.get("shot") is None:
+            continue
         lines.append(
-            f"| {s['index']} | {s['beat']} | {s.get('page', '')} | "
-            f"{s.get('caption', '').replace('|', '/')} | "
-            f"`{s['shot']}` | {s.get('capture_ms')} | {s.get('geometry', '')} |"
+            f"| {s['index']} | {s.get('beat', '')} | {s.get('kind', '')} | "
+            f"{s.get('page', '')} | {s.get('caption', '').replace('|', '/')} | "
+            f"`{s['shot']}` | "
+            f"`{(s.get('inject') or '').replace('|', '/').replace(chr(10), ';')}` | "
+            f"{(s.get('expect') or '').replace('|', '/')} |"
         )
     lines.extend(
         [
@@ -409,10 +497,12 @@ def write_capture_md(
             "",
             "1. `read_file` every `shots/*.png` (multimodal — not filename-only).",
             "2. Score with `references/rubric.md` (ok / ugly / broken).",
-            "3. If the goal is pixel perfection: fix **source** for clear defects,",
+            "3. For `after-interact` shots: confirm the **expect** column is visible",
+            "   (state change vs the preceding `idle` shot on the same beat).",
+            "4. If the goal is pixel perfection: fix **source** for clear defects,",
             "   re-run this harness on affected beats, `read_file` new shots (max 3 cycles).",
-            "4. Write `VISUAL_REPORT.md` with Environment, Shot table, Fix log, Verdict.",
-            "5. Never `image_gen` the UI; never score by filename alone.",
+            "5. Write `VISUAL_REPORT.md` with Environment, Shot table, Fix log, Verdict.",
+            "6. Never `image_gen` the UI; never score by filename alone.",
             "",
         ]
     )
@@ -446,6 +536,11 @@ def main() -> int:
         type=Path,
         default=None,
         help="Optional ffmpeg GIF from shots (demo package)",
+    )
+    ap.add_argument(
+        "--interact",
+        action="store_true",
+        help="After each beat, run built-in inject scripts and capture after-state shots",
     )
     ap.add_argument("--client-w", type=int, default=1600)
     ap.add_argument("--client-h", type=int, default=900)
@@ -493,8 +588,10 @@ def main() -> int:
     lenfile = work / "tour_len"
     cmdfile = work / "cmd"
     ackfile = work / "ack"
+    injectfile = work / "inject"
     cmdfile.write_text("0\n", encoding="utf-8")
-    for p in (lenfile, ackfile):
+    injectfile.write_text("", encoding="utf-8")
+    for p in (lenfile, ackfile, injectfile.with_suffix(".ack")):
         if p.exists():
             p.unlink()
 
@@ -502,6 +599,7 @@ def main() -> int:
     env["ICEDTEA_GALLERY_TOUR_LEN_FILE"] = str(lenfile)
     env["ICEDTEA_GALLERY_TOUR_CMD"] = str(cmdfile)
     env["ICEDTEA_GALLERY_TOUR_ACK"] = str(ackfile)
+    env["ICEDTEA_GALLERY_INJECT"] = str(injectfile)
     if args.backend != "host":
         env["ICEDTEA_GALLERY_NESTED"] = "1"
 
@@ -559,8 +657,57 @@ def main() -> int:
         steps: list[dict] = []
         steps_path = out / "steps.jsonl"
         settle = max(0, args.settle_ms) / 1000.0
+        shot_i = 0
 
-        for i, beat in enumerate(beats):
+        def record_shot(
+            *,
+            beat: int,
+            caption: str,
+            face: str,
+            page: str,
+            kind: str,
+            name_extra: str,
+            t0: int,
+            inject: str | None = None,
+            expect: str | None = None,
+        ) -> None:
+            nonlocal shot_i
+            place_window(display, wid, 40, 48, args.client_w, args.client_h)
+            name = f"{shot_i:02d}-beat{beat:02d}-{kind}-{slug(name_extra)[:40]}"
+            shot_rel = f"shots/{name}.png"
+            shot_path = out / shot_rel
+            try:
+                cap = capture_window(display, wid, shot_path)
+                err = None
+            except Exception as exc:
+                cap = {"ms": None, "size": 0, "geometry": None}
+                err = str(exc)
+                print(f"capture failed: {exc}", file=sys.stderr)
+            step = {
+                "index": shot_i,
+                "beat": beat,
+                "page": page,
+                "caption": caption,
+                "theme": face,
+                "kind": kind,
+                "shot": shot_rel,
+                "capture_ms": cap.get("ms"),
+                "geometry": cap.get("geometry"),
+                "step_ms": _now_ms() - t0,
+                "inject": inject,
+                "expect": expect,
+                "error": err,
+            }
+            steps.append(step)
+            with steps_path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(step) + "\n")
+            print(
+                f"[{shot_i}] beat={beat} {kind} {caption!r} -> {shot_rel}",
+                file=sys.stderr,
+            )
+            shot_i += 1
+
+        for beat in beats:
             cmdfile.write_text(f"{beat}\n", encoding="utf-8")
             t_step0 = _now_ms()
             if not wait_file(
@@ -569,7 +716,6 @@ def main() -> int:
                 timeout_s=10.0,
             ):
                 raise SystemExit(f"gallery did not acknowledge beat {beat}")
-            # Caption / face sidecars written with ack
             caption = ""
             face = ""
             cap_path = ackfile.with_suffix(".caption")
@@ -579,46 +725,57 @@ def main() -> int:
             if face_path.is_file():
                 face = face_path.read_text(encoding="utf-8", errors="replace").strip()
             page = (
-                caption.split(":", 1)[0].strip().lower().replace(" ", "-")
-                if caption
-                else f"beat-{beat}"
+                slug(caption.split(":", 1)[0])
+                if ":" in caption
+                else (slug(caption) if caption else f"beat-{beat}")
             )
-            # Prefer catalog-style page slug from known captions: "List: cards..."
-            if ":" in caption:
-                page = slug(caption.split(":", 1)[0])
 
             time.sleep(settle)
-            place_window(display, wid, 40, 48, args.client_w, args.client_h)
-            name = f"{i:02d}-beat{beat:02d}-{slug(caption)[:48] or page}"
-            shot_rel = f"shots/{name}.png"
-            shot_path = out / shot_rel
-            try:
-                cap = capture_window(display, wid, shot_path)
-                err = None
-            except Exception as exc:
-                cap = {"ms": None, "size": 0, "geometry": None}
-                err = str(exc)
-                print(f"capture failed beat {beat}: {exc}", file=sys.stderr)
-
-            step = {
-                "index": i,
-                "beat": beat,
-                "page": page,
-                "caption": caption,
-                "theme": face,
-                "shot": shot_rel,
-                "capture_ms": cap.get("ms"),
-                "geometry": cap.get("geometry"),
-                "step_ms": _now_ms() - t_step0,
-                "error": err,
-            }
-            steps.append(step)
-            with steps_path.open("a", encoding="utf-8") as f:
-                f.write(json.dumps(step) + "\n")
-            print(
-                f"[{i + 1}/{len(beats)}] beat={beat} {caption!r} -> {shot_rel}",
-                file=sys.stderr,
+            record_shot(
+                beat=beat,
+                caption=caption,
+                face=face,
+                page=page,
+                kind="idle",
+                name_extra=caption or page,
+                t0=t_step0,
             )
+
+            if args.interact:
+                for ix in interactions_for_caption(caption):
+                    t_ix = _now_ms()
+                    try:
+                        applied = inject_script(injectfile, ix["script"])
+                    except TimeoutError as exc:
+                        print(f"inject failed: {exc}", file=sys.stderr)
+                        steps.append(
+                            {
+                                "index": shot_i,
+                                "beat": beat,
+                                "kind": "inject-error",
+                                "error": str(exc),
+                                "inject": ix["script"],
+                                "name": ix["name"],
+                            }
+                        )
+                        shot_i += 1
+                        continue
+                    time.sleep(settle)
+                    record_shot(
+                        beat=beat,
+                        caption=caption,
+                        face=face,
+                        page=page,
+                        kind="after-interact",
+                        name_extra=ix["name"],
+                        t0=t_ix,
+                        inject=ix["script"].strip(),
+                        expect=ix.get("expect"),
+                    )
+                    print(
+                        f"  interact {ix['name']}: applied={applied} expect={ix.get('expect')!r}",
+                        file=sys.stderr,
+                    )
 
         total_ms = _now_ms() - t_all0
         step_ms = [s["step_ms"] for s in steps if s.get("step_ms") is not None]
