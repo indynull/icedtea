@@ -123,8 +123,9 @@ Constructor: [`widget::image_slot`](https://docs.rs/icedtea/latest/icedtea/widge
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
-Ready keeps the requested width and height. Missing bytes show the
-empty slot, not a collapsed layout.
+Ready keeps the requested width and height. Loading centers the
+spinner (`phase` 0..=1; advance while waiting). Missing bytes show
+the empty slot, not a collapsed layout.
 
 ### Selectable
 

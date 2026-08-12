@@ -192,15 +192,17 @@ Same `Action` iterator as `toolbar`. Disabled actions paint muted.
 
 ### Context menu
 
-**`context-menu`** — Action list under the pointer.
+**`context-menu`** — Nested action menu under the pointer.
 
 Constructor: [`pattern::context_menu`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.context_menu.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Stack on the window with the click point. Click-away dismisses.
-Empty table still paints a card.
+[`ContextEntry`](https://docs.rs/icedtea/latest/icedtea/pattern/enum.ContextEntry.html)
+is an item, separator, or one-level submenu flyout. Stack on the
+window with the click point. `open_submenu` is the root index of the
+open flyout. Click-away dismisses.
 
 ### Breadcrumb
 

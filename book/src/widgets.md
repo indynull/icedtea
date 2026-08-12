@@ -12,7 +12,9 @@ disabled, checked). The application owns state.
 | Content | [Content](reference/content.md) |
 | Collections | [Collections](reference/collections.md) |
 | Chrome | [Chrome](reference/chrome.md) |
-| Patterns | [Patterns](reference/patterns.md) |
+| Layouts | [Layouts](reference/layouts.md) |
+| Overlays | [Overlays](reference/overlays.md) |
+| Screens | [Screens](reference/screens.md) |
 
 Each entry names the job, the shipped constructor, and links to
 [rustdoc](https://docs.rs/icedtea),

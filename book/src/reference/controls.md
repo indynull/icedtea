@@ -30,7 +30,8 @@ Constructor: [`widget::split_button`](https://docs.rs/icedtea/latest/icedtea/wid
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
-`primary` is the main message. `more` opens the overflow. Disabled
+`primary` is the main face press. `overflow` is label → message rows
+opened by the chevron. Empty overflow keeps the chevron idle. Disabled
 drops both.
 
 ### Toggle button

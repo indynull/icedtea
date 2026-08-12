@@ -46,11 +46,13 @@ table.
 `dispatch` / `KeyLayer` are for an application that builds its own
 layer list. Most windows only need `key::handle` and `KeyContext`.
 
-`pattern::context_menu` places the same `Action` list under the
-pointer. The application stores the point (`layout::listen_cursor`)
-and whether the menu is open. Click-away and Escape close it. Editors
-enable Cut/Copy from `text_editor::Content::selection`. Lists select
-on right-click, then the application opens the menu.
+`pattern::context_menu` places [`ContextEntry`](https://docs.rs/icedtea/latest/icedtea/pattern/enum.ContextEntry.html)
+rows under the pointer (actions, separators, one-level submenus). The
+application stores the point (`layout::listen_cursor`), whether the
+menu is open, and which submenu flyout is open. Click-away and Escape
+close it. Editors enable Cut/Copy from
+`text_editor::Content::selection`. Lists select on right-click, then
+the application opens the menu.
 
 Subscribe with `key::listen` and map events into `update`, as
 `examples/hello.rs` does.

@@ -59,3 +59,8 @@ impl App {
 `ColumnLayout` holds widths, display order, and `frozen` leading
 columns. `on_sort`, `on_scroll`, and `on_h_scroll` must land in
 `update` or the table will not move.
+
+The table paints and selects; it does not edit cells or own a filter.
+Filter the rows in the application (search field, status chips), then
+pass the view into `data_table`. Inline spreadsheet editing is not a
+library surface.

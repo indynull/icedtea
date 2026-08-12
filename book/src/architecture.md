@@ -2,7 +2,7 @@
 
 Five nouns cover a window.
 
-<img src="images/compose.svg" alt="Boot starts the window. Tokens color it. One Action is Save on the menu, toolbar, and shortcut. Patterns lay out constructors. The application owns state." width="800"/>
+<img src="images/compose.svg" alt="Boot starts the window. Tokens color it. One Action is Save on the menu, toolbar, and shortcut. Layout recipes compose constructors. The application owns state." width="800"/>
 
 **Boot.** [`Boot`](https://docs.rs/icedtea/latest/icedtea/app/struct.Boot.html)
 sets title, application id, theme name, locale, density, and window
@@ -27,9 +27,9 @@ and the command palette. The action carries your message type. Write
 return iced `Element`s and emit your messages. Each takes `A11y` and
 tokens. The application owns state.
 
-**Patterns.** [`pattern`](https://docs.rs/icedtea/latest/icedtea/pattern/index.html)
-composes recipes (`dock`, `split`, `clamp`, `form`) with widgets:
-list/detail, navigation, preferences, about, the main window.
+**Recipes.** [`pattern`](https://docs.rs/icedtea/latest/icedtea/pattern/index.html)
+composes layouts, overlays, and screens: main window, list/detail,
+navigation, dialogs, palette, preferences, about.
 
 [First window](first-window.md) uses Boot, tokens, one Action, a
 toolbar, and a notes editor. The [reference](widgets.md) names every

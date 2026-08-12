@@ -26,6 +26,18 @@ row heights (`visible_range_var`). `RowFace::Flush` is one clipped
 line. `RowFace::Card` is a surface, wrapped title, and an optional
 3px meter.
 
+### Pagination
+
+**`pagination`** — Page through a long list.
+
+Constructor: [`widget::pagination`](https://docs.rs/icedtea/latest/icedtea/widget/fn.pagination.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea)
+
+Pass page count and the current page. Messages are previous, next,
+and jump. One page hides the control or disables the arrows.
+
 ### Log
 
 **`log`** — Append-only lines that stick to the end.
@@ -41,14 +53,16 @@ reads the reversed offset and mounts the tail. Empty lines show
 
 ### Item grid
 
-**`grid`** — Tiles that share the row width.
+**`grid`** — Equal-width cards in a grid.
 
 Constructor: [`widget::item_grid`](https://docs.rs/icedtea/latest/icedtea/widget/fn.item_grid.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Pass titles. Click sends the index. Empty grid is an empty column.
+Pass [`GridTile`](https://docs.rs/icedtea/latest/icedtea/widget/struct.GridTile.html)
+rows (title, optional subtitle and icon) and an optional selected
+index. Click sends the index. Empty grid is an empty column.
 
 ### Data table
 
@@ -78,27 +92,29 @@ tree is an empty column.
 
 ### Document tabs
 
-**`document-tabs`** — Closable document titles; dirty titles get a bullet.
+**`document-tabs`** — Closable document shells on a strip; dirty titles get a bullet.
 
 Constructor: [`pattern::document_tabs`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.document_tabs.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Close confirm is the application's. `DocumentTabs` holds titles and
-dirty flags.
+Each tab is a bordered shell with the close control inside. Close
+confirm is the application's. `DocumentTabs` holds titles and dirty
+flags.
 
 ### Tabs
 
-**`tabs`** — A tab bar over a body the application paints.
+**`tabs`** — A tab strip over a body the application paints.
 
 Constructor: [`widget::tab_bar`](https://docs.rs/icedtea/latest/icedtea/widget/fn.tab_bar.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-`Tabs { closable: false }` is pinned sections. Select sends the
-index. See also [`pattern::tab_view`](patterns.md#tab-view).
+Bordered tab shells on a panel rail. `Tabs { closable: false }` is
+pinned sections. Select sends the index. See also
+[`pattern::tab_view`](layouts.md#tab-view).
 
 ### Accordion
 
@@ -126,15 +142,3 @@ The application owns `open`. Closed shows a `Peek` of the child
 fades the cut. Open paints the full child. Title starts; the
 chevron sits on the trailing edge. Accordion is many headers;
 this is one card.
-
-### Pagination
-
-**`pagination`** — Page through a long list.
-
-Constructor: [`widget::pagination`](https://docs.rs/icedtea/latest/icedtea/widget/fn.pagination.html)
-
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea)
-
-Pass page count and the current page. Messages are previous, next,
-and jump. One page hides the control or disables the arrows.

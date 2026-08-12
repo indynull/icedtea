@@ -63,20 +63,25 @@ pub const ENTRIES: &[Entry] = &[
     Entry { id: "image", title: "Image", group: "Content", page: "image" },
     Entry { id: "selectable", title: "Selectable", group: "Content", page: "selectable" },
     Entry { id: "list", title: "List", group: "Collections", page: "list" },
+    // Pages a large set; lives with list, not disclosure chrome.
+    Entry { id: "pagination", title: "Pagination", group: "Collections", page: "list" },
     Entry { id: "log", title: "Log", group: "Collections", page: "log" },
     Entry { id: "grid", title: "Item grid", group: "Collections", page: "grid" },
     Entry { id: "table", title: "Data table", group: "Collections", page: "table" },
     Entry { id: "tree", title: "Tree", group: "Collections", page: "tree" },
-    Entry { id: "document-tabs", title: "Document tabs", group: "Collections", page: "sections" },
+    // Disclosure (not editor document strips).
     Entry { id: "tabs", title: "Tabs", group: "Collections", page: "sections" },
     Entry { id: "accordion", title: "Accordion", group: "Collections", page: "sections" },
     Entry { id: "expander", title: "Expander", group: "Collections", page: "sections" },
-    Entry { id: "pagination", title: "Pagination", group: "Collections", page: "sections" },
+    // Editor document strip — own page; not mixed with accordion.
+    Entry { id: "document-tabs", title: "Document tabs", group: "Collections", page: "document-tabs" },
     Entry { id: "theme", title: "Theme", group: "Chrome", page: "theme" },
     Entry { id: "colors", title: "Colors", group: "Chrome", page: "colors" },
     Entry { id: "keys", title: "Keys", group: "Chrome", page: "keys" },
     Entry { id: "cheatsheet", title: "Cheatsheet", group: "Chrome", page: "keys" },
+    // Surfaces first, then inline marks, then layout helpers, then messaging.
     Entry { id: "card", title: "Card", group: "Chrome", page: "marks" },
+    Entry { id: "group-box", title: "Group box", group: "Chrome", page: "marks" },
     Entry { id: "rule", title: "Rule", group: "Chrome", page: "marks" },
     Entry { id: "chip", title: "Chip", group: "Chrome", page: "marks" },
     Entry { id: "badge", title: "Badge", group: "Chrome", page: "marks" },
@@ -84,32 +89,34 @@ pub const ENTRIES: &[Entry] = &[
     Entry { id: "pad", title: "Pad", group: "Chrome", page: "marks" },
     Entry { id: "callout", title: "Callout", group: "Chrome", page: "marks" },
     Entry { id: "banner", title: "Banner", group: "Chrome", page: "marks" },
-    Entry { id: "group-box", title: "Group box", group: "Chrome", page: "marks" },
-    Entry { id: "skeleton", title: "Skeleton", group: "Chrome", page: "marks" },
     Entry { id: "teaching-tip", title: "Teaching tip", group: "Chrome", page: "marks" },
-    Entry { id: "command-bar", title: "Command bar", group: "Chrome", page: "chrome-rows" },
-    Entry { id: "context-menu", title: "Context menu", group: "Chrome", page: "chrome-rows" },
-    Entry { id: "breadcrumb", title: "Breadcrumb", group: "Chrome", page: "chrome-rows" },
+    Entry { id: "skeleton", title: "Skeleton", group: "Chrome", page: "marks" },
     Entry { id: "menu", title: "Menu", group: "Chrome", page: "chrome-rows" },
     Entry { id: "toolbar", title: "Toolbar", group: "Chrome", page: "chrome-rows" },
+    Entry { id: "command-bar", title: "Command bar", group: "Chrome", page: "chrome-rows" },
     Entry { id: "status-bar", title: "Status bar", group: "Chrome", page: "chrome-rows" },
-    Entry { id: "busy", title: "Busy overlay", group: "Chrome", page: "feedback" },
+    Entry { id: "breadcrumb", title: "Breadcrumb", group: "Chrome", page: "chrome-rows" },
+    Entry { id: "context-menu", title: "Context menu", group: "Chrome", page: "chrome-rows" },
     Entry { id: "toast", title: "Toast", group: "Chrome", page: "feedback" },
     Entry { id: "jobs", title: "Jobs", group: "Chrome", page: "feedback" },
+    Entry { id: "busy", title: "Busy overlay", group: "Chrome", page: "feedback" },
     Entry { id: "scrollbar", title: "Scrollbar", group: "Chrome", page: "feedback" },
-    Entry { id: "dialogs", title: "Dialogs", group: "Patterns", page: "dialogs" },
-    Entry { id: "list-detail", title: "List/detail", group: "Patterns", page: "list-detail" },
-    Entry { id: "inspector", title: "Inspector", group: "Patterns", page: "inspector" },
-    Entry { id: "drawer", title: "Drawer", group: "Patterns", page: "workspace" },
-    Entry { id: "workspace", title: "Workspace", group: "Patterns", page: "workspace" },
-    Entry { id: "tool-panel", title: "Tool panel", group: "Patterns", page: "workspace" },
-    Entry { id: "navigation", title: "Navigation view", group: "Patterns", page: "navigation" },
-    Entry { id: "tab-view", title: "Tab view", group: "Patterns", page: "tab-view" },
-    Entry { id: "preferences", title: "Preferences", group: "Patterns", page: "preferences" },
-    Entry { id: "about", title: "About", group: "Patterns", page: "about" },
-    Entry { id: "status-page", title: "Status page", group: "Patterns", page: "status-page" },
-    Entry { id: "palette", title: "Command palette", group: "Patterns", page: "palette" },
-    Entry { id: "main-window", title: "Main window", group: "Patterns", page: "main-window" },
+    // Multi-pane and window structure.
+    Entry { id: "main-window", title: "Main window", group: "Layouts", page: "main-window" },
+    Entry { id: "navigation", title: "Navigation view", group: "Layouts", page: "navigation" },
+    Entry { id: "tab-view", title: "Tab view", group: "Layouts", page: "tab-view" },
+    Entry { id: "list-detail", title: "List/detail", group: "Layouts", page: "list-detail" },
+    Entry { id: "inspector", title: "Inspector", group: "Layouts", page: "inspector" },
+    Entry { id: "workspace", title: "Workspace", group: "Layouts", page: "workspace" },
+    Entry { id: "drawer", title: "Drawer", group: "Layouts", page: "workspace" },
+    Entry { id: "tool-panel", title: "Tool panel", group: "Layouts", page: "workspace" },
+    // Float over content.
+    Entry { id: "dialogs", title: "Dialogs", group: "Overlays", page: "dialogs" },
+    Entry { id: "palette", title: "Command palette", group: "Overlays", page: "palette" },
+    // Full-window views apps put on menu items (Help → About, …).
+    Entry { id: "preferences", title: "Preferences", group: "Screens", page: "preferences" },
+    Entry { id: "about", title: "About", group: "Screens", page: "about" },
+    Entry { id: "status-page", title: "Status page", group: "Screens", page: "status-page" },
 ];
 
 pub fn get(id: &str) -> Option<&'static Entry> {
@@ -146,15 +153,127 @@ pub fn page_title(page: &str) -> &'static str {
         "controls" => "Controls",
         "fields" => "Fields",
         "readout" => "Readout",
-        "type" => "Type",
-        "sections" => "Tabs and sections",
-        "marks" => "Marks",
-        "chrome-rows" => "Chrome rows",
-        "feedback" => "Feedback",
+        "type" => "Text and icons",
+        "list" => "List and pages",
+        "sections" => "Tabs and disclosure",
+        "document-tabs" => "Document tabs",
+        "marks" => "Surfaces and marks",
+        "chrome-rows" => "Window chrome",
+        "feedback" => "Toasts and busy",
         "workspace" => "Workspace",
         id => get(id).map(|e| e.title).unwrap_or("Page"),
     }
 }
+
+/// Module path of the shipped constructor (`widget`, `pattern`, …).
+pub fn constructor_module(id: &str) -> Option<&'static str> {
+    CONSTRUCTORS
+        .iter()
+        .find(|(i, _, _)| *i == id)
+        .map(|(_, m, _)| *m)
+}
+
+/// Rust function name of the shipped constructor (`themed_button`, …).
+pub fn constructor_name(id: &str) -> Option<&'static str> {
+    CONSTRUCTORS
+        .iter()
+        .find(|(i, _, _)| *i == id)
+        .map(|(_, _, n)| *n)
+}
+
+/// `module::name` for gallery and handbook links.
+pub fn constructor_path(id: &str) -> Option<String> {
+    match (constructor_module(id), constructor_name(id)) {
+        (Some(m), Some(n)) => Some(format!("{m}::{n}")),
+        _ => None,
+    }
+}
+
+/// One row per catalog id: (id, module, constructor name).
+const CONSTRUCTORS: &[(&str, &str, &str)] = &[
+    ("button", "widget", "themed_button"),
+    ("split-button", "widget", "split_button"),
+    ("toggle-button", "widget", "toggle_button"),
+    ("checkbox", "widget", "themed_checkbox"),
+    ("radio", "widget", "themed_radio"),
+    ("switch", "widget", "themed_switch"),
+    ("slider", "widget", "themed_slider"),
+    ("text-input", "widget", "themed_text_input"),
+    ("password", "widget", "password_input"),
+    ("secret", "widget", "secret_field"),
+    ("value-field", "widget", "value_field"),
+    ("textarea", "widget", "textarea"),
+    ("search", "widget", "search_input"),
+    ("suggest", "widget", "suggest_field"),
+    ("select", "widget", "themed_pick_list"),
+    ("number", "widget", "number_input"),
+    ("mask", "widget", "masked_input"),
+    ("date", "widget", "date_picker"),
+    ("time", "widget", "time_picker"),
+    ("color", "widget", "color_swatch"),
+    ("progress", "widget", "progress"),
+    ("progress-ring", "widget", "progress_ring"),
+    ("spinner", "widget", "spinner"),
+    ("sparkline", "widget", "sparkline"),
+    ("display", "widget", "display_reading"),
+    ("label", "widget", "label"),
+    ("rich-cell", "widget", "rich_cell"),
+    ("icon", "widget", "icon_svg"),
+    ("tooltip", "widget", "tooltip_wrap"),
+    ("link", "widget", "hyperlink"),
+    ("markdown", "widget", "markdown_view"),
+    ("code", "widget", "highlighted_code"),
+    ("image", "widget", "image_slot"),
+    ("selectable", "widget", "selectable"),
+    ("list", "widget", "list_view"),
+    ("log", "widget", "log_view"),
+    ("grid", "widget", "item_grid"),
+    ("table", "widget", "data_table"),
+    ("tree", "widget", "tree_view"),
+    ("tabs", "widget", "tab_bar"),
+    ("accordion", "widget", "accordion_view"),
+    ("expander", "widget", "expander"),
+    ("pagination", "widget", "pagination"),
+    ("document-tabs", "pattern", "document_tabs"),
+    ("theme", "theme", "named"),
+    ("colors", "theme", "mix"),
+    ("keys", "key", "handle"),
+    ("cheatsheet", "pattern", "cheatsheet"),
+    ("card", "widget", "group_box"),
+    ("rule", "widget", "rule_h"),
+    ("chip", "widget", "chip"),
+    ("badge", "widget", "badge"),
+    ("wrap", "layout", "wrap"),
+    ("pad", "layout", "pad"),
+    ("callout", "widget", "info_bar"),
+    ("banner", "widget", "banner"),
+    ("group-box", "widget", "group_box"),
+    ("skeleton", "widget", "placeholder_skeleton"),
+    ("teaching-tip", "widget", "teaching_tip"),
+    ("command-bar", "pattern", "command_bar"),
+    ("context-menu", "pattern", "context_menu"),
+    ("breadcrumb", "widget", "breadcrumb"),
+    ("menu", "pattern", "menu_bar"),
+    ("toolbar", "pattern", "toolbar"),
+    ("status-bar", "pattern", "status_bar"),
+    ("busy", "widget", "busy_overlay"),
+    ("toast", "widget", "toast_view"),
+    ("jobs", "pattern", "job_strip"),
+    ("scrollbar", "widget", "themed_scroll"),
+    ("dialogs", "pattern", "dialog_sheet"),
+    ("list-detail", "pattern", "list_detail"),
+    ("inspector", "pattern", "inspector"),
+    ("workspace", "pattern", "workspace"),
+    ("tool-panel", "pattern", "tool_panel"),
+    ("drawer", "pattern", "drawer"),
+    ("navigation", "pattern", "navigation_view"),
+    ("tab-view", "pattern", "tab_view"),
+    ("preferences", "pattern", "preferences_page"),
+    ("about", "pattern", "about_page"),
+    ("status-page", "pattern", "status_page"),
+    ("palette", "pattern", "command_palette_view"),
+    ("main-window", "pattern", "main_window"),
+];
 
 #[cfg(test)]
 mod tests {
@@ -186,7 +305,9 @@ mod tests {
                 "Content",
                 "Collections",
                 "Chrome",
-                "Patterns"
+                "Layouts",
+                "Overlays",
+                "Screens"
             ]
         );
         assert!(ENTRIES.len() >= 40);
@@ -238,7 +359,9 @@ mod tests {
             "reference/content.md",
             "reference/collections.md",
             "reference/chrome.md",
-            "reference/patterns.md",
+            "reference/layouts.md",
+            "reference/overlays.md",
+            "reference/screens.md",
         ] {
             let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("book/src")
@@ -257,93 +380,18 @@ mod tests {
             ("Content", "reference/content.md"),
             ("Collections", "reference/collections.md"),
             ("Chrome", "reference/chrome.md"),
-            ("Patterns", "reference/patterns.md"),
+            ("Layouts", "reference/layouts.md"),
+            ("Overlays", "reference/overlays.md"),
+            ("Screens", "reference/screens.md"),
         ];
-        let ctors = [
-            ("button", "themed_button"),
-            ("split-button", "split_button"),
-            ("toggle-button", "toggle_button"),
-            ("checkbox", "themed_checkbox"),
-            ("radio", "themed_radio"),
-            ("switch", "themed_switch"),
-            ("slider", "themed_slider"),
-            ("text-input", "themed_text_input"),
-            ("password", "password_input"),
-            ("secret", "secret_field"),
-            ("value-field", "value_field"),
-            ("textarea", "textarea"),
-            ("search", "search_input"),
-            ("suggest", "suggest_field"),
-            ("select", "themed_pick_list"),
-            ("number", "number_input"),
-            ("mask", "masked_input"),
-            ("date", "date_picker"),
-            ("time", "time_picker"),
-            ("color", "color_swatch"),
-            ("progress", "progress"),
-            ("progress-ring", "progress_ring"),
-            ("spinner", "spinner"),
-            ("sparkline", "sparkline"),
-            ("display", "display_reading"),
-            ("label", "label"),
-            ("rich-cell", "rich_cell"),
-            ("icon", "icon_svg"),
-            ("tooltip", "tooltip_wrap"),
-            ("link", "hyperlink"),
-            ("markdown", "markdown_view"),
-            ("code", "highlighted_code"),
-            ("image", "image_slot"),
-            ("selectable", "selectable"),
-            ("list", "list_view"),
-            ("log", "log_view"),
-            ("grid", "item_grid"),
-            ("table", "data_table"),
-            ("tree", "tree_view"),
-            ("tabs", "tab_bar"),
-            ("accordion", "accordion_view"),
-            ("expander", "expander"),
-            ("pagination", "pagination"),
-            ("document-tabs", "document_tabs"),
-            ("theme", "named"),
-            ("colors", "mix"),
-            ("keys", "handle"),
-            ("cheatsheet", "cheatsheet"),
-            ("card", "group_box"),
-            ("rule", "rule_h"),
-            ("chip", "chip"),
-            ("badge", "badge"),
-            ("wrap", "wrap"),
-            ("pad", "pad"),
-            ("callout", "info_bar"),
-            ("banner", "banner"),
-            ("group-box", "group_box"),
-            ("skeleton", "placeholder_skeleton"),
-            ("teaching-tip", "teaching_tip"),
-            ("command-bar", "command_bar"),
-            ("context-menu", "context_menu"),
-            ("breadcrumb", "breadcrumb"),
-            ("menu", "menu_bar"),
-            ("toolbar", "toolbar"),
-            ("status-bar", "status_bar"),
-            ("busy", "busy_overlay"),
-            ("toast", "toast_view"),
-            ("jobs", "job_strip"),
-            ("scrollbar", "themed_scroll"),
-            ("dialogs", "dialog_sheet"),
-            ("list-detail", "list_detail"),
-            ("inspector", "inspector"),
-            ("workspace", "workspace"),
-            ("tool-panel", "tool_panel"),
-            ("drawer", "drawer"),
-            ("navigation", "navigation_view"),
-            ("tab-view", "tab_view"),
-            ("preferences", "preferences_page"),
-            ("about", "about_page"),
-            ("status-page", "status_page"),
-            ("palette", "command_palette_view"),
-            ("main-window", "main_window"),
-        ];
-        assert_eq!(ctors.len(), ENTRIES.len());
+        assert_eq!(CONSTRUCTORS.len(), ENTRIES.len());
+        for e in ENTRIES {
+            assert!(
+                constructor_name(e.id).is_some(),
+                "missing constructor for {}",
+                e.id
+            );
+        }
         for (group, rel) in group_file {
             let text = std::fs::read_to_string(root.join(rel)).unwrap();
             must(
@@ -361,11 +409,7 @@ mod tests {
                     .map(|i| i + marker.len())
                     .unwrap_or(rest.len());
                 let section = &rest[..end];
-                let ctor = ctors
-                    .iter()
-                    .find(|(id, _)| *id == e.id)
-                    .map(|(_, n)| *n)
-                    .unwrap();
+                let ctor = constructor_name(e.id).unwrap();
                 assert!(section.contains(ctor), "{} section must name {ctor}", e.id);
                 must(
                     section.contains("docs.rs/icedtea"),
@@ -406,7 +450,9 @@ mod tests {
             "book/src/reference/content.md",
             "book/src/reference/collections.md",
             "book/src/reference/chrome.md",
-            "book/src/reference/patterns.md",
+            "book/src/reference/layouts.md",
+            "book/src/reference/overlays.md",
+            "book/src/reference/screens.md",
             "book/src/cookbook/save.md",
             "book/src/cookbook/list-detail.md",
             "book/src/cookbook/table.md",
@@ -461,104 +507,29 @@ mod tests {
         let theme = include_str!("theme.rs");
         let key = include_str!("key.rs");
         let layout = include_str!("layout/recipes.rs");
-        let map = [
-            ("button", "themed_button", widget),
-            ("split-button", "split_button", widget),
-            ("toggle-button", "toggle_button", widget),
-            ("checkbox", "themed_checkbox", widget),
-            ("radio", "themed_radio", widget),
-            ("switch", "themed_switch", widget),
-            ("slider", "themed_slider", widget),
-            ("text-input", "themed_text_input", widget),
-            ("password", "password_input", widget),
-            ("secret", "secret_field", widget),
-            ("value-field", "value_field", widget),
-            ("textarea", "textarea", widget),
-            ("search", "search_input", widget),
-            ("suggest", "suggest_field", widget),
-            ("select", "themed_pick_list", widget),
-            ("number", "number_input", widget),
-            ("mask", "masked_input", widget),
-            ("date", "date_picker", widget),
-            ("time", "time_picker", widget),
-            ("color", "color_swatch", widget),
-            ("progress", "progress", widget),
-            ("progress-ring", "progress_ring", widget),
-            ("spinner", "spinner", widget),
-            ("sparkline", "sparkline", widget),
-            ("display", "display_reading", widget),
-            ("label", "label", widget),
-            ("rich-cell", "rich_cell", widget),
-            ("icon", "icon_svg", widget),
-            ("tooltip", "tooltip_wrap", widget),
-            ("link", "hyperlink", widget),
-            ("markdown", "markdown_view", widget),
-            ("code", "highlighted_code", widget),
-            ("image", "image_slot", widget),
-            ("selectable", "selectable", widget),
-            ("list", "list_view", widget),
-            ("log", "log_view", widget),
-            ("grid", "item_grid", widget),
-            ("table", "data_table", widget),
-            ("tree", "tree_view", widget),
-            ("tabs", "tab_bar", widget),
-            ("accordion", "accordion_view", widget),
-            ("expander", "expander", widget),
-            ("pagination", "pagination", widget),
-            ("document-tabs", "document_tabs", pattern),
-            ("theme", "named", theme),
-            ("colors", "mix", theme),
-            ("keys", "handle", key),
-            ("cheatsheet", "cheatsheet", pattern),
-            ("card", "group_box", widget),
-            ("rule", "rule_h", widget),
-            ("chip", "chip", widget),
-            ("badge", "badge", widget),
-            ("wrap", "wrap", layout),
-            ("pad", "pad", layout),
-            ("callout", "info_bar", widget),
-            ("banner", "banner", widget),
-            ("group-box", "group_box", widget),
-            ("skeleton", "placeholder_skeleton", widget),
-            ("teaching-tip", "teaching_tip", widget),
-            ("command-bar", "command_bar", pattern),
-            ("context-menu", "context_menu", pattern),
-            ("breadcrumb", "breadcrumb", widget),
-            ("menu", "menu_bar", pattern),
-            ("toolbar", "toolbar", pattern),
-            ("status-bar", "status_bar", pattern),
-            ("busy", "busy_overlay", widget),
-            ("toast", "toast_view", widget),
-            ("jobs", "job_strip", pattern),
-            ("scrollbar", "themed_scroll", widget),
-            ("dialogs", "dialog_sheet", pattern),
-            ("list-detail", "list_detail", pattern),
-            ("inspector", "inspector", pattern),
-            ("workspace", "workspace", pattern),
-            ("tool-panel", "tool_panel", pattern),
-            ("drawer", "drawer", pattern),
-            ("navigation", "navigation_view", pattern),
-            ("tab-view", "tab_view", pattern),
-            ("preferences", "preferences_page", pattern),
-            ("about", "about_page", pattern),
-            ("status-page", "status_page", pattern),
-            ("palette", "command_palette_view", pattern),
-            ("main-window", "main_window", pattern),
-        ];
-        assert_eq!(map.len(), ENTRIES.len());
+        let src = |m: &str| match m {
+            "widget" => widget,
+            "pattern" => pattern,
+            "theme" => theme,
+            "key" => key,
+            "layout" => layout,
+            _ => "",
+        };
+        assert_eq!(CONSTRUCTORS.len(), ENTRIES.len());
         for e in ENTRIES {
-            let hit = map.iter().find(|(id, _, _)| *id == e.id);
-            let (_, name, src) = hit.expect(e.id);
-            let at = find_pub_fn(src, name)
+            let name = constructor_name(e.id).expect(e.id);
+            let module = constructor_module(e.id).expect(e.id);
+            let body = src(module);
+            let at = find_pub_fn(body, name)
                 .unwrap_or_else(|| panic!("{} missing constructor pub fn {}(", e.id, name));
             must(
-                rustdoc_example_immediately_above(&src[..at]),
+                rustdoc_example_immediately_above(&body[..at]),
                 format!(
                     "{} constructor pub fn {} needs a rustdoc example immediately above it",
                     e.id, name
                 ),
             );
-            let rustdoc = rustdoc_block_above(&src[..at]);
+            let rustdoc = rustdoc_block_above(&body[..at]);
             must(
                 !rustdoc.contains("catalog id") && !rustdoc.contains("Catalog `"),
                 format!("{} rustdoc must not teach catalog id", e.id),

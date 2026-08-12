@@ -27,4 +27,6 @@
 - [Content](reference/content.md)
 - [Collections](reference/collections.md)
 - [Chrome](reference/chrome.md)
-- [Patterns](reference/patterns.md)
+- [Layouts](reference/layouts.md)
+- [Overlays](reference/overlays.md)
+- [Screens](reference/screens.md)

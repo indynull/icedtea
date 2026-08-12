@@ -20,9 +20,11 @@ fn subscription() -> iced::Subscription<u16> {
 }
 ```
 
-List/detail, tab view, preferences, about, and status page are in
+List/detail and tab view are [Layouts](reference/layouts.md).
+Preferences, about, and status page are [Screens](reference/screens.md).
+They live in
 [`icedtea::pattern`](https://docs.rs/icedtea/latest/icedtea/pattern/index.html)
-— they return `Element`s. See [Patterns](reference/patterns.md).
+and return `Element`s.
 
 - [`NavStack`](https://docs.rs/icedtea/latest/icedtea/nav/struct.NavStack.html)
 - [source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs)
