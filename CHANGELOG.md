@@ -12,7 +12,8 @@ the rest. `command_palette_view` paints a parameter field when
 `CommandPalette::ask` is set. `window::place_pinned` clamps an
 overlay onto a chosen display. `daemon!` starts `iced::daemon` with
 the same `Prepared` settings; `Prepared::open` maps a window and
-`Prepared::open_desktop` maps a decorated pop-out.
+`Prepared::open_desktop` maps a decorated pop-out. `expander` title
+and body share the 12px card inset.
 
 ## 0.3.0 — 2026-08-11
 
