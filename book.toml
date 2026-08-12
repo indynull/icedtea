@@ -12,3 +12,6 @@ build-dir = "book/book"
 git-repository-url = "https://github.com/indynull/icedtea"
 edit-url-template = "https://github.com/indynull/icedtea/edit/master/book/src/{path}"
 site-url = "/icedtea/"
+additional-js = ["theme/mermaid-init.js"]
+additional-css = ["theme/mermaid.css"]
+

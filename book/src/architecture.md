@@ -2,10 +2,23 @@
 
 Five nouns cover a window.
 
+```mermaid
+flowchart LR
+  Boot --> Start["run! / daemon!"]
+  Start --> Window[iced window]
+  Tokens --> View
+  Action[one Action] --> View
+  View["constructors + patterns"] --> Window
+  View -->|messages| App[your state]
+  App -->|view| View
+```
+
 **Boot.** [`Boot`](https://docs.rs/icedtea/latest/icedtea/app/struct.Boot.html)
 sets title, application id, theme name, locale, density, and window
 kind: application, dialog, or overlay. [`run!`](https://docs.rs/icedtea/latest/icedtea/macro.run.html)
-loads that and starts iced. [`bootstrap`](https://docs.rs/icedtea/latest/icedtea/app/fn.bootstrap.html)
+loads that and starts iced. [`daemon!`](https://docs.rs/icedtea/latest/icedtea/macro.daemon.html)
+is the same `Prepared` settings when the process must stay up with
+no window mapped. [`bootstrap`](https://docs.rs/icedtea/latest/icedtea/app/fn.bootstrap.html)
 is the same path without opening a window.
 
 **Tokens.** [`theme::named`](https://docs.rs/icedtea/latest/icedtea/theme/fn.named.html)
