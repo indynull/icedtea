@@ -114,9 +114,12 @@ impl TypeRole {
 /// Selection order: host preference list (Core Text on macOS, non-client
 /// metrics on Windows; empty on Linux where fontconfig already rewrote
 /// the generics), then the database's current generic mapping, then any
-/// usable family already loaded. UI requires a normal face and a bold
-/// face at weight 700 so `UI_BOLD` does not fall through to monospaced
-/// cascade entries.
+/// usable family already loaded. UI needs a normal face and either a
+/// discrete bold (weight 700) or a variable face with a weight axis so
+/// `UI_BOLD` stays on the same family. Prefer discrete Regular+Bold
+/// (Helvetica Neue on macOS) over multi-axis System Font: iced's swash
+/// path does not set SF optical size, and Core Text's UI cascade lists
+/// Menlo, which must never win for titles.
 pub fn install_platform_faces() {
     static ONCE: OnceLock<()> = OnceLock::new();
     ONCE.get_or_init(|| {
@@ -140,9 +143,51 @@ pub fn install_platform_faces() {
             &host_font::mono_preferences(),
             &mono_current,
         );
-        db.set_sans_serif_family(sans);
-        db.set_monospace_family(mono);
+        db.set_sans_serif_family(&sans);
+        db.set_monospace_family(&mono);
+        // Cosmic-text ranks faces by weight delta and will pick Menlo-Bold
+        // when SansSerif bold is monospaced. Walk usable UI families until
+        // bold is proportional.
+        if !bold_is_proportional(db) {
+            let index = family_index(&covers);
+            let mut tried = vec![sans.clone()];
+            let mut candidates = host_font::ui_preferences();
+            for (name, cover) in &index {
+                if cover.canonical.is_none() && cover.usable(FamilyKind::Ui) {
+                    candidates.push(name.clone());
+                }
+            }
+            for name in candidates {
+                let Some(cover) = index.get(&name) else {
+                    continue;
+                };
+                if !cover.usable(FamilyKind::Ui) {
+                    continue;
+                }
+                let bind = cover.bind_name(&name).to_string();
+                if tried.iter().any(|t| t == &bind) {
+                    continue;
+                }
+                tried.push(bind.clone());
+                db.set_sans_serif_family(&bind);
+                if bold_is_proportional(db) {
+                    break;
+                }
+            }
+        }
     });
+}
+
+fn bold_is_proportional(db: &fontdb::Database) -> bool {
+    let bold = fontdb::Query {
+        families: &[DbFamily::SansSerif],
+        weight: fontdb::Weight::BOLD,
+        stretch: fontdb::Stretch::Normal,
+        style: fontdb::Style::Normal,
+    };
+    db.query(&bold)
+        .and_then(|id| db.face(id))
+        .is_some_and(|face| !face.monospaced)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -157,15 +202,27 @@ struct FaceCover {
     monospaced: bool,
     weight: u16,
     post_script_name: String,
+    /// True when the source is a variable font (weight can be instanced).
+    variable: bool,
 }
 
 fn faces_from_db(db: &fontdb::Database) -> Vec<FaceCover> {
     db.faces()
-        .map(|face| FaceCover {
-            families: face.families.iter().map(|(n, _)| n.clone()).collect(),
-            monospaced: face.monospaced,
-            weight: face.weight.0,
-            post_script_name: face.post_script_name.clone(),
+        .map(|face| {
+            let variable = db
+                .with_face_data(face.id, |data, index| {
+                    ttf_parser::Face::parse(data, index)
+                        .ok()
+                        .is_some_and(|f| f.is_variable())
+                })
+                .unwrap_or(false);
+            FaceCover {
+                families: face.families.iter().map(|(n, _)| n.clone()).collect(),
+                monospaced: face.monospaced,
+                weight: face.weight.0,
+                post_script_name: face.post_script_name.clone(),
+                variable,
+            }
         })
         .collect()
 }
@@ -183,6 +240,7 @@ fn family_index(faces: &[FaceCover]) -> BTreeMap<String, FamilyCoverage> {
         };
         let entry = map.entry(primary.clone()).or_default();
         entry.monospaced |= face.monospaced;
+        entry.variable |= face.variable;
         if face.weight == 400 {
             entry.has_normal = true;
         }
@@ -197,6 +255,7 @@ fn family_index(faces: &[FaceCover]) -> BTreeMap<String, FamilyCoverage> {
             }
             let alt_entry = map.entry(alt.clone()).or_default();
             alt_entry.monospaced |= face.monospaced;
+            alt_entry.variable |= face.variable;
             if face.weight == 400 {
                 alt_entry.has_normal = true;
             }
@@ -214,6 +273,8 @@ struct FamilyCoverage {
     monospaced: bool,
     has_normal: bool,
     has_bold: bool,
+    /// Variable source: cosmic-text/swash can instance weight (macOS SF).
+    variable: bool,
     /// When this key is an alias, the primary English family name to bind.
     canonical: Option<String>,
 }
@@ -221,7 +282,10 @@ struct FamilyCoverage {
 impl FamilyCoverage {
     fn usable(&self, kind: FamilyKind) -> bool {
         match kind {
-            FamilyKind::Ui => !self.monospaced && self.has_normal && self.has_bold,
+            // Discrete bold *or* variable weight axis — not mono cascade.
+            FamilyKind::Ui => {
+                !self.monospaced && self.has_normal && (self.has_bold || self.variable)
+            }
             FamilyKind::Mono => self.monospaced && self.has_normal,
         }
     }
@@ -285,6 +349,17 @@ mod tests {
             monospaced: mono,
             weight,
             post_script_name: format!("{family}-{weight}"),
+            variable: false,
+        }
+    }
+
+    fn cover_var(family: &str, mono: bool, weight: u16) -> FaceCover {
+        FaceCover {
+            families: vec![family.into()],
+            monospaced: mono,
+            weight,
+            post_script_name: format!("{family}-{weight}"),
+            variable: true,
         }
     }
 
@@ -294,6 +369,7 @@ mod tests {
             monospaced: mono,
             weight,
             post_script_name: format!("{primary}-{weight}"),
+            variable: false,
         }
     }
 
@@ -344,8 +420,8 @@ mod tests {
     }
 
     #[test]
-    fn rejects_ui_family_without_bold_weight() {
-        // System Font style: regular only — bold would cascade to mono.
+    fn rejects_static_ui_family_without_bold_weight() {
+        // Static regular-only would cascade bold away; skip it.
         let faces = vec![
             cover("SystemOnly", false, 400),
             cover("HasBold", false, 400),
@@ -353,6 +429,38 @@ mod tests {
         ];
         let name = select_family(&faces, FamilyKind::Ui, &["SystemOnly".into()], "SystemOnly");
         assert_eq!(name, "HasBold");
+    }
+
+    #[test]
+    fn accepts_variable_ui_family_without_discrete_bold() {
+        // Variable-only UI is usable when nothing discrete is preferred first.
+        let faces = vec![
+            cover_var(".SF NS", false, 400),
+            cover("ThinOnly", false, 400),
+        ];
+        let name = select_family(
+            &faces,
+            FamilyKind::Ui,
+            &[".SF NS".into()],
+            "ThinOnly",
+        );
+        assert_eq!(name, ".SF NS");
+    }
+
+    #[test]
+    fn prefers_discrete_bold_when_listed_before_variable() {
+        let faces = vec![
+            cover_var("System Font", false, 400),
+            cover("Helvetica Neue", false, 400),
+            cover("Helvetica Neue", false, 700),
+        ];
+        let name = select_family(
+            &faces,
+            FamilyKind::Ui,
+            &["Helvetica Neue".into(), "System Font".into()],
+            "System Font",
+        );
+        assert_eq!(name, "Helvetica Neue");
     }
 
     #[test]
@@ -385,7 +493,7 @@ mod tests {
             cover("RealSans", false, 400),
             cover("RealSans", false, 700),
         ];
-        // Alias preference without bold fails; RealSans wins.
+        // Static alias without bold fails; RealSans wins.
         let name = select_family(&faces, FamilyKind::Ui, &[".SF NS".into()], "System Font");
         assert_eq!(name, "RealSans");
     }
@@ -443,6 +551,37 @@ mod tests {
             mono_face.monospaced,
             "Monospace generic must bind a monospaced face (got {mono_name})"
         );
-        assert_eq!(bold_face.weight.0, 700);
+        // Discrete bold is weight 700. Variable UI (macOS SF) keeps one face;
+        // cosmic-text instances weight at draw time.
+        if bold_id == normal_id {
+            let variable = db
+                .with_face_data(bold_id, |data, index| {
+                    ttf_parser::Face::parse(data, index)
+                        .ok()
+                        .is_some_and(|f| f.is_variable())
+                })
+                .unwrap_or(false);
+            assert!(
+                variable,
+                "same face for bold must be variable (got {sans_name})"
+            );
+        } else {
+            assert_eq!(
+                bold_face.weight.0, 700,
+                "discrete bold face for {sans_name}"
+            );
+        }
+        #[cfg(target_os = "macos")]
+        {
+            // Discrete Regular+Bold (Helvetica Neue) preferred; Menlo never.
+            assert!(
+                !sans_name.to_ascii_lowercase().contains("menlo"),
+                "macOS UI must not bind Menlo (got {sans_name})"
+            );
+            assert!(
+                bold_is_proportional(db),
+                "UI bold must stay proportional after install (got {sans_name})"
+            );
+        }
     }
 }

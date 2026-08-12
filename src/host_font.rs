@@ -56,11 +56,55 @@ mod platform {
     const CF_STRING_ENCODING_UTF8: u32 = 0x0800_0100;
 
     pub(super) fn ui_preferences() -> Vec<String> {
-        families_for_ui_type(CT_FONT_UI_SYSTEM)
+        // iced → cosmic-text → swash rasterizes outlines with grayscale AA.
+        // Prefer a proportional family that has *discrete* Regular + Bold
+        // (Helvetica Neue, Lucida Grande): UI_BOLD must not cascade into
+        // Menlo. Core Text's system cascade lists Menlo and many script
+        // fallbacks; multi-axis System Font (SFNS) without an opsz axis
+        // also looks harsh at 12–18px in swash. SF stays as a later choice.
+        let mut out: Vec<String> = [
+            "Helvetica Neue",
+            "Lucida Grande",
+            "Avenir Next",
+            ".SF NS",
+            "System Font",
+            "SF Pro Text",
+            "SF Pro",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        for name in families_for_ui_type(CT_FONT_UI_SYSTEM) {
+            if looks_fixed_pitch_name(&name) {
+                continue;
+            }
+            if !out.iter().any(|s| s == &name) {
+                out.push(name);
+            }
+        }
+        out
     }
 
     pub(super) fn mono_preferences() -> Vec<String> {
-        families_for_ui_type(CT_FONT_UI_USER_FIXED_PITCH)
+        let mut out = families_for_ui_type(CT_FONT_UI_USER_FIXED_PITCH);
+        for alias in [".SF NS Mono", "SF Mono", "Menlo", "Monaco"] {
+            if !out.iter().any(|s| s == alias) {
+                out.push(alias.into());
+            }
+        }
+        out
+    }
+
+    /// Names that must never be the UI (SansSerif) bind.
+    fn looks_fixed_pitch_name(name: &str) -> bool {
+        let n = name.to_ascii_lowercase();
+        n.contains("mono")
+            || n.contains("menlo")
+            || n.contains("monaco")
+            || n.contains("courier")
+            || n.contains("andale")
+            || n.contains("fixed")
+            || n.contains("nerd font")
     }
 
     fn families_for_ui_type(ui_type: u32) -> Vec<String> {

@@ -1768,6 +1768,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.20",
+ "ttf-parser",
 ]
 
 [[package]]
@@ -1775,6 +1776,7 @@ name = "icedtea-gallery"
 version = "0.4.0"
 dependencies = [
  "icedtea",
+ "image",
 ]
 
 [[package]]
