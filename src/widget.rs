@@ -34,13 +34,12 @@ use iced::{Alignment, Background, Color, Element, Length, Padding, Radians};
 
 use crate::chrome::SCROLL_RAIL_WIDTH;
 use crate::host_canvas::{ArcRing, SpinnerDots};
-use crate::scroll::ScrollRail;
+use crate::scroll::{ClipLayer, ScrollRail};
 
 use crate::a11y::{self, A11y, Role};
 use crate::collection::{
-    page_range, virtual_pads, visible_window, visible_window_var, window_after_scroll,
-    window_after_scroll_var, Accordion, ListModel, RowFace, RowHeights, Selection, Tabs, TreeNode,
-    VisibleWindow,
+    page_range, virtual_pads, window_after_scroll, window_after_scroll_var, Accordion, ListModel,
+    RowFace, RowHeights, Selection, Tabs, TreeNode, VisibleWindow,
 };
 use crate::i18n::Direction;
 use crate::icon::Icon;
@@ -53,6 +52,20 @@ use crate::variant::Variant;
 /// Shared padding for controls.
 fn pad() -> Padding {
     Padding::from([8, 12])
+}
+
+/// Outer height of a standard padded control (body type + vertical pad).
+fn control_height() -> f32 {
+    typo::BODY as f32 + 16.0
+}
+
+/// Step for a continuous [`themed_slider`] range (~100 positions).
+pub fn slider_step(range: std::ops::RangeInclusive<f32>) -> f32 {
+    let span = (*range.end() - *range.start()).abs();
+    if span == 0.0 {
+        return f32::EPSILON;
+    }
+    (span / 100.0).max(span * 1e-6)
 }
 
 pub fn icon_style(tok: Tokens) -> impl Fn(&iced::Theme, svg::Status) -> svg::Style {
@@ -179,10 +192,11 @@ pub fn label<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Elemen
     )
 }
 
-/// A large value for a compact tool, end-aligned.
+/// Large end-aligned value for a compact tool window.
 ///
-/// Empty string is a blank reading. `display_line` is the smaller
-/// caption above it.
+/// Use for a calculator result, timer, or meter reading—not for body
+/// labels ([`label`]). Empty string is a blank reading. Pair with
+/// [`display_line`] for a smaller caption above (e.g. the expression).
 ///
 ///
 /// ```
@@ -380,10 +394,10 @@ pub fn themed_button_sized<'a, M: Clone + 'a>(
     a11y::attach(b.into(), &a11y)
 }
 
-/// A primary press plus a more menu.
+/// A primary press plus a chevron that opens an overflow menu.
 ///
-/// `primary` is the main message. `more` opens the overflow. Disabled
-/// drops both.
+/// `primary` is the main face. `overflow` is label → message rows in the
+/// menu. Empty overflow keeps the chevron closed. Disabled drops both.
 ///
 ///
 /// ```
@@ -391,42 +405,40 @@ pub fn themed_button_sized<'a, M: Clone + 'a>(
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let _: icedtea::Element<'_, ()> =
-///     widget::split_button("Save", (), (), tok, A11y::button("Save"));
+/// let _: icedtea::Element<'_, i32> = widget::split_button(
+///     "Save",
+///     0,
+///     vec![("Save As…".into(), 1), ("Export…".into(), 2)],
+///     tok,
+///     A11y::button("Save"),
+/// );
 /// ```
 pub fn split_button<'a, M: Clone + 'a>(
     title: impl Into<String>,
     primary: M,
-    more: M,
+    overflow: impl IntoIterator<Item = (String, M)>,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
     let title = a11y.apply_name(title);
     let primary_msg = (!a11y.disabled).then_some(primary);
-    let more_msg = (!a11y.disabled).then_some(more);
+    let items: Vec<(String, M)> = overflow.into_iter().collect();
+    let h = control_height();
     a11y::attach(
         row![
-            themed_button(
+            themed_button_sized(
                 title.clone(),
                 primary_msg,
                 tok,
                 Variant::Primary,
+                Length::Shrink,
+                Length::Fixed(h),
                 A11y::button(&title).with_disabled(a11y.disabled),
             ),
-            {
-                let mut more = button(icon_svg(Icon::Chevron, tok, A11y::new("more", Role::Image)))
-                    .padding(pad())
-                    .style(style::button_style(tok, Variant::Quiet));
-                if let Some(m) = a11y.apply_message(more_msg) {
-                    more = more.on_press(m);
-                }
-                a11y::attach(
-                    more.into(),
-                    &A11y::button("more").with_disabled(a11y.disabled),
-                )
-            },
+            crate::menubar::split_more(items, tok, a11y.disabled, h),
         ]
         .spacing(2)
+        .align_y(Alignment::Center)
         .into(),
         &a11y,
     )
@@ -675,9 +687,12 @@ pub fn themed_slider<'a, M: Clone + 'a>(
             &a11y,
         );
     }
+    let step = slider_step(range.clone());
     a11y::attach(
         slider(range, value, msg)
+            .step(step)
             .style(style::slider_style(tok))
+            .width(Length::Fill)
             .into(),
         &a11y,
     )
@@ -711,10 +726,16 @@ pub fn progress<'a, M: 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let bar = progress_bar(0.0..=1.0, value.clamp(0.0, 1.0)).style(style::progress_style(tok));
+    // Horizontal bar defaults to Fill; the column must also be Fill or the
+    // bar collapses to zero width inside a shrink parent.
+    let bar = progress_bar(0.0..=1.0, value.clamp(0.0, 1.0))
+        .style(style::progress_style(tok))
+        .length(Length::Fill)
+        .girth(8);
     let el = if let Some(c) = copy.filter(|s| !s.is_empty()) {
         column![bar, meta(c, tok, A11y::new(c, Role::Status))]
             .spacing(4)
+            .width(Length::Fill)
             .into()
     } else {
         bar.into()
@@ -763,17 +784,20 @@ pub fn progress_ring<'a, M: 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let (start, end) = ring_angles(value);
+    // Track must contrast with the card surface (panel alone is often white).
+    let track = crate::theme::mix(tok.text, tok.surface, 0.12);
     let ring = Canvas::new(ArcRing {
         start,
         end,
         color: tok.primary,
-        track: tok.panel,
+        track,
     })
     .width(56)
     .height(56);
     let el = if let Some(c) = copy.filter(|s| !s.is_empty()) {
         column![ring, meta(c, tok, A11y::new(c, Role::Status))]
             .spacing(4)
+            .width(Length::Fill)
             .into()
     } else {
         ring.into()
@@ -905,13 +929,17 @@ pub enum ImageSlot {
         handle: iced::widget::image::Handle,
         fit: iced::ContentFit,
     },
-    Loading,
+    /// Bytes not ready. Advance `phase` (0..=1) each frame for the spinner.
+    Loading {
+        phase: f32,
+    },
     Error(String),
 }
 
 /// An image slot that keeps its box.
 ///
-/// Ready keeps the requested width and height. Missing bytes show the
+/// Ready keeps the requested width and height. Loading centers the
+/// spinner (advance `phase` while waiting). Missing bytes show the
 /// empty slot, not a collapsed layout.
 ///
 ///
@@ -921,7 +949,11 @@ pub enum ImageSlot {
 /// use icedtea::widget::{self, ImageSlot};
 /// let tok = theme::named("dark").tokens;
 /// let _: icedtea::Element<'_, ()> = widget::image_slot(
-///     ImageSlot::Loading, 120.0, 80.0, tok, A11y::new("img", Role::Image),
+///     ImageSlot::Loading { phase: 0.2 },
+///     120.0,
+///     80.0,
+///     tok,
+///     A11y::new("img", Role::Image),
 /// );
 /// ```
 pub fn image_slot<'a, M: Clone + 'a>(
@@ -948,18 +980,14 @@ pub fn image_slot<'a, M: Clone + 'a>(
             .into(),
             &a11y,
         ),
-        ImageSlot::Loading => a11y::attach(
-            box_up(
-                column![
-                    container(Space::new().width(Length::Fill).height(14))
-                        .style(move |_| style::skeleton(tok)),
-                    container(Space::new().width(Length::Fill).height(14))
-                        .style(move |_| style::skeleton(tok)),
-                ]
-                .spacing(8)
-                .padding(12)
-                .into(),
-            )
+        ImageSlot::Loading { phase } => a11y::attach(
+            box_up(spinner(
+                tok,
+                phase,
+                A11y::new("loading", Role::Progress).with_disabled(a11y.disabled),
+            ))
+            .center_x(width)
+            .center_y(height)
             .style(move |_| style::fill(crate::theme::chip_fill(tok), tok.text))
             .into(),
             &a11y,
@@ -2098,17 +2126,19 @@ fn markdown_text_len(text: &markdown::Text) -> usize {
 }
 
 fn markdown_item_extent(item: &markdown::Item) -> f32 {
-    const TEXT: f32 = 16.0;
-    const SPACING: f32 = 16.0 * 0.875;
+    // Keep in step with [`markdown_settings`] (typo scale, not iced defaults).
+    const TEXT: f32 = typo::BODY as f32;
+    const SPACING: f32 = 12.0;
     const COL: f32 = 64.0;
     match item {
         markdown::Item::Heading(level, text) => {
             let size = match level {
-                markdown::HeadingLevel::H1 => TEXT * 2.0,
-                markdown::HeadingLevel::H2 => TEXT * 1.75,
-                markdown::HeadingLevel::H3 => TEXT * 1.5,
-                markdown::HeadingLevel::H4 => TEXT * 1.25,
-                markdown::HeadingLevel::H5 | markdown::HeadingLevel::H6 => TEXT,
+                markdown::HeadingLevel::H1 => typo::PAGE as f32,
+                markdown::HeadingLevel::H2 => typo::TITLE as f32,
+                markdown::HeadingLevel::H3 => typo::BODY as f32,
+                markdown::HeadingLevel::H4
+                | markdown::HeadingLevel::H5
+                | markdown::HeadingLevel::H6 => typo::META as f32,
             };
             let lines = ((markdown_text_len(text) as f32) / COL).ceil().max(1.0);
             size * 1.3 * lines + TEXT * 0.5 + SPACING
@@ -2119,7 +2149,7 @@ fn markdown_item_extent(item: &markdown::Item) -> f32 {
         }
         markdown::Item::CodeBlock { code, lines, .. } => {
             let n = lines.len().max(code.lines().count()).max(1) as f32;
-            n * TEXT * 0.75 * 1.5 + 24.0 + SPACING
+            n * (typo::CODE as f32) * 1.5 + 24.0 + SPACING
         }
         markdown::Item::List { bullets, .. } => {
             bullets
@@ -2168,27 +2198,40 @@ pub fn markdown_outline<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let mut col = Column::new().spacing(2);
+    // Meta-sized jump list (not full body buttons) so it reads as a TOC.
+    let mut col = Column::new().spacing(0).width(Length::Fill);
     for h in headings {
-        let pad = 8 + u16::from(h.level.saturating_sub(1)) * 8;
+        let nest = h.level.saturating_sub(1) as f32;
         let on = selected == Some(h.index);
-        col = col.push(
-            container(themed_button(
-                h.title.clone(),
-                a11y.apply_message(Some(on_jump(h.index))),
-                tok,
-                if on { Variant::Quiet } else { Variant::Ghost },
-                A11y::button(h.title.clone())
-                    .with_checked(on)
-                    .with_disabled(a11y.disabled),
-            ))
+        let title = h.title.clone();
+        let face = text(title.clone())
+            .size(typo::META)
+            .color(if on { tok.text } else { tok.muted });
+        let mut b = button(face)
             .padding(Padding {
-                top: 0.0,
-                right: 0.0,
-                bottom: 0.0,
-                left: f32::from(pad),
-            }),
-        );
+                top: 4.0,
+                right: 8.0,
+                bottom: 4.0,
+                left: 8.0 + nest * 10.0,
+            })
+            .width(Length::Fill)
+            .style(style::button_style(
+                tok,
+                if on {
+                    Variant::Quiet
+                } else {
+                    Variant::Ghost
+                },
+            ));
+        if let Some(m) = a11y.apply_message(Some(on_jump(h.index))) {
+            b = b.on_press(m);
+        }
+        col = col.push(a11y::attach(
+            b.into(),
+            &A11y::button(title)
+                .with_checked(on)
+                .with_disabled(a11y.disabled),
+        ));
     }
     if headings.is_empty() {
         col = col.push(meta(
@@ -2250,15 +2293,31 @@ pub fn markdown_view<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     a11y::attach(
-        iced_selection::markdown::view(items, markdown::Settings::with_style(markdown_style(tok)))
-            .map(on_link),
+        iced_selection::markdown::view(items, markdown_settings(tok)).map(on_link),
         &a11y,
     )
 }
 
+/// Type scale and spacing for markdown paint. Matches [`typo`], not iced defaults.
+fn markdown_settings(tok: Tokens) -> markdown::Settings {
+    markdown::Settings {
+        text_size: (typo::BODY as f32).into(),
+        h1_size: (typo::PAGE as f32).into(),
+        h2_size: (typo::TITLE as f32).into(),
+        h3_size: (typo::BODY as f32).into(),
+        h4_size: (typo::META as f32).into(),
+        h5_size: (typo::META as f32).into(),
+        h6_size: (typo::META as f32).into(),
+        code_size: (typo::CODE as f32).into(),
+        spacing: 12.0.into(),
+        style: markdown_style(tok),
+    }
+}
+
 fn markdown_style(tok: Tokens) -> markdown::Style {
+    use iced::border;
     let mut style = markdown::Style::from_palette(iced::theme::Palette {
-        background: tok.canvas,
+        background: tok.surface,
         text: tok.text,
         primary: tok.primary,
         success: tok.success,
@@ -2270,7 +2329,16 @@ fn markdown_style(tok: Tokens) -> markdown::Style {
     style.inline_code_font = typo::MONO;
     style.code_block_font = typo::MONO;
     style.link_color = tok.accent;
-    style.inline_code_highlight.background = iced::Background::Color(tok.panel);
+    style.inline_code_padding = Padding {
+        top: 1.0,
+        right: 4.0,
+        bottom: 1.0,
+        left: 4.0,
+    };
+    style.inline_code_highlight = markdown::Highlight {
+        background: Background::Color(crate::theme::mix(tok.text, tok.panel, 0.08)),
+        border: border::rounded(crate::chrome::Corner::Tight.radius_px()),
+    };
     style
 }
 
@@ -2919,15 +2987,23 @@ where
         } else {
             prev.viewport.max(1.0)
         };
+        // Clamp at paint time (same math as wheel/rail). Unclamped past-end
+        // scroll after a face/height change mounts an empty window even when
+        // the model still has rows.
         let win = match heights {
             RowHeights::Uniform(h) => {
-                visible_window(prev.scroll, viewport, h.max(0.0), len, overscan, cover)
+                window_after_scroll(prev, prev.scroll, viewport, h.max(0.0), len, overscan, cover)
             }
             RowHeights::PerRow(hs) => {
-                visible_window_var(prev.scroll, viewport, hs, overscan, cover)
+                window_after_scroll_var(prev, prev.scroll, viewport, hs, overscan, cover)
             }
         };
-        let shift = heights.offset(win.start) - prev.scroll;
+        let scroll = win.scroll;
+        // shift is usually negative (overscan above + partial first row).
+        // Apply it on an *inner* shrink box; ClipLayer scissors paint so
+        // card backgrounds cannot cover chrome above the list.
+        // (container.clip only tightens the culling viewport — not enough.)
+        let shift = heights.offset(win.start) - scroll;
         let emit = move |y: f32| {
             on_scroll(match heights {
                 RowHeights::Uniform(h) => {
@@ -2938,27 +3014,30 @@ where
                 }
             })
         };
-        let mut frame = container(rows(win))
-            .width(crate::layout::FILL)
-            .height(crate::layout::FILL)
-            .padding(Padding {
+        let mut inner = container(rows(win)).width(crate::layout::FILL).padding(
+            Padding {
                 top: shift,
                 right: 0.0,
                 bottom: 0.0,
                 left: 0.0,
-            })
-            .clip(true);
+            },
+        );
         if let Some(id) = scroll_id.clone() {
-            frame = frame.id(id);
+            inner = inner.id(id);
         }
-        let pane = mouse_area(frame).on_scroll(move |delta| {
+        let frame = container(inner)
+            .width(crate::layout::FILL)
+            .height(crate::layout::FILL);
+        let pane = mouse_area(ClipLayer::new(frame)).on_scroll(move |delta| {
             let max_s = (content - viewport).max(0.0);
-            emit((prev.scroll + scroll_delta_pixels(delta, step)).clamp(0.0, max_s))
+            emit((scroll + scroll_delta_pixels(delta, step)).clamp(0.0, max_s))
         });
+        // 4px between rows and the rail so the thumb is not flush on text.
         row![
             pane,
-            Element::from(ScrollRail::new(content, viewport, prev.scroll, emit, tok)),
+            Element::from(ScrollRail::new(content, viewport, scroll, emit, tok)),
         ]
+        .spacing(4)
         .width(crate::layout::FILL)
         .height(crate::layout::FILL)
         .into()
@@ -3050,8 +3129,9 @@ fn card_row<'a, M: 'a>(
 /// wheel write it. Uniform rows sit at `i * row_h - scroll`. Variable
 /// rows use [`RowHeights::PerRow`] and [`visible_window_var`].
 /// `face` is [`RowFace::Flush`] (clipped line) or [`RowFace::Card`]
-/// (wrapped title, 2px gap, optional meter). `scroll_id` names the
-/// clip pane. The 24px rail sits beside it.
+/// (wrapped title, optional meter). Rows stack at the virtual heights
+/// with no extra paint gap. `scroll_id` names the clip pane. The 24px
+/// rail sits beside it.
 ///
 ///
 /// ```
@@ -3107,6 +3187,10 @@ where
     let len = model.len();
     let prev = window;
     let disabled = a11y.disabled;
+    // No inter-row Column spacing: virtualization places rows at
+    // `offset(i) - scroll`. A paint-only gap (old Card 2px spacing)
+    // drifts the shift and cards jump above the clip. Card face
+    // separates with surface/border; keep paint height == virtual height.
     a11y::attach(
         virtual_clip(
             prev,
@@ -3118,11 +3202,7 @@ where
             scroll_id,
             tok,
             move |win| {
-                let gap = match face {
-                    RowFace::Flush => 0.0,
-                    RowFace::Card { .. } => 2.0,
-                };
-                let mut col = Column::new().spacing(gap);
+                let mut col = Column::new().spacing(0);
                 if model.is_empty() {
                     col = col.push(meta(empty, tok, A11y::new(empty, Role::Status)));
                 } else {
@@ -3178,23 +3258,75 @@ where
     )
 }
 
+/// One launcher / picker tile for [`item_grid`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GridTile {
+    pub title: String,
+    /// Secondary line (count, path, status). Empty hides the line.
+    pub subtitle: String,
+    pub icon: Option<Icon>,
+}
+
+impl GridTile {
+    pub fn new(title: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            subtitle: String::new(),
+            icon: None,
+        }
+    }
+
+    pub fn with_subtitle(mut self, subtitle: impl Into<String>) -> Self {
+        self.subtitle = subtitle.into();
+        self
+    }
+
+    pub fn with_icon(mut self, icon: Icon) -> Self {
+        self.icon = Some(icon);
+        self
+    }
+}
+
+impl From<&str> for GridTile {
+    fn from(title: &str) -> Self {
+        Self::new(title)
+    }
+}
+
+impl From<String> for GridTile {
+    fn from(title: String) -> Self {
+        Self::new(title)
+    }
+}
+
 /// Tiles that share the row width.
 ///
-/// Click sends the index. Empty grid is an empty column.
+/// Each tile is a card: optional icon, title, and subtitle. Click sends
+/// the index. `selected` paints that card focused. Empty grid is empty.
 ///
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
+/// use icedtea::icon::Icon;
 /// use icedtea::theme;
-/// use icedtea::widget;
+/// use icedtea::widget::{self, GridTile};
 /// let tok = theme::named("dark").tokens;
-/// let labels = vec!["Inbox".into(), "Mail".into()];
+/// let tiles = [
+///     GridTile::new("Inbox").with_subtitle("12 unread").with_icon(Icon::Search),
+///     GridTile::new("Mail").with_subtitle("Drafts"),
+/// ];
 /// let on_select = |i| i;
-/// let _: icedtea::Element<'_, usize> =
-///     widget::item_grid(&labels, on_select, tok, A11y::new("grid", Role::List));
+/// let _: icedtea::Element<'_, usize> = widget::item_grid(
+///     &tiles,
+///     Some(0),
+///     on_select,
+///     tok,
+///     A11y::new("grid", Role::List),
+/// );
 /// ```
 pub fn item_grid<'a, M: Clone + 'a>(
-    labels: &[String],
+    tiles: &[GridTile],
+    selected: Option<usize>,
     on_select: impl Fn(usize) -> M + Copy + 'a,
     tok: Tokens,
     a11y: A11y,
@@ -3205,28 +3337,74 @@ pub fn item_grid<'a, M: Clone + 'a>(
         .width(Length::Fill)
         .height(Length::Fill);
     let mut i = 0;
-    while i < labels.len() {
+    while i < tiles.len() {
         let mut r = iced::widget::Row::new()
             .spacing(8)
             .width(Length::Fill)
             .height(Length::Fill);
         for _ in 0..cols {
-            if i < labels.len() {
-                let s = labels[i].clone();
-                let tile = themed_button_sized(
-                    s.clone(),
-                    a11y.apply_message(Some(on_select(i))),
-                    tok,
-                    Variant::Quiet,
-                    Length::Fill,
-                    Length::Fill,
-                    A11y::new(s.clone(), Role::ListItem).with_disabled(a11y.disabled),
+            if i < tiles.len() {
+                let tile = &tiles[i];
+                let s = tile.title.clone();
+                let sub = tile.subtitle.clone();
+                let icon = tile.icon;
+                let idx = i;
+                let on = selected == Some(idx);
+                let mut face = Column::new()
+                    .spacing(6)
+                    .align_x(Alignment::Center)
+                    .width(Length::Fill);
+                if let Some(ic) = icon {
+                    face = face.push(icon_svg(
+                        ic,
+                        tok,
+                        A11y::new(format!("{s}-icon"), Role::Image),
+                    ));
+                }
+                face = face.push(
+                    text(s.clone())
+                        .size(typo::TITLE)
+                        .font(if on {
+                            typo::UI_BOLD
+                        } else {
+                            typo::UI
+                        })
+                        .color(tok.text),
                 );
-                r = r.push(if a11y.disabled {
-                    tile
+                if !sub.is_empty() {
+                    face = face.push(
+                        text(sub)
+                            .size(typo::META)
+                            .color(if on { tok.accent } else { tok.muted }),
+                    );
+                } else if on {
+                    face = face.push(
+                        text("Selected")
+                            .size(typo::META)
+                            .color(tok.accent),
+                    );
+                }
+                let card = container(face)
+                    .width(Length::Fill)
+                    .height(Length::Fill)
+                    .center_x(Length::Fill)
+                    .center_y(Length::Fill)
+                    .padding(12)
+                    .style(move |_| style::card(tok, on));
+                let body: Element<'a, M> = if a11y.disabled {
+                    card.into()
                 } else {
-                    mouse_area(tile).on_right_press(on_select(i)).into()
-                });
+                    mouse_area(card)
+                        .on_press(on_select(idx))
+                        .on_right_press(on_select(idx))
+                        .into()
+                };
+                r = r.push(a11y::attach(
+                    body,
+                    &A11y::new(s, Role::ListItem)
+                        .with_checked(on)
+                        .with_disabled(a11y.disabled),
+                ));
                 i += 1;
             } else {
                 r = r.push(Space::new().width(Length::Fill).height(Length::Fill));
@@ -3355,7 +3533,9 @@ where
             .width(col_w(c)),
         );
     }
-    let rest_head = mouse_area(
+    // Hard-clip unfrozen strip so scrolled cells cannot paint under frozen pins
+    // (container.clip only tightens the culling viewport).
+    let rest_head = mouse_area(ClipLayer::new(
         container(rest_head)
             .width(Length::Fill)
             .padding(Padding {
@@ -3363,9 +3543,8 @@ where
                 right: 0.0,
                 bottom: 0.0,
                 left: -h_scroll,
-            })
-            .clip(true),
-    )
+            }),
+    ))
     .on_scroll(move |delta| on_h_scroll((h_scroll + scroll_delta_x(delta)).max(0.0)));
     let header = row![pin_head, rest_head].width(crate::layout::FILL);
     a11y::attach(
@@ -3428,15 +3607,17 @@ where
                         for c in &rest {
                             rest_line = paint_cell(rest_line, *c);
                         }
-                        let rest_line = container(rest_line)
-                            .width(Length::Fill)
-                            .padding(Padding {
-                                top: 0.0,
-                                right: 0.0,
-                                bottom: 0.0,
-                                left: -h_scroll,
-                            })
-                            .clip(true);
+                        let rest_line: Element<'a, M> = ClipLayer::new(
+                            container(rest_line)
+                                .width(Length::Fill)
+                                .padding(Padding {
+                                    top: 0.0,
+                                    right: 0.0,
+                                    bottom: 0.0,
+                                    left: -h_scroll,
+                                }),
+                        )
+                        .into();
                         body = body.push(row![pin_line, rest_line].width(crate::layout::FILL));
                     }
                     body
@@ -3547,10 +3728,11 @@ pub fn tree_view<'a, M: Clone + 'a>(
     )
 }
 
-/// A tab bar over a body the application paints.
+/// A tab strip: bordered shells on a panel rail, close inside each tab.
 ///
 /// `Tabs { closable: false }` is pinned sections. Select sends the
-/// index.
+/// index. Closable tabs keep the close control inside the shell so the
+/// title is not bare text beside a free-floating ×.
 ///
 ///
 /// ```
@@ -3582,28 +3764,77 @@ pub fn tab_bar<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let mut r = Row::new().spacing(4).align_y(Alignment::Center);
+    let mut r = Row::new()
+        .spacing(4)
+        .align_y(Alignment::End)
+        .width(Length::Fill);
     for (i, title) in tabs.titles.iter().enumerate() {
-        let mut tab = button(text(title.clone()).size(typo::META))
-            .padding([6, 10])
-            .style(style::tab_style(tok, i == tabs.active));
+        let active = i == tabs.active;
+        let mut title_btn = button(
+            text(title.clone())
+                .size(typo::META)
+                .font(if active {
+                    typo::UI_BOLD
+                } else {
+                    typo::UI
+                }),
+        )
+        .padding(Padding {
+            top: 8.0,
+            right: if tabs.closable { 6.0 } else { 12.0 },
+            bottom: 8.0,
+            left: 12.0,
+        })
+        .style(style::tab_style(tok, active));
         if !a11y.disabled {
-            tab = tab.on_press(on_select(i));
+            title_btn = title_btn.on_press(on_select(i));
         }
-        let mut cell = row![tab].spacing(2).align_y(Alignment::Center);
+        let mut inner = row![title_btn].spacing(0).align_y(Alignment::Center);
         if tabs.closable {
-            cell = cell.push(dismiss_button(
-                on_close(i),
-                tok,
-                A11y::button(format!("close {title}")).with_disabled(a11y.disabled),
-            ));
+            inner = inner.push(
+                container(dismiss_button(
+                    on_close(i),
+                    tok,
+                    A11y::button(format!("close {title}")).with_disabled(a11y.disabled),
+                ))
+                .padding(Padding {
+                    top: 0.0,
+                    right: 4.0,
+                    bottom: 0.0,
+                    left: 0.0,
+                }),
+            );
         }
+        let shell = container(inner)
+            .style(move |_| style::tab_shell(tok, active))
+            .padding(0);
         r = r.push(a11y::attach(
-            container(cell).padding([2, 2]).into(),
-            &A11y::new(title.clone(), Role::Tab).with_checked(i == tabs.active),
+            shell.into(),
+            &A11y::new(title.clone(), Role::Tab)
+                .with_checked(active)
+                .with_disabled(a11y.disabled),
         ));
     }
-    a11y::attach(r.into(), &a11y)
+    let strip = column![
+        container(r).padding(Padding {
+            top: 6.0,
+            right: 8.0,
+            bottom: 0.0,
+            left: 8.0,
+        }),
+        container(Space::new().width(Length::Fill).height(1))
+            .width(Length::Fill)
+            .style(move |_| style::hairline(tok)),
+    ]
+    .spacing(0)
+    .width(Length::Fill);
+    a11y::attach(
+        container(strip)
+            .width(Length::Fill)
+            .style(move |_| style::tab_strip(tok))
+            .into(),
+        &a11y,
+    )
 }
 
 /// Title on the start edge, `Icon::Chevron` on the end. Open rotates
@@ -3798,6 +4029,8 @@ pub fn expander<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let title = a11y.apply_name(title);
+    // Same horizontal inset as accordion (`pad()`): zero L/R made the
+    // title and chevron sit on the card edge.
     let header = disclosure_header(
         title.clone(),
         open,
@@ -3806,12 +4039,7 @@ pub fn expander<'a, M: Clone + 'a>(
         A11y::button(title.clone())
             .with_checked(open)
             .with_disabled(a11y.disabled),
-        Padding {
-            top: 8.0,
-            right: 0.0,
-            bottom: 8.0,
-            left: 0.0,
-        },
+        pad(),
     );
     let h = collapsed.into().height();
     let body: Element<'a, M> = if open {
@@ -3819,9 +4047,23 @@ pub fn expander<'a, M: Clone + 'a>(
     } else {
         peek_clip(child, h, tok)
     };
+    // Body shares the header's horizontal pad so title and peek align.
+    let body = container(body)
+        .width(Length::Fill)
+        .padding(Padding {
+            top: 0.0,
+            right: 12.0,
+            bottom: 0.0,
+            left: 12.0,
+        });
     a11y::attach(
         container(column![header, body].spacing(8))
-            .padding(12)
+            .padding(Padding {
+                top: 4.0,
+                right: 4.0,
+                bottom: 12.0,
+                left: 4.0,
+            })
             .width(Length::Fill)
             .style(move |_| style::card(tok, false))
             .into(),
@@ -4075,8 +4317,15 @@ mod tests {
             Variant::Danger,
             btn("D").with_disabled(true),
         );
-        let _: Element<'_, ()> = split_button("S", (), (), tok, btn("S"));
-        let _: Element<'_, ()> = split_button("S", (), (), tok, btn("S").with_disabled(true));
+        let _: Element<'_, i32> =
+            split_button("S", 0, vec![("As…".into(), 1)], tok, btn("S"));
+        let _: Element<'_, i32> = split_button(
+            "S",
+            0,
+            vec![("As…".into(), 1)],
+            tok,
+            btn("S").with_disabled(true),
+        );
         let _: Element<'_, ()> = toggle_button("T", true, (), tok, btn("T").with_checked(true));
         let _: Element<'_, ()> = toggle_button("T", false, (), tok, btn("T").with_checked(false));
         let _: Element<'_, ()> = toggle_button(
@@ -4143,6 +4392,9 @@ mod tests {
             scroll_delta_x(iced::mouse::ScrollDelta::Pixels { x: 8.0, y: 0.0 }),
             -8.0
         );
+        assert!((slider_step(0.0..=1.0) - 0.01).abs() < f32::EPSILON);
+        assert!(slider_step(0.0..=1.0) < 1.0);
+        assert!((slider_step(10.0..=10.0) - f32::EPSILON).abs() < 1e-12);
         let _: Element<'_, ()> = themed_slider(
             0.0..=1.0,
             0.5,
@@ -4168,6 +4420,30 @@ mod tests {
         );
         assert_eq!(progress_label(0.5, None), "50%");
         assert_eq!(progress_label(0.5, Some("1 min")), "50% · 1 min");
+        // Fill bar + labeled column must keep Fill width (shrink parent used to collapse the bar).
+        {
+            use iced::advanced::layout::Limits;
+            use iced::advanced::widget::Tree;
+            use iced::{Font, Pixels, Size};
+            let mut el: Element<'_, ()> = progress(
+                0.4,
+                Some("40%"),
+                tok,
+                role("p-fill", Role::Progress).with_value("0.4"),
+            );
+            let mut tree = Tree::new(el.as_widget());
+            let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+                Font::DEFAULT,
+                Pixels::from(16u32),
+            ));
+            let limits = Limits::new(Size::ZERO, Size::new(320.0, 80.0));
+            let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+            assert!(
+                node.size().width >= 300.0,
+                "progress with label must span parent width, got {}",
+                node.size().width
+            );
+        }
         assert!(spark_points(&[], 10.0, 10.0).is_empty());
         let pts = spark_points(&[1.0, 3.0, 2.0], 100.0, 20.0);
         assert_eq!(pts.len(), 3);
@@ -4185,7 +4461,7 @@ mod tests {
             role("cover", Role::Image),
         );
         let _: Element<'_, ()> = image_slot(
-            ImageSlot::Loading,
+            ImageSlot::Loading { phase: 0.3 },
             48.0,
             48.0,
             tok,
@@ -4608,7 +4884,8 @@ mod tests {
             role("log-empty", Role::List),
         );
         let _: Element<'_, ()> = item_grid(
-            &["a".into(), "b".into()],
+            &[GridTile::from("a"), GridTile::from("b")],
+            None,
             |_| (),
             tok,
             role("grid", Role::List),
@@ -5060,7 +5337,8 @@ mod tests {
         );
         draw_once(&mut dead_tree);
         let mut dead_grid = item_grid(
-            &["A".into(), "B".into()],
+            &[GridTile::from("A"), GridTile::from("B")],
+            None,
             |_| (),
             tok,
             role("grid", Role::List).with_disabled(true),
@@ -5833,8 +6111,8 @@ mod tests {
             .map(|b| b.y - origin_c.y)
             .collect();
         must(
-            cards_y.iter().any(|y| (*y - 22.0).abs() < 3.0),
-            format!("card gap is 2px so the 50px row starts at 22, got {cards_y:?}"),
+            cards_y.iter().any(|y| (*y - 20.0).abs() < 3.0),
+            format!("card rows stack without paint-only gap, second at 20, got {cards_y:?}"),
         );
         draw_once(&mut cards);
         let bare = VecList {
@@ -5868,6 +6146,33 @@ mod tests {
             &renderer0,
             &Limits::new(Size::ZERO, Size::new(320.0, 0.0)),
         );
+    }
+
+    #[test]
+    fn data_table_unfrozen_strip_uses_hard_clip() {
+        // Soft container.clip lets scrolled selection fills paint under frozen pins.
+        let src = include_str!("widget.rs");
+        let table = src
+            .split("pub fn data_table")
+            .nth(1)
+            .unwrap()
+            .split("/// Heading or file tree")
+            .next()
+            .unwrap();
+        assert!(
+            table.contains("ClipLayer::new"),
+            "data_table unfrozen strip must hard-clip with ClipLayer"
+        );
+        assert!(
+            table.matches("ClipLayer::new").count() >= 2,
+            "header and body unfrozen strips both need ClipLayer"
+        );
+        // No leftover soft-only clip on the h-scrolled strip after hard clip.
+        let soft_only = table
+            .lines()
+            .filter(|l| l.contains("left: -h_scroll") || l.contains("left: -h_scroll,"))
+            .count();
+        assert!(soft_only >= 1, "h_scroll shift still present");
     }
 
     #[test]
@@ -6348,16 +6653,17 @@ mod tests {
         walk_bounds(layout, &mut boxes);
         let lefts: Vec<f32> = boxes
             .iter()
-            .filter(|b| b.x > 1.0 && b.x < 40.0 && b.width > 24.0 && b.width < 280.0)
+            .filter(|b| b.x > 1.0 && b.x < 48.0 && b.width > 24.0 && b.width < 280.0)
             .map(|b| b.x)
             .collect();
+        // Card edge pad (4) + header/body horizontal pad (12) → text at ~16.
         assert!(
-            lefts.iter().any(|x| (*x - 12.0).abs() < 2.0),
-            "title and body should sit on the 12px card inset, got {lefts:?}"
+            lefts.iter().any(|x| *x >= 14.0 && *x <= 20.0),
+            "title and body need horizontal inset from the card edge, got {lefts:?}"
         );
         assert!(
-            !lefts.iter().any(|x| (*x - 24.0).abs() < 2.0),
-            "header must not add a second 12px inset, got {lefts:?}"
+            lefts.iter().all(|x| *x >= 10.0),
+            "no content should sit flush on the border, got {lefts:?}"
         );
     }
 
@@ -6431,9 +6737,13 @@ mod tests {
         use iced::advanced::widget::Tree;
         use iced::{Font, Pixels, Size};
         let tok = named("dark").tokens;
-        let labels = vec!["Inbox".into(), "Calendar".into(), "Mail".into()];
+        let tiles = [
+            GridTile::from("Inbox"),
+            GridTile::from("Calendar"),
+            GridTile::from("Mail"),
+        ];
         let mut el: Element<'_, ()> =
-            item_grid(&labels, |_| (), tok, A11y::new("grid", Role::List));
+            item_grid(&tiles, Some(0), |_| (), tok, A11y::new("grid", Role::List));
         let mut tree = Tree::new(el.as_widget());
         let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
             Font::DEFAULT,
