@@ -46,3 +46,8 @@ book-serve:
 # ICEDTEA_GALLERY_ISOLATED=0 uses the current display.
 gallery-gif:
     bash scripts/gallery-gif.sh
+
+# Timed tour screenshots (Xephyr). Optional: just gallery-walk --gif demo.gif
+# Full review: open .grok/skills/gallery-visual-walkthrough/SKILL.md
+gallery-walk *args:
+    python3 .grok/skills/gallery-visual-walkthrough/scripts/gallery_walkthrough.py {{args}}

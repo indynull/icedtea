@@ -1,5 +1,6 @@
 /target
 /book/book
+/tmp/
 .superpowers/
 .ruff_cache/
 **/*.rs.bk
