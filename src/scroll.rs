@@ -299,11 +299,10 @@ impl<'a, Message> Widget<Message, iced::Theme, iced::Renderer> for ClipLayer<'a,
             child_max.height = 1.0;
         }
         let child_limits = layout::Limits::new(Size::ZERO, child_max);
-        let child = self.content.as_widget_mut().layout(
-            &mut tree.children[0],
-            renderer,
-            &child_limits,
-        );
+        let child =
+            self.content
+                .as_widget_mut()
+                .layout(&mut tree.children[0], renderer, &child_limits);
         let size = limits.resolve(hint.width, hint.height, child.size());
         // If we expanded past the first child layout, re-lay so the child
         // actually fills the scissor box (list pane case).
@@ -454,8 +453,8 @@ mod tests {
     fn clip_layer_fills_finite_parent_box() {
         use iced::advanced::layout::Limits;
         use iced::advanced::widget::{Tree, Widget};
-        use iced::{Font, Length, Pixels, Size};
         use iced::widget::{container, Space};
+        use iced::{Font, Length, Pixels, Size};
 
         let child = container(Space::new().width(Length::Fill).height(Length::Fill))
             .width(Length::Fill)

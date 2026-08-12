@@ -416,12 +416,7 @@ fn sample_table_rows() -> Vec<Vec<String>> {
 }
 
 fn table_headers() -> Vec<String> {
-    vec![
-        "Name".into(),
-        "Role".into(),
-        "Status".into(),
-        "Path".into(),
-    ]
+    vec!["Name".into(), "Role".into(), "Status".into(), "Path".into()]
 }
 
 /// Rows per page for the List + Pagination demo. Application owns paging.
@@ -1279,8 +1274,7 @@ impl Gallery {
                 if q.is_empty() {
                     return true;
                 }
-                r.iter()
-                    .any(|c| c.to_ascii_lowercase().contains(&q))
+                r.iter().any(|c| c.to_ascii_lowercase().contains(&q))
             })
             .cloned()
             .collect();
@@ -2443,7 +2437,11 @@ impl Gallery {
             let tok = self.tokens;
             // Job under page head for multi-entry only; single-entry puts job here too.
             return column![
-                widget::meta(widget_job(id), tok, named(&format!("{id}-job"), Role::Status)),
+                widget::meta(
+                    widget_job(id),
+                    tok,
+                    named(&format!("{id}-job"), Role::Status)
+                ),
                 self.demo_widget(id),
             ]
             .spacing(8)
@@ -5546,11 +5544,19 @@ mod tests {
         g2.page = "list-detail";
         let _ = g2.update(super::Message::ListSel(50));
         assert_eq!(g2.list_detail_sel.primary(), Some(50));
-        assert_eq!(g2.list_sel.primary(), list_pick, "list-detail must not stomp list_sel");
+        assert_eq!(
+            g2.list_sel.primary(),
+            list_pick,
+            "list-detail must not stomp list_sel"
+        );
         g2.page = "table";
         let _ = g2.update(super::Message::TableCell(2, 0));
         assert_eq!(g2.table_sel.primary(), Some(2));
-        assert_eq!(g2.list_sel.primary(), list_pick, "table must not stomp list_sel");
+        assert_eq!(
+            g2.list_sel.primary(),
+            list_pick,
+            "table must not stomp list_sel"
+        );
         // Dual scroll windows stay separate
         let detail_scroll = g2.list_detail_window.scroll;
         g2.page = "list";

@@ -438,12 +438,7 @@ mod tests {
             cover_var(".SF NS", false, 400),
             cover("ThinOnly", false, 400),
         ];
-        let name = select_family(
-            &faces,
-            FamilyKind::Ui,
-            &[".SF NS".into()],
-            "ThinOnly",
-        );
+        let name = select_family(&faces, FamilyKind::Ui, &[".SF NS".into()], "ThinOnly");
         assert_eq!(name, ".SF NS");
     }
 

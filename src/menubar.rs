@@ -490,8 +490,8 @@ where
         _cursor: mouse::Cursor,
         viewport: &Rectangle,
     ) {
-        use iced::advanced::svg;
         use crate::icon::Icon;
+        use iced::advanced::svg;
 
         let bounds = layout.bounds();
         let status = self.last_status.unwrap_or(TitleStatus::Active);
@@ -526,11 +526,7 @@ where
         } else {
             self.tok.text
         };
-        renderer.draw_svg(
-            svg::Svg::new(handle).color(color),
-            icon_bounds,
-            *viewport,
-        );
+        renderer.draw_svg(svg::Svg::new(handle).color(color), icon_bounds, *viewport);
     }
 
     fn overlay<'b>(

@@ -1069,13 +1069,9 @@ fn context_menu_column<'a, M: Clone + 'a>(
                     continue;
                 }
                 let open = open_submenu == Some(i);
-                let title_el: Element<'a, M> = label(
-                    title.clone(),
-                    tok,
-                    A11y::new(title.clone(), Role::MenuItem),
-                );
-                let cue: Element<'a, M> =
-                    meta("›", tok, A11y::new("submenu", Role::Status));
+                let title_el: Element<'a, M> =
+                    label(title.clone(), tok, A11y::new(title.clone(), Role::MenuItem));
+                let cue: Element<'a, M> = meta("›", tok, A11y::new("submenu", Role::Status));
                 let face = row![title_el, Space::new().width(Length::Fill), cue]
                     .spacing(8)
                     .align_y(Alignment::Center)
@@ -1195,8 +1191,7 @@ pub fn context_menu<'a, M: Clone + 'a>(
             let kids = kids.clone();
             let fly_size = context_card_size_entries(&kids, viewport);
             let row_top = context_offset_before(&entries, i);
-            let fly_at =
-                context_flyout_origin(at, size, row_top, fly_size, viewport);
+            let fly_at = context_flyout_origin(at, size, row_top, fly_size, viewport);
             let fly_list = context_menu_column(&kids, None, on_submenu, false, tok);
             let fly_natural = context_entries_height(&kids);
             // Same cap + scroll as the root card so placement size matches paint.
@@ -1228,10 +1223,7 @@ pub fn context_menu<'a, M: Clone + 'a>(
         }
     }
 
-    stack
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .into()
+    stack.width(Length::Fill).height(Length::Fill).into()
 }
 
 /// Closable document titles; dirty titles get a bullet.
@@ -1911,8 +1903,7 @@ mod tests {
         let many: Vec<ContextEntry<()>> = (0..30)
             .map(|i| ContextEntry::from(Action::new(format!("a.{i}"), format!("A{i}"), ())))
             .collect();
-        let mut long =
-            context_menu(many, iced::Point::new(8.0, 8.0), vp, None, |_| (), (), tok);
+        let mut long = context_menu(many, iced::Point::new(8.0, 8.0), vp, None, |_| (), (), tok);
         paint(&mut long);
         let nested = [
             ContextEntry::from(Action::new("edit.copy", "Copy", ())),
@@ -1947,8 +1938,7 @@ mod tests {
         let fly_size = context_card_size_entries(kids, vp);
         let fly = context_flyout_origin(root_at, root_size, row_top, fly_size, vp);
         assert!(
-            fly.x >= root_at.x + root_size.width - 0.5
-                || fly.x + fly_size.width <= root_at.x + 0.5,
+            fly.x >= root_at.x + root_size.width - 0.5 || fly.x + fly_size.width <= root_at.x + 0.5,
             "flyout must not overlap root card: root=({}..{}) fly=({}..{})",
             root_at.x,
             root_at.x + root_size.width,
@@ -1997,15 +1987,17 @@ mod tests {
             fly_branch.contains("themed_scroll") && fly_branch.contains("fly_size.height"),
             "tall flyouts must height-cap and scroll like the root menu"
         );
-        assert!(context_card_size_entries(
-            &[
-                ContextEntry::from(Action::new("a", "A", ())),
-                ContextEntry::Separator,
-            ],
-            vp
-        )
-        .height
-            < context_card_size(3, vp).height);
+        assert!(
+            context_card_size_entries(
+                &[
+                    ContextEntry::from(Action::new("a", "A", ())),
+                    ContextEntry::Separator,
+                ],
+                vp
+            )
+            .height
+                < context_card_size(3, vp).height
+        );
         let mut ld = list_detail(lab("l"), lab("d"), crate::layout::fixed(260.0), tok);
         paint(&mut ld);
         let mut nv = navigation_view(lab("s"), lab("c"), &nav, 900.0, (), tok, &cat);

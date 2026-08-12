@@ -2204,9 +2204,10 @@ pub fn markdown_outline<'a, M: Clone + 'a>(
         let nest = h.level.saturating_sub(1) as f32;
         let on = selected == Some(h.index);
         let title = h.title.clone();
-        let face = text(title.clone())
-            .size(typo::META)
-            .color(if on { tok.text } else { tok.muted });
+        let face =
+            text(title.clone())
+                .size(typo::META)
+                .color(if on { tok.text } else { tok.muted });
         let mut b = button(face)
             .padding(Padding {
                 top: 4.0,
@@ -2217,11 +2218,7 @@ pub fn markdown_outline<'a, M: Clone + 'a>(
             .width(Length::Fill)
             .style(style::button_style(
                 tok,
-                if on {
-                    Variant::Quiet
-                } else {
-                    Variant::Ghost
-                },
+                if on { Variant::Quiet } else { Variant::Ghost },
             ));
         if let Some(m) = a11y.apply_message(Some(on_jump(h.index))) {
             b = b.on_press(m);
@@ -2991,9 +2988,15 @@ where
         // scroll after a face/height change mounts an empty window even when
         // the model still has rows.
         let win = match heights {
-            RowHeights::Uniform(h) => {
-                window_after_scroll(prev, prev.scroll, viewport, h.max(0.0), len, overscan, cover)
-            }
+            RowHeights::Uniform(h) => window_after_scroll(
+                prev,
+                prev.scroll,
+                viewport,
+                h.max(0.0),
+                len,
+                overscan,
+                cover,
+            ),
             RowHeights::PerRow(hs) => {
                 window_after_scroll_var(prev, prev.scroll, viewport, hs, overscan, cover)
             }
@@ -3014,14 +3017,14 @@ where
                 }
             })
         };
-        let mut inner = container(rows(win)).width(crate::layout::FILL).padding(
-            Padding {
+        let mut inner = container(rows(win))
+            .width(crate::layout::FILL)
+            .padding(Padding {
                 top: shift,
                 right: 0.0,
                 bottom: 0.0,
                 left: 0.0,
-            },
-        );
+            });
         if let Some(id) = scroll_id.clone() {
             inner = inner.id(id);
         }
@@ -3364,25 +3367,17 @@ pub fn item_grid<'a, M: Clone + 'a>(
                 face = face.push(
                     text(s.clone())
                         .size(typo::TITLE)
-                        .font(if on {
-                            typo::UI_BOLD
-                        } else {
-                            typo::UI
-                        })
+                        .font(if on { typo::UI_BOLD } else { typo::UI })
                         .color(tok.text),
                 );
                 if !sub.is_empty() {
-                    face = face.push(
-                        text(sub)
-                            .size(typo::META)
-                            .color(if on { tok.accent } else { tok.muted }),
-                    );
+                    face = face.push(text(sub).size(typo::META).color(if on {
+                        tok.accent
+                    } else {
+                        tok.muted
+                    }));
                 } else if on {
-                    face = face.push(
-                        text("Selected")
-                            .size(typo::META)
-                            .color(tok.accent),
-                    );
+                    face = face.push(text("Selected").size(typo::META).color(tok.accent));
                 }
                 let card = container(face)
                     .width(Length::Fill)
@@ -3536,14 +3531,12 @@ where
     // Hard-clip unfrozen strip so scrolled cells cannot paint under frozen pins
     // (container.clip only tightens the culling viewport).
     let rest_head = mouse_area(ClipLayer::new(
-        container(rest_head)
-            .width(Length::Fill)
-            .padding(Padding {
-                top: 0.0,
-                right: 0.0,
-                bottom: 0.0,
-                left: -h_scroll,
-            }),
+        container(rest_head).width(Length::Fill).padding(Padding {
+            top: 0.0,
+            right: 0.0,
+            bottom: 0.0,
+            left: -h_scroll,
+        }),
     ))
     .on_scroll(move |delta| on_h_scroll((h_scroll + scroll_delta_x(delta)).max(0.0)));
     let header = row![pin_head, rest_head].width(crate::layout::FILL);
@@ -3608,14 +3601,12 @@ where
                             rest_line = paint_cell(rest_line, *c);
                         }
                         let rest_line: Element<'a, M> = ClipLayer::new(
-                            container(rest_line)
-                                .width(Length::Fill)
-                                .padding(Padding {
-                                    top: 0.0,
-                                    right: 0.0,
-                                    bottom: 0.0,
-                                    left: -h_scroll,
-                                }),
+                            container(rest_line).width(Length::Fill).padding(Padding {
+                                top: 0.0,
+                                right: 0.0,
+                                bottom: 0.0,
+                                left: -h_scroll,
+                            }),
                         )
                         .into();
                         body = body.push(row![pin_line, rest_line].width(crate::layout::FILL));
@@ -3770,15 +3761,11 @@ pub fn tab_bar<'a, M: Clone + 'a>(
         .width(Length::Fill);
     for (i, title) in tabs.titles.iter().enumerate() {
         let active = i == tabs.active;
-        let mut title_btn = button(
-            text(title.clone())
-                .size(typo::META)
-                .font(if active {
-                    typo::UI_BOLD
-                } else {
-                    typo::UI
-                }),
-        )
+        let mut title_btn = button(text(title.clone()).size(typo::META).font(if active {
+            typo::UI_BOLD
+        } else {
+            typo::UI
+        }))
         .padding(Padding {
             top: 8.0,
             right: if tabs.closable { 6.0 } else { 12.0 },
@@ -4048,14 +4035,12 @@ pub fn expander<'a, M: Clone + 'a>(
         peek_clip(child, h, tok)
     };
     // Body shares the header's horizontal pad so title and peek align.
-    let body = container(body)
-        .width(Length::Fill)
-        .padding(Padding {
-            top: 0.0,
-            right: 12.0,
-            bottom: 0.0,
-            left: 12.0,
-        });
+    let body = container(body).width(Length::Fill).padding(Padding {
+        top: 0.0,
+        right: 12.0,
+        bottom: 0.0,
+        left: 12.0,
+    });
     a11y::attach(
         container(column![header, body].spacing(8))
             .padding(Padding {
@@ -4317,8 +4302,7 @@ mod tests {
             Variant::Danger,
             btn("D").with_disabled(true),
         );
-        let _: Element<'_, i32> =
-            split_button("S", 0, vec![("As…".into(), 1)], tok, btn("S"));
+        let _: Element<'_, i32> = split_button("S", 0, vec![("As…".into(), 1)], tok, btn("S"));
         let _: Element<'_, i32> = split_button(
             "S",
             0,
