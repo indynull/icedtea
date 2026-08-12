@@ -163,6 +163,7 @@
 //! | [`action`] / [`key`] / [`shortcut`] | Commands and chords |
 //! | [`theme`] / [`variant`] / [`typo`] | Color, variant, type |
 //! | [`widget`] / [`collection`] | Controls, lists, tables |
+//! | [`select`] | Select-and-copy contract for content text |
 //! | [`layout`] / [`pattern`] / [`window`] | Recipes and chrome |
 //!
 //! The [guide](https://indynull.github.io/icedtea/) walks composition
@@ -197,6 +198,7 @@ pub mod palette;
 pub mod pattern;
 pub mod persist;
 mod scroll;
+pub mod select;
 pub mod shortcut;
 pub mod style;
 pub mod theme;

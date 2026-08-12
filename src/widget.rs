@@ -1420,13 +1420,9 @@ pub fn textarea<'a, M: Clone + 'a>(
 
 /// Keep selection, click, drag, and scroll. Typing, paste, and delete
 /// become a zero scroll so `Content::perform` does not change the text.
-pub fn select_only(action: text_editor::Action) -> text_editor::Action {
-    if action.is_edit() {
-        text_editor::Action::Scroll { lines: 0 }
-    } else {
-        action
-    }
-}
+///
+/// See [`crate::select`] for the app-facing select-and-copy contract.
+pub use crate::select::select_only;
 
 /// Body the user can drag-select and copy.
 ///
@@ -2223,15 +2219,18 @@ pub fn parse(source: &str) -> MarkdownDoc {
 ///
 /// # Select and copy
 ///
-/// Drag-select in the painted view. Ctrl+C / Cmd+C copies the range
-/// through the host clipboard (widget-owned selection). To copy the
-/// whole document without selecting, post [`MarkdownDoc::source`] with
-/// [`crate::copy_text`]. That is the same full-source job as a
-/// "Copy source" action.
+/// Painted with real markdown layout (headings, lists, code frames,
+/// quotes). Drag-select is paint-side **within each block** (one
+/// paragraph, heading, or code surface); Ctrl+C / Cmd+C copies that
+/// range through the host clipboard. A single flattened rich surface
+/// can drag across blocks but ruins layout and multi-line selection
+/// paint, so this path keeps structured layout.
 ///
-/// Code and field values use [`selectable`] / [`highlighted_code`] and
-/// a [`Content`](iced::widget::text_editor::Content) the application
-/// owns. Markdown uses paint-side selection instead of an editor.
+/// To copy the whole document without selecting, post
+/// [`MarkdownDoc::source`] with [`crate::copy_text`]. Code and field
+/// values use [`selectable`] / [`highlighted_code`] and app-owned
+/// [`Content`](iced::widget::text_editor::Content). See [`crate::select`]
+/// for the app-facing contract.
 ///
 ///
 /// ```
@@ -5392,6 +5391,30 @@ mod tests {
         let drag = Action::Drag(iced::Point::new(4.0, 5.0));
         assert_eq!(select_only(drag.clone()), drag);
         let _ = selectable_style(named("dark").tokens);
+    }
+
+    #[test]
+    fn markdown_view_uses_structured_selectable_layout() {
+        let tok = named("dark").tokens;
+        let source = "# Title\n\nFirst paragraph.\n\nSecond block.";
+        let doc = parse(source);
+        let _: Element<'_, ()> =
+            markdown_view(&doc.items, tok, |_| (), A11y::new("md", Role::Group));
+        let plain = crate::select::markdown_plain(&doc.items);
+        assert!(plain.contains("Title") && plain.contains("Second block."));
+        let src = include_str!("widget.rs");
+        let md = src
+            .split("pub fn markdown_view")
+            .nth(1)
+            .unwrap()
+            .split("fn markdown_style")
+            .next()
+            .unwrap();
+        assert!(
+            md.contains("iced_selection::markdown::view"),
+            "markdown_view must use structured selectable markdown layout"
+        );
+        assert!(!md.contains("Rich::with_spans"));
     }
 
     #[test]

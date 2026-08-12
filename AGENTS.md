@@ -84,11 +84,14 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   `themed_scroll`, keys subscribe with `key::listen`, sidebar recipe
   is `Breakpoint::from_width`.
 - One path per feature. Pick it and delete the other. Fallbacks re-grow.
-- Select and copy: code and fields use `text_editor` + `select_only` and
-  app-owned `Content` / `Selectables`. Painted markdown uses
-  `markdown_view` (paint-side selection via `iced_selection`); full
-  document copy is `copy_text` on `MarkdownDoc::source`. Gallery demos
-  only those constructors—no dual-pane source under the paint.
+- Select and copy: code and fields use `text_editor` + `select_only`
+  and app-owned `Content` / `Selectables` (clean multi-line highlight).
+  Markdown uses structured paint (`markdown_view` via
+  `iced_selection::markdown`) so layout stays real; selection is
+  paint-side within each block. Do not flatten the document into one
+  mixed-size `Rich` — that breaks layout and selection paint. Full
+  document copy is `copy_text` on `MarkdownDoc::source`. Contract:
+  `select` module rustdoc. Gallery demos only public constructors.
 - Always drop `target/llvm-cov-target` after a passing coverage run.
   `just clean` is `cargo clean`. Check recipes set `CARGO_INCREMENTAL=0`.
 - Always keep `TODO.md` current with the shipped library. Sort items

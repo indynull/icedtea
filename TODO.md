@@ -2,6 +2,14 @@
 
 ## Do
 
+- Webpage-like continuous select in `markdown_view`: drag a range across
+  headings, paragraphs, and lists (not only within one block). Keep real
+  markdown layout (lists, code frames, spacing). Do not ship a single
+  mixed-size `Rich` flatten — that broke layout and multi-line selection
+  paint. Full-document copy already uses `copy_text` on
+  `MarkdownDoc::source`. Code/fields (`text_editor` + `select_only`) stay
+  the clean multi-line highlight reference.
+
 ## Consider
 
 - Plugin surfaces and extension host chrome.

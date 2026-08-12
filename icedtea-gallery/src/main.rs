@@ -553,7 +553,6 @@ enum Message {
     Tick,
     Family(String),
     Follow(bool),
-    SelectCopy(bool),
     Spin,
     OsMode(icedtea::iced::theme::Mode),
     OsAccent(Option<icedtea::iced::Color>),
@@ -698,7 +697,6 @@ struct Gallery {
     themes: ThemeCatalog,
     family: String,
     follow_os: bool,
-    select_copy: bool,
     spin: f32,
     appearance: Appearance,
     os_accent: Option<icedtea::iced::Color>,
@@ -960,7 +958,6 @@ impl Gallery {
             },
             family: "default".into(),
             follow_os: true,
-            select_copy: true,
             spin: 0.0,
             appearance: Appearance::Dark,
             os_accent: theme::os_accent(),
@@ -1134,7 +1131,7 @@ impl Gallery {
     fn context_actions(&self) -> Vec<Action<Message>> {
         let mut v = Vec::new();
         let editor = self.page == "fields";
-        let select_body = self.select_copy && matches!(self.page, "selectable" | "code");
+        let select_body = matches!(self.page, "selectable" | "code");
         if editor {
             let has = self.live_selection().is_some();
             v.push(
@@ -1252,14 +1249,12 @@ impl Gallery {
                 self.editor.perform(action);
             }
             Message::Field(id, action) => {
-                if self.select_copy {
-                    let before = self.fields.get(id).and_then(|c| c.selection());
-                    self.fields.perform(id, action);
-                    if let Some(s) = self.fields.get(id).and_then(|c| c.selection()) {
-                        self.last_sel = Some(s);
-                    } else if before.is_some() {
-                        self.last_sel = before;
-                    }
+                let before = self.fields.get(id).and_then(|c| c.selection());
+                self.fields.perform(id, action);
+                if let Some(s) = self.fields.get(id).and_then(|c| c.selection()) {
+                    self.last_sel = Some(s);
+                } else if before.is_some() {
+                    self.last_sel = before;
                 }
             }
             Message::CopyFields => {
@@ -1487,7 +1482,6 @@ impl Gallery {
                 self.follow_os = on;
                 self.apply_theme_pref();
             }
-            Message::SelectCopy(on) => self.select_copy = on,
             Message::Spin => self.spin = (self.spin + 0.07) % 1.0,
             Message::OsMode(mode) => {
                 self.appearance = Appearance::from_mode(mode);
@@ -1585,14 +1579,12 @@ impl Gallery {
                 }
             }
             Message::CodeEdit(action) => {
-                if self.select_copy {
-                    let before = self.code_editor.selection();
-                    self.code_editor.perform(action);
-                    if let Some(s) = self.code_editor.selection() {
-                        self.last_sel = Some(s);
-                    } else if before.is_some() {
-                        self.last_sel = before;
-                    }
+                let before = self.code_editor.selection();
+                self.code_editor.perform(action);
+                if let Some(s) = self.code_editor.selection() {
+                    self.last_sel = Some(s);
+                } else if before.is_some() {
+                    self.last_sel = before;
                 }
             }
             Message::FileOpen => {
@@ -2415,53 +2407,36 @@ impl Gallery {
             .spacing(8)
             .into(),
             "value-field" => {
-                if self.select_copy {
-                    let copy = Action::new("value.copy", "Copy", Message::CopyFields);
-                    column![
-                        widget::meta(
-                            "Labeled value. Select, then Copy.",
-                            tok,
-                            named("value-hint", Role::Status),
-                        ),
-                        widget::value_field(
-                            "Path",
-                            self.field("path"),
-                            |a| Message::Field("path", a),
-                            Some(&copy),
-                            icedtea::typo::FontFace::Mono,
-                            tok,
-                            self.direction,
-                            named("value-path", Role::Group),
-                        ),
-                        widget::value_field(
-                            "Id",
-                            self.field("id"),
-                            |a| Message::Field("id", a),
-                            None,
-                            icedtea::typo::FontFace::Mono,
-                            tok,
-                            self.direction,
-                            named("value-id", Role::Group).with_disabled(true),
-                        ),
-                    ]
-                    .spacing(8)
-                    .into()
-                } else {
-                    column![
-                        widget::meta(
-                            "Labeled value. The pointer cannot select.",
-                            tok,
-                            named("value-hint", Role::Status),
-                        ),
-                        widget::label(
-                            self.field("path").text(),
-                            tok,
-                            named("value-path", Role::Status),
-                        ),
-                    ]
-                    .spacing(8)
-                    .into()
-                }
+                let copy = Action::new("value.copy", "Copy", Message::CopyFields);
+                column![
+                    widget::meta(
+                        "Labeled value. Select, then Copy.",
+                        tok,
+                        named("value-hint", Role::Status),
+                    ),
+                    widget::value_field(
+                        "Path",
+                        self.field("path"),
+                        |a| Message::Field("path", a),
+                        Some(&copy),
+                        icedtea::typo::FontFace::Mono,
+                        tok,
+                        self.direction,
+                        named("value-path", Role::Group),
+                    ),
+                    widget::value_field(
+                        "Id",
+                        self.field("id"),
+                        |a| Message::Field("id", a),
+                        None,
+                        icedtea::typo::FontFace::Mono,
+                        tok,
+                        self.direction,
+                        named("value-id", Role::Group).with_disabled(true),
+                    ),
+                ]
+                .spacing(8)
+                .into()
             }
             "textarea" => widget::textarea(
                 &self.editor,
@@ -2581,98 +2556,74 @@ impl Gallery {
                 btn("color"),
             ),
             "selectable" => {
-                if self.select_copy {
-                    let copy = Action::new("edit.copy", "Copy", Message::CopyFields);
-                    column![
-                        widget::meta(
-                            "Inspector rows and a transcript. Copy posts the first selection.",
-                            tok,
-                            named("select-hint", Role::Status),
-                        ),
-                        widget::value_field(
-                            "Path",
-                            self.field("path"),
-                            |a| Message::Field("path", a),
-                            Some(&copy),
-                            icedtea::typo::FontFace::Mono,
-                            tok,
-                            self.direction,
-                            named("path", Role::Group),
-                        ),
-                        widget::value_field(
-                            "Id",
-                            self.field("id"),
-                            |a| Message::Field("id", a),
-                            Some(&copy),
-                            icedtea::typo::FontFace::Mono,
-                            tok,
-                            self.direction,
-                            named("id", Role::Group),
-                        ),
-                        widget::value_field(
-                            "Host",
-                            self.field("host"),
-                            |a| Message::Field("host", a),
-                            None,
-                            icedtea::typo::FontFace::Mono,
-                            tok,
-                            self.direction,
-                            named("host", Role::Group),
-                        ),
-                        widget::value_field(
-                            "Clock",
-                            self.field("clock"),
-                            |a| Message::Field("clock", a),
-                            None,
-                            icedtea::typo::FontFace::Ui,
-                            tok,
-                            self.direction,
-                            named("clock", Role::Group),
-                        ),
-                        widget::selectable(
-                            self.field("body"),
-                            |a| Message::Field("body", a),
-                            tok,
-                            icedtea::typo::FontFace::Ui,
-                            named("body", Role::TextBox),
-                        ),
-                        pattern::command_bar([copy], tok, self.direction),
-                    ]
-                    .spacing(12)
-                    .into()
-                } else {
-                    column![
-                        widget::meta(
-                            "Painted values. The pointer cannot select.",
-                            tok,
-                            named("select-hint", Role::Status),
-                        ),
-                        widget::label(self.field("path").text(), tok, named("path", Role::Status),),
-                        widget::label(self.field("id").text(), tok, named("id", Role::Status),),
-                        widget::label(self.field("host").text(), tok, named("host", Role::Status),),
-                        widget::label(self.field("body").text(), tok, named("body", Role::Status),),
-                    ]
-                    .spacing(12)
-                    .into()
-                }
+                let copy = Action::new("edit.copy", "Copy", Message::CopyFields);
+                column![
+                    widget::meta(
+                        "Inspector rows and a transcript. Copy posts the first selection.",
+                        tok,
+                        named("select-hint", Role::Status),
+                    ),
+                    widget::value_field(
+                        "Path",
+                        self.field("path"),
+                        |a| Message::Field("path", a),
+                        Some(&copy),
+                        icedtea::typo::FontFace::Mono,
+                        tok,
+                        self.direction,
+                        named("path", Role::Group),
+                    ),
+                    widget::value_field(
+                        "Id",
+                        self.field("id"),
+                        |a| Message::Field("id", a),
+                        Some(&copy),
+                        icedtea::typo::FontFace::Mono,
+                        tok,
+                        self.direction,
+                        named("id", Role::Group),
+                    ),
+                    widget::value_field(
+                        "Host",
+                        self.field("host"),
+                        |a| Message::Field("host", a),
+                        None,
+                        icedtea::typo::FontFace::Mono,
+                        tok,
+                        self.direction,
+                        named("host", Role::Group),
+                    ),
+                    widget::value_field(
+                        "Clock",
+                        self.field("clock"),
+                        |a| Message::Field("clock", a),
+                        None,
+                        icedtea::typo::FontFace::Ui,
+                        tok,
+                        self.direction,
+                        named("clock", Role::Group),
+                    ),
+                    widget::selectable(
+                        self.field("body"),
+                        |a| Message::Field("body", a),
+                        tok,
+                        icedtea::typo::FontFace::Ui,
+                        named("body", Role::TextBox),
+                    ),
+                    pattern::command_bar([copy], tok, self.direction),
+                ]
+                .spacing(12)
+                .into()
             }
             "label" => column![
                 widget::label("Page title", tok, named("page", Role::Header)),
                 widget::meta("Meta / caption", tok, named("meta", Role::Status)),
-                if self.select_copy {
-                    widget::code_block(
-                        self.field("snippet"),
-                        |a| Message::Field("snippet", a),
-                        tok,
-                        named("plain", Role::TextBox),
-                    )
-                } else {
-                    widget::label(
-                        self.field("snippet").text(),
-                        tok,
-                        named("plain", Role::Status),
-                    )
-                },
+                widget::code_block(
+                    self.field("snippet"),
+                    |a| Message::Field("snippet", a),
+                    tok,
+                    named("plain", Role::TextBox),
+                ),
             ]
             .spacing(8)
             .into(),
@@ -2777,18 +2728,11 @@ impl Gallery {
             "code" => {
                 let lang = CodeLang::named(&self.code_lang).unwrap_or(&samples::CODE_LANGS[0]);
                 let hl = icedtea::theme::code_highlight(&self.theme);
-                let hint = if self.select_copy {
-                    format!(
-                        "Drag to select. Language + UI colorway `{theme}`. Highlighter: {hl}.",
-                        theme = self.theme
-                    )
-                } else {
-                    format!(
-                        "Painted highlight. Language + UI colorway `{theme}`. Highlighter: {hl}.",
-                        theme = self.theme
-                    )
-                };
-                let mut col = column![
+                let hint = format!(
+                    "Drag to select. Language + UI colorway `{theme}`. Highlighter: {hl}.",
+                    theme = self.theme
+                );
+                column![
                     widget::meta(hint, tok, named("code-hint", Role::Status)),
                     widget::themed_pick_list(
                         CodeLang::names(),
@@ -2806,16 +2750,14 @@ impl Gallery {
                         layout::FILL,
                         named(lang.name, Role::TextBox),
                     ),
-                ]
-                .spacing(8);
-                if self.select_copy {
-                    col = col.push(pattern::command_bar(
+                    pattern::command_bar(
                         [Action::new("edit.copy", "Copy", Message::EditCopy)],
                         tok,
                         self.direction,
-                    ));
-                }
-                col.into()
+                    ),
+                ]
+                .spacing(8)
+                .into()
             }
             "theme" => {
                 let names = self.themes.names();
@@ -2899,13 +2841,6 @@ impl Gallery {
                             Message::Follow,
                             tok,
                             named("follow", Role::Checkbox).with_checked(self.follow_os),
-                        ),
-                        widget::themed_checkbox(
-                            "Select and copy",
-                            self.select_copy,
-                            Message::SelectCopy,
-                            tok,
-                            named("select-copy", Role::Checkbox).with_checked(self.select_copy),
                         ),
                         widget::themed_button(
                             "Light",
@@ -4555,11 +4490,13 @@ mod tests {
         assert_eq!(g.sel.primary(), Some(3));
         let _ = g.view();
         let _ = g.update(super::Message::CopyValue);
-        let _ = g.update(super::Message::SelectCopy(false));
-        assert!(!g.select_copy);
         g.page = "markdown";
         let _ = g.view();
         g.page = "code";
+        let _ = g.view();
+        g.page = "selectable";
+        let _ = g.view();
+        g.page = "value-field";
         let _ = g.view();
         assert!(g.context.is_none());
         assert_eq!(g.note, "Copied");
@@ -4621,5 +4558,29 @@ mod tests {
         )));
         assert_eq!(g.last_press.as_deref(), Some("none"));
         assert_eq!(g.press_log, vec!["Enter".to_string(), "none".to_string()]);
+    }
+
+    #[test]
+    fn content_pages_always_use_public_select_constructors() {
+        let src = include_str!("main.rs");
+        // Avoid naming the deleted field in this source so the scan is honest.
+        let dual = format!("{}_{}", "select", "copy");
+        let dual_msg = format!("{}{}", "Select", "Copy");
+        assert!(
+            !src.contains(&dual) && !src.contains(&dual_msg),
+            "gallery must not dual-path select-and-copy with a paint-only fallback"
+        );
+        let paint_only = format!("pointer cannot {}", "select");
+        assert!(!src.contains(&paint_only));
+        assert!(src.contains("widget::selectable("));
+        assert!(src.contains("widget::value_field("));
+        assert!(src.contains("widget::highlighted_code("));
+        assert!(src.contains("widget::markdown_view("));
+        assert!(src.contains("widget::code_block("));
+        let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
+        for page in ["selectable", "value-field", "code", "markdown", "type"] {
+            g.page = page;
+            let _ = g.view();
+        }
     }
 }

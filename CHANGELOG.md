@@ -8,8 +8,11 @@ accent; `apply_os_accent` puts it in primary. Canvas and text stay.
 The spinner is eight dots around a circle. `chip` takes optional
 press and dismiss. `Selectables::get` is `Option`; unbound
 `perform` is a no-op. `status_bar` takes an optional tone and
-caption. `markdown_view` uses paint-side drag select and host
-clipboard copy (via `iced_selection`).
+caption. `markdown_view` keeps structured markdown layout with
+paint-side select within each block. Code and fields stay select-only
+editors with clean multi-line highlight. Contract: `select` module.
+Gallery content pages always demo those constructors (no paint-only
+toggle).
 
 ## 0.4.0 — 2026-08-11
 

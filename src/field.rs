@@ -2,7 +2,8 @@
 //!
 //! [`Selectables`] is UI state, not a document store. Bind a source
 //! string; rebind is a no-op when the text is unchanged so a live
-//! refresh keeps the highlight.
+//! refresh keeps the highlight. App-facing select-and-copy contract:
+//! [`crate::select`].
 
 use iced::widget::text_editor::{self, Content};
 
