@@ -31,6 +31,30 @@ Score each screenshot. Prefer evidence over taste essays.
 
 Polished demo frames: calm density, one clear hierarchy (nav → title → body), consistent chips/buttons, quiet footer. Flag **ugly** if it reads like a debug dump or uneven prototype.
 
+## Usability / accessibility (visual)
+
+Score from the frame; then confirm in code when fixing.
+
+| Check | Broken / ugly signal |
+|-------|----------------------|
+| Target size | Controls look crushed or labels touch edges |
+| Hierarchy | Primary action not distinct from Quiet/Ghost |
+| Disabled | Disabled rows/buttons same weight as enabled |
+| Selection | Selected list/table row or field has no visible selection |
+| Empty state | Blank void without meta/status copy when page should explain |
+| Motion of focus | Active nav page does not match caption (wrong beat paint) |
+
+## Auto-fix eligibility
+
+| Fix now (in source) | Defer / report only |
+|---------------------|---------------------|
+| Padding, spacing, token contrast, clipped layout in a constructor | Upstream iced paint bugs with no icedtea lever |
+| Gallery dual-path / stub content | One-line fixture taste without product impact |
+| Missing disabled/selection styling | Continuous cross-block markdown select (TODO) |
+| Density grid violations in chrome rows | Host font rasterization differences |
+
+Never “fix” by regenerating the screenshot without a code change.
+
 ## Timing interpretation
 
 | Class | Guidance |

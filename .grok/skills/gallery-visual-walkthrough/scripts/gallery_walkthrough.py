@@ -408,8 +408,11 @@ def write_capture_md(
             "## Agent checklist",
             "",
             "1. `read_file` every `shots/*.png` (multimodal — not filename-only).",
-            "2. Score with `references/rubric.md`.",
-            "3. Write `VISUAL_REPORT.md` with Environment, Shot table, Verdict, Top fixes.",
+            "2. Score with `references/rubric.md` (ok / ugly / broken).",
+            "3. If the goal is pixel perfection: fix **source** for clear defects,",
+            "   re-run this harness on affected beats, `read_file` new shots (max 3 cycles).",
+            "4. Write `VISUAL_REPORT.md` with Environment, Shot table, Fix log, Verdict.",
+            "5. Never `image_gen` the UI; never score by filename alone.",
             "",
         ]
     )
