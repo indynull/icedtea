@@ -185,13 +185,35 @@ Rejected alternatives live once under Non-goals below. Do not add a
 
 ## Check and coverage
 
-`just check` is the public check: `cargo fmt --all -- --check`, clippy
+`just check` is the **public** check (continuous integration and
+feature-complete handoff): `cargo fmt --all -- --check`, clippy
 workspace `-D warnings`, `cargo test --workspace --all-features`,
 `cargo doc` on `icedtea`, `cargo llvm-cov` on `icedtea` with
 `--fail-under-lines 99 --ignore-filename-regex 'src[/\\]host'`.
 Check/clippy/test/doc/cov set `CARGO_INCREMENTAL=0`. After a passing
 `just cov`, delete `target/llvm-cov-target` (and `target/llvm-cov`).
-`just clean` is `cargo clean`.
+`just clean` is `cargo clean`. Recipes: `just fmt-check`, `just clippy`,
+`just test`, `just doc`, `just cov`.
+
+**Agent verification (default: targeted, not full `just check`)**
+
+While iterating, run the smallest command that can falsify the change.
+Do not default to full `just check` after every edit. Prefer:
+
+| Situation | Run |
+| --- | --- |
+| Logic in one module | `cargo test -p icedtea --lib <module>::` (or a named test) |
+| Gallery-only | `cargo test -p icedtea-gallery --bin icedtea-gallery <filter>` |
+| Compile only | `cargo check -p icedtea` / `-p icedtea-gallery` |
+| Style on touched files | `cargo fmt --all` then `cargo clippy -p icedtea --all-targets --all-features -- -D warnings` (or workspace if many crates) |
+| Public API / rustdoc examples changed | `cargo test -p icedtea --doc` and/or `just doc` |
+| Coverage-sensitive branch work | `just cov` (or module tests first, cov before handoff) |
+| Feature complete / pre-push / “ready for review” | full `just check` |
+
+Skip doc builds and rustdoc tests when the change is pure private
+logic, host glue, or tests with no rustdoc/API surface change. Skip
+coverage until handoff unless you are chasing fail-under. Report the
+exact command and result you ran.
 
 - Coverage ignore is host glue only: `src/host.rs` (native dialogs,
   clipboard tasks), `src/host_canvas.rs` (iced canvas stroke), and
@@ -204,9 +226,9 @@ Check/clippy/test/doc/cov set `CARGO_INCREMENTAL=0`. After a passing
 - Tests are named after production behavior, never leftover line counts
   or coverage percentages. Drive shipped entry points. No `*_for_test`
   library hooks, no `#[cfg(test)]` library paths.
-- `just check` green is necessary, not proof a widget works. Report
-  the exact command and result. Proof for a widget is the gallery
-  page plus tests that call the shipped constructor.
+- `just check` green is necessary for handoff, not proof a widget
+  works. Proof for a widget is the gallery page plus tests that call
+  the shipped constructor.
 - Gallery launch: if a display is present, start
   `cargo run -p icedtea-gallery` and confirm iced starts without panic.
   A timeout after a clean start is a successful smoke. Compile + unit
@@ -224,8 +246,9 @@ Check/clippy/test/doc/cov set `CARGO_INCREMENTAL=0`. After a passing
   green results for the others. Tag `vX.Y.Z` (matching `Cargo.toml`
   `version`) publishes `icedtea` to crates.io via
   `.github/workflows/publish.yml`.
-- Lint and format before commit or handoff (`cargo fmt`, clippy via
-  `just check`). Do not reformat unrelated files.
+- Lint and format before commit or handoff (`cargo fmt`, `just clippy`
+  or package clippy). Full `just check` at handoff. Do not reformat
+  unrelated files.
 
 `icedtea::run!` is a macro because iced 0.14 title/view closures are
 higher-ranked; do not replace it with a generic `run` function unless
@@ -297,15 +320,15 @@ Rewrite vague asks before coding:
 | Make it faster | Benchmark the hot path, change it, show the number improved |
 
 1. State success criteria before writing code.
-2. Prefer real verification (`just check`, named tests, gallery)
-   over a plausible-looking diff.
+2. Prefer real verification over a plausible-looking diff: targeted
+   tests first (see Check and coverage), full `just check` at handoff.
 3. Run the check. Read the output. Do not claim done without evidence.
 4. Fix the cause, not the test. After two failed corrections on the
    same issue, stop, summarize, and ask.
 
-Finish and commit each unit of work before the next topic: cheap checks,
-then `git commit`, so `git status` is clean. Park incomplete work only
-with explicit agreement.
+Finish and commit each unit of work before the next topic: cheap
+targeted checks, then `git commit`, so `git status` is clean. Park
+incomplete work only with explicit agreement.
 
 **Permission**
 
@@ -403,7 +426,8 @@ tables or essays in discussion notes.
 
 ## Done for a change
 
-- `just check` green (full check before claiming a feature complete).
+- Full `just check` green before claiming a feature complete or asking
+  for human review (not required after every intermediate edit).
 - New or changed public API: rustdoc example immediately above the
   constructor, `catalog::ENTRIES` plus the constructor-name map in
   `catalog` tests, a gallery page if it is a widget or pattern, and
