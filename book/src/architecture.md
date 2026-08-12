@@ -2,7 +2,7 @@
 
 Five nouns cover a window.
 
-<img src="images/compose.svg" alt="An icedtea window: Boot in the title, one Action on the chrome, tokens on the rail, a list/detail pattern, and constructors in the editor." width="800"/>
+<img src="images/compose.svg" alt="Boot starts the window. Tokens color it. One Action is Save on the menu, toolbar, and shortcut. Patterns lay out constructors. The application owns state." width="800"/>
 
 **Boot.** [`Boot`](https://docs.rs/icedtea/latest/icedtea/app/struct.Boot.html)
 sets title, application id, theme name, locale, density, and window
