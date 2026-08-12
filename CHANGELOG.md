@@ -2,13 +2,32 @@
 
 ## Unreleased
 
-`widget::virtual_column` virtualizes app-built rows (expand cards)
-with known heights; `collection::expand_card_heights` builds the
-closed/open slice. Same rail and overscan as `list_view`.
-`key::WhileInput::Chrome` / `KeyContext::chrome_over_input` still
-match Escape, Enter, and F1–F24 while a field is focused (chords
-already did). `Selectables::ensure` / `retain` / `unbind` bind bodies
-lazily for open cards.
+## 0.4.0 — 2026-08-12
+
+`pattern::workspace` calls `pane` with each leaf id. `list_view`
+takes `RowHeights` so rows can be `visible_range_var` heights, and
+`RowFace::Card` for a wrapped title on a surface. `widget::virtual_column`
+virtualizes app-built rows (expand cards) with known heights;
+`collection::expand_card_heights` builds the closed/open slice (same
+rail and overscan as list). `data_table` keeps `ColumnLayout.frozen`
+leading columns in view; `on_h_scroll` moves the rest.
+`command_palette_view` paints a parameter field when
+`CommandPalette::ask` is set. `window::place_pinned` clamps an
+overlay onto a chosen display. `daemon!` starts `iced::daemon` with
+the same `Prepared` settings; `Prepared::open` maps a window and
+`Prepared::open_desktop` maps a decorated pop-out. `expander` title
+and body share the 12px card inset.
+
+`selectable` is body text the user can drag-select and copy.
+`field::Selectables` binds those buffers by id (`get` is `Option`,
+unbound `perform` is a no-op; `ensure` / `retain` / `unbind` for lazy
+open cards); `value_field` is the labeled row. `highlighted_code` and
+`code_block` use the same select-and-copy contract. `markdown_view`
+keeps structured layout with paint-side select within each block;
+full document copy posts `MarkdownDoc.source`. Contract: `select`
+module. `key::WhileInput::Chrome` / `KeyContext::chrome_over_input`
+match Escape, Enter, and F1–F24 while a field is focused (modifier
+chords already did). Gallery demos public select constructors only.
 
 `light` and `dark` are a neutral desktop pair. Persist defaults
 `follow_os` on. When follow-OS is on, `OsChrome` /
@@ -24,30 +43,8 @@ and Monospace bind to installed faces (UI needs normal and bold weight
 700). Apps that start iced without those macros call it before the
 first frame.
 
-The spinner is eight dots around a circle. `chip` takes optional press
-and dismiss. `Selectables::get` is `Option`; unbound `perform` is a
-no-op. `status_bar` takes an optional tone and caption.
-`markdown_view` keeps structured markdown layout with paint-side
-select within each block. Code and fields stay select-only editors
-with clean multi-line highlight. Contract: `select` module. Gallery
-content pages always demo those constructors (no paint-only toggle).
-
-## 0.4.0 — 2026-08-11
-
-`pattern::workspace` calls `pane` with each leaf id. `list_view`
-takes `RowHeights` so rows can be `visible_range_var` heights, and
-`RowFace::Card` for a wrapped title on a surface. `data_table` keeps
-`ColumnLayout.frozen` leading columns in view; `on_h_scroll` moves
-the rest. `command_palette_view` paints a parameter field when
-`CommandPalette::ask` is set. `window::place_pinned` clamps an
-overlay onto a chosen display. `daemon!` starts `iced::daemon` with
-the same `Prepared` settings; `Prepared::open` maps a window and
-`Prepared::open_desktop` maps a decorated pop-out. `expander` title
-and body share the 12px card inset. `selectable` is body text the
-user can drag-select and copy. `field::Selectables` binds those
-buffers by id; `value_field` is the labeled row. `highlighted_code`
-and `code_block` use the same select-and-copy contract. Markdown
-copy posts `MarkdownDoc.source`.
+The spinner is eight dots around a circle. `chip` takes optional
+press and dismiss. `status_bar` takes an optional tone and caption.
 
 ## 0.3.0 — 2026-08-11
 
