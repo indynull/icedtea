@@ -1,65 +1,131 @@
 # Gallery QA rubric
 
-| Tag | Meaning |
-|-----|---------|
-| **ok** | Usable, clear hierarchy, no obvious defect |
-| **ugly** | Usable but dense, weak contrast, uneven gaps, weak dim |
-| **broken** | Wrong page, empty stub, clipped UI, paint bleed, dead control, invisible selection/disabled, all-black, first paint empty |
+Score every shot (and every live page) **ok / ugly / broken**. Prefer
+one primary class per defect. Severity first, then taste.
 
-## Layout
+| Tag | Meaning | Ship bar |
+|-----|---------|----------|
+| **ok** | Intentional hierarchy, honest demo, states clear | Allowed |
+| **ugly** | Usable but weak contrast, density, alignment, or chrome | Full cut: fix or residual |
+| **broken** | Wrong, empty, dead, bleed, cross-talk, unreadable, first-paint fail | Must fix |
 
-- ~12–16px inset; 4/8px spacing grid; pages share the same rhythm
-- No clipped labels/buttons; body not under status bar
-- Nav selection matches page title/caption
-- Multi-host pages: each fill widget has a real height (not one row + hole)
-- Text and icons clear card edges (no flush title/meta)
+Industry design-QA and usability heuristics (consistency, status,
+affordance, hierarchy, contrast, states) map onto the classes below.
+This is a **desktop widget library gallery**, not a marketing site:
+prefer control correctness and catalog honesty over pixel-diff thrash.
 
-## Clip / stack
+---
 
-- Virtualized lists/tables do not paint rows **over** filters, headers, or sibling demos when scrolled
-- Soft `container::clip` is not enough if card backgrounds fill their layout box — library must scissor (e.g. layer) when overscan exists
-- Idle list/table is not blank; first useful frame shows rows without a prior scroll message
+## 1. Hierarchy and density
 
-## Live behavior
+- Page title → section title → control → meta is readable at a glance
+- One primary focus per section; no equal-weight wall of controls
+- Gaps on the **4px grid** (default density 8px); uneven “random” air is ugly
+- Related items grouped; orphan controls or two copies of the same idea are broken catalog sense
+- Multi-host pages: each host has usable height (not one row + empty Fill hole)
 
-- Selection, disabled, open expander, and selected row are visible
-- Inject after-shot differs from idle in the way `expect` describes
-- Filters, pagination, split overflow, and menus that appear must **drive state** (dead chrome is broken)
-- One control must not flip unrelated widgets (message cross-talk)
-- Progress/slider/list have non-zero width/height (Fill collapse is broken)
+## 2. Alignment and geometry
 
-Inject proves `update` paths. It does **not** prove slider drag, wheel
-scroll clip, or menu hit-tests — call those out if only inject is green.
+- Shared leading edges for labels/fields in a column
+- Buttons in a row share height and baseline; split primary + overflow same height
+- Icons optically centered in hit boxes; chevrons are chevrons, not dots
+- Text and chrome clear card edges (no flush titles); ~12–16px page inset
+- Body not under status/menu; nav selection matches the open page
 
-## Demo honesty
+## 3. Color, type, contrast
 
-- Catalog page shows real demo content (not empty, not one-line stub)
-- Select surfaces use real constructors (not label-only fakes)
-- Demos teach the job of the widget (not grey boxes or random duplicates)
-- Page/widget job text matches what is actually on the page (no “slider on this page” when there is none)
-- Light theme beat looks light; dark looks dark
-- Related controls share a page; full-window screens (About, Preferences) are not dumped under an unrelated “Patterns” pile without a clear group
+- Text readable on its surface (body, meta, muted, disabled all distinct)
+- Selection and focus use tokens (`selection`, primary), not a mystery wash
+- Disabled ≠ idle (opacity or muted), but still legible
+- Light beat is light; dark is dark; high-contrast still hierarchical
+- Type: UI for chrome, mono only for code/values that need it — titles/logo never mono by accident
+- Modal: sheet above a **visible** dim wash; weak dim is ugly
 
-## Chrome atoms
+## 4. States and feedback (usability: system status)
 
-- Chevrons and icons are recognizable shapes at control size (not dots or reinvented stubs)
-- Tabs/document tabs have a clear face (border/shell), not bare text + close
-- Split button: primary and overflow same height; overflow opens a real menu
-- Modal sheets sit on a visible dim wash
-- Selectable value rows read as body text, not heavy editor slabs
+For each interactive control, the gallery should show or inject:
 
-## Platform
+| State | Fail if |
+|-------|---------|
+| Idle | Missing or collapsed |
+| Selected / on / open | No visual change vs idle |
+| Disabled | Looks enabled or invisible |
+| Empty | No empty copy or layout collapse |
+| Loading | Slot collapses or static blank with no spinner/progress |
+| Error | No error face when the constructor has one |
 
-- Default harness is Linux Xephyr. Titles and logo must not look mono there.
-- macOS bold/UI cascade and OS chrome colors need a **host** (or remote Mac) pass when those areas changed — do not claim them from Xephyr alone.
+Busy, toast, jobs, progress: motion or value must be **perceivable** in
+the shot (not a zero-width bar).
 
-## Interact pairs (`idle` → `after-interact`)
+## 5. Affordance and honesty
 
-Expected state change must be **visible**. Same paint as idle → broken
-inject, target below the fold, or broken style.
+- Looks pressable → works (dead split-overflow, dead filters, dead
+  pagination = **broken**)
+- Job / meta text matches the page (hint lies = broken)
+- Demos teach the **job** of the widget (grey stubs, random duplicates,
+  label-only “select” fakes = broken or ugly)
+- Select/copy pages use real select constructors
+- Catalog grouping is sensible (lists with pagination; overlays vs
+  full-window screens; not a junk “Patterns” drawer)
 
-## Fix
+## 6. Clip, scroll, stack
 
-Change **source**, re-capture. Never edit PNGs or `image_gen` the UI.
-Prefer library fix for clip, Fill, icons, and control behavior; gallery
-only for pure demo packing, seed data, and page grouping.
+- Virtualized rows do not paint **over** filters, headers, or siblings
+- Soft container clip is not enough when backgrounds fill layout boxes —
+  library needs a real scissor/layer for overscan
+- First useful frame shows content (empty list until scroll message = broken)
+- Sticky/frozen columns stay put; horizontal scroll does not orphan them
+- Overlays (menu, context, palette, dialog) sit above content with clear
+  z-order; flyouts align to parent row and do not needlessly overlap
+
+## 7. Interaction integrity
+
+- Inject after-shot ≠ idle in the way `expect` describes
+- One message must not flip unrelated widgets (**cross-talk** = broken)
+- Progress/slider/list/table have non-zero size (**Fill collapse** = broken)
+- Keyboard story where the library owns it: focus order, Escape on
+  modal/menu (live pass; note if unproven)
+
+### Pointer-only (shot pass cannot fully prove)
+
+Call out if only inject is green:
+
+- Slider / sash drag
+- Wheel scroll + clip
+- Split overflow open, context submenu flyout placement
+- Hover/pressed faces
+- Text selection drag
+
+## 8. Platform
+
+| Host | Proves |
+|------|--------|
+| Linux Xephyr (default) | Layout, tokens, most demos, inject |
+| Host Linux display | Same + real window manager chrome |
+| macOS / Windows host | UI font cascade, bold proportional, OS accent/chrome if follow-OS |
+
+Do not claim macOS type quality from Xephyr. When `host_font` / `typo` /
+follow-OS change: host or remote Mac pass required for **SHIP** on those
+paths.
+
+## 9. Performance feel (light check)
+
+- First paint not empty for virtual collections
+- Scrolling large lists stays usable (live); no full-list mount panic
+- No obvious thrash (spinner stuck, scroll jump every frame) in a short live try
+
+## Interact pairs
+
+`idle` → `after-interact`: expected change **visible on screen**. Same
+as idle → broken inject, target below fold, or broken style. Reorder or
+fixed heights so inject targets sit above the fold.
+
+## Fix layer
+
+| Symptom | Prefer |
+|---------|--------|
+| Clip, Fill, icons, control API, tokens, type bind | `src/` |
+| Packing, seeds, page group, job copy, multi-host heights | `icedtea-gallery/` |
+| Both | Library for mechanism, gallery for story |
+
+Never edit PNGs. Never generative-fake the UI.
