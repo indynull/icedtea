@@ -615,12 +615,17 @@ pub fn resolve_pref(
 /// Desktop accent, if the host reports one.
 ///
 /// Linux: settings portal, or Yaru `gtk-theme` on Ubuntu. Windows:
-/// system accent. macOS: control accent. `None` when the host has no
-/// color or the read times out.
+/// system accent. macOS: control accent (`once_blocking` on the main
+/// thread). `None` when the host has no color or the read times out.
+///
+/// Prefer [`listen_os_accent`] from the application; call this only on
+/// the UI thread at boot when a one-shot is enough.
 ///
 ///
 /// ```
-/// let _ = icedtea::theme::os_accent();
+/// // Boot path only (main thread on macOS):
+/// // let accent = icedtea::theme::os_accent();
+/// let _ = icedtea::theme::listen_os_accent();
 /// ```
 pub fn os_accent() -> Option<Color> {
     let prefs = mundy::Preferences::once_blocking(
@@ -855,9 +860,12 @@ mod tests {
         assert!(mapped.g.abs() < 0.01);
         assert!((mapped.b - 0.5).abs() < 0.01);
         assert_eq!(mapped.a, 1.0);
-        let _ = os_accent();
         let _ = listen_os_accent();
-        let _ = apply_os_accent(tok, true, os_accent());
+        // `once_blocking` is main-thread-only on macOS; unit tests are not.
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = apply_os_accent(tok, true, os_accent());
+        }
     }
 
     #[test]
