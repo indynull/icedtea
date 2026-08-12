@@ -628,10 +628,15 @@ pub fn resolve_pref(
 /// let _ = icedtea::theme::listen_os_accent();
 /// ```
 pub fn os_accent() -> Option<Color> {
-    let prefs = mundy::Preferences::once_blocking(
-        mundy::Interest::AccentColor,
-        std::time::Duration::from_millis(80),
-    )?;
+    // mundy panics off the main thread on macOS. Unit tests and some
+    // boot paths are not on that thread; return None instead of aborting.
+    let prefs = std::panic::catch_unwind(|| {
+        mundy::Preferences::once_blocking(
+            mundy::Interest::AccentColor,
+            std::time::Duration::from_millis(80),
+        )
+    })
+    .ok()??;
     prefs.accent_color.0.map(color_from_srgba)
 }
 
@@ -861,11 +866,8 @@ mod tests {
         assert!((mapped.b - 0.5).abs() < 0.01);
         assert_eq!(mapped.a, 1.0);
         let _ = listen_os_accent();
-        // `once_blocking` is main-thread-only on macOS; unit tests are not.
-        #[cfg(not(target_os = "macos"))]
-        {
-            let _ = apply_os_accent(tok, true, os_accent());
-        }
+        // Safe off the main thread (macOS once_blocking panics otherwise).
+        let _ = apply_os_accent(tok, true, os_accent());
     }
 
     #[test]
