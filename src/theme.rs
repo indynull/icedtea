@@ -612,9 +612,43 @@ pub fn resolve_pref(
     }
 }
 
+/// Desktop accent, if the host reports one.
+///
+/// Linux: settings portal, or Yaru `gtk-theme` on Ubuntu. Windows:
+/// system accent. macOS: control accent. `None` when the host has no
+/// color or the read times out.
+///
+///
+/// ```
+/// let _ = icedtea::theme::os_accent();
+/// ```
+pub fn os_accent() -> Option<Color> {
+    let prefs = mundy::Preferences::once_blocking(
+        mundy::Interest::AccentColor,
+        std::time::Duration::from_millis(80),
+    )?;
+    prefs.accent_color.0.map(color_from_srgba)
+}
+
+/// Emits the desktop accent when it changes. First item is the current
+/// value (`None` if the host has no color).
+pub fn listen_os_accent() -> iced::Subscription<Option<Color>> {
+    iced::Subscription::run(os_accent_stream)
+}
+
+fn os_accent_stream() -> impl iced::futures::Stream<Item = Option<Color>> {
+    use iced::futures::StreamExt;
+    mundy::Preferences::stream(mundy::Interest::AccentColor)
+        .map(|prefs| prefs.accent_color.0.map(color_from_srgba))
+}
+
+fn color_from_srgba(c: mundy::Srgba) -> Color {
+    Color::from_rgba(c.red as f32, c.green as f32, c.blue as f32, c.alpha as f32)
+}
+
 /// When `follow_os` is on, fill [`Tokens::primary`] from the desktop
-/// accent. Canvas and text stay. Decorated windows keep the native
-/// title bar.
+/// accent ([`os_accent`], [`listen_os_accent`]). Canvas and text stay.
+/// Decorated windows keep the native title bar.
 ///
 /// ```
 /// use iced::Color;
@@ -811,6 +845,19 @@ mod tests {
             tok.primary
         );
         assert_eq!(apply_os_accent(tok, true, None).primary, tok.primary);
+        let mapped = color_from_srgba(mundy::Srgba {
+            red: 1.0,
+            green: 0.0,
+            blue: 0.5,
+            alpha: 1.0,
+        });
+        assert!((mapped.r - 1.0).abs() < 0.01);
+        assert!(mapped.g.abs() < 0.01);
+        assert!((mapped.b - 0.5).abs() < 0.01);
+        assert_eq!(mapped.a, 1.0);
+        let _ = os_accent();
+        let _ = listen_os_accent();
+        let _ = apply_os_accent(tok, true, os_accent());
     }
 
     #[test]

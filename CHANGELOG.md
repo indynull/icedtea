@@ -3,8 +3,8 @@
 ## Unreleased
 
 `light` and `dark` are a neutral desktop pair. Persist defaults
-`follow_os` on. Canvas and text stay; primary can take the desktop
-accent.
+`follow_os` on. `os_accent` / `listen_os_accent` read the desktop
+accent; `apply_os_accent` puts it in primary. Canvas and text stay.
 
 ## 0.4.0 — 2026-08-11
 

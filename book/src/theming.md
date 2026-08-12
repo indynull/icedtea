@@ -37,8 +37,10 @@ High-contrast is its own name. Names without a pair do not follow the
 OS. Persist stores `theme` plus optional `family` and `follow_os`
 (`follow_os` defaults on). Mode changes come from iced
 (`system::theme` / `theme_changes`).
-When follow-OS is on, `theme::apply_os_accent` can fill
-`Tokens.primary` from the desktop accent. Canvas and text stay the
+When follow-OS is on, `theme::os_accent` / `theme::listen_os_accent`
+read the desktop accent (settings portal, Windows accent, macOS
+control accent). `theme::apply_os_accent` puts that color in
+`Tokens.primary` and rebuilds selection. Canvas and text stay the
 family's tokens. Decorated windows keep the native title bar.
 
 - [`theme`](https://docs.rs/icedtea/latest/icedtea/theme/index.html)
