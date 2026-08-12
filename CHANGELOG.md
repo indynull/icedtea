@@ -5,7 +5,10 @@
 `light` and `dark` are a neutral desktop pair. Persist defaults
 `follow_os` on. `os_accent` / `listen_os_accent` read the desktop
 accent; `apply_os_accent` puts it in primary. Canvas and text stay.
-The spinner is eight dots around a circle.
+The spinner is eight dots around a circle. `chip` takes optional
+press and dismiss. `Selectables::get` is `Option`; unbound
+`perform` is a no-op. `status_bar` takes an optional tone and
+caption.
 
 ## 0.4.0 — 2026-08-11
 

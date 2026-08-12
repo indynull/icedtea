@@ -1054,11 +1054,17 @@ impl Gallery {
         self.pointer.x > side
     }
 
+    fn field(&self, id: &str) -> &Content {
+        self.fields
+            .get(id)
+            .unwrap_or_else(|| panic!("gallery binds {id}"))
+    }
+
     fn edit_content(&self) -> &Content {
         if self.page == "code" {
             &self.code_editor
         } else if self.page == "selectable" {
-            self.fields.get("body")
+            self.field("body")
         } else {
             &self.editor
         }
@@ -1068,7 +1074,9 @@ impl Gallery {
         if self.page == "code" {
             &mut self.code_editor
         } else if self.page == "selectable" {
-            self.fields.get_mut("body")
+            self.fields
+                .get_mut("body")
+                .unwrap_or_else(|| panic!("gallery binds body"))
         } else {
             &mut self.editor
         }
@@ -1245,9 +1253,9 @@ impl Gallery {
             }
             Message::Field(id, action) => {
                 if self.select_copy {
-                    let before = self.fields.get(id).selection();
+                    let before = self.fields.get(id).and_then(|c| c.selection());
                     self.fields.perform(id, action);
-                    if let Some(s) = self.fields.get(id).selection() {
+                    if let Some(s) = self.fields.get(id).and_then(|c| c.selection()) {
                         self.last_sel = Some(s);
                     } else if before.is_some() {
                         self.last_sel = before;
@@ -1985,6 +1993,8 @@ impl Gallery {
                 } else {
                     format!("{} · {}", self.page, self.note)
                 },
+                None,
+                None,
                 &self.actions,
                 tok,
                 self.direction,
@@ -2415,7 +2425,7 @@ impl Gallery {
                         ),
                         widget::value_field(
                             "Path",
-                            self.fields.get("path"),
+                            self.field("path"),
                             |a| Message::Field("path", a),
                             Some(&copy),
                             icedtea::typo::FontFace::Mono,
@@ -2425,7 +2435,7 @@ impl Gallery {
                         ),
                         widget::value_field(
                             "Id",
-                            self.fields.get("id"),
+                            self.field("id"),
                             |a| Message::Field("id", a),
                             None,
                             icedtea::typo::FontFace::Mono,
@@ -2444,7 +2454,7 @@ impl Gallery {
                             named("value-hint", Role::Status),
                         ),
                         widget::label(
-                            self.fields.get("path").text(),
+                            self.field("path").text(),
                             tok,
                             named("value-path", Role::Status),
                         ),
@@ -2581,7 +2591,7 @@ impl Gallery {
                         ),
                         widget::value_field(
                             "Path",
-                            self.fields.get("path"),
+                            self.field("path"),
                             |a| Message::Field("path", a),
                             Some(&copy),
                             icedtea::typo::FontFace::Mono,
@@ -2591,7 +2601,7 @@ impl Gallery {
                         ),
                         widget::value_field(
                             "Id",
-                            self.fields.get("id"),
+                            self.field("id"),
                             |a| Message::Field("id", a),
                             Some(&copy),
                             icedtea::typo::FontFace::Mono,
@@ -2601,7 +2611,7 @@ impl Gallery {
                         ),
                         widget::value_field(
                             "Host",
-                            self.fields.get("host"),
+                            self.field("host"),
                             |a| Message::Field("host", a),
                             None,
                             icedtea::typo::FontFace::Mono,
@@ -2611,7 +2621,7 @@ impl Gallery {
                         ),
                         widget::value_field(
                             "Clock",
-                            self.fields.get("clock"),
+                            self.field("clock"),
                             |a| Message::Field("clock", a),
                             None,
                             icedtea::typo::FontFace::Ui,
@@ -2620,7 +2630,7 @@ impl Gallery {
                             named("clock", Role::Group),
                         ),
                         widget::selectable(
-                            self.fields.get("body"),
+                            self.field("body"),
                             |a| Message::Field("body", a),
                             tok,
                             icedtea::typo::FontFace::Ui,
@@ -2637,26 +2647,10 @@ impl Gallery {
                             tok,
                             named("select-hint", Role::Status),
                         ),
-                        widget::label(
-                            self.fields.get("path").text(),
-                            tok,
-                            named("path", Role::Status),
-                        ),
-                        widget::label(
-                            self.fields.get("id").text(),
-                            tok,
-                            named("id", Role::Status),
-                        ),
-                        widget::label(
-                            self.fields.get("host").text(),
-                            tok,
-                            named("host", Role::Status),
-                        ),
-                        widget::label(
-                            self.fields.get("body").text(),
-                            tok,
-                            named("body", Role::Status),
-                        ),
+                        widget::label(self.field("path").text(), tok, named("path", Role::Status),),
+                        widget::label(self.field("id").text(), tok, named("id", Role::Status),),
+                        widget::label(self.field("host").text(), tok, named("host", Role::Status),),
+                        widget::label(self.field("body").text(), tok, named("body", Role::Status),),
                     ]
                     .spacing(12)
                     .into()
@@ -2667,14 +2661,14 @@ impl Gallery {
                 widget::meta("Meta / caption", tok, named("meta", Role::Status)),
                 if self.select_copy {
                     widget::code_block(
-                        self.fields.get("snippet"),
+                        self.field("snippet"),
                         |a| Message::Field("snippet", a),
                         tok,
                         named("plain", Role::TextBox),
                     )
                 } else {
                     widget::label(
-                        self.fields.get("snippet").text(),
+                        self.field("snippet").text(),
                         tok,
                         named("plain", Role::Status),
                     )
@@ -3372,6 +3366,7 @@ impl Gallery {
                             tags = tags.push(widget::chip(
                                 "markdown",
                                 None,
+                                None,
                                 tok,
                                 Variant::Quiet,
                                 btn("markdown"),
@@ -3379,6 +3374,7 @@ impl Gallery {
                             if self.card_tag {
                                 tags = tags.push(widget::chip(
                                     "local",
+                                    None,
                                     Some(Message::DismissCardTag),
                                     tok,
                                     Variant::Quiet,
@@ -3412,12 +3408,20 @@ impl Gallery {
             "rule" => widget::rule_h(tok, named("rule", Role::Separator)),
             "chip" => column![
                 widget::meta(
-                    "Dismissible tags. Idle and a quiet neighbour.",
+                    "Press a filter chip, or dismiss a tag with ×.",
                     tok,
                     named("chip-hint", Role::Status),
                 ),
                 {
                     let mut chips = row![].spacing(8).align_y(Alignment::Center);
+                    chips = chips.push(widget::chip(
+                        "Add note",
+                        Some(Message::Note("Add note".into())),
+                        None,
+                        tok,
+                        Variant::Chip,
+                        btn("Add note"),
+                    ));
                     for (i, name) in self.chips.iter().enumerate() {
                         let v = if name == "iced" {
                             Variant::Primary
@@ -3431,7 +3435,14 @@ impl Gallery {
                         } else {
                             Some(Message::DismissChip(i))
                         };
-                        chips = chips.push(widget::chip(name.clone(), dismiss, tok, v, btn(name)));
+                        chips = chips.push(widget::chip(
+                            name.clone(),
+                            None,
+                            dismiss,
+                            tok,
+                            v,
+                            btn(name),
+                        ));
                     }
                     chips = chips.push(widget::badge(
                         self.chips.len().to_string(),
@@ -3453,6 +3464,7 @@ impl Gallery {
                     .map(|(i, t)| {
                         widget::chip(
                             t.clone(),
+                            None,
                             Some(Message::DismissWrap(i)),
                             tok,
                             Variant::Quiet,
@@ -3638,7 +3650,19 @@ impl Gallery {
             ),
             "menu" => pattern::menu_bar(&self.actions, tok, self.direction, &self.catalog),
             "toolbar" => pattern::toolbar(self.actions.iter(), tok, self.direction),
-            "status-bar" => pattern::status_bar("ready", &self.actions, tok, self.direction),
+            "status-bar" => column![
+                pattern::status_bar("ready", None, None, &self.actions, tok, self.direction),
+                pattern::status_bar(
+                    "socket down",
+                    Some(ToastKind::Danger),
+                    Some("Tab fields  ·  Esc"),
+                    &self.actions,
+                    tok,
+                    self.direction,
+                ),
+            ]
+            .spacing(8)
+            .into(),
             "toast" => column![
                 widget::themed_button(
                     "Toast",
@@ -4232,7 +4256,7 @@ impl Gallery {
                 .width(Length::Fill)
                 .height(Length::Fill)
                 .into(),
-                pattern::status_bar("ok", &self.actions, tok, self.direction),
+                pattern::status_bar("ok", None, None, &self.actions, tok, self.direction),
                 tok,
             ),
             other => panic!("gallery missing demo for {other}"),

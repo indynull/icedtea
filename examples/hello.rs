@@ -78,7 +78,7 @@ impl Hello {
                 icedtea::layout::FILL,
                 A11y::new("notes", Role::TextBox),
             ),
-            pattern::status_bar(&self.status, &self.table, tok, Direction::Ltr),
+            pattern::status_bar(&self.status, None, None, &self.table, tok, Direction::Ltr),
         ]
         .spacing(8)
         .padding(12)

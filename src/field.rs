@@ -19,6 +19,9 @@ use crate::widget::select_only;
 /// fields.perform("body", Action::SelectAll);
 /// assert_eq!(fields.copy("path"), "sessions/a/transcript.jsonl");
 /// assert_eq!(fields.first_selection().as_deref(), Some("hello"));
+/// assert!(fields.contains("path"));
+/// assert!(fields.get("missing").is_none());
+/// fields.perform("missing", Action::SelectAll);
 /// fields.bind("body", "hello");
 /// assert_eq!(fields.first_selection().as_deref(), Some("hello"));
 /// ```
@@ -47,33 +50,34 @@ impl Selectables {
         self.items.push((id, Content::with_text(text)));
     }
 
+    /// Whether `id` is bound.
+    pub fn contains(&self, id: &str) -> bool {
+        self.items.iter().any(|(k, _)| k == id)
+    }
+
     /// Buffer for a bound id.
-    pub fn get(&self, id: &str) -> &Content {
-        self.items
-            .iter()
-            .find(|(k, _)| k == id)
-            .map(|(_, c)| c)
-            .unwrap_or_else(|| panic!("unbound selectable {id}"))
+    pub fn get(&self, id: &str) -> Option<&Content> {
+        self.items.iter().find(|(k, _)| k == id).map(|(_, c)| c)
     }
 
     /// Mutable buffer for a bound id.
-    pub fn get_mut(&mut self, id: &str) -> &mut Content {
-        self.items
-            .iter_mut()
-            .find(|(k, _)| k == id)
-            .map(|(_, c)| c)
-            .unwrap_or_else(|| panic!("unbound selectable {id}"))
+    pub fn get_mut(&mut self, id: &str) -> Option<&mut Content> {
+        self.items.iter_mut().find(|(k, _)| k == id).map(|(_, c)| c)
     }
 
-    /// Apply a pointer or key action. Typing is dropped.
+    /// Apply a pointer or key action. Typing is dropped. Unbound is a
+    /// no-op.
     pub fn perform(&mut self, id: &str, action: text_editor::Action) {
-        self.get_mut(id).perform(select_only(action));
+        if let Some(content) = self.get_mut(id) {
+            content.perform(select_only(action));
+        }
     }
 
-    /// Selection if any, otherwise the full text.
+    /// Selection if any, otherwise the full text. Unbound is empty.
     pub fn copy(&self, id: &str) -> String {
-        let content = self.get(id);
-        content.selection().unwrap_or_else(|| content.text())
+        self.get(id)
+            .map(|content| content.selection().unwrap_or_else(|| content.text()))
+            .unwrap_or_default()
     }
 
     /// First non-empty selection in bind order.
@@ -101,7 +105,8 @@ mod tests {
         assert!(fields.is_empty());
         fields.bind("path", "a/b");
         assert_eq!(fields.len(), 1);
-        assert_eq!(fields.get("path").text(), "a/b");
+        assert!(fields.contains("path"));
+        assert_eq!(fields.get("path").map(|c| c.text()), Some("a/b".into()));
         assert_eq!(fields.copy("path"), "a/b");
         assert_eq!(fields.first_selection(), None);
     }
@@ -123,7 +128,7 @@ mod tests {
         fields.bind("body", "hello");
         fields.perform("body", Action::SelectAll);
         fields.bind("body", "other");
-        assert_eq!(fields.get("body").text(), "other");
+        assert_eq!(fields.get("body").map(|c| c.text()), Some("other".into()));
         assert_eq!(fields.first_selection(), None);
         assert_eq!(fields.copy("body"), "other");
     }
@@ -133,7 +138,7 @@ mod tests {
         let mut fields = Selectables::new();
         fields.bind("body", "keep");
         fields.perform("body", Action::Edit(Edit::Insert('x')));
-        assert_eq!(fields.get("body").text(), "keep");
+        assert_eq!(fields.get("body").map(|c| c.text()), Some("keep".into()));
     }
 
     #[test]
@@ -149,16 +154,13 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "unbound selectable missing")]
-    fn get_requires_a_bound_id() {
-        let fields = Selectables::new();
-        let _ = fields.get("missing");
-    }
-
-    #[test]
-    #[should_panic(expected = "unbound selectable missing")]
-    fn perform_requires_a_bound_id() {
+    fn unbound_get_is_none_and_perform_is_noop() {
         let mut fields = Selectables::new();
+        assert!(!fields.contains("missing"));
+        assert!(fields.get("missing").is_none());
+        assert!(fields.get_mut("missing").is_none());
         fields.perform("missing", Action::SelectAll);
+        assert_eq!(fields.copy("missing"), "");
+        assert!(fields.is_empty());
     }
 }

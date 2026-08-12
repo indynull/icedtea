@@ -86,7 +86,8 @@ Constructor: [`widget::chip`](https://docs.rs/icedtea/latest/icedtea/widget/fn.c
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Optional press message. Disabled keeps the face.
+Optional press and optional dismiss. META type, chip wash, shrink
+width. Disabled keeps the face and drops press.
 
 ### Badge
 
@@ -246,7 +247,8 @@ Constructor: [`pattern::status_bar`](https://docs.rs/icedtea/latest/icedtea/patt
 [source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Left is status copy. Right is `table.footer_hints()`.
+Left is status copy (`meta`, or `info_bar` when a tone is set). Right
+is `table.footer_hints()`, or an optional caption string.
 
 ### Jobs
 

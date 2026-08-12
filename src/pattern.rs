@@ -233,28 +233,50 @@ pub fn command_bar<'a, M: Clone + 'a>(
 
 /// Footer text plus shortcut hints from the same table.
 ///
+/// `tone` paints the left with [`crate::widget::info_bar`] when set,
+/// otherwise meta. `caption` is the right text; `None` uses
+/// `table.footer_hints()`.
+///
 ///
 /// ```
 /// use icedtea::action::{Action, ActionTable};
 /// use icedtea::i18n::Direction;
 /// use icedtea::pattern;
 /// use icedtea::theme;
+/// use icedtea::toast::ToastKind;
 /// let tok = theme::named("dark").tokens;
 /// let mut table = ActionTable::new();
 /// table.insert(Action::new("file.save", "Save", ()));
 /// let _: icedtea::Element<'_, ()> =
-///     pattern::status_bar("ready", &table, tok, Direction::Ltr);
+///     pattern::status_bar("ready", None, None, &table, tok, Direction::Ltr);
+/// let _: icedtea::Element<'_, ()> = pattern::status_bar(
+///     "socket down",
+///     Some(ToastKind::Danger),
+///     Some("Tab fields  ·  Esc"),
+///     &table,
+///     tok,
+///     Direction::Ltr,
+/// );
 /// ```
 pub fn status_bar<'a, M: Clone + 'a>(
     status: impl Into<String>,
+    tone: Option<crate::toast::ToastKind>,
+    caption: Option<&str>,
     table: &ActionTable<M>,
     tok: Tokens,
     dir: Direction,
 ) -> Element<'a, M> {
     let status = status.into();
-    let hints = table.footer_hints().join("  ·  ");
-    let left = meta(status.clone(), tok, A11y::new(status, Role::Status));
-    let right = meta(hints.clone(), tok, A11y::new(hints, Role::Status));
+    let right_s = caption.map(str::to_string).unwrap_or_else(|| {
+        let hints = table.footer_hints();
+        hints.join("  ·  ")
+    });
+    let left: Element<'a, M> = if let Some(kind) = tone {
+        crate::widget::info_bar(kind, status.clone(), tok, A11y::new(status, Role::Status))
+    } else {
+        meta(status.clone(), tok, A11y::new(status, Role::Status))
+    };
+    let right = meta(right_s.clone(), tok, A11y::new(right_s, Role::Status));
     let ends = order(dir, [left, right]);
     let mut ends = ends.into_iter();
     crate::a11y::attach(
@@ -727,7 +749,7 @@ pub fn tab_view<'a, M: Clone + 'a>(
 /// let menu = pattern::menu_bar(&table, tok, Direction::Ltr, &cat);
 /// let tools = pattern::toolbar(table.iter(), tok, Direction::Ltr);
 /// let center = widget::label("notes.txt", tok, A11y::new("doc", icedtea::a11y::Role::Header));
-/// let status = pattern::status_bar("ok", &table, tok, Direction::Ltr);
+/// let status = pattern::status_bar("ok", None, None, &table, tok, Direction::Ltr);
 /// let _: icedtea::Element<'_, ()> = pattern::main_window(
 ///     menu,
 ///     tools,
@@ -1438,8 +1460,16 @@ mod tests {
         let _: Element<'_, ()> = toolbar(acts.iter().copied(), tok, rtl);
         let _: Element<'_, ()> = command_bar(table.iter(), tok, rtl);
         let _: Element<'_, ()> = command_bar(std::iter::empty::<Action<()>>(), tok, ltr);
-        let _: Element<'_, ()> = status_bar("ready", &table, tok, ltr);
-        let _: Element<'_, ()> = status_bar("ready", &table, tok, rtl);
+        let _: Element<'_, ()> = status_bar("ready", None, None, &table, tok, ltr);
+        let _: Element<'_, ()> = status_bar("ready", None, None, &table, tok, rtl);
+        let _: Element<'_, ()> = status_bar(
+            "socket down",
+            Some(crate::toast::ToastKind::Danger),
+            Some("Tab fields  ·  Esc"),
+            &table,
+            tok,
+            ltr,
+        );
         let ltr_ids: Vec<_> = order(ltr, table.iter().map(|a| a.id.as_str()));
         let rtl_ids: Vec<_> = order(rtl, table.iter().map(|a| a.id.as_str()));
         assert_eq!(ltr_ids.first(), Some(&"file.save"));
@@ -1506,7 +1536,7 @@ mod tests {
         paint(&mut bar);
         let mut tb = toolbar(acts.iter().copied(), tok, ltr);
         paint(&mut tb);
-        let mut sb = status_bar("ready", &table, tok, ltr);
+        let mut sb = status_bar("ready", None, None, &table, tok, ltr);
         paint(&mut sb);
         let mut pal = command_palette_view("", &res, 0, |_| (), |_| (), None, |_| (), None, tok);
         paint(&mut pal);

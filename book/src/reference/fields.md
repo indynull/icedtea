@@ -54,7 +54,8 @@ Constructor: [`widget::value_field`](https://docs.rs/icedtea/latest/icedtea/widg
 [icedtea](https://crates.io/crates/icedtea)
 
 Meta label, selectable value, optional Copy `Action`. Bind the text
-with `field::Selectables`. Mono face for paths and ids.
+with `field::Selectables` (`get` is `Option`, unbound `perform` is a
+no-op). Mono face for paths and ids.
 
 ### Text area
 

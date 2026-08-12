@@ -2340,7 +2340,8 @@ fn chip_wash(tok: Tokens, variant: Variant) -> iced::Color {
 
 /// A compact labeled pill.
 ///
-/// Optional press message. Disabled keeps the face.
+/// Optional press and optional dismiss. META type, chip wash, shrink
+/// width. Disabled keeps the face and drops press.
 ///
 ///
 /// ```
@@ -2349,11 +2350,28 @@ fn chip_wash(tok: Tokens, variant: Variant) -> iced::Color {
 /// use icedtea::variant::Variant;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let _: icedtea::Element<'_, ()> =
-///     widget::chip("Rust", None, tok, Variant::Quiet, A11y::button("Rust"));
+/// let add = ();
+/// let _: icedtea::Element<'_, ()> = widget::chip(
+///     "Add note",
+///     Some(add),
+///     None,
+///     tok,
+///     Variant::Chip,
+///     A11y::button("Add note"),
+/// );
+/// let drop = ();
+/// let _: icedtea::Element<'_, ()> = widget::chip(
+///     "Rust",
+///     None,
+///     Some(drop),
+///     tok,
+///     Variant::Quiet,
+///     A11y::button("Rust"),
+/// );
 /// ```
 pub fn chip<'a, M: Clone + 'a>(
     title: impl Into<String>,
+    press: Option<M>,
     dismiss: Option<M>,
     tok: Tokens,
     variant: Variant,
@@ -2375,13 +2393,15 @@ pub fn chip<'a, M: Clone + 'a>(
         ));
     }
     let wash = chip_wash(tok, variant);
-    a11y::attach(
-        container(line)
-            .padding([4, 8])
-            .style(move |_| style::fill(wash, ink))
-            .into(),
-        &a11y,
-    )
+    let face = container(line)
+        .padding([4, 8])
+        .style(move |_| style::fill(wash, ink));
+    let body: Element<'a, M> = if let Some(msg) = a11y.apply_message(press) {
+        mouse_area(face).on_press(msg).into()
+    } else {
+        face.into()
+    };
+    a11y::attach(body, &a11y)
 }
 
 /// A count or status mark.
@@ -4414,13 +4434,13 @@ mod tests {
         );
         let _: Element<'_, ()> = rule_h(tok, role("rule", Role::Separator));
         let _: Element<'_, ()> = dismiss_button((), tok, btn("dismiss"));
-        let _: Element<'_, ()> = chip("c", Some(()), tok, Variant::Quiet, btn("c"));
-        let _: Element<'_, ()> = chip("plain", None, tok, Variant::Primary, btn("plain"));
-        let _: Element<'_, ()> = chip("hot", Some(()), tok, Variant::Danger, btn("hot"));
-        let _: Element<'_, ()> = chip("g", None, tok, Variant::Ghost, btn("g"));
-        let _: Element<'_, ()> = chip("k", None, tok, Variant::Chip, btn("k"));
-        let _: Element<'_, ()> = chip("ok", None, tok, Variant::Success, btn("ok"));
-        let _: Element<'_, ()> = chip("warn", None, tok, Variant::Warning, btn("warn"));
+        let _: Element<'_, ()> = chip("c", None, Some(()), tok, Variant::Quiet, btn("c"));
+        let _: Element<'_, ()> = chip("plain", None, None, tok, Variant::Primary, btn("plain"));
+        let _: Element<'_, ()> = chip("hot", None, Some(()), tok, Variant::Danger, btn("hot"));
+        let _: Element<'_, ()> = chip("g", None, None, tok, Variant::Ghost, btn("g"));
+        let _: Element<'_, ()> = chip("k", Some(()), None, tok, Variant::Chip, btn("k"));
+        let _: Element<'_, ()> = chip("ok", None, None, tok, Variant::Success, btn("ok"));
+        let _: Element<'_, ()> = chip("warn", None, None, tok, Variant::Warning, btn("warn"));
         let _: Element<'_, ()> = badge("b", tok, Variant::Quiet, role("b", Role::Status));
         let _: Element<'_, ()> = badge("new", tok, Variant::Primary, role("new", Role::Status));
         let _: Element<'_, ()> = badge("!", tok, Variant::Danger, role("bang", Role::Status));
@@ -4852,8 +4872,8 @@ mod tests {
                 role("code", Role::Group),
             ),
             color_swatch(1, 2, 3, (), tok, btn("color")),
-            chip("ok", None, tok, Variant::Success, btn("ok")),
-            chip("x", Some(()), tok, Variant::Quiet, btn("x")),
+            chip("ok", None, None, tok, Variant::Success, btn("ok")),
+            chip("x", None, Some(()), tok, Variant::Quiet, btn("x")),
             tooltip_wrap(
                 label("n", tok, role("n", Role::Status)),
                 "tip",
