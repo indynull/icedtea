@@ -201,12 +201,7 @@ fn state_caption<'a>(label: &str, tok: Tokens) -> Element<'a, Message> {
 
 fn scene_card<'a>(child: Element<'a, Message>, tok: Tokens) -> Element<'a, Message> {
     container(child)
-        .padding(Padding {
-            top: 20.0,
-            right: 20.0,
-            bottom: 48.0,
-            left: 20.0,
-        })
+        .padding(16)
         .width(Length::Fill)
         .style(move |_| icedtea::style::card(tok, false))
         .into()
@@ -233,6 +228,7 @@ fn page_fills(page: &str) -> bool {
             | "keys"
             | "image"
             | "markdown"
+            | "document-tabs"
     )
 }
 
@@ -241,23 +237,24 @@ fn page_job(page: &str) -> &'static str {
         "controls" => "Press a control. The status bar records the message.",
         "fields" => "Typed values the application owns. Select-and-copy is on for labeled rows.",
         "readout" => "Progress, a ring, a sparkline, and an indeterminate spinner.",
-        "type" => "Labels, icons, links, and a tooltip.",
-        "markdown" => "Rendered document. Drag to select; Ctrl+C copies the range.",
+        "type" => "Body text, table cells, chrome icons, hover tips, and links.",
+        "markdown" => "Document on the right, outline on the left. Drag to select; Copy source posts the file.",
         "code" => "Highlighted source. Select a range and copy.",
-        "image" => "The slot keeps its box while loading or on error.",
-        "selectable" => "Body text the user can drag-select and copy.",
-        "list" => "Virtualized rows. Cards wrap a long title; flush rows are one line.",
+        "image" => "Same box for ready, loading (spinner), and error. Contain vs cover on a real photo.",
+        "selectable" => "Drag to select body text. Typing does not change it. Copy posts the range.",
+        "list" => "Search and Unread/Flagged at the top filter the virtualized list. Pagination pages a large set.",
         "log" => "Virtualized lines for a growing log.",
-        "grid" => "Tiles that share a row height.",
-        "table" => "Columns stay in layout order. Frozen leading columns stay in view.",
+        "grid" => "Equal-width tiles. Press a card; selection stays on the tile.",
+        "table" => "Virtualized rows. Filter and sort are application-owned. Cells select; they do not edit.",
         "tree" => "Folders expand in place. Leaves select.",
-        "sections" => "Tabs, an accordion, an expander, and pagination.",
+        "sections" => "Section tabs, accordion, and expander — not document strips.",
+        "document-tabs" => "Closable editor titles on a strip. Dirty tabs show a bullet.",
         "theme" => "Named colorways. Follow the desktop light/dark pair and accent.",
         "colors" => "Semantic tokens and mixes. These are the paints widgets use.",
         "keys" => "The action table drives shortcuts. The cheatsheet lists them.",
-        "marks" => "Cards, chips, badges, rules, and a teaching tip.",
-        "chrome-rows" => "Menu, toolbar, status, breadcrumb, and the command bar.",
-        "feedback" => "Toasts, a job strip, scroll, and a busy overlay on a child.",
+        "marks" => "Cards and group boxes, then chips and badges, then callouts and tips.",
+        "chrome-rows" => "Menu, toolbar, command bar, status, breadcrumb, and context menu.",
+        "feedback" => "Toasts, background jobs, busy overlay, and a themed scroller.",
         "dialogs" => "An in-window confirm sheet on a dim backdrop.",
         "list-detail" => "A list beside a detail pane. Pick a row; the right side is that row.",
         "inspector" => "Pick a file. The middle is the document. The right column is properties.",
@@ -277,38 +274,97 @@ fn page_job(page: &str) -> &'static str {
     }
 }
 
-fn widget_job(id: &str) -> Option<&'static str> {
-    Some(match id {
+/// One line job for a catalog id. Always present so the demo maps to a use case.
+fn widget_job(id: &str) -> &'static str {
+    match id {
+        "button" => "Primary actions. Variants, then disabled.",
+        "split-button" => "Primary runs Save. Chevron opens Save As and Export.",
+        "toggle-button" => "Pressed (checked), idle, and disabled. Own state per control.",
+        "checkbox" => "Checked, idle, and disabled.",
+        "radio" => "One choice in a set. Selected, idle, and disabled.",
+        "switch" => "On, off, and disabled.",
+        "slider" => "Continuous value. This page shares it with progress widgets.",
+        "text-input" => "Single-line field. Enter submits; Focus field moves the caret.",
+        "password" => "Masked entry for secrets the user types.",
+        "secret" => "Reveal the token, then copy it.",
+        "value-field" => "Labeled select-and-copy row. Application owns the buffer.",
+        "textarea" => "Multi-line editor. Application owns the buffer.",
+        "search" => "Query field with a search icon.",
+        "suggest" => "Type to filter suggestions; pick a row.",
+        "select" => "Pick one option from a list.",
+        "number" => "Numeric value with step buttons.",
+        "mask" => "Template 0000-0000. Digits fill slots; dashes are literals.",
+        "date" => "Calendar day the application owns.",
+        "time" => "Clock fields the application owns.",
+        "color" => "Swatch and picker. Application owns the color.",
         "spinner" => "Indeterminate work. Eight dots light in turn.",
-        "progress-ring" => {
-            "Determinate fraction as a ring. The slider on this page drives the value."
-        }
-        "progress" => "Determinate bar. Same fraction as the ring.",
+        "progress-ring" => "Determinate fraction as a ring. Drag the slider under Progress.",
+        "progress" => "Determinate bar. Drag the slider on this section to set the fraction.",
         "sparkline" => "One-row series. Domain plots stay in the application.",
-        "display" => "A large value for a compact tool.",
+        "display" => "Big end-aligned value for a tool window (calculator, meter).",
+        "label" => "One line of body text. Meta is the smaller caption under a title.",
+        "rich-cell" => "One table or list cell: plain, emphasis, mono code, or a link.",
+        "icon" => "Chrome SVG set. Tokens tint the fill.",
+        "tooltip" => "Hover the control. The tip follows the pointer.",
+        "link" => "Press the link. The status bar records where the app would go.",
+        "markdown" => "Parsed document with real layout. Outline jumps; select a range to copy.",
+        "code" => "Syntax-highlighted source. Select a range and copy.",
+        "selectable" => "Drag to select; typing does not change the text.",
+        "list" => "Search and bucket filters at the top. Application owns the view.",
+        "log" => "Virtualized lines for a growing log.",
+        "grid" => "Equal-width tiles with per-tile icon and subtitle.",
+        "table" => "Sortable columns. Filter is application-owned. Cells select only.",
+        "tree" => "Folders expand in place. Leaves select.",
+        "tabs" => "Strip only. Body below is application content for the active tab.",
+        "accordion" => "One open section at a time.",
+        "expander" => "Short face when closed; full body when open.",
+        "pagination" => "Page through a large set.",
+        "document-tabs" => "Closable document shells. Dirty titles show a bullet.",
+        "image" => "Contain vs cover on a photo. Loading spins; missing keeps the box.",
+        "theme" => "Named colorways and follow-OS.",
+        "colors" => "Washes and text-on colors from the active colorway.",
+        "keys" => "Last key and recent presses from the action table.",
+        "cheatsheet" => "Shortcuts from the same action table.",
+        "card" => "group_box with a title and body.",
+        "group-box" => "Titled surface for related controls.",
+        "rule" => "Horizontal hairline.",
+        "chip" => "Compact labeled pill; optional dismiss.",
+        "badge" => "Status pill on a title row.",
+        "wrap" => "Flow children to the next line.",
+        "pad" => "Fixed padding around a child.",
+        "callout" => "Inline info bar with tone.",
+        "banner" => "Full-width notice with optional action.",
+        "teaching-tip" => "One-shot hint with a go action.",
+        "skeleton" => "Placeholder bars while content loads.",
+        "menu" => "Menu bar from the action table.",
+        "toolbar" => "Action buttons from the same table.",
+        "command-bar" => "Dense action strip for a card footer.",
+        "status-bar" => "Footer status plus table actions.",
+        "breadcrumb" => "Path of links; last crumb is current.",
+        "context-menu" => "Nested menu at the pointer. Right-click the page for a live one.",
         "busy" => "The switch is the busy flag. On, the child dims and eight dots spin.",
         "toast" => "Transient notice. The application owns the queue.",
         "jobs" => "Background jobs. Progress ticks while the gallery is open.",
         "scrollbar" => "Themed scroller for panes that are not a list or table.",
-        "skeleton" => "Placeholder bars while content loads.",
-        "teaching-tip" => "A one-shot hint with a go action.",
-        "workspace" => "Editor split: files on the left, Edit and Terminal as tabs. Drag the sash.",
+        "workspace" => "Editor split: files on the left, Edit and Terminal as tabs.",
         "drawer" => "A side pane that hides. Closed paints the content only.",
-        "tool-panel" => {
-            "Press Dock to pin this outline as a pane on the right of the workspace above."
-        }
-        "inspector" => "Pick a file. Middle is the document. Right is name, kind, and path.",
+        "tool-panel" => "Press Dock to pin this outline on the right of the workspace.",
+        "inspector" => "Pick a file. Middle is the document. Right is properties.",
         "list-detail" => "Sidebar list plus a filling detail pane.",
         "tab-view" => "The strip is the constructor. The body below is application content.",
-        "preferences" => "Filter groups by the search field. Rows are title plus key/value text.",
+        "preferences" => "Filter groups by search. Rows are title plus key/value text.",
         "about" => "Four strings in a group box. The application supplies the copy.",
         "status-page" => "Centered title, body, and an optional action.",
-        "palette" => "Query field plus hits from the action table. Not a full-page layout.",
+        "palette" => "Query field plus hits from the action table.",
         "navigation" => "Wide: sidebar beside content. Narrow: a stack with Back.",
         "main-window" => "The four regions are arguments. This page is that compose.",
         "dialogs" => "Primary and optional cancel. Native file pickers go through native_dialog.",
-        _ => return None,
-    })
+        _ => "Shipped constructor demo.",
+    }
+}
+
+fn ctor_caption(id: &str) -> String {
+    catalog::constructor_path(id).unwrap_or_else(|| id.to_string())
 }
 
 fn sample_mail(i: usize) -> ListRow {
@@ -327,9 +383,49 @@ fn sample_mail(i: usize) -> ListRow {
     })
 }
 
+/// Unread / flagged flags for sample mail row `i` (same seed as [`sample_mail`]).
+fn sample_mail_flags(i: usize) -> (bool, bool) {
+    (i % 3 != 0, i % 5 == 0)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ListBucket {
+    All,
+    Unread,
+    Flagged,
+}
+
 fn list_meter(i: usize) -> f32 {
     ((i % 5) as f32 + 1.0) / 5.0
 }
+
+/// Full sample rows for the data table page (filter/sort view over this).
+fn sample_table_rows() -> Vec<Vec<String>> {
+    const FILES: &[&str] = &["lib.rs", "catalog.rs", "widget.rs", "theme.rs", "app.rs"];
+    const ROLES: &[&str] = &["Library", "Catalog", "Widget", "Theme", "App"];
+    (0..1_000)
+        .map(|i| {
+            vec![
+                FILES[i % FILES.len()].into(),
+                ROLES[i % ROLES.len()].into(),
+                if i % 3 == 0 { "ready" } else { "idle" }.into(),
+                format!("src/{}", FILES[i % FILES.len()]),
+            ]
+        })
+        .collect()
+}
+
+fn table_headers() -> Vec<String> {
+    vec![
+        "Name".into(),
+        "Role".into(),
+        "Status".into(),
+        "Path".into(),
+    ]
+}
+
+/// Rows per page for the List + Pagination demo. Application owns paging.
+const LIST_PER_PAGE: usize = 25;
 
 fn list_row_heights(list: &VecList, card: bool) -> Vec<f32> {
     list.items
@@ -405,7 +501,7 @@ fn tour_caption_for(page: &str) -> &'static str {
         "code" => "Code: select and copy",
         "image" => "Image: slot keeps its box",
         "selectable" => "Selectable: drag to copy",
-        "list" => "List: cards and variable height",
+        "list" => "List: cards, filters, and pagination",
         "log" => "Log: virtualized lines",
         "grid" => "Item grid: shared row tiles",
         "table" => "Table: frozen leading columns",
@@ -524,13 +620,16 @@ enum Message {
     Expand(bool),
     Page(usize),
     Sort(usize),
+    TableFilter(String),
+    TableStatus(Option<&'static str>),
+    ListFilter(String),
+    ListBucket(ListBucket),
     Tree(u64),
     TreeSelect(u64),
     ListScroll(VisibleWindow),
     TableScroll(VisibleWindow),
     ListSel(usize),
     TableCell(usize, usize),
-    OptSel(usize),
     MdJump(usize),
     MdLink(String),
     Note(String),
@@ -574,7 +673,7 @@ enum Message {
     AskLine,
     TableHScroll(f32),
     ListFace(bool),
-    OptScroll(VisibleWindow),
+
     FocusName,
     Secret(String),
     RevealSecret,
@@ -583,6 +682,7 @@ enum Message {
     WindowHeight(f32),
     Cursor(icedtea::layout::CursorEvent),
     ContextDismiss,
+    ContextSubmenu(Option<usize>),
     EditCopy,
     EditCut,
     EditPaste,
@@ -593,9 +693,12 @@ enum Message {
     Slide(f32),
     Check(bool),
     Optional(bool),
+    Bold(bool),
+    Italic(bool),
     Switch(bool),
     Sounds(bool),
     Radio(u8),
+
     Editor(icedtea::iced::widget::text_editor::Action),
     Field(&'static str, icedtea::iced::widget::text_editor::Action),
     CopyFields,
@@ -647,6 +750,8 @@ struct Gallery {
     secret_revealed: bool,
     checked: bool,
     optional: bool,
+    bold: bool,
+    italic: bool,
     on: bool,
     sounds: bool,
     radio: u8,
@@ -659,27 +764,48 @@ struct Gallery {
     tabs: Tabs,
     accordion: Accordion,
     expander_open: bool,
-    page_i: usize,
+    /// 0-based page index for the List + Pagination demo.
+    list_page: usize,
     table: TableModel,
+    /// Unfiltered rows; `table.rows` is the filtered/sorted view.
+    table_all: Vec<Vec<String>>,
+    table_filter: String,
+    /// `None` = all statuses; `Some("ready")` / `Some("idle")`.
+    table_status: Option<&'static str>,
     tree: TreeNode,
     tree_sel: Option<u64>,
+    /// Full mail seed; filter + page slice into [`Self::list`].
+    list_all: VecList,
+    /// (unread, flagged) parallel to `list_all`.
+    list_flags: Vec<(bool, bool)>,
+    list_filter: String,
+    list_bucket: ListBucket,
+    /// Rows matching the current filter (all pages).
+    list_matched: usize,
+    /// Current page of the List demo (what `list_view` paints).
     list: VecList,
-    sel: Selection,
+    /// Selection for the List page (indices into the current page slice).
+    list_sel: Selection,
+    /// Selection for list-detail (indices into `list_all`).
+    list_detail_sel: Selection,
+    /// Selection for the table demo (row indices into `table.rows`).
+    table_sel: Selection,
     actions: ActionTable<Message>,
     nav: NavStack,
     prefs: Vec<PrefGroup>,
     editor: Content,
     fields: icedtea::field::Selectables,
     md: MarkdownDoc,
+    /// Virtual window for the List page only (not list-detail).
     list_window: VisibleWindow,
+    /// Virtual window for list-detail (full seed; must not stomp List page).
+    list_detail_window: VisibleWindow,
     table_window: VisibleWindow,
     table_cursor: (usize, usize),
     table_cols: icedtea::collection::ColumnLayout,
     log_lines: Vec<String>,
     log_window: VisibleWindow,
     mask: String,
-    options: VecList,
-    opt_sel: Selection,
     md_jump: Option<usize>,
     md_heads: Vec<icedtea::widget::MdHeading>,
     note: String,
@@ -712,6 +838,8 @@ struct Gallery {
     window_height: f32,
     pointer: icedtea::iced::Point,
     context: Option<icedtea::iced::Point>,
+    /// Open root submenu index for the live context menu.
+    context_submenu: Option<usize>,
     last_press: Option<String>,
     press_log: Vec<String>,
     nav_split: SplitState,
@@ -725,7 +853,6 @@ struct Gallery {
     drawer_open: bool,
     cheat_q: String,
     last_sel: Option<String>,
-    opt_window: VisibleWindow,
     list_heights: Vec<f32>,
     list_card: bool,
 }
@@ -784,6 +911,8 @@ impl Gallery {
             secret_revealed: false,
             checked: true,
             optional: false,
+            bold: true,
+            italic: false,
             on: true,
             sounds: false,
             radio: 0,
@@ -804,23 +933,16 @@ impl Gallery {
             tabs,
             accordion: Accordion { open: Some(0) },
             expander_open: false,
-            page_i: 0,
+            list_page: 0,
             table: TableModel {
-                headers: vec!["Name".into(), "Role".into(), "Status".into(), "Path".into()],
-                rows: (0..1_000)
-                    .map(|i| {
-                        let files = ["lib.rs", "catalog.rs", "widget.rs", "theme.rs", "app.rs"];
-                        vec![
-                            files[i % files.len()].into(),
-                            ["Library", "Catalog", "Widget", "Theme", "App"][i % 5].into(),
-                            if i % 3 == 0 { "ready" } else { "idle" }.into(),
-                            format!("src/{}", files[i % files.len()]),
-                        ]
-                    })
-                    .collect(),
+                headers: table_headers(),
+                rows: sample_table_rows(),
                 sort_col: None,
                 sort_asc: true,
             },
+            table_all: sample_table_rows(),
+            table_filter: String::new(),
+            table_status: None,
             tree: TreeNode::branch(
                 1,
                 "icedtea",
@@ -846,10 +968,19 @@ impl Gallery {
                 ],
             ),
             tree_sel: None,
+            list_all: VecList {
+                items: (0..1_000).map(sample_mail).collect(),
+            },
+            list_flags: (0..1_000).map(sample_mail_flags).collect(),
+            list_filter: String::new(),
+            list_bucket: ListBucket::All,
+            list_matched: 1_000,
             list: VecList {
                 items: (0..1_000).map(sample_mail).collect(),
             },
-            sel: Selection::Single(0),
+            list_sel: Selection::Single(0),
+            list_detail_sel: Selection::Single(0),
+            table_sel: Selection::Single(0),
             actions,
             nav: NavStack::new("home"),
             prefs: vec![
@@ -893,13 +1024,16 @@ impl Gallery {
                 fields.bind("clock", "idle");
                 fields.bind(
                     "snippet",
-                    "plain monospace block — see Code for highlighting",
+                    "Selectable keeps a long paragraph readable: wrap at the pane edge, drag across \
+                     several lines, and copy without an edit caret. Use this for licenses, quotes, \
+                     or any body the user should not type into.",
                 );
                 fields.bind("md", md.source.as_str());
                 fields
             },
             md,
             list_window: VisibleWindow::new(400.0),
+            list_detail_window: VisibleWindow::new(400.0),
             table_window: VisibleWindow::new(360.0),
             table_cursor: (0, 0),
             table_cols: {
@@ -917,14 +1051,6 @@ impl Gallery {
                 .collect(),
             log_window: VisibleWindow::new(240.0),
             mask: String::new(),
-            options: {
-                let mut o = VecList::titles(["All"]);
-                o.items.push(icedtea::collection::ListRow::separator());
-                o.items.push(icedtea::collection::ListRow::new("Unread"));
-                o.items.push(icedtea::collection::ListRow::new("Flagged"));
-                o
-            },
-            opt_sel: Selection::Multi(vec![0]),
             md_jump: None,
             md_heads,
             note: String::new(),
@@ -973,13 +1099,23 @@ impl Gallery {
             window_height: 640.0,
             pointer: icedtea::iced::Point::ORIGIN,
             context: None,
+            context_submenu: None,
             last_press: None,
             press_log: Vec::new(),
             nav_split: SplitState::new(Axis::Horizontal, 280.0 / 900.0),
             nav_drag: SashDrag::default(),
             ws_sash: None,
             ws_drag: SashDrag::default(),
-            collapsed: HashSet::new(),
+            collapsed: {
+                // Start with a short nav: only Controls expanded.
+                let mut c = HashSet::new();
+                for g in catalog::groups() {
+                    if g != "Controls" {
+                        c.insert(g);
+                    }
+                }
+                c
+            },
             tour_at: 0,
             docs: {
                 let mut d =
@@ -1003,11 +1139,10 @@ impl Gallery {
             drawer_open: true,
             cheat_q: String::new(),
             last_sel: None,
-            opt_window: VisibleWindow::new(140.0),
             list_heights: Vec::new(),
             list_card: true,
         };
-        gallery.list_heights = list_row_heights(&gallery.list, gallery.list_card);
+        gallery.refresh_list_view();
         gallery.apply_theme_pref();
         gallery.clamp_nav();
         if tour_wanted() {
@@ -1057,6 +1192,121 @@ impl Gallery {
             .unwrap_or_else(|| panic!("gallery binds {id}"))
     }
 
+    /// Rebuild the list page from `list_all` using search, bucket, and page.
+    /// Application owns filter + pagination; the list paints one page.
+    fn refresh_list_view(&mut self) {
+        let q = self.list_filter.to_ascii_lowercase();
+        let mut matched = Vec::new();
+        for (i, row) in self.list_all.items.iter().enumerate() {
+            let (unread, flagged) = self.list_flags.get(i).copied().unwrap_or((false, false));
+            match self.list_bucket {
+                ListBucket::All => {}
+                ListBucket::Unread if !unread => continue,
+                ListBucket::Flagged if !flagged => continue,
+                _ => {}
+            }
+            if !q.is_empty() {
+                let title_hit = row.title.to_ascii_lowercase().contains(&q);
+                let meta_hit = row
+                    .meta
+                    .as_ref()
+                    .is_some_and(|m| m.to_ascii_lowercase().contains(&q));
+                if !title_hit && !meta_hit {
+                    continue;
+                }
+            }
+            matched.push(row.clone());
+        }
+        self.list_matched = matched.len();
+        let pages = icedtea::collection::page_count(self.list_matched, LIST_PER_PAGE);
+        if pages == 0 {
+            self.list_page = 0;
+        } else if self.list_page >= pages {
+            self.list_page = pages - 1;
+        }
+        let range =
+            icedtea::collection::page_range(self.list_matched, self.list_page, LIST_PER_PAGE);
+        self.list = VecList {
+            items: matched[range].to_vec(),
+        };
+        self.list_heights = list_row_heights(&self.list, self.list_card);
+        let n = self.list.items.len();
+        if n == 0 {
+            self.list_sel = Selection::None;
+        } else if let Some(i) = self.list_sel.primary() {
+            if i >= n {
+                self.list_sel.select_single(n - 1);
+            }
+        }
+        // Remount from the current scroll (callers zero it on page/filter).
+        // Never leave a non-empty page with an empty mounted window — that
+        // paints a blank list with no “empty” label.
+        let total: f32 = self.list_heights.iter().sum();
+        let vp = self.list_window.viewport.max(1.0);
+        let scroll = self.list_window.scroll.clamp(0.0, (total - vp).max(0.0));
+        let mut win = icedtea::collection::visible_window_var(
+            scroll,
+            vp,
+            &self.list_heights,
+            OVERSCAN,
+            self.list_sel.primary(),
+        );
+        if n > 0 && win.end <= win.start {
+            win = icedtea::collection::visible_window_var(
+                0.0,
+                vp,
+                &self.list_heights,
+                OVERSCAN,
+                self.list_sel.primary(),
+            );
+        }
+        self.list_window = win;
+    }
+
+    /// Rebuild `table.rows` from `table_all` using filter, status, and sort.
+    /// The library table only paints; the application owns the view.
+    fn refresh_table_view(&mut self) {
+        let q = self.table_filter.to_ascii_lowercase();
+        let mut rows: Vec<Vec<String>> = self
+            .table_all
+            .iter()
+            .filter(|r| {
+                if let Some(st) = self.table_status {
+                    if r.get(2).map(String::as_str) != Some(st) {
+                        return false;
+                    }
+                }
+                if q.is_empty() {
+                    return true;
+                }
+                r.iter()
+                    .any(|c| c.to_ascii_lowercase().contains(&q))
+            })
+            .cloned()
+            .collect();
+        if let Some(col) = self.table.sort_col {
+            let asc = self.table.sort_asc;
+            rows.sort_by(|a, b| {
+                let av = a.get(col).map(String::as_str).unwrap_or("");
+                let bv = b.get(col).map(String::as_str).unwrap_or("");
+                if asc {
+                    av.cmp(bv)
+                } else {
+                    bv.cmp(av)
+                }
+            });
+        }
+        self.table.rows = rows;
+        let n = self.table.rows.len();
+        if n == 0 {
+            self.table_cursor = (0, 0);
+            self.table_sel = Selection::None;
+        } else if self.table_cursor.0 >= n {
+            self.table_cursor.0 = n - 1;
+            self.table_sel.select_single(self.table_cursor.0);
+        }
+    }
+
     fn edit_content(&self) -> &Content {
         if self.page == "code" {
             &self.code_editor
@@ -1086,14 +1336,20 @@ impl Gallery {
     fn copy_value(&self) -> String {
         match self.page {
             "markdown" => self.md.source.clone(),
-            "list" | "list-detail" => self
-                .sel
+            "list" => self
+                .list_sel
                 .primary()
                 .and_then(|i| self.list.items.get(i))
                 .map(|r| r.title.clone())
                 .unwrap_or_default(),
+            "list-detail" => self
+                .list_detail_sel
+                .primary()
+                .and_then(|i| self.list_all.items.get(i))
+                .map(|r| r.title.clone())
+                .unwrap_or_default(),
             "table" => self
-                .sel
+                .table_sel
                 .primary()
                 .map(|i| self.table.cell(i, 0).to_string())
                 .unwrap_or_default(),
@@ -1109,10 +1365,9 @@ impl Gallery {
                         "Notes", "Terminal", "Settings", "Help",
                     ]
                     .get(i)
-                    .copied()
+                    .map(|s| (*s).to_string())
                 })
-                .unwrap_or("")
-                .to_string(),
+                .unwrap_or_default(),
             "type" => "Page title".into(),
             _ => {
                 if !self.query.is_empty() {
@@ -1128,47 +1383,107 @@ impl Gallery {
         self.edit_selection().or_else(|| self.last_sel.clone())
     }
 
-    fn context_actions(&self) -> Vec<Action<Message>> {
-        let mut v = Vec::new();
+    fn context_entries(&self) -> Vec<icedtea::pattern::ContextEntry<Message>> {
+        use icedtea::pattern::ContextEntry;
         let editor = self.page == "fields";
         let select_body = matches!(self.page, "selectable" | "code");
         if editor {
             let has = self.live_selection().is_some();
-            v.push(
-                Action::new("edit.cut", "Cut", Message::EditCut)
-                    .with_shortcut(Shortcut::parse("ctrl+x").unwrap()),
-            );
-            v.last_mut().unwrap().enabled = has;
-            v.push(
-                Action::new("edit.copy", "Copy", Message::EditCopy)
-                    .with_shortcut(Shortcut::parse("ctrl+c").unwrap()),
-            );
-            v.last_mut().unwrap().enabled = has;
-            v.push(
-                Action::new("edit.paste", "Paste", Message::EditPaste)
-                    .with_shortcut(Shortcut::parse("ctrl+v").unwrap()),
-            );
-            v.push(Action::new(
-                "edit.select-all",
-                "Select all",
-                Message::EditSelectAll,
-            ));
+            let mut cut = Action::new("edit.cut", "Cut", Message::EditCut)
+                .with_shortcut(Shortcut::parse("ctrl+x").unwrap());
+            cut.enabled = has;
+            let mut copy = Action::new("edit.copy", "Copy", Message::EditCopy)
+                .with_shortcut(Shortcut::parse("ctrl+c").unwrap());
+            copy.enabled = has;
+            vec![
+                ContextEntry::from(cut),
+                ContextEntry::from(copy),
+                ContextEntry::from(
+                    Action::new("edit.paste", "Paste", Message::EditPaste)
+                        .with_shortcut(Shortcut::parse("ctrl+v").unwrap()),
+                ),
+                ContextEntry::Separator,
+                ContextEntry::from(Action::new(
+                    "edit.select-all",
+                    "Select all",
+                    Message::EditSelectAll,
+                )),
+            ]
         } else if select_body {
             let has = self.live_selection().is_some();
-            v.push(
-                Action::new("edit.copy", "Copy", Message::EditCopy)
-                    .with_shortcut(Shortcut::parse("ctrl+c").unwrap()),
-            );
-            v.last_mut().unwrap().enabled = has;
-            v.push(Action::new(
-                "edit.select-all",
-                "Select all",
-                Message::EditSelectAll,
-            ));
+            let mut copy = Action::new("edit.copy", "Copy", Message::EditCopy)
+                .with_shortcut(Shortcut::parse("ctrl+c").unwrap());
+            copy.enabled = has;
+            vec![
+                ContextEntry::from(copy),
+                ContextEntry::from(Action::new(
+                    "edit.select-all",
+                    "Select all",
+                    Message::EditSelectAll,
+                )),
+            ]
         } else {
-            v.push(Action::new("edit.copy", "Copy", Message::CopyValue));
+            // Nested flyouts for the general live menu (chrome-rows demo).
+            vec![
+                ContextEntry::from(
+                    Action::new("edit.copy", "Copy", Message::CopyValue)
+                        .with_shortcut(Shortcut::parse("ctrl+c").unwrap()),
+                ),
+                ContextEntry::from(Action::new(
+                    "edit.paste",
+                    "Paste",
+                    Message::Note("Paste".into()),
+                )),
+                ContextEntry::Separator,
+                ContextEntry::menu(
+                    "Share",
+                    [
+                        ContextEntry::from(Action::new(
+                            "share.link",
+                            "Copy link",
+                            Message::Note("Copied link".into()),
+                        )),
+                        ContextEntry::from(Action::new(
+                            "share.mail",
+                            "Mail",
+                            Message::Note("Open mail".into()),
+                        )),
+                        ContextEntry::from(Action::new(
+                            "share.message",
+                            "Messages",
+                            Message::Note("Open messages".into()),
+                        )),
+                    ],
+                ),
+                ContextEntry::menu(
+                    "Arrange",
+                    [
+                        ContextEntry::from(Action::new(
+                            "arr.front",
+                            "Bring to front",
+                            Message::Note("Bring to front".into()),
+                        )),
+                        ContextEntry::from(Action::new(
+                            "arr.forward",
+                            "Bring forward",
+                            Message::Note("Bring forward".into()),
+                        )),
+                        ContextEntry::Separator,
+                        ContextEntry::from(Action::new(
+                            "arr.back",
+                            "Send to back",
+                            Message::Note("Send to back".into()),
+                        )),
+                    ],
+                ),
+                ContextEntry::Separator,
+                ContextEntry::from(Action::new(
+                    "view.inspect",
+                    "Inspect",
+                    Message::Note("Inspect".into()),
+                )),
+            ]
         }
-        v
     }
 
     fn theme(&self) -> Theme {
@@ -1241,6 +1556,9 @@ impl Gallery {
             }
             Message::Check(v) => self.checked = v,
             Message::Optional(v) => self.optional = v,
+            Message::Bold(v) => self.bold = v,
+            Message::Italic(v) => self.italic = v,
+
             Message::Switch(v) => self.on = v,
             Message::Sounds(v) => self.sounds = v,
             Message::Radio(v) => self.radio = v,
@@ -1356,16 +1674,48 @@ impl Gallery {
             }
             Message::Acc(i) => self.accordion.toggle(i),
             Message::Expand(open) => self.expander_open = open,
-            Message::Page(i) => self.page_i = i,
-            Message::Sort(c) => self.table.sort(c),
+            Message::Page(i) => {
+                self.list_page = i;
+                self.list_window.scroll = 0.0;
+                self.refresh_list_view();
+            }
+            Message::Sort(c) => {
+                if self.table.sort_col == Some(c) {
+                    self.table.sort_asc = !self.table.sort_asc;
+                } else {
+                    self.table.sort_col = Some(c);
+                    self.table.sort_asc = true;
+                }
+                self.refresh_table_view();
+            }
+            Message::TableFilter(q) => {
+                self.table_filter = q;
+                self.refresh_table_view();
+            }
+            Message::TableStatus(st) => {
+                self.table_status = st;
+                self.refresh_table_view();
+            }
             Message::Tree(id) => {
                 let _ = icedtea::collection::tree_toggle(&mut self.tree, id);
                 fill_lazy_folder(&mut self.tree, id);
             }
             Message::TreeSelect(id) => self.tree_sel = Some(id),
-            Message::ListScroll(w) => self.list_window = w,
+            Message::ListScroll(w) => {
+                if self.page == "list-detail" {
+                    self.list_detail_window = w;
+                } else {
+                    self.list_window = w;
+                }
+            }
             Message::TableScroll(w) => self.table_window = w,
-            Message::ListSel(i) => self.sel.select_single(i),
+            Message::ListSel(i) => {
+                if self.page == "list-detail" {
+                    self.list_detail_sel.select_single(i);
+                } else {
+                    self.list_sel.select_single(i);
+                }
+            }
             Message::LogScroll(w) => self.log_window = w,
             Message::Mask(s) => self.mask = s,
             Message::SuggestPick(i) => {
@@ -1453,14 +1803,10 @@ impl Gallery {
                     "Accent idle".into()
                 };
             }
-            Message::OptSel(i) => {
-                if !self.options.is_separator(i) {
-                    self.opt_sel.toggle_multi(i);
-                }
-            }
+
             Message::TableCell(r, c) => {
                 self.table_cursor = (r, c);
-                self.sel.select_single(r);
+                self.table_sel.select_single(r);
             }
             Message::Submit => {
                 self.dialog_note = format!("submit: {}", self.query);
@@ -1520,11 +1866,14 @@ impl Gallery {
                 if self.context.is_some() {
                     if matches!(icedtea::key::press(&ev), Some(icedtea::key::Press::Escape)) {
                         self.context = None;
+                        self.context_submenu = None;
                         return Task::none();
                     }
                     let mut menu = ActionTable::new();
-                    for a in self.context_actions() {
-                        menu.insert(a);
+                    for entry in self.context_entries() {
+                        if let icedtea::pattern::ContextEntry::Item(a) = entry {
+                            menu.insert(a);
+                        }
                     }
                     let ctx = KeyContext {
                         text_input_focused: false,
@@ -1532,6 +1881,7 @@ impl Gallery {
                     };
                     if let Some(msg) = icedtea::key::handle(ctx, &menu, &ev) {
                         self.context = None;
+                        self.context_submenu = None;
                         return self.update(msg);
                     }
                     return Task::none();
@@ -1564,11 +1914,14 @@ impl Gallery {
                             10,
                         );
                         self.table_cursor = (r, c);
-                        self.sel.select_single(r);
+                        self.table_sel.select_single(r);
                     } else if self.page == "list" {
-                        let next =
-                            press.step_index(self.sel.primary().unwrap_or(0), self.list.len(), 10);
-                        self.sel.select_single(next);
+                        let next = press.step_index(
+                            self.list_sel.primary().unwrap_or(0),
+                            self.list.len(),
+                            10,
+                        );
+                        self.list_sel.select_single(next);
                     }
                 }
             }
@@ -1642,9 +1995,22 @@ impl Gallery {
             Message::TableHScroll(x) => self.table_cols.set_h_scroll(x),
             Message::ListFace(card) => {
                 self.list_card = card;
-                self.list_heights = list_row_heights(&self.list, card);
+                // Heights change; remount/clamp so deep scroll cannot blank the pane.
+                self.refresh_list_view();
             }
-            Message::OptScroll(w) => self.opt_window = w,
+            Message::ListFilter(q) => {
+                self.list_filter = q;
+                self.list_page = 0;
+                self.list_window.scroll = 0.0;
+                self.refresh_list_view();
+            }
+            Message::ListBucket(b) => {
+                self.list_bucket = b;
+                self.list_page = 0;
+                self.list_window.scroll = 0.0;
+                self.refresh_list_view();
+            }
+
             Message::FocusName => {
                 return icedtea::iced::widget::operation::focus(icedtea::iced::widget::Id::new(
                     "gallery-name",
@@ -1666,10 +2032,15 @@ impl Gallery {
                 icedtea::layout::CursorEvent::Context => {
                     if wants_context(self.page) && self.pointer_in_content() {
                         self.context = Some(self.pointer);
+                        self.context_submenu = None;
                     }
                 }
             },
-            Message::ContextDismiss => self.context = None,
+            Message::ContextDismiss => {
+                self.context = None;
+                self.context_submenu = None;
+            }
+            Message::ContextSubmenu(i) => self.context_submenu = i,
             Message::EditCopy => {
                 let s = self.live_selection().unwrap_or_else(|| {
                     if self.page == "code" {
@@ -1759,6 +2130,12 @@ impl Gallery {
             }
             Message::Select(id) => {
                 self.page = id;
+                if id == "list" {
+                    // Resync page slice + mounted window every time the user
+                    // opens List and pages (shared state with list-detail used
+                    // to leave an empty mounted range).
+                    self.refresh_list_view();
+                }
                 if let Some(e) = catalog::page_entries(id).next() {
                     self.collapsed.remove(e.group);
                 }
@@ -1820,7 +2197,7 @@ impl Gallery {
             layout::listen_sash().map(nav_sash),
             layout::listen_cursor().map(Message::Cursor),
         ];
-        if matches!(self.page, "feedback" | "readout") {
+        if matches!(self.page, "feedback" | "readout" | "image") {
             subs.push(
                 icedtea::iced::time::every(std::time::Duration::from_millis(50))
                     .map(|_| Message::Spin),
@@ -1921,10 +2298,10 @@ impl Gallery {
             .style(move |_| icedtea::style::panel(tok));
         let page = container(self.page_view())
             .padding(Padding {
-                top: 28.0,
-                right: 32.0,
-                bottom: 28.0,
-                left: 32.0,
+                top: 16.0,
+                right: 24.0,
+                bottom: 16.0,
+                left: 24.0,
             })
             .width(Length::Fill)
             .height(Length::Fill);
@@ -2002,9 +2379,11 @@ impl Gallery {
         .style(move |_| icedtea::style::fill(tok.canvas, tok.text));
         let overlay: Element<'_, Message> = if let Some(origin) = self.context {
             pattern::context_menu(
-                self.context_actions(),
+                self.context_entries(),
                 origin,
                 icedtea::iced::Size::new(self.window_width, self.window_height),
+                self.context_submenu,
+                Message::ContextSubmenu,
                 Message::ContextDismiss,
                 tok,
             )
@@ -2019,29 +2398,37 @@ impl Gallery {
         let title = catalog::page_title(self.page);
         let demo = self.demo(self.page);
         let fill = page_fills(self.page);
+        // Title + job sit inside the card so outer pad is not stacked with
+        // card inset (that double gap read as "weird top padding" on every page).
+        let mut head = column![
+            text(title)
+                .size(icedtea::typo::PAGE)
+                .font(icedtea::typo::UI_BOLD)
+                .color(tok.text),
+            widget::meta(page_job(self.page), tok, named("page-job", Role::Status)),
+        ]
+        .spacing(4);
+        // Single-entry pages: put the constructor path under the page job.
+        let hosted: Vec<_> = catalog::page_entries(self.page).collect();
+        if hosted.len() == 1 {
+            head = head.push(widget::meta(
+                ctor_caption(hosted[0].id),
+                tok,
+                named("page-ctor", Role::Status),
+            ));
+        }
+        let body = column![head, demo].spacing(16);
         let card = if fill {
-            container(demo)
-                .padding(20)
+            container(body.height(Length::Fill))
+                .padding(16)
                 .width(Length::Fill)
                 .height(Length::Fill)
                 .style(move |_| icedtea::style::card(tok, false))
                 .into()
         } else {
-            scene_card(demo, tok)
+            scene_card(body.into(), tok)
         };
-        let mut col = column![
-            text(title)
-                .size(icedtea::typo::PAGE)
-                .font(icedtea::typo::UI_BOLD)
-                .color(tok.text),
-            widget::meta(page_job(self.page), tok, named("page-job", Role::Status),),
-            card,
-        ]
-        .spacing(12);
-        if fill {
-            col = col.height(Length::Fill);
-        }
-        let clamped = container(col).width(Length::Fill);
+        let clamped = container(card).width(Length::Fill);
         if fill {
             clamped.height(Length::Fill).into()
         } else {
@@ -2052,29 +2439,57 @@ impl Gallery {
     fn demo(&self, page: &str) -> Element<'_, Message> {
         let hosted: Vec<_> = catalog::page_entries(page).collect();
         if hosted.len() == 1 {
-            return self.demo_widget(hosted[0].id);
+            let id = hosted[0].id;
+            let tok = self.tokens;
+            // Job under page head for multi-entry only; single-entry puts job here too.
+            return column![
+                widget::meta(widget_job(id), tok, named(&format!("{id}-job"), Role::Status)),
+                self.demo_widget(id),
+            ]
+            .spacing(8)
+            .into();
         }
         let tok = self.tokens;
         let fill = page_fills(page);
-        let mut col = icedtea::iced::widget::Column::new().spacing(28);
+        // Between sections 16; within a section title/job/demo stay tight.
+        // Long pages (Fields) used 20 + FILL children and looked looser than Controls.
+        let mut col = icedtea::iced::widget::Column::new()
+            .spacing(16)
+            .width(Length::Fill);
         if fill {
             col = col.height(Length::Fill);
         }
-        for e in hosted {
-            col = col.push(
-                text(e.title)
-                    .size(icedtea::typo::TITLE)
-                    .font(icedtea::typo::UI_BOLD)
-                    .color(tok.text),
-            );
-            if let Some(job) = widget_job(e.id) {
-                col = col.push(widget::meta(
-                    job,
+        // On fill pages, only the first section expands (list under pagination).
+        for (i, e) in hosted.iter().enumerate() {
+            let path = ctor_caption(e.id);
+            let mut section = column![
+                row![
+                    text(e.title)
+                        .size(icedtea::typo::TITLE)
+                        .font(icedtea::typo::UI_BOLD)
+                        .color(tok.text),
+                    Space::new().width(Length::Fill),
+                    text(path)
+                        .size(icedtea::typo::META)
+                        .font(icedtea::typo::MONO)
+                        .color(tok.muted),
+                ]
+                .spacing(8)
+                .align_y(Alignment::Center)
+                .width(Length::Fill),
+                widget::meta(
+                    widget_job(e.id),
                     tok,
                     named(&format!("{}-job", e.id), Role::Status),
-                ));
+                ),
+                self.demo_widget(e.id),
+            ]
+            .spacing(6)
+            .width(Length::Fill);
+            if fill && i == 0 {
+                section = section.height(Length::Fill);
             }
-            col = col.push(self.demo_widget(e.id));
+            col = col.push(section);
         }
         col.into()
     }
@@ -2115,7 +2530,7 @@ impl Gallery {
             }
             "split-button" => column![
                 widget::meta(
-                    "Primary action plus a more menu. Idle and disabled.",
+                    "Primary runs Save. The chevron opens Save As / Export.",
                     tok,
                     named("split-hint", Role::Status),
                 ),
@@ -2123,42 +2538,49 @@ impl Gallery {
                     widget::split_button(
                         "Save",
                         Message::Note("Save".into()),
-                        Message::Note("More".into()),
+                        vec![
+                            ("Save As…".into(), Message::Note("Save As…".into())),
+                            ("Export…".into(), Message::Note("Export…".into())),
+                        ],
                         tok,
                         btn("Save"),
                     ),
                     widget::split_button(
                         "Save",
                         Message::Note("Save".into()),
-                        Message::Note("More".into()),
+                        vec![
+                            ("Save As…".into(), Message::Note("Save As…".into())),
+                            ("Export…".into(), Message::Note("Export…".into())),
+                        ],
                         tok,
                         btn("Save off").with_disabled(true),
                     ),
                 ]
-                .spacing(12),
+                .spacing(12)
+                .align_y(Alignment::Center),
             ]
             .spacing(8)
             .into(),
             "toggle-button" => column![
                 widget::meta(
-                    "Pressed (checked), idle, and disabled.",
+                    "Pressed (checked), idle, and disabled. Own state per control.",
                     tok,
                     named("toggle-hint", Role::Status),
                 ),
                 row![
                     widget::toggle_button(
                         "Bold",
-                        self.checked,
-                        Message::Check(!self.checked),
+                        self.bold,
+                        Message::Bold(!self.bold),
                         tok,
-                        btn("Bold").with_checked(self.checked),
+                        btn("Bold").with_checked(self.bold),
                     ),
                     widget::toggle_button(
                         "Italic",
-                        false,
-                        Message::Toggle(!self.checked),
+                        self.italic,
+                        Message::Italic(!self.italic),
                         tok,
-                        btn("Italic").with_checked(false),
+                        btn("Italic").with_checked(self.italic),
                     ),
                     widget::toggle_button(
                         "Strike",
@@ -2285,12 +2707,24 @@ impl Gallery {
             ]
             .spacing(8)
             .into(),
-            "progress" => widget::progress(
-                self.value,
-                Some(&widget::progress_label(self.value, Some("1 min"))),
-                tok,
-                named("progress", Role::Progress).with_value(self.value.to_string()),
-            ),
+            "progress" => column![
+                widget::themed_slider(
+                    0.0..=1.0,
+                    self.value,
+                    Message::Slide,
+                    tok,
+                    named("progress-slider", Role::Slider)
+                        .with_value(self.value.to_string()),
+                ),
+                widget::progress(
+                    self.value,
+                    Some(&widget::progress_label(self.value, Some("1 min"))),
+                    tok,
+                    named("progress", Role::Progress).with_value(self.value.to_string()),
+                ),
+            ]
+            .spacing(8)
+            .into(),
             "sparkline" => column![
                 widget::meta(
                     "One-row series on tokens. Domain plots stay in the application.",
@@ -2305,39 +2739,20 @@ impl Gallery {
             ]
             .spacing(8)
             .into(),
-            "progress-ring" => widget::progress_ring(
-                self.value,
-                Some(&widget::progress_label(self.value, None)),
-                tok,
-                named("ring", Role::Progress).with_value(self.value.to_string()),
-            ),
-            "number" => widget::number_input(
-                self.number.parse().unwrap_or(0.0),
-                Message::Number,
-                tok,
-                named("number", Role::SpinButton).with_value(self.number.clone()),
-            ),
-            "mask" => column![
+            "progress-ring" => column![
                 widget::meta(
-                    "Template 0000-0000. Digits fill slots; dashes are literals.",
+                    format!(
+                        "Fraction {pct}% — same value as Progress (slider above).",
+                        pct = (self.value * 100.0).round() as i32
+                    ),
                     tok,
-                    named("mask-hint", Role::Status),
+                    named("ring-hint", Role::Status),
                 ),
-                widget::masked_input(
-                    "0000-0000",
-                    &self.mask,
-                    Message::Mask,
+                widget::progress_ring(
+                    self.value,
+                    Some(&widget::progress_label(self.value, None)),
                     tok,
-                    named("mask", Role::TextBox),
-                ),
-                widget::meta(
-                    if self.mask.is_empty() {
-                        "Type digits.".into()
-                    } else {
-                        self.mask.clone()
-                    },
-                    tok,
-                    named("mask-value", Role::Status),
+                    named("ring", Role::Progress).with_value(self.value.to_string()),
                 ),
             ]
             .spacing(8)
@@ -2352,39 +2767,41 @@ impl Gallery {
                     named("Name", Role::TextBox),
                     Some(icedtea::iced::widget::Id::new("gallery-name")),
                 ),
-                widget::themed_button(
-                    "Focus field",
-                    Some(Message::FocusName),
-                    tok,
-                    Variant::Quiet,
-                    btn("Focus field"),
-                ),
-                widget::meta(
-                    if self.dialog_note.is_empty() {
-                        "Enter submits. Focus field moves into the name.".into()
-                    } else {
-                        self.dialog_note.clone()
-                    },
-                    tok,
-                    named("submit-note", Role::Status),
-                ),
+                row![
+                    widget::themed_button(
+                        "Focus field",
+                        Some(Message::FocusName),
+                        tok,
+                        Variant::Quiet,
+                        btn("Focus field"),
+                    ),
+                    widget::meta(
+                        if self.dialog_note.is_empty() {
+                            "Enter submits.".into()
+                        } else {
+                            self.dialog_note.clone()
+                        },
+                        tok,
+                        named("submit-note", Role::Status),
+                    ),
+                ]
+                .spacing(12)
+                .align_y(Alignment::Center),
             ]
             .spacing(8)
+            .width(Length::Fill)
             .into(),
-            "password" => widget::password_input(
+            "password" => column![widget::password_input(
                 "Secret",
                 &self.secret,
                 Message::Secret,
                 tok,
                 named("password", Role::TextBox),
                 true,
-            ),
+            )]
+            .width(Length::Fill)
+            .into(),
             "secret" => column![
-                widget::meta(
-                    "Reveal the token, then copy it.",
-                    tok,
-                    named("secret-hint", Role::Status),
-                ),
                 widget::secret_field(
                     "Token",
                     &self.secret,
@@ -2407,15 +2824,11 @@ impl Gallery {
                 ),
             ]
             .spacing(8)
+            .width(Length::Fill)
             .into(),
             "value-field" => {
                 let copy = Action::new("value.copy", "Copy", Message::CopyFields);
                 column![
-                    widget::meta(
-                        "Labeled value. Select, then Copy.",
-                        tok,
-                        named("value-hint", Role::Status),
-                    ),
                     widget::value_field(
                         "Path",
                         self.field("path"),
@@ -2438,49 +2851,80 @@ impl Gallery {
                     ),
                 ]
                 .spacing(8)
+                .width(Length::Fill)
                 .into()
             }
-            "textarea" => widget::textarea(
+            // Fixed height: FILL inside a scrolling multi-section page stretches
+            // the section and makes Fields look padded differently from Controls.
+            "textarea" => column![widget::textarea(
                 &self.editor,
                 Message::Editor,
                 tok,
-                layout::FILL,
+                layout::fixed(120.0),
                 named("body", Role::TextBox),
-            ),
-            "search" => widget::search_input(
+            )]
+            .width(Length::Fill)
+            .into(),
+            "search" => column![widget::search_input(
                 &self.query,
                 Message::Query,
                 tok,
                 named("search", Role::TextBox),
-            ),
-            "suggest" => column![
-                widget::meta(
-                    "Suggest on any field. Pick fills the query.",
-                    tok,
-                    named("suggest-hint", Role::Status),
-                ),
-                widget::suggest_field(
-                    "Command",
-                    &self.query,
-                    Message::Query,
-                    &self.suggests,
-                    Message::SuggestPick,
-                    tok,
-                    named("suggest", Role::Group),
-                ),
-            ]
-            .spacing(8)
+            )]
+            .width(Length::Fill)
+            .into(),
+            "suggest" => column![widget::suggest_field(
+                "Command",
+                &self.query,
+                Message::Query,
+                &self.suggests,
+                Message::SuggestPick,
+                tok,
+                named("suggest", Role::Group),
+            )]
+            .width(Length::Fill)
             .into(),
             "select" => {
                 let opts = ["nord".into(), "dark".into(), "light".into()];
-                widget::themed_pick_list(
+                column![widget::themed_pick_list(
                     opts,
                     Some(self.pick.clone()),
                     Message::Pick,
                     tok,
                     named(&self.pick, Role::ComboBox),
-                )
+                )]
+                .width(Length::Fill)
+                .into()
             }
+            "number" => column![widget::number_input(
+                self.number.parse().unwrap_or(0.0),
+                Message::Number,
+                tok,
+                named("number", Role::SpinButton).with_value(self.number.clone()),
+            )]
+            .width(Length::Fill)
+            .into(),
+            "mask" => column![
+                widget::masked_input(
+                    "0000-0000",
+                    &self.mask,
+                    Message::Mask,
+                    tok,
+                    named("mask", Role::TextBox),
+                ),
+                widget::meta(
+                    if self.mask.is_empty() {
+                        "Type digits.".into()
+                    } else {
+                        self.mask.clone()
+                    },
+                    tok,
+                    named("mask-value", Role::Status),
+                ),
+            ]
+            .spacing(8)
+            .width(Length::Fill)
+            .into(),
             "date" => column![
                 state_caption("Appointment", tok),
                 widget::date_picker(
@@ -2490,7 +2934,6 @@ impl Gallery {
                     tok,
                     named("date", Role::SpinButton),
                 ),
-                widget::rule_h(tok, named("date-rule", Role::Separator)),
                 state_caption("Disabled", tok),
                 widget::date_picker(
                     self.date,
@@ -2500,7 +2943,8 @@ impl Gallery {
                     named("date-off", Role::SpinButton).with_disabled(true),
                 ),
             ]
-            .spacing(12)
+            .spacing(8)
+            .width(Length::Fill)
             .into(),
             "time" => {
                 let clock24 = TimeClock::HOURS_MINUTES;
@@ -2531,12 +2975,6 @@ impl Gallery {
                         tok,
                         named("time-12", Role::SpinButton),
                     ),
-                    widget::meta(
-                        "Click a field to step. AM / PM flips the half-day.",
-                        tok,
-                        named("time-hint", Role::Status),
-                    ),
-                    widget::rule_h(tok, named("time-rule", Role::Separator)),
                     state_caption("Disabled", tok),
                     widget::time_picker(
                         self.time,
@@ -2546,65 +2984,29 @@ impl Gallery {
                         named("time-off", Role::SpinButton).with_disabled(true),
                     ),
                 ]
-                .spacing(12)
+                .spacing(8)
+                .width(Length::Fill)
                 .into()
             }
-            "color" => widget::color_swatch(
+            "color" => column![widget::color_swatch(
                 if self.swatch { 0 } else { 1 },
                 120,
                 212,
                 Message::Swatch,
                 tok,
                 btn("color"),
-            ),
+            )]
+            .width(Length::Fill)
+            .into(),
             "selectable" => {
                 let copy = Action::new("edit.copy", "Copy", Message::CopyFields);
                 column![
                     widget::meta(
-                        "Inspector rows and a transcript. Copy posts the first selection.",
+                        "Each block is select-only. Drag a range, then Copy. Typing is ignored.",
                         tok,
                         named("select-hint", Role::Status),
                     ),
-                    widget::value_field(
-                        "Path",
-                        self.field("path"),
-                        |a| Message::Field("path", a),
-                        Some(&copy),
-                        icedtea::typo::FontFace::Mono,
-                        tok,
-                        self.direction,
-                        named("path", Role::Group),
-                    ),
-                    widget::value_field(
-                        "Id",
-                        self.field("id"),
-                        |a| Message::Field("id", a),
-                        Some(&copy),
-                        icedtea::typo::FontFace::Mono,
-                        tok,
-                        self.direction,
-                        named("id", Role::Group),
-                    ),
-                    widget::value_field(
-                        "Host",
-                        self.field("host"),
-                        |a| Message::Field("host", a),
-                        None,
-                        icedtea::typo::FontFace::Mono,
-                        tok,
-                        self.direction,
-                        named("host", Role::Group),
-                    ),
-                    widget::value_field(
-                        "Clock",
-                        self.field("clock"),
-                        |a| Message::Field("clock", a),
-                        None,
-                        icedtea::typo::FontFace::Ui,
-                        tok,
-                        self.direction,
-                        named("clock", Role::Group),
-                    ),
+                    widget::meta("Prose body", tok, named("sel-prose-cap", Role::Status)),
                     widget::selectable(
                         self.field("body"),
                         |a| Message::Field("body", a),
@@ -2612,86 +3014,184 @@ impl Gallery {
                         icedtea::typo::FontFace::Ui,
                         named("body", Role::TextBox),
                     ),
+                    widget::meta(
+                        "Monospace path (ids, files)",
+                        tok,
+                        named("sel-mono-cap", Role::Status),
+                    ),
+                    widget::selectable(
+                        self.field("path"),
+                        |a| Message::Field("path", a),
+                        tok,
+                        icedtea::typo::FontFace::Mono,
+                        named("path", Role::TextBox),
+                    ),
+                    widget::meta(
+                        "Long wrap (word wrap, multi-line)",
+                        tok,
+                        named("sel-wrap-cap", Role::Status),
+                    ),
+                    widget::selectable(
+                        self.field("snippet"),
+                        |a| Message::Field("snippet", a),
+                        tok,
+                        icedtea::typo::FontFace::Ui,
+                        named("wrap", Role::TextBox),
+                    ),
                     pattern::command_bar([copy], tok, self.direction),
                 ]
-                .spacing(12)
+                .spacing(10)
                 .into()
             }
             "label" => column![
-                widget::label("Page title", tok, named("page", Role::Header)),
-                widget::meta("Meta / caption", tok, named("meta", Role::Status)),
-                widget::code_block(
-                    self.field("snippet"),
-                    |a| Message::Field("snippet", a),
-                    tok,
-                    named("plain", Role::TextBox),
-                ),
-            ]
-            .spacing(8)
-            .into(),
-            "rich-cell" => column![
+                widget::label("Export settings", tok, named("page", Role::Header)),
                 widget::meta(
-                    "Rust enum for a cell. Not a markup parser.",
+                    "Caption under a title. Smaller than body label.",
                     tok,
-                    named("rich-hint", Role::Status),
+                    named("meta", Role::Status),
                 ),
-                widget::rich_cell(
-                    &widget::RichCell::Plain("Plain".into()),
-                    None,
+                widget::label(
+                    "Body label is one line of platform sans at reading size.",
                     tok,
-                    named("plain-cell", Role::Status),
-                ),
-                widget::rich_cell(
-                    &widget::RichCell::Emphasis("Emphasis".into()),
-                    None,
-                    tok,
-                    named("em-cell", Role::Status),
-                ),
-                widget::rich_cell(
-                    &widget::RichCell::Code("code()".into()),
-                    None,
-                    tok,
-                    named("code-cell", Role::Status),
-                ),
-                widget::rich_cell(
-                    &widget::RichCell::Link("docs".into()),
-                    Some(Message::Note("docs".into())),
-                    tok,
-                    named("link-cell", Role::Link),
+                    named("body", Role::Status),
                 ),
             ]
             .spacing(8)
             .into(),
+            "rich-cell" => {
+                // Mini table so each mode reads as a cell, not a type sample.
+                let header = |title: &str, id: &str| {
+                    widget::meta(title, tok, named(id, Role::Status))
+                };
+                let row = |name: &str,
+                           kind: &str,
+                           symbol: &str,
+                           link: &str,
+                           note: &str,
+                           selected: bool|
+                 -> Element<'_, Message> {
+                    container(
+                        row![
+                            container(widget::rich_cell(
+                                &widget::RichCell::Plain(name.into()),
+                                None,
+                                tok,
+                                named(name, Role::Status),
+                            ))
+                            .width(Length::FillPortion(3)),
+                            container(widget::rich_cell(
+                                &widget::RichCell::Emphasis(kind.into()),
+                                None,
+                                tok,
+                                named(&format!("{name}-kind"), Role::Status),
+                            ))
+                            .width(Length::FillPortion(2)),
+                            container(widget::rich_cell(
+                                &widget::RichCell::Code(symbol.into()),
+                                None,
+                                tok,
+                                named(&format!("{name}-sym"), Role::Status),
+                            ))
+                            .width(Length::FillPortion(3)),
+                            container(widget::rich_cell(
+                                &widget::RichCell::Link(link.into()),
+                                Some(Message::Note(note.into())),
+                                tok,
+                                named(&format!("{name}-link"), Role::Link),
+                            ))
+                            .width(Length::FillPortion(2)),
+                        ]
+                        .spacing(12)
+                        .align_y(Alignment::Center),
+                    )
+                    .padding([8, 10])
+                    .width(Length::Fill)
+                    .style(move |_| icedtea::style::list_row(tok, selected))
+                    .into()
+                };
+                column![
+                    container(
+                        row![
+                            container(header("Name", "h-name")).width(Length::FillPortion(3)),
+                            container(header("Kind", "h-kind")).width(Length::FillPortion(2)),
+                            container(header("Symbol", "h-sym")).width(Length::FillPortion(3)),
+                            container(header("Docs", "h-docs")).width(Length::FillPortion(2)),
+                        ]
+                        .spacing(12),
+                    )
+                    .padding([4, 10])
+                    .width(Length::Fill),
+                    row(
+                        "save_file",
+                        "function",
+                        "path::save",
+                        "API",
+                        "Open path::save docs",
+                        true,
+                    ),
+                    row(
+                        "Tokens",
+                        "struct",
+                        "theme::Tokens",
+                        "API",
+                        "Open theme::Tokens docs",
+                        false,
+                    ),
+                    row(
+                        "UI_BOLD",
+                        "const",
+                        "typo::UI_BOLD",
+                        "API",
+                        "Open typo::UI_BOLD docs",
+                        false,
+                    ),
+                ]
+                .spacing(2)
+                .width(Length::Fill)
+                .into()
+            }
             "display" => column![
                 widget::meta(
-                    "Display reading and expression line on the type scale.",
+                    "For compact tools: small caption above, large result below (end-aligned). Not body copy.",
                     tok,
                     named("display-hint", Role::Status),
                 ),
-                widget::display_line("6 × 4 =", tok, named("expr", Role::Status)),
-                widget::display_reading("24", tok, named("value", Role::Status)),
+                // Mini calculator face so the job is obvious.
+                container(
+                    column![
+                        widget::display_line("6 × 4 =", tok, named("expr", Role::Status)),
+                        widget::display_reading("24", tok, named("value", Role::Status)),
+                    ]
+                    .spacing(4),
+                )
+                .padding(16)
+                .width(Length::Fill)
+                .style(move |_| icedtea::style::fill(tok.panel, tok.text)),
+                widget::meta(
+                    "figure_display is segmented digits (clocks, codes).",
+                    tok,
+                    named("figure-hint", Role::Status),
+                ),
                 widget::figure_display("12:40", tok, named("clock", Role::Status)),
             ]
-            .spacing(8)
+            .spacing(12)
             .into(),
             "markdown" => {
                 let showing = self
                     .md_jump
                     .and_then(|i| self.md_heads.iter().find(|h| h.index == i))
-                    .map(|h| format!("Showing {}", h.title))
+                    .map(|h| format!("At {}", h.title))
                     .unwrap_or_else(|| {
-                        "Drag to select in the document. Ctrl+C copies the range. Copy source posts all."
-                            .into()
+                        "Drag to select. Ctrl+C / Cmd+C copies the range.".into()
                     });
-                column![
-                    widget::meta(showing, tok, named("md-hash", Role::Status)),
-                    pattern::command_bar(
-                        [Action::new("edit.copy", "Copy source", Message::CopyValue)],
-                        tok,
-                        self.direction,
-                    ),
-                    row![
-                        container(widget::themed_scroll(
+                let outline = container(
+                    column![
+                        widget::meta(
+                            "On this page",
+                            tok,
+                            named("md-outline-title", Role::Header),
+                        ),
+                        widget::themed_scroll(
                             widget::markdown_outline(
                                 &self.md_heads,
                                 self.md_jump,
@@ -2704,28 +3204,63 @@ impl Gallery {
                             false,
                             None,
                             None::<fn(_) -> Message>,
-                        ))
-                        .width(Length::Fixed(220.0)),
-                        widget::themed_scroll(
-                            widget::markdown_view(
-                                &self.md.items,
-                                tok,
-                                Message::MdLink,
-                                named("md", Role::Group)
-                            ),
-                            tok,
-                            named("md-scroll", Role::Group),
-                            false,
-                            Some(icedtea::iced::widget::Id::new("gallery-md")),
-                            None::<fn(_) -> Message>,
                         ),
                     ]
-                    .spacing(12)
-                    .height(Length::Fill),
+                    .spacing(8),
+                )
+                .width(Length::Fixed(200.0))
+                .height(Length::Fill)
+                .padding(Padding {
+                    top: 4.0,
+                    right: 8.0,
+                    bottom: 4.0,
+                    left: 4.0,
+                })
+                .style(move |_| icedtea::style::panel(tok));
+                let doc_chrome = row![
+                    widget::meta(showing, tok, named("md-status", Role::Status)),
+                    Space::new().width(Length::Fill),
+                    widget::themed_button(
+                        "Copy source",
+                        Some(Message::CopyValue),
+                        tok,
+                        Variant::Quiet,
+                        btn("md-copy-source"),
+                    ),
                 ]
                 .spacing(8)
-                .height(Length::Fill)
-                .into()
+                .align_y(Alignment::Center);
+                let document = column![
+                    doc_chrome,
+                    widget::themed_scroll(
+                        container(widget::markdown_view(
+                            &self.md.items,
+                            tok,
+                            Message::MdLink,
+                            named("md", Role::Group)
+                        ))
+                        .padding(Padding {
+                            top: 4.0,
+                            right: 12.0,
+                            bottom: 16.0,
+                            left: 12.0,
+                        })
+                        .width(Length::Fill)
+                        .into(),
+                        tok,
+                        named("md-scroll", Role::Group),
+                        false,
+                        Some(icedtea::iced::widget::Id::new("gallery-md")),
+                        None::<fn(_) -> Message>,
+                    ),
+                ]
+                .spacing(8)
+                .width(Length::Fill)
+                .height(Length::Fill);
+                row![outline, document]
+                    .spacing(0)
+                    .height(Length::Fill)
+                    .into()
             }
             "code" => {
                 let lang = CodeLang::named(&self.code_lang).unwrap_or(&samples::CODE_LANGS[0]);
@@ -2962,22 +3497,13 @@ impl Gallery {
                     row_icons = row_icons.push(
                         column![
                             widget::icon_svg(icon, tok, named(name, Role::Image)),
-                            widget::meta(name, tok, named(name, Role::Status)),
+                            widget::meta(name, tok, named(&format!("{name}-cap"), Role::Status)),
                         ]
                         .spacing(4)
                         .align_x(icedtea::iced::Alignment::Center),
                     );
                 }
-                column![
-                    widget::meta(
-                        "Chrome set: search, menu, back, close, check, warning, chevron.",
-                        tok,
-                        named("icon-hint", Role::Status),
-                    ),
-                    row_icons,
-                ]
-                .spacing(12)
-                .into()
+                column![row_icons].spacing(12).into()
             }
             "image" => {
                 let slot = |face: widget::ImageSlot, name: &str| {
@@ -3001,7 +3527,7 @@ impl Gallery {
                 };
                 column![
                     widget::meta(
-                        "Contain, cover, loading, and error. The application owns the bytes.",
+                        "NASA public-domain photo. Contain letterboxes; cover crops. Loading spins; missing keeps the box.",
                         tok,
                         named("img-hint", Role::Status),
                     ),
@@ -3012,7 +3538,12 @@ impl Gallery {
                     .spacing(16)
                     .height(Length::Fill),
                     row![
-                        slot(widget::ImageSlot::Loading, "Loading"),
+                        slot(
+                            widget::ImageSlot::Loading {
+                                phase: self.spin
+                            },
+                            "Loading",
+                        ),
                         slot(widget::ImageSlot::Error("missing".into()), "Missing"),
                     ]
                     .spacing(16)
@@ -3023,54 +3554,160 @@ impl Gallery {
                 .height(Length::Fill)
                 .into()
             }
-            "tooltip" => widget::tooltip_wrap(
-                widget::label("Hover", tok, named("Hover", Role::Header)),
-                "Tip",
-                tok,
-                named("Tip", Role::Tooltip),
-            ),
-            "link" => widget::hyperlink(
-                "docs",
-                Message::Note("docs".into()),
-                tok,
-                named("docs", Role::Link),
-            ),
-            "list" => column![
+            "tooltip" => row![
+                widget::tooltip_wrap(
+                    widget::themed_button(
+                        "Save",
+                        Some(Message::Note("Saved".into())),
+                        tok,
+                        Variant::Primary,
+                        btn("tip-save"),
+                    ),
+                    "Write the buffer to disk",
+                    tok,
+                    named("tip-save-tip", Role::Tooltip),
+                ),
+                widget::tooltip_wrap(
+                    widget::icon_svg(
+                        icedtea::icon::Icon::Search,
+                        tok,
+                        named("tip-search", Role::Image),
+                    ),
+                    "Find in document",
+                    tok,
+                    named("tip-search-tip", Role::Tooltip),
+                ),
+            ]
+            .spacing(16)
+            .align_y(Alignment::Center)
+            .into(),
+            "link" => column![
                 row![
-                    widget::themed_button(
-                        "Flush",
-                        Some(Message::ListFace(false)),
+                    widget::label("Read the ", tok, named("link-lead", Role::Status)),
+                    widget::hyperlink(
+                        "crate guide",
+                        Message::Note("Open crate guide".into()),
                         tok,
-                        if self.list_card {
-                            Variant::Ghost
-                        } else {
-                            Variant::Quiet
-                        },
-                        btn("list-flush"),
+                        named("crate-guide", Role::Link),
                     ),
-                    widget::themed_button(
-                        "Card",
-                        Some(Message::ListFace(true)),
+                    widget::label(" or jump to ", tok, named("link-mid", Role::Status)),
+                    widget::hyperlink(
+                        "API docs",
+                        Message::Note("Open API docs".into()),
                         tok,
-                        if self.list_card {
-                            Variant::Quiet
-                        } else {
-                            Variant::Ghost
-                        },
-                        btn("list-card"),
+                        named("api-docs", Role::Link),
                     ),
+                    widget::label(".", tok, named("link-end", Role::Status)),
                 ]
-                .spacing(8),
-                widget::list_view(
+                .spacing(0)
+                .align_y(Alignment::Center),
+                widget::meta(
+                    if self.note.is_empty() {
+                        "No link pressed yet.".into()
+                    } else {
+                        format!("Last: {}", self.note)
+                    },
+                    tok,
+                    named("link-note", Role::Status),
+                ),
+            ]
+            .spacing(8)
+            .into(),
+            "list" => {
+                let range = icedtea::collection::page_range(
+                    self.list_matched,
+                    self.list_page,
+                    LIST_PER_PAGE,
+                );
+                let count = if self.list_matched == 0 {
+                    format!("0 / {}", self.list_all.len())
+                } else {
+                    format!(
+                        "{}–{} of {} (page {})",
+                        range.start + 1,
+                        range.end,
+                        self.list_matched,
+                        self.list_page + 1
+                    )
+                };
+                let filters = container(
+                    column![
+                        widget::search_input(
+                            &self.list_filter,
+                            Message::ListFilter,
+                            tok,
+                            named("list-filter", Role::TextBox),
+                        ),
+                        row![
+                            widget::themed_radio(
+                                "All",
+                                ListBucket::All,
+                                Some(self.list_bucket),
+                                Message::ListBucket,
+                                tok,
+                                named("list-all", Role::Radio)
+                                    .with_checked(self.list_bucket == ListBucket::All),
+                            ),
+                            widget::themed_radio(
+                                "Unread",
+                                ListBucket::Unread,
+                                Some(self.list_bucket),
+                                Message::ListBucket,
+                                tok,
+                                named("list-unread", Role::Radio)
+                                    .with_checked(self.list_bucket == ListBucket::Unread),
+                            ),
+                            widget::themed_radio(
+                                "Flagged",
+                                ListBucket::Flagged,
+                                Some(self.list_bucket),
+                                Message::ListBucket,
+                                tok,
+                                named("list-flagged", Role::Radio)
+                                    .with_checked(self.list_bucket == ListBucket::Flagged),
+                            ),
+                            Space::new().width(Length::Fill),
+                            widget::meta(count, tok, named("list-count", Role::Status)),
+                            widget::themed_radio(
+                                "One line",
+                                false,
+                                Some(self.list_card),
+                                Message::ListFace,
+                                tok,
+                                named("list-one-line", Role::Radio).with_checked(!self.list_card),
+                            ),
+                            widget::themed_radio(
+                                "Cards",
+                                true,
+                                Some(self.list_card),
+                                Message::ListFace,
+                                tok,
+                                named("list-cards", Role::Radio).with_checked(self.list_card),
+                            ),
+                        ]
+                        .spacing(12)
+                        .align_y(Alignment::Center),
+                    ]
+                    .spacing(8),
+                )
+                .width(Length::Fill)
+                .padding(Padding {
+                    top: 8.0,
+                    right: 10.0,
+                    bottom: 8.0,
+                    left: 10.0,
+                })
+                .style(move |_| icedtea::style::panel(tok));
+                let list = container(widget::list_view(
                     &self.list,
-                    &self.sel,
+                    &self.list_sel,
                     Message::ListSel,
                     tok,
                     self.list_window,
                     icedtea::collection::RowHeights::PerRow(&self.list_heights),
                     OVERSCAN,
                     Message::ListScroll,
-                    "No rows",
+                    "No messages match",
                     move |_| tok.muted,
                     Some(icedtea::iced::widget::Id::from("gallery-list")),
                     if self.list_card {
@@ -3081,28 +3718,16 @@ impl Gallery {
                         icedtea::collection::RowFace::FLUSH
                     },
                     named("list", Role::List),
-                ),
-                widget::meta("Filter", tok, named("opt-hint", Role::Status),),
-                container(widget::list_view(
-                    &self.options,
-                    &self.opt_sel,
-                    Message::OptSel,
-                    tok,
-                    self.opt_window,
-                    36.0,
-                    1,
-                    Message::OptScroll,
-                    "No options",
-                    move |_| tok.muted,
-                    None,
-                    icedtea::collection::RowFace::FLUSH,
-                    named("options", Role::List),
                 ))
-                .height(140),
-            ]
-            .spacing(8)
-            .height(Length::Fill)
-            .into(),
+                .width(Length::Fill)
+                .height(Length::Fill);
+                // Pagination is the next catalog section on this page
+                // (`demo_widget("pagination")`); do not paint a second strip.
+                column![filters, list]
+                    .spacing(0)
+                    .height(Length::Fill)
+                    .into()
+            }
             "log" => column![widget::log_view(
                 &self.log_lines,
                 self.log_window,
@@ -3117,52 +3742,182 @@ impl Gallery {
             .height(Length::Fill)
             .into(),
             "grid" => {
-                let labels = [
-                    "Inbox", "Calendar", "Mail", "Files", "Photos", "Music", "Chat", "Maps",
-                    "Notes", "Terminal", "Settings", "Help",
-                ]
-                .iter()
-                .map(|s| (*s).to_string())
-                .collect::<Vec<_>>();
+                use icedtea::icon::Icon;
+                use icedtea::widget::GridTile;
+                let tiles = [
+                    GridTile::new("Inbox")
+                        .with_subtitle("12 unread")
+                        .with_icon(Icon::Search),
+                    GridTile::new("Calendar")
+                        .with_subtitle("Today · 3")
+                        .with_icon(Icon::Menu),
+                    GridTile::new("Mail")
+                        .with_subtitle("2 drafts")
+                        .with_icon(Icon::Check),
+                    GridTile::new("Files")
+                        .with_subtitle("~/Documents")
+                        .with_icon(Icon::Back),
+                    GridTile::new("Photos")
+                        .with_subtitle("48 new")
+                        .with_icon(Icon::Warning),
+                    GridTile::new("Music")
+                        .with_subtitle("On pause")
+                        .with_icon(Icon::Chevron),
+                    GridTile::new("Chat")
+                        .with_subtitle("Ali is typing…")
+                        .with_icon(Icon::Menu),
+                    GridTile::new("Maps").with_subtitle("Offline tiles"),
+                    GridTile::new("Notes")
+                        .with_subtitle("Scratch pad")
+                        .with_icon(Icon::Check),
+                    GridTile::new("Terminal")
+                        .with_subtitle("zsh · 2")
+                        .with_icon(Icon::Search),
+                    GridTile::new("Settings")
+                        .with_subtitle("Theme, density")
+                        .with_icon(Icon::Warning),
+                    GridTile::new("Help").with_subtitle("Guide & API"),
+                ];
                 let picked = self
                     .grid_sel
-                    .and_then(|i| labels.get(i))
-                    .map(|s| format!("Opened {s}"))
-                    .unwrap_or_else(|| "Pick a tile".into());
+                    .and_then(|i| tiles.get(i))
+                    .map(|t| {
+                        if t.subtitle.is_empty() {
+                            format!("Selected {}", t.title)
+                        } else {
+                            format!("Selected {} — {}", t.title, t.subtitle)
+                        }
+                    })
+                    .unwrap_or_else(|| {
+                        "Press a tile. Icons and subtitles differ per app.".into()
+                    });
                 column![
                     widget::meta(picked, tok, named("grid-sel", Role::Status)),
-                    widget::item_grid(&labels, Message::Grid, tok, named("grid", Role::List),),
+                    widget::item_grid(
+                        &tiles,
+                        self.grid_sel,
+                        Message::Grid,
+                        tok,
+                        named("grid", Role::List),
+                    ),
                 ]
                 .spacing(8)
                 .height(Length::Fill)
                 .into()
             }
-            "table" => column![
-                widget::meta(
-                    "Name is pinned. Role, Status, and Path follow horizontal scroll.",
-                    tok,
-                    named("table-pin", Role::Status),
-                ),
-                widget::data_table(
-                    &self.table,
-                    &self.sel,
-                    Some(self.table_cursor),
-                    &self.table_cols,
-                    true,
-                    self.table_window,
-                    48.0,
-                    OVERSCAN,
-                    Message::TableCell,
-                    Message::Sort,
-                    Message::TableScroll,
-                    Message::TableHScroll,
-                    tok,
-                    named("table", Role::Table),
-                ),
-            ]
-            .spacing(8)
-            .height(Length::Fill)
-            .into(),
+            "table" => {
+                let sort = match self.table.sort_col {
+                    Some(c) => {
+                        let name = self
+                            .table
+                            .headers
+                            .get(c)
+                            .map(String::as_str)
+                            .unwrap_or("?");
+                        let dir = if self.table.sort_asc {
+                            "ascending"
+                        } else {
+                            "descending"
+                        };
+                        format!("Sorted by {name} ({dir})")
+                    }
+                    None => "Click a header to sort.".into(),
+                };
+                let cell = if self.table.rows.is_empty() {
+                    "No rows match the filter.".into()
+                } else {
+                    let (r, c) = self.table_cursor;
+                    let name = self.table.cell(r, 0);
+                    let col = self
+                        .table
+                        .headers
+                        .get(c)
+                        .map(String::as_str)
+                        .unwrap_or("?");
+                    let val = self.table.cell(r, c);
+                    format!("Selected {name} · {col} = {val}")
+                };
+                let count = format!(
+                    "{} of {} rows",
+                    self.table.rows.len(),
+                    self.table_all.len()
+                );
+                column![
+                    widget::meta(
+                        "Not a spreadsheet: paint, select, sort headers, frozen Name. Filter and sort live in the application. Cells do not edit.",
+                        tok,
+                        named("table-job", Role::Status),
+                    ),
+                    row![
+                        widget::search_input(
+                            &self.table_filter,
+                            Message::TableFilter,
+                            tok,
+                            named("table-filter", Role::TextBox),
+                        ),
+                        widget::themed_button(
+                            "All",
+                            Some(Message::TableStatus(None)),
+                            tok,
+                            if self.table_status.is_none() {
+                                Variant::Quiet
+                            } else {
+                                Variant::Ghost
+                            },
+                            btn("table-st-all"),
+                        ),
+                        widget::themed_button(
+                            "ready",
+                            Some(Message::TableStatus(Some("ready"))),
+                            tok,
+                            if self.table_status == Some("ready") {
+                                Variant::Quiet
+                            } else {
+                                Variant::Ghost
+                            },
+                            btn("table-st-ready"),
+                        ),
+                        widget::themed_button(
+                            "idle",
+                            Some(Message::TableStatus(Some("idle"))),
+                            tok,
+                            if self.table_status == Some("idle") {
+                                Variant::Quiet
+                            } else {
+                                Variant::Ghost
+                            },
+                            btn("table-st-idle"),
+                        ),
+                        widget::meta(count, tok, named("table-count", Role::Status)),
+                    ]
+                    .spacing(8)
+                    .align_y(Alignment::Center),
+                    widget::meta(
+                        format!("{sort}  ·  {cell}  ·  Name is pinned; scroll sideways for Path."),
+                        tok,
+                        named("table-status", Role::Status),
+                    ),
+                    widget::data_table(
+                        &self.table,
+                        &self.table_sel,
+                        Some(self.table_cursor),
+                        &self.table_cols,
+                        true,
+                        self.table_window,
+                        48.0,
+                        OVERSCAN,
+                        Message::TableCell,
+                        Message::Sort,
+                        Message::TableScroll,
+                        Message::TableHScroll,
+                        tok,
+                        named("table", Role::Table),
+                    ),
+                ]
+                .spacing(8)
+                .height(Length::Fill)
+                .into()
+            }
             "tree" => {
                 let picked = self.tree_sel.map_or_else(
                     || "assets is an empty folder.".into(),
@@ -3182,26 +3937,81 @@ impl Gallery {
                 .spacing(8)
                 .into()
             }
-            "tabs" => column![
-                widget::meta("Pinned", tok, named("tabs-pinned-hint", Role::Status),),
-                widget::tab_bar(
-                    &self.pinned,
-                    Message::PinTab,
-                    |_| Message::Nop,
-                    tok,
-                    named("tabs-pinned", Role::Tab),
-                ),
-                widget::meta("Closable", tok, named("tabs-close-hint", Role::Status),),
-                widget::tab_bar(
-                    &self.tabs,
-                    Message::Tab,
-                    Message::CloseTab,
-                    tok,
-                    named("tabs", Role::Tab),
-                ),
-            ]
-            .spacing(8)
-            .into(),
+            "tabs" => {
+                let pin_body = match self.pinned.active {
+                    1 => (
+                        "Write",
+                        "Compose a short note. Pinned tabs stay; there is no close control.",
+                        "Draft: ship list filter + card clip in the same cut.",
+                    ),
+                    _ => (
+                        "Read",
+                        "Pinned strip for section chrome (Read / Write).",
+                        "You are on Read. Switch to Write to see the other pane.",
+                    ),
+                };
+                let close_body = match self.tabs.active {
+                    1 => (
+                        "Guide",
+                        "Install the crate, then start a window with run!.",
+                        "Chrome, actions, and theme come from icedtea — not a second toolkit.",
+                    ),
+                    2 => (
+                        "Changelog",
+                        "0.4 tracks iced 0.14.",
+                        "Library cuts land on crates.io when tagged.",
+                    ),
+                    _ => (
+                        "Notes",
+                        "Draft the weekly recap in this tab.",
+                        "Close with ×; the application owns confirm when dirty.",
+                    ),
+                };
+                let pane = |title: &str, lead: &str, detail: &str, id: &str| {
+                    container(
+                        column![
+                            widget::label(title, tok, named(id, Role::Header)),
+                            widget::meta(lead, tok, named(&format!("{id}-lead"), Role::Status)),
+                            widget::meta(detail, tok, named(&format!("{id}-detail"), Role::Status)),
+                        ]
+                        .spacing(8)
+                        .padding(12),
+                    )
+                    .width(Length::Fill)
+                    .style(move |_| icedtea::style::fill(tok.surface, tok.text))
+                };
+                column![
+                    widget::meta(
+                        "Pinned — no close. Body below follows the active tab.",
+                        tok,
+                        named("tabs-pinned-hint", Role::Status),
+                    ),
+                    widget::tab_bar(
+                        &self.pinned,
+                        Message::PinTab,
+                        |_| Message::Nop,
+                        tok,
+                        named("tabs-pinned", Role::Tab),
+                    ),
+                    pane(pin_body.0, pin_body.1, pin_body.2, "pin-body"),
+                    widget::meta(
+                        "Closable — × removes a tab. Body swaps with selection.",
+                        tok,
+                        named("tabs-close-hint", Role::Status),
+                    ),
+                    widget::tab_bar(
+                        &self.tabs,
+                        Message::Tab,
+                        Message::CloseTab,
+                        tok,
+                        named("tabs", Role::Tab),
+                    ),
+                    pane(close_body.0, close_body.1, close_body.2, "close-body"),
+                ]
+                .spacing(8)
+                .width(Length::Fill)
+                .into()
+            }
             "accordion" => widget::accordion_view(
                 &["Files".into(), "Appearance".into(), "Advanced".into()],
                 vec![
@@ -3267,9 +4077,9 @@ impl Gallery {
                 )
             }
             "pagination" => widget::pagination(
-                40,
-                self.page_i,
-                10,
+                self.list_matched,
+                self.list_page,
+                LIST_PER_PAGE,
                 Message::Page,
                 tok,
                 named("pages", Role::Group),
@@ -3463,26 +4273,62 @@ impl Gallery {
             }
             "command-bar" => pattern::command_bar(self.actions.iter(), tok, self.direction),
             "context-menu" => {
-                let acts = [
-                    Action::new("edit.copy", "Copy", Message::EditCopy),
-                    Action::new("edit.select-all", "Select all", Message::EditSelectAll),
-                    Action::new("edit.paste", "Paste", Message::EditPaste),
+                use icedtea::pattern::ContextEntry;
+                let entries = [
+                    ContextEntry::from(Action::new("edit.copy", "Copy", Message::EditCopy)),
+                    ContextEntry::from(Action::new("edit.paste", "Paste", Message::EditPaste)),
+                    ContextEntry::Separator,
+                    ContextEntry::menu(
+                        "Share",
+                        [
+                            ContextEntry::from(Action::new(
+                                "share.link",
+                                "Copy link",
+                                Message::Note("Copied link".into()),
+                            )),
+                            ContextEntry::from(Action::new(
+                                "share.mail",
+                                "Mail",
+                                Message::Note("Open mail".into()),
+                            )),
+                        ],
+                    ),
+                    ContextEntry::menu(
+                        "Arrange",
+                        [
+                            ContextEntry::from(Action::new(
+                                "arr.front",
+                                "Bring to front",
+                                Message::Note("Bring to front".into()),
+                            )),
+                            ContextEntry::from(Action::new(
+                                "arr.back",
+                                "Send to back",
+                                Message::Note("Send to back".into()),
+                            )),
+                        ],
+                    ),
                 ];
+                // Keep Share open so the nested flyout is visible without a live hover.
+                let open = self.context_submenu.or(Some(3));
                 column![
                     widget::meta(
-                        "A short menu at the pointer. Right-click the page for a live one.",
+                        "Nested flyouts (Share, Arrange). Hover a chevron row. Right-click the page for a live menu.",
                         tok,
                         named("ctx-hint", Role::Status),
                     ),
                     container(pattern::context_menu(
-                        acts,
-                        icedtea::iced::Point::new(16.0, 16.0),
-                        icedtea::iced::Size::new(480.0, 280.0),
+                        entries,
+                        icedtea::iced::Point::new(16.0, 12.0),
+                        // Viewport for clamp must match the painted box height.
+                        icedtea::iced::Size::new(520.0, 220.0),
+                        open,
+                        Message::ContextSubmenu,
                         Message::Nop,
                         tok,
                     ))
                     .width(Length::Fill)
-                    .height(Length::Fixed(160.0)),
+                    .height(Length::Fixed(220.0)),
                 ]
                 .spacing(8)
                 .into()
@@ -3727,11 +4573,11 @@ impl Gallery {
             }
             "list-detail" => pattern::list_detail(
                 widget::list_view(
-                    &self.list,
-                    &self.sel,
+                    &self.list_all,
+                    &self.list_detail_sel,
                     Message::ListSel,
                     tok,
-                    self.list_window,
+                    self.list_detail_window,
                     48.0,
                     OVERSCAN,
                     Message::ListScroll,
@@ -3743,9 +4589,9 @@ impl Gallery {
                 ),
                 {
                     let title = self
-                        .sel
+                        .list_detail_sel
                         .primary()
-                        .and_then(|i| self.list.items.get(i))
+                        .and_then(|i| self.list_all.items.get(i))
                         .map(|row| row.title.as_str())
                         .unwrap_or("Select a message");
                     column![
@@ -3762,7 +4608,6 @@ impl Gallery {
                         ),
                     ]
                     .spacing(8)
-                    .padding(8)
                     .into()
                 },
                 layout::fixed(260.0),
@@ -3830,18 +4675,24 @@ impl Gallery {
                 )
             }
             "tab-view" => {
-                let (title, body) = match self.tabs.active {
+                let (title, lead, detail, action) = match self.tabs.active {
                     1 => (
                         "Guide",
-                        "Install the crate, then start a window with run!. Chrome, actions, and theme come from icedtea.",
+                        "Install the crate, then start a window with run!.",
+                        "Chrome, actions, and theme come from icedtea. The application paints this body.",
+                        "Open first-window chapter",
                     ),
                     2 => (
                         "Changelog",
-                        "0.2 is the first library cut on crates.io.",
+                        "0.4 tracks iced 0.14.",
+                        "Library cuts land on crates.io when tagged. This tab is application content.",
+                        "Copy version string",
                     ),
                     _ => (
                         "Notes",
-                        "Draft the weekly recap in this tab. File / Edit / View stay in the window chrome.",
+                        "Draft the weekly recap in this tab.",
+                        "File / Edit / View stay in the window chrome. Selecting another tab swaps this pane.",
+                        "Save notes",
                     ),
                 };
                 pattern::tab_view(
@@ -3849,19 +4700,27 @@ impl Gallery {
                     container(
                         column![
                             widget::label(title, tok, named(title, Role::Header)),
-                            widget::meta(body, tok, named("tab-body", Role::Status)),
+                            widget::meta(lead, tok, named("tab-lead", Role::Status)),
+                            widget::meta(detail, tok, named("tab-body", Role::Status)),
+                            widget::themed_button(
+                                action,
+                                Some(Message::Note(format!("{title}: {action}"))),
+                                tok,
+                                Variant::Quiet,
+                                btn("tab-action"),
+                            ),
                             widget::meta(
-                                "Close a tab with the ×. Selecting another tab swaps this body.",
+                                "Close with ×. The strip is pattern::tab_view; the body is yours.",
                                 tok,
                                 named("tab-how", Role::Status),
                             ),
                         ]
-                        .spacing(8)
+                        .spacing(10)
                         .padding(16),
                     )
                     .width(Length::Fill)
                     .height(Length::Fill)
-                    .style(move |_| icedtea::style::panel(tok))
+                    .style(move |_| icedtea::style::fill(tok.surface, tok.text))
                     .into(),
                     Message::Tab,
                     Message::CloseTab,
@@ -3929,26 +4788,43 @@ impl Gallery {
             }
             "document-tabs" => {
                 let bodies = [
-                    "Draft the weekly recap. The first tab is dirty until you save.",
-                    "# Readme\n\nGallery document tabs close with a confirm when dirty.",
+                    "Draft the weekly recap. The first tab is dirty (bullet) until you save.",
+                    "# Readme\n\nClose a dirty tab to exercise the app-owned confirm path.",
                     "- [ ] Ship the tour GIF\n- [ ] Read the stills",
                 ];
                 let i = self.docs.tabs.active.min(bodies.len() - 1);
                 let body = column![
-                    widget::label(self.docs.title(i), tok, named("doc-title", Role::Header),),
+                    widget::label(
+                        self.docs
+                            .tabs
+                            .titles
+                            .get(i)
+                            .cloned()
+                            .unwrap_or_else(|| "Document".into()),
+                        tok,
+                        named("doc-title", Role::Header),
+                    ),
                     widget::meta(bodies[i], tok, named("doc-body", Role::Status)),
                 ]
                 .spacing(8)
-                .padding(12)
                 .into();
-                container(pattern::document_tabs(
-                    &self.docs,
-                    body,
-                    Message::DocSel,
-                    Message::DocClose,
-                    tok,
-                ))
-                .height(Length::Fixed(220.0))
+                column![
+                    widget::meta(
+                        "Bordered shells on a strip. Close is inside the tab. Dirty titles show a bullet.",
+                        tok,
+                        named("doc-tabs-job", Role::Status),
+                    ),
+                    container(pattern::document_tabs(
+                        &self.docs,
+                        body,
+                        Message::DocSel,
+                        Message::DocClose,
+                        tok,
+                    ))
+                    .height(Length::Fixed(260.0))
+                    .width(Length::Fill),
+                ]
+                .spacing(8)
                 .into()
             }
             "inspector" => {
@@ -4319,6 +5195,19 @@ mod tests {
     }
 
     #[test]
+    fn every_entry_maps_to_a_constructor_path() {
+        for e in icedtea::catalog::ENTRIES {
+            let path = icedtea::catalog::constructor_path(e.id)
+                .unwrap_or_else(|| panic!("{} needs constructor_path", e.id));
+            assert!(path.contains("::"), "{path}");
+            assert!(!super::widget_job(e.id).is_empty(), "{} job", e.id);
+        }
+        let src = include_str!("main.rs");
+        assert!(src.contains("constructor_path"));
+        assert!(src.contains("ctor_caption"));
+    }
+
+    #[test]
     fn parse_tour_beat_rejects_wrap_and_junk() {
         assert_eq!(super::parse_tour_beat("0", 29), Some(0));
         assert_eq!(super::parse_tour_beat("28\n", 29), Some(28));
@@ -4504,7 +5393,7 @@ mod tests {
             icedtea::layout::CursorEvent::Context,
         ));
         assert!(g.context.is_some());
-        assert_eq!(g.sel.primary(), Some(3));
+        assert_eq!(g.list_sel.primary(), Some(3));
         let _ = g.view();
         let _ = g.update(super::Message::CopyValue);
         g.page = "markdown";
@@ -4552,10 +5441,12 @@ mod tests {
         let _ = g.update(super::Message::Cursor(
             icedtea::layout::CursorEvent::Context,
         ));
-        assert!(g
-            .context_actions()
-            .iter()
-            .any(|a| a.id.as_str() == "edit.paste"));
+        assert!(g.context_entries().iter().any(|e| {
+            matches!(
+                e,
+                icedtea::pattern::ContextEntry::Item(a) if a.id.as_str() == "edit.paste"
+            )
+        }));
         let _ = g.update(super::Message::ContextDismiss);
         assert!(g.context.is_none());
     }
@@ -4599,5 +5490,82 @@ mod tests {
             g.page = page;
             let _ = g.view();
         }
+    }
+
+    #[test]
+    fn list_and_pages_starts_with_a_filled_page() {
+        let (g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
+        assert_eq!(g.list_all.items.len(), 1_000, "seed");
+        assert_eq!(g.list_matched, 1_000, "all rows match default filters");
+        assert_eq!(g.list_page, 0);
+        assert_eq!(
+            g.list.items.len(),
+            super::LIST_PER_PAGE,
+            "first page should be full, got {}",
+            g.list.items.len()
+        );
+        assert_eq!(
+            g.list_heights.len(),
+            g.list.items.len(),
+            "heights parallel to page rows"
+        );
+        assert!(
+            g.list_window.end > g.list_window.start,
+            "mounted window must cover rows, got {:?}",
+            g.list_window
+        );
+        // Next page advances the slice
+        let (mut g2, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
+        let first = g2.list.items[0].title.clone();
+        let _ = g2.update(super::Message::Page(1));
+        assert_eq!(g2.list_page, 1);
+        assert_eq!(g2.list.items.len(), super::LIST_PER_PAGE);
+        assert_ne!(
+            g2.list.items[0].title, first,
+            "page 1 must show different rows"
+        );
+        // Filter Unread then still non-empty page
+        let _ = g2.update(super::Message::ListBucket(super::ListBucket::Unread));
+        assert_eq!(g2.list_page, 0);
+        assert!(g2.list_matched > 0 && g2.list_matched < 1_000);
+        assert!(!g2.list.items.is_empty());
+        // Opening the page again keeps a filled page
+        g2.page = "list";
+        let _ = g2.update(super::Message::Select("list"));
+        assert!(!g2.list.items.is_empty());
+        assert!(g2.list_window.end > g2.list_window.start);
+        // Deep scroll + shorter face must not blank the list
+        g2.list_window.scroll = 50_000.0;
+        let _ = g2.update(super::Message::ListFace(false));
+        assert!(
+            !g2.list.items.is_empty() && g2.list_window.end > g2.list_window.start,
+            "ListFace remount must keep a non-empty mounted window"
+        );
+        // Selection isolation: list-detail does not clear list_sel
+        let list_pick = g2.list_sel.primary();
+        g2.page = "list-detail";
+        let _ = g2.update(super::Message::ListSel(50));
+        assert_eq!(g2.list_detail_sel.primary(), Some(50));
+        assert_eq!(g2.list_sel.primary(), list_pick, "list-detail must not stomp list_sel");
+        g2.page = "table";
+        let _ = g2.update(super::Message::TableCell(2, 0));
+        assert_eq!(g2.table_sel.primary(), Some(2));
+        assert_eq!(g2.list_sel.primary(), list_pick, "table must not stomp list_sel");
+        // Dual scroll windows stay separate
+        let detail_scroll = g2.list_detail_window.scroll;
+        g2.page = "list";
+        let _ = g2.update(super::Message::ListScroll(
+            icedtea::collection::VisibleWindow {
+                start: 0,
+                end: 5,
+                scroll: 12.0,
+                viewport: 200.0,
+            },
+        ));
+        assert!((g2.list_window.scroll - 12.0).abs() < 0.01);
+        assert!(
+            (g2.list_detail_window.scroll - detail_scroll).abs() < 0.01,
+            "list scroll must not mutate list_detail_window"
+        );
     }
 }

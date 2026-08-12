@@ -170,29 +170,24 @@ impl CodeLang {
     }
 }
 
-/// Decoded 48×48 checker. `Handle::from_bytes` paints on a worker and
-/// the first frames of a tour beat are empty.
+/// Real photo for contain/cover demos (NASA public domain, 640×640 JPEG).
+///
+/// Pre-decoded to RGBA so the first gallery frame paints (iced's
+/// `from_bytes` path uses a worker and can flash empty). Classic Lena
+/// scans are not used.
 pub fn sample_handle() -> icedtea::iced::widget::image::Handle {
-    const W: u32 = 48;
-    const H: u32 = 48;
-    let mut px = vec![0u8; (W * H * 4) as usize];
-    for y in 0..H {
-        for x in 0..W {
-            let on = ((x / 8) + (y / 8)) % 2 == 1;
-            let i = ((y * W + x) * 4) as usize;
-            if on {
-                px[i] = 0x1a;
-                px[i + 1] = 0x73;
-                px[i + 2] = 0xe8;
-            } else {
-                px[i] = 0xf4;
-                px[i + 1] = 0xc4;
-                px[i + 2] = 0x30;
-            }
-            px[i + 3] = 255;
-        }
-    }
-    icedtea::iced::widget::image::Handle::from_rgba(W, H, px)
+    use std::sync::OnceLock;
+    static HANDLE: OnceLock<icedtea::iced::widget::image::Handle> = OnceLock::new();
+    HANDLE
+        .get_or_init(|| {
+            let jpeg = include_bytes!("../assets/sample.jpg");
+            let rgba = image::load_from_memory(jpeg)
+                .expect("gallery assets/sample.jpg")
+                .to_rgba8();
+            let (w, h) = rgba.dimensions();
+            icedtea::iced::widget::image::Handle::from_rgba(w, h, rgba.into_raw())
+        })
+        .clone()
 }
 
 /// Which markdown item kinds `MARKDOWN` must produce after parse.

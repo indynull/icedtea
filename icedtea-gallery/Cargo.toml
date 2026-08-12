@@ -9,3 +9,5 @@ description = "Living catalog of every icedtea widget and pattern"
 
 [dependencies]
 icedtea = { path = ".." }
+# Decode the gallery sample photo to RGBA so the first frame paints.
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
