@@ -3259,12 +3259,18 @@ where
 /// let tok = theme::named("dark").tokens;
 /// let labels = vec!["Inbox".into(), "Mail".into()];
 /// let on_select = |i| i;
-/// let _: icedtea::Element<'_, usize> =
-///     widget::item_grid(&labels, on_select, tok, A11y::new("grid", Role::List));
+/// let _: icedtea::Element<'_, usize> = widget::item_grid(
+///     &labels,
+///     on_select,
+///     Some(0),
+///     tok,
+///     A11y::new("grid", Role::List),
+/// );
 /// ```
 pub fn item_grid<'a, M: Clone + 'a>(
     labels: &[String],
     on_select: impl Fn(usize) -> M + Copy + 'a,
+    selected: Option<usize>,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
@@ -3282,14 +3288,17 @@ pub fn item_grid<'a, M: Clone + 'a>(
         for _ in 0..cols {
             if i < labels.len() {
                 let s = labels[i].clone();
+                let on = selected == Some(i);
                 let tile = themed_button_sized(
                     s.clone(),
                     a11y.apply_message(Some(on_select(i))),
                     tok,
-                    Variant::Quiet,
+                    if on { Variant::Primary } else { Variant::Quiet },
                     Length::Fill,
                     Length::Fill,
-                    A11y::new(s.clone(), Role::ListItem).with_disabled(a11y.disabled),
+                    A11y::new(s.clone(), Role::ListItem)
+                        .with_checked(on)
+                        .with_disabled(a11y.disabled),
                 );
                 r = r.push(if a11y.disabled {
                     tile
@@ -4679,6 +4688,7 @@ mod tests {
         let _: Element<'_, ()> = item_grid(
             &["a".into(), "b".into()],
             |_| (),
+            None,
             tok,
             role("grid", Role::List),
         );
@@ -5131,6 +5141,7 @@ mod tests {
         let mut dead_grid = item_grid(
             &["A".into(), "B".into()],
             |_| (),
+            None,
             tok,
             role("grid", Role::List).with_disabled(true),
         );
@@ -6548,7 +6559,7 @@ mod tests {
         let tok = named("dark").tokens;
         let labels = vec!["Inbox".into(), "Calendar".into(), "Mail".into()];
         let mut el: Element<'_, ()> =
-            item_grid(&labels, |_| (), tok, A11y::new("grid", Role::List));
+            item_grid(&labels, |_| (), Some(1), tok, A11y::new("grid", Role::List));
         let mut tree = Tree::new(el.as_widget());
         let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
             Font::DEFAULT,

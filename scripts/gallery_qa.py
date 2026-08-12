@@ -370,8 +370,8 @@ DEFAULT_INTERACT: list[dict[str, str]] = [
     {
         "match": "controls:",
         "name": "controls-toggles",
-        "script": "check true\nswitch true\nradio 1\nslide 0.75\n",
-        "expect": "Accept/Sounds toggled on; radio and slider moved",
+        "script": "check true\nswitch true\nsounds true\nradio 1\nslide 0.75\n",
+        "expect": "Accept and Sounds on; Option B; slider at 75%",
     },
     {
         "match": "list:",
@@ -396,9 +396,11 @@ DEFAULT_INTERACT: list[dict[str, str]] = [
     },
     {
         "match": "tree:",
-        "name": "tree-toggle",
-        "script": "tree 1\ntree-sel 1\n",
-        "expect": "tree node toggled/selected when ids exist",
+        "name": "tree-select-leaf",
+        # Select a leaf under the open src branch. Do not toggle root closed —
+        # that empties the tree for later pages that share the model.
+        "script": "tree-sel 3\n",
+        "expect": "lib.rs leaf selected; folders still open",
     },
     {
         "match": "item grid",

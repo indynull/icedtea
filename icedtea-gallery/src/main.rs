@@ -281,7 +281,7 @@ fn widget_job(id: &str) -> Option<&'static str> {
     Some(match id {
         "spinner" => "Indeterminate work. Eight dots light in turn.",
         "progress-ring" => {
-            "Determinate fraction as a ring. The slider on this page drives the value."
+            "Determinate fraction as a ring. Same value as the progress bar on this page."
         }
         "progress" => "Determinate bar. Same fraction as the ring.",
         "sparkline" => "One-row series. Domain plots stay in the application.",
@@ -3287,7 +3287,13 @@ impl Gallery {
                     .unwrap_or_else(|| "Pick a tile".into());
                 column![
                     widget::meta(picked, tok, named("grid-sel", Role::Status)),
-                    widget::item_grid(&labels, Message::Grid, tok, named("grid", Role::List),),
+                    widget::item_grid(
+                        &labels,
+                        Message::Grid,
+                        self.grid_sel,
+                        tok,
+                        named("grid", Role::List),
+                    ),
                 ]
                 .spacing(8)
                 .height(Length::Fill)
@@ -3922,7 +3928,7 @@ impl Gallery {
                     .padding(8)
                     .into()
                 },
-                layout::fixed(260.0),
+                layout::fixed(320.0),
                 tok,
             ),
             "navigation" => {

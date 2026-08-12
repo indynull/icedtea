@@ -608,24 +608,31 @@ pub fn list_detail<'a, M: 'a>(
     sidebar: Length,
     tok: Tokens,
 ) -> Element<'a, M> {
-    row![
-        container(list)
-            .width(sidebar)
-            .height(Length::Fill)
-            .style(move |_| style::panel(tok)),
-        container(detail)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .padding(iced::Padding {
-                top: 8.0,
-                right: 16.0,
-                bottom: 0.0,
-                left: 16.0,
-            }),
-    ]
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .into()
+    // List pad clears the panel edge and the rail; detail gets a full 12px inset.
+    let list_pad = iced::Padding {
+        top: 8.0,
+        right: 4.0,
+        bottom: 8.0,
+        left: 8.0,
+    };
+    let list_pane = container(list)
+        .width(sidebar)
+        .height(Length::Fill)
+        .padding(list_pad)
+        .clip(true)
+        .style(move |_| style::panel(tok));
+    let rule = container(Space::new().width(1).height(Length::Fill))
+        .width(1)
+        .height(Length::Fill)
+        .style(move |_| style::hairline(tok));
+    let detail_pane = container(detail)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .padding(iced::Padding::from(12));
+    row![list_pane, rule, detail_pane]
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .into()
 }
 
 /// Sidebar beside content, or a stack with Back.
