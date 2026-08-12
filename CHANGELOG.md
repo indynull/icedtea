@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+`light` and `dark` are a neutral desktop pair. Persist defaults
+`follow_os` on. Canvas and text stay; primary can take the desktop
+accent.
+
 ## 0.4.0 — 2026-08-11
 
 `pattern::workspace` calls `pane` with each leaf id. `list_view`

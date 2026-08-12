@@ -840,7 +840,7 @@ impl Gallery {
                 c
             },
             family: "default".into(),
-            follow_os: false,
+            follow_os: true,
             appearance: Appearance::Dark,
             tick: 0,
             direction,
@@ -914,11 +914,7 @@ impl Gallery {
             .get(&name)
             .map(|t| t.tokens)
             .unwrap_or_else(|| theme::named(&name).tokens);
-        self.tokens = theme::apply_os_accent(
-            tokens,
-            self.follow_os,
-            Some(icedtea::iced::Color::from_rgb8(0, 122, 255)),
-        );
+        self.tokens = theme::apply_os_accent(tokens, self.follow_os, None);
     }
 
     fn clamp_nav(&mut self) {
@@ -1074,16 +1070,32 @@ impl Gallery {
         }
         match message {
             Message::Theme(name) => {
-                self.theme = name.clone();
-                self.follow_os = false;
                 if let Some(f) = theme::family_of_name(&name) {
                     self.family = f.id.to_string();
+                    self.appearance = if theme::named(&name).name == f.light {
+                        Appearance::Light
+                    } else {
+                        Appearance::Dark
+                    };
+                    if self.follow_os {
+                        self.apply_theme_pref();
+                    } else {
+                        self.theme = name.clone();
+                        self.tokens = self
+                            .themes
+                            .get(&name)
+                            .map(|t| t.tokens)
+                            .unwrap_or_else(|| theme::named(&name).tokens);
+                    }
+                } else {
+                    self.follow_os = false;
+                    self.theme = name.clone();
+                    self.tokens = self
+                        .themes
+                        .get(&name)
+                        .map(|t| t.tokens)
+                        .unwrap_or_else(|| theme::named(&name).tokens);
                 }
-                self.tokens = self
-                    .themes
-                    .get(&name)
-                    .map(|t| t.tokens)
-                    .unwrap_or_else(|| theme::named(&name).tokens);
             }
             Message::Query(q) => {
                 self.query = q;
@@ -1268,7 +1280,7 @@ impl Gallery {
             Message::Swatch => {
                 self.swatch = !self.swatch;
                 self.note = if self.swatch {
-                    "Accent #0178d4".into()
+                    "Accent on".into()
                 } else {
                     "Accent idle".into()
                 };
@@ -4120,6 +4132,33 @@ mod tests {
         assert!(mid > top);
         assert!(end > mid);
         assert!(end > 200.0, "patterns should require a scroll, got {end}");
+    }
+
+    #[test]
+    fn follow_os_maps_gnome_default_to_light() {
+        let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
+        assert!(g.follow_os);
+        assert_eq!(g.family, "default");
+        let _ = g.update(super::Message::OsMode(icedtea::iced::theme::Mode::None));
+        assert_eq!(g.theme, "light");
+        assert_eq!(
+            g.tokens.canvas,
+            icedtea::theme::named("light").tokens.canvas
+        );
+        let _ = g.update(super::Message::OsMode(icedtea::iced::theme::Mode::Dark));
+        assert_eq!(g.theme, "dark");
+        assert_eq!(g.tokens.canvas, icedtea::theme::named("dark").tokens.canvas);
+    }
+
+    #[test]
+    fn paired_swatch_keeps_follow_os() {
+        let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
+        let _ = g.update(super::Message::Theme("github-light".into()));
+        assert!(g.follow_os);
+        assert_eq!(g.family, "github");
+        let _ = g.update(super::Message::Theme("nord".into()));
+        assert!(!g.follow_os);
+        assert_eq!(g.theme, "nord");
     }
 
     #[test]

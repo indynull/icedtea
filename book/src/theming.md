@@ -15,7 +15,8 @@ Dracula, Everforest, Kanagawa, Ayu, GitHub, and others).
 [`theme::named`](https://docs.rs/icedtea/latest/icedtea/theme/fn.named.html)
 and `theme::code_highlight` pick UI tokens and the iced highlighter
 face together. Register more on `ThemeCatalog`. `Boot.theme` is a
-concrete name and defaults to `dark`. `markdown_view` paints inline
+concrete name and defaults to `dark`. `light` and `dark` are a
+neutral desktop pair (not a community skin). `markdown_view` paints inline
 code and links from `Tokens` (`text`, `panel`, `accent`). Truncation
 is slicing the source before `MarkdownDoc::parse`.
 
@@ -33,8 +34,9 @@ Families are explicit pairs (`github` → `github-dark` / `github-light`,
 and the other real couples). A follow-OS preference selects the light
 or dark member of one family (default family: `light` / `dark`).
 High-contrast is its own name. Names without a pair do not follow the
-OS. Persist stores `theme` plus optional `family` and `follow_os`.
-Mode changes come from iced (`system::theme` / `theme_changes`).
+OS. Persist stores `theme` plus optional `family` and `follow_os`
+(`follow_os` defaults on). Mode changes come from iced
+(`system::theme` / `theme_changes`).
 When follow-OS is on, `theme::apply_os_accent` can fill
 `Tokens.primary` from the desktop accent. Canvas and text stay the
 family's tokens. Decorated windows keep the native title bar.

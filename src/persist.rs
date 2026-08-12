@@ -85,7 +85,7 @@ impl Default for UiState {
             docks: BTreeMap::new(),
             theme: "dark".into(),
             family: None,
-            follow_os: false,
+            follow_os: true,
             density: DensityName::Default,
             font_scale: 1.0,
             accent: None,
@@ -172,6 +172,7 @@ mod tests {
     #[test]
     fn json_roundtrip_and_split_restore() {
         let mut ui = UiState::default();
+        assert!(ui.follow_os);
         ui.set_split("main", SplitState::new(Axis::Horizontal, 0.4));
         ui.docks.insert(
             "nav".into(),

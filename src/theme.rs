@@ -225,9 +225,9 @@ fn catalog_from_json(raw: &str) -> BTreeMap<&'static str, NamedTheme> {
                 continue;
             };
             let rec = Value::Object(obj.clone());
-            let canvas = hex_of(&rec, "canvas", rgb(0x1E, 0x1E, 0x1E));
-            let text = hex_of(&rec, "text", rgb(0xE0, 0xE0, 0xE0));
-            let primary = hex_of(&rec, "primary", rgb(0x01, 0x78, 0xD4));
+            let canvas = hex_of(&rec, "canvas", rgb(0x20, 0x20, 0x20));
+            let text = hex_of(&rec, "text", rgb(0xF2, 0xF2, 0xF2));
+            let primary = hex_of(&rec, "primary", rgb(0x6B, 0x9E, 0xFF));
             let panel = hex_of(&rec, "panel", mix(text, canvas, 0.10));
             let surface = hex_of(&rec, "surface", panel);
             let key = intern(&name);
@@ -243,10 +243,10 @@ fn catalog_from_json(raw: &str) -> BTreeMap<&'static str, NamedTheme> {
                         text,
                         hex_of(&rec, "muted", mix(text, canvas, 0.55)),
                         primary,
-                        hex_of(&rec, "accent", rgb(0xFE, 0xA6, 0x2B)),
-                        hex_of(&rec, "success", rgb(0x4E, 0xBF, 0x71)),
-                        hex_of(&rec, "warning", rgb(0xFE, 0xA6, 0x2B)),
-                        hex_of(&rec, "danger", rgb(0xB9, 0x3C, 0x5B)),
+                        hex_of(&rec, "accent", rgb(0x5E, 0xEA, 0xD4)),
+                        hex_of(&rec, "success", rgb(0x4A, 0xDE, 0x80)),
+                        hex_of(&rec, "warning", rgb(0xFB, 0xBF, 0x24)),
+                        hex_of(&rec, "danger", rgb(0xF8, 0x71, 0x71)),
                         hex_of(&rec, "border", mix(primary, canvas, 0.35)),
                     ),
                 },
@@ -484,10 +484,12 @@ pub enum Appearance {
 }
 
 impl Appearance {
+    /// Map iced / mundy mode. `None` is no preference (GNOME Light is
+    /// often `default` on the portal), so it follows the light member.
     pub fn from_mode(mode: iced::theme::Mode) -> Self {
         match mode {
-            iced::theme::Mode::Light => Self::Light,
-            iced::theme::Mode::Dark | iced::theme::Mode::None => Self::Dark,
+            iced::theme::Mode::Light | iced::theme::Mode::None => Self::Light,
+            iced::theme::Mode::Dark => Self::Dark,
         }
     }
 }
@@ -676,6 +678,8 @@ mod tests {
         }
         assert_eq!(named("").name, "dark");
         assert_eq!(named("  nord  ").name, "nord");
+        assert_eq!(named("dark").tokens.canvas, rgb(0x20, 0x20, 0x20));
+        assert_eq!(named("light").tokens.canvas, rgb(0xF3, 0xF3, 0xF3));
         assert!(named("light").tokens.canvas.r > named("dark").tokens.canvas.r);
         assert_eq!(named("high-contrast").tokens.border, rgb(0xFF, 0xFF, 0xFF));
         assert_ne!(named("gruvbox").tokens.canvas, named("nord").tokens.canvas);
@@ -752,6 +756,19 @@ mod tests {
         );
         assert_eq!(resolve_pref("dark", None, false, Appearance::Light), "dark");
         assert_eq!(
+            resolve_pref("dark", Some("default"), true, Appearance::Light),
+            "light"
+        );
+        assert_eq!(
+            resolve_pref(
+                "dark",
+                Some("default"),
+                true,
+                Appearance::from_mode(iced::theme::Mode::None)
+            ),
+            "light"
+        );
+        assert_eq!(
             resolve_pref("default", Some("default"), true, Appearance::Dark),
             "dark"
         );
@@ -765,7 +782,7 @@ mod tests {
         );
         assert_eq!(
             Appearance::from_mode(iced::theme::Mode::None),
-            Appearance::Dark
+            Appearance::Light
         );
         assert_eq!(FAMILIES[0].id, "default");
     }
