@@ -18,6 +18,8 @@ rules file.
 just check          # format, clippy -D warnings, test, docs, coverage
 just clean          # cargo clean (debug, release, coverage trees)
 cargo run -p icedtea-gallery
+just gallery-qa     # visual QA (shots under tmp/gallery-qa/); see .grok/skills/gallery-qa
+just gallery-gif    # recapture assets/gallery.gif when the gallery shell changes
 ```
 
 ## Tree

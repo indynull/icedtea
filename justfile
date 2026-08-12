@@ -40,14 +40,13 @@ book:
 book-serve:
     mdbook serve
 
-# Record the gallery tour into assets/gallery.gif and book/src/gallery.gif.
-# Needs a display, ffmpeg, xwininfo, wmctrl, import, python3, Xephyr, metacity.
-# Records inside Xephyr. Burns a step caption on each frame.
+# Gallery QA (Xephyr tour shots). Skill: .grok/skills/gallery-qa/SKILL.md
+#   just gallery-qa
+#   just gallery-qa --interact --beats 0,8
+gallery-qa *args:
+    python3 scripts/gallery_qa.py {{args}}
+
+# Ship README/book tour GIF only (captioned frames into assets/ + book/).
 # ICEDTEA_GALLERY_ISOLATED=0 uses the current display.
 gallery-gif:
     bash scripts/gallery-gif.sh
-
-# Timed tour screenshots (Xephyr). Optional: just gallery-walk --gif demo.gif
-# Full review: open .grok/skills/gallery-visual-walkthrough/SKILL.md
-gallery-walk *args:
-    python3 .grok/skills/gallery-visual-walkthrough/scripts/gallery_walkthrough.py {{args}}

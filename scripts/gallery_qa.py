@@ -2,13 +2,15 @@
 # /// script
 # requires-python = ">=3.12"
 # ///
-"""Timed icedtea-gallery tour walkthrough with per-beat screenshots.
+"""Gallery QA: tour the icedtea gallery, capture shots, optional interact.
 
-Default: Xephyr + metacity (same isolation idea as scripts/gallery-gif.sh).
-Drives the built-in ICEDTEA_GALLERY_TOUR beat protocol (cmd/ack files).
+Default Xephyr + metacity. Tour protocol + optional inject scripts.
 Writes shots/, steps.jsonl, timings.json, CAPTURE.md under --out.
-
 Does not commit. Does not invent screenshots.
+
+  just gallery-qa
+  just gallery-qa --interact --beats 0,8
+  just gallery-gif   # ship assets/gallery.gif for README/book only
 """
 
 from __future__ import annotations
@@ -28,7 +30,7 @@ from pathlib import Path
 
 def _repo_root() -> Path:
     # …/icedtea/.grok/skills/gallery-visual-walkthrough/scripts/this.py
-    return Path(__file__).resolve().parents[4]
+    return Path(__file__).resolve().parents[1]
 
 
 def _which(*names: str) -> str | None:
@@ -150,7 +152,7 @@ class NestedDisplay:
                     "+extension",
                     "XFIXES",
                     "-title",
-                    "icedtea-gallery-walk",
+                    "icedtea-gallery-qa",
                 ],
                 env=env,
                 stdout=subprocess.DEVNULL,
@@ -515,7 +517,7 @@ def main() -> int:
         "--out",
         type=Path,
         default=None,
-        help="Output directory (default: tmp/gallery-walk/<timestamp>/)",
+        help="Output directory (default: tmp/gallery-qa/<timestamp>/)",
     )
     ap.add_argument(
         "--backend",
@@ -555,7 +557,7 @@ def main() -> int:
     root = _repo_root()
     out = args.out
     if out is None:
-        out = root / "tmp" / "gallery-walk" / _utc_stamp()
+        out = root / "tmp" / "gallery-qa" / _utc_stamp()
     out = out.resolve()
     shots = out / "shots"
     shots.mkdir(parents=True, exist_ok=True)
