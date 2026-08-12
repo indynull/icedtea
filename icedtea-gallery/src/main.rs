@@ -242,7 +242,7 @@ fn page_job(page: &str) -> &'static str {
         "fields" => "Typed values the application owns. Select-and-copy is on for labeled rows.",
         "readout" => "Progress, a ring, a sparkline, and an indeterminate spinner.",
         "type" => "Labels, icons, links, and a tooltip.",
-        "markdown" => "A full document. Drag to select; copy posts the source.",
+        "markdown" => "Rendered document. Source pane is selectable when select-and-copy is on.",
         "code" => "Highlighted source. Select a range and copy.",
         "image" => "The slot keeps its box while loading or on error.",
         "selectable" => "Body text the user can drag-select and copy.",
@@ -401,7 +401,7 @@ fn tour_caption_for(page: &str) -> &'static str {
         "fields" => "Fields: text, numbers, dates",
         "readout" => "Readout: progress and meters",
         "type" => "Type: labels and icons",
-        "markdown" => "Markdown: copy posts the source",
+        "markdown" => "Markdown: render and select source",
         "code" => "Code: select and copy",
         "image" => "Image: slot keeps its box",
         "selectable" => "Selectable: drag to copy",
@@ -1065,6 +1065,8 @@ impl Gallery {
             &self.code_editor
         } else if self.page == "selectable" {
             self.field("body")
+        } else if self.page == "markdown" {
+            self.field("md")
         } else {
             &self.editor
         }
@@ -1077,6 +1079,10 @@ impl Gallery {
             self.fields
                 .get_mut("body")
                 .unwrap_or_else(|| panic!("gallery binds body"))
+        } else if self.page == "markdown" {
+            self.fields
+                .get_mut("md")
+                .unwrap_or_else(|| panic!("gallery binds md"))
         } else {
             &mut self.editor
         }
@@ -1134,7 +1140,8 @@ impl Gallery {
     fn context_actions(&self) -> Vec<Action<Message>> {
         let mut v = Vec::new();
         let editor = self.page == "fields";
-        let select_body = self.select_copy && (self.page == "selectable" || self.page == "code");
+        let select_body =
+            self.select_copy && matches!(self.page, "selectable" | "code" | "markdown");
         if editor {
             let has = self.live_selection().is_some();
             v.push(
@@ -1677,12 +1684,10 @@ impl Gallery {
             },
             Message::ContextDismiss => self.context = None,
             Message::EditCopy => {
-                let s = self.live_selection().unwrap_or_else(|| {
-                    if self.page == "code" {
-                        self.code_editor.text()
-                    } else {
-                        String::new()
-                    }
+                let s = self.live_selection().unwrap_or_else(|| match self.page {
+                    "code" => self.code_editor.text(),
+                    "markdown" if self.select_copy => self.field("md").text(),
+                    _ => String::new(),
                 });
                 if !s.is_empty() {
                     self.note = "Copied".into();
@@ -2727,51 +2732,87 @@ impl Gallery {
                     .and_then(|i| self.md_heads.iter().find(|h| h.index == i))
                     .map(|h| format!("Showing {}", h.title))
                     .unwrap_or_else(|| {
-                        "Rendered document. Outline jumps. Copy source posts the markdown.".into()
+                        if self.select_copy {
+                            "Rendered view above. Source below is selectable; Copy source posts all."
+                                .into()
+                        } else {
+                            "Rendered document. Turn on Select and copy on Theme for the source pane."
+                                .into()
+                        }
                     });
-                column![
-                    widget::meta(showing, tok, named("md-hash", Role::Status)),
-                    pattern::command_bar(
-                        [Action::new("edit.copy", "Copy source", Message::CopyValue)],
+                let painted = row![
+                    container(widget::themed_scroll(
+                        widget::markdown_outline(
+                            &self.md_heads,
+                            self.md_jump,
+                            Message::MdJump,
+                            tok,
+                            named("md-outline", Role::List),
+                        ),
                         tok,
-                        self.direction,
+                        named("md-outline-scroll", Role::Group),
+                        false,
+                        None,
+                        None::<fn(_) -> Message>,
+                    ))
+                    .width(Length::Fixed(220.0)),
+                    widget::themed_scroll(
+                        widget::markdown_view(
+                            &self.md.items,
+                            tok,
+                            Message::MdLink,
+                            named("md", Role::Group)
+                        ),
+                        tok,
+                        named("md-scroll", Role::Group),
+                        false,
+                        Some(icedtea::iced::widget::Id::new("gallery-md")),
+                        None::<fn(_) -> Message>,
                     ),
-                    row![
+                ]
+                .spacing(12)
+                .height(Length::Fill);
+                let mut bar = vec![Action::new("edit.copy", "Copy source", Message::CopyValue)];
+                if self.select_copy {
+                    bar.push(Action::new(
+                        "edit.copy-sel",
+                        "Copy selection",
+                        Message::EditCopy,
+                    ));
+                }
+                let mut col = column![
+                    widget::meta(showing, tok, named("md-hash", Role::Status)),
+                    pattern::command_bar(bar, tok, self.direction),
+                    painted,
+                ]
+                .spacing(8)
+                .height(Length::Fill);
+                if self.select_copy {
+                    col = col.push(widget::meta(
+                        "Source — drag to select a range, then Copy selection or the context menu.",
+                        tok,
+                        named("md-src-label", Role::Status),
+                    ));
+                    col = col.push(
                         container(widget::themed_scroll(
-                            widget::markdown_outline(
-                                &self.md_heads,
-                                self.md_jump,
-                                Message::MdJump,
+                            widget::selectable(
+                                self.field("md"),
+                                |a| Message::Field("md", a),
                                 tok,
-                                named("md-outline", Role::List),
+                                icedtea::typo::FontFace::Mono,
+                                named("md-src", Role::TextBox),
                             ),
                             tok,
-                            named("md-outline-scroll", Role::Group),
+                            named("md-src-scroll", Role::Group),
                             false,
                             None,
                             None::<fn(_) -> Message>,
                         ))
-                        .width(Length::Fixed(220.0)),
-                        widget::themed_scroll(
-                            widget::markdown_view(
-                                &self.md.items,
-                                tok,
-                                Message::MdLink,
-                                named("md", Role::Group)
-                            ),
-                            tok,
-                            named("md-scroll", Role::Group),
-                            false,
-                            Some(icedtea::iced::widget::Id::new("gallery-md")),
-                            None::<fn(_) -> Message>,
-                        ),
-                    ]
-                    .spacing(12)
-                    .height(Length::Fill),
-                ]
-                .spacing(8)
-                .height(Length::Fill)
-                .into()
+                        .height(Length::Fixed(160.0))
+                        .width(Length::Fill),
+                    );
+                }
+                col.into()
             }
             "code" => {
                 let lang = CodeLang::named(&self.code_lang).unwrap_or(&samples::CODE_LANGS[0]);
