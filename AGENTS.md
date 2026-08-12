@@ -84,6 +84,11 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   `themed_scroll`, keys subscribe with `key::listen`, sidebar recipe
   is `Breakpoint::from_width`.
 - One path per feature. Pick it and delete the other. Fallbacks re-grow.
+- Select and copy: code and fields use `text_editor` + `select_only` and
+  app-owned `Content` / `Selectables`. Painted markdown uses
+  `markdown_view` (paint-side selection via `iced_selection`); full
+  document copy is `copy_text` on `MarkdownDoc::source`. Gallery demos
+  only those constructors—no dual-pane source under the paint.
 - Always drop `target/llvm-cov-target` after a passing coverage run.
   `just clean` is `cargo clean`. Check recipes set `CARGO_INCREMENTAL=0`.
 - Always keep `TODO.md` current with the shipped library. Sort items
@@ -132,8 +137,10 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   docs.rs) links. Composition chapters teach how to put pieces
   together; the reference lists the pieces. Never send readers to
   the gallery from README, the guide, or crate-root rustdoc. The
-  gallery is a demo. Those pages reference shipped constructors,
-  rustdoc, and source only.
+  gallery is a demo. Those pages are a brain-dead copy of the public
+  constructors an app would call—same messages, tokens, and A11y.
+  Never stage dual-pane or other glue that invents a path the library
+  does not ship.
 - Always use one first-path program (`examples/hello.rs`) that is a
   tiny Save tool: `file.save`, toolbar, filling editor, status.
   README, crate-root, and First window include that program. Never

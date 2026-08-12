@@ -76,9 +76,9 @@ Constructor: [`widget::markdown_view`](https://docs.rs/icedtea/latest/icedtea/wi
 [iced](https://crates.io/crates/iced)
 
 Parse with `MarkdownDoc::parse`, then view the items. Truncate by
-slicing the source before parse. Links use `Tokens.accent`. Copy
-posts `doc.source` with `icedtea::copy_text`. The painted tree has
-no drag selection.
+slicing the source before parse. Links use `Tokens.accent`. Drag to
+select in the painted view; Ctrl+C / Cmd+C copies the range. Copy
+the whole document with `icedtea::copy_text` on `doc.source`.
 
 ### Code
 

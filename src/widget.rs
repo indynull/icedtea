@@ -1436,6 +1436,9 @@ pub fn select_only(action: text_editor::Action) -> text_editor::Action {
 /// allows select-and-copy. Use [`typo::FontFace::Ui`] for prose and
 /// [`typo::FontFace::Mono`] for paths or raw values.
 ///
+/// For painted markdown (not an editor buffer), use
+/// [`markdown_view`]: selection and Ctrl+C are paint-side.
+///
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -2215,9 +2218,20 @@ pub fn parse(source: &str) -> MarkdownDoc {
 
 /// A parsed markdown document.
 ///
-/// Parse with [`parse`], then view the items. Truncate by slicing the
-/// source before parse. Copy the source with [`crate::copy_text`] on
-/// [`MarkdownDoc::source`]. The painted tree has no drag selection.
+/// Parse with [`parse`], then view with [`markdown_view`]. Truncate by
+/// slicing the source before parse.
+///
+/// # Select and copy
+///
+/// Drag-select in the painted view. Ctrl+C / Cmd+C copies the range
+/// through the host clipboard (widget-owned selection). To copy the
+/// whole document without selecting, post [`MarkdownDoc::source`] with
+/// [`crate::copy_text`]. That is the same full-source job as a
+/// "Copy source" action.
+///
+/// Code and field values use [`selectable`] / [`highlighted_code`] and
+/// a [`Content`](iced::widget::text_editor::Content) the application
+/// owns. Markdown uses paint-side selection instead of an editor.
 ///
 ///
 /// ```
@@ -2237,7 +2251,8 @@ pub fn markdown_view<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     a11y::attach(
-        markdown::view(items, markdown::Settings::with_style(markdown_style(tok))).map(on_link),
+        iced_selection::markdown::view(items, markdown::Settings::with_style(markdown_style(tok)))
+            .map(on_link),
         &a11y,
     )
 }
