@@ -12,9 +12,24 @@ Unset fields and follow-OS off leave the colorway unchanged. Success,
 warning, and danger stay on the colorway.
 
 `run!` and `daemon!` call `typo::install_platform_faces` so SansSerif
-and Monospace bind to installed faces (UI needs normal and bold weight
-700). Apps that start iced without those macros call it before the
-first frame.
+and Monospace bind to installed faces. UI prefers a discrete
+Regular+Bold family (Helvetica Neue, Lucida Grande, …) and accepts
+variable faces when needed; monospaced names never bind as UI.
+Apps that start iced without those macros call `install_platform_faces`
+before the first frame.
+
+Virtual lists and tables hard-clip overscan with `ClipLayer` (real
+scissor, not soft `container.clip`). Paint clamps scroll so a past-end
+offset cannot blank a non-empty model. Frozen table columns stay clear
+of horizontally scrolled cells. `list_detail` and `inspector` pad the
+list pane and separate regions with a hairline. Nested context menus
+place the flyout beside the root (no overlap) and top-align to the
+parent row; tall flyouts share the root height cap and scroll.
+`split_button` takes overflow rows and opens an iced menu from the
+chevron.
+
+The catalog groups chrome recipes as Layouts, Overlays, and Screens
+(replacing Patterns). Guide reference pages match those groups.
 
 The spinner is eight dots around a circle. `chip` takes optional press
 and dismiss. `Selectables::get` is `Option`; unbound `perform` is a
@@ -23,6 +38,8 @@ no-op. `status_bar` takes an optional tone and caption.
 select within each block. Code and fields stay select-only editors
 with clean multi-line highlight. Contract: `select` module. Gallery
 content pages always demo those constructors (no paint-only toggle).
+The List page pages filtered rows and isolates selection from
+list-detail and the table demo.
 
 ## 0.4.0 — 2026-08-11
 
