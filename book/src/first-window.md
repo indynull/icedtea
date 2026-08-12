@@ -10,9 +10,11 @@ in the repository. `cargo run --example hello`.
 {{#include ../../examples/hello.rs}}
 ```
 
-`Boot` loads tokens, locale, and window settings. Text uses the
-platform sans; code uses the platform mono. Load a named family on
-the iced application if you want a specific face.
+`Boot` loads tokens, locale, and window settings. `run!` (and
+`daemon!`) call `typo::install_platform_faces` so UI text uses an
+installed sans with normal and bold, and mono uses an installed fixed
+face. Load a named family on the iced application if you want a
+specific face.
 
 A compact tool sets size on `Boot` (`.size(380.0, 560.0).min_size(...)`)
 instead of calling iced window resize. See [Compact tools](compact-tools.md).

@@ -14,6 +14,12 @@ editors with clean multi-line highlight. Contract: `select` module.
 Gallery content pages always demo those constructors (no paint-only
 toggle).
 
+`run!` and `daemon!` call `typo::install_platform_faces` so SansSerif
+and Monospace bind to installed faces (UI needs normal and bold weight
+700). Apps that start iced without those macros call it before the
+first frame.
+
+
 ## 0.4.0 — 2026-08-11
 
 `pattern::workspace` calls `pane` with each leaf id. `list_view`

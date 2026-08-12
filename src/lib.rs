@@ -188,6 +188,7 @@ pub mod focus;
 pub mod fuzzy;
 pub mod host;
 mod host_canvas;
+mod host_font;
 pub mod i18n;
 pub mod icon;
 pub mod key;
@@ -239,6 +240,7 @@ macro_rules! run {
             __direction == $crate::i18n::Direction::Ltr
                 || __direction == $crate::i18n::Direction::Rtl
         );
+        $crate::typo::install_platform_faces();
         $crate::iced::application($new, $update, $view)
             .title($crate::app::WindowTitle(__title))
             .theme($theme)
@@ -281,6 +283,7 @@ macro_rules! daemon {
             __direction == $crate::i18n::Direction::Ltr
                 || __direction == $crate::i18n::Direction::Rtl
         );
+        $crate::typo::install_platform_faces();
         $crate::iced::daemon($new, $update, $view)
             .title(move |_, _| __title.clone())
             .theme(move |state, _| $theme(state))

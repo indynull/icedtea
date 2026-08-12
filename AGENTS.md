@@ -52,7 +52,10 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
 - User-facing text uses `typo::UI` (`Font::DEFAULT`, platform sans).
   Code uses `typo::MONO` (`Font::MONOSPACE`). Never bundle a font
   file. Apps that want a named family load it on the iced application
-  themselves.
+  themselves. `run!` / `daemon!` call `typo::install_platform_faces`
+  so those generics bind to installed faces (normal + bold for UI).
+  Apps that start iced without those macros must call it before the
+  first frame.
 - Every public widget constructor takes `a11y::A11y` and calls
   `a11y::attach` (name, role, value, disabled, checked). iced 0.14 has
   no accesskit slot; the widget id carries the node id.
