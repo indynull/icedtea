@@ -218,7 +218,6 @@ fn page_fills(page: &str) -> bool {
         "code"
             | "tree"
             | "list-detail"
-            | "list"
             | "table"
             | "log"
             | "grid"
@@ -471,9 +470,7 @@ fn parse_inject_line(line: &str) -> Option<Message> {
         "slide" => Some(Message::Slide(parts.next()?.parse().ok()?)),
         "list" => Some(Message::ListSel(parts.next()?.parse().ok()?)),
         "opt" => Some(Message::OptSel(parts.next()?.parse().ok()?)),
-        "expand-card" | "expand_card" => {
-            Some(Message::ExpandCard(parts.next()?.parse().ok()?))
-        }
+        "expand-card" | "expand_card" => Some(Message::ExpandCard(parts.next()?.parse().ok()?)),
         "face" | "list-face" | "list_face" => {
             let v = parts.next()?.to_ascii_lowercase();
             Some(Message::ListFace(v == "card" || v == "true"))
@@ -3160,7 +3157,9 @@ impl Gallery {
                     ),
                 ]
                 .spacing(8),
-                widget::list_view(
+                // Fixed height: multi-host list + virtual_column both used Fill
+                // and the main list collapsed to one row.
+                container(widget::list_view(
                     &self.list,
                     &self.sel,
                     Message::ListSel,
@@ -3180,7 +3179,8 @@ impl Gallery {
                         icedtea::collection::RowFace::FLUSH
                     },
                     named("list", Role::List),
-                ),
+                ))
+                .height(220),
                 widget::meta("Filter", tok, named("opt-hint", Role::Status),),
                 container(widget::list_view(
                     &self.options,
@@ -3197,10 +3197,9 @@ impl Gallery {
                     icedtea::collection::RowFace::FLUSH,
                     named("options", Role::List),
                 ))
-                .height(140),
+                .height(110),
             ]
             .spacing(8)
-            .height(Length::Fill)
             .into(),
             "virtual-column" => {
                 let titles: Vec<String> = (0..self.list.len())
@@ -3225,31 +3224,39 @@ impl Gallery {
                             let title =
                                 titles.get(i).cloned().unwrap_or_else(|| format!("row {i}"));
                             let open = open_at == Some(i);
-                            let body = if open {
-                                format!("{title}\n\nOpen face. Only this slice is mounted.")
+                            let face: Element<'_, Message> = if open {
+                                column![
+                                    widget::label(
+                                        title.clone(),
+                                        tok,
+                                        named(&format!("vc-{i}"), Role::ListItem),
+                                    ),
+                                    widget::meta(
+                                        "Open face. Only this slice is mounted.",
+                                        tok,
+                                        named(&format!("vc-body-{i}"), Role::Status),
+                                    ),
+                                ]
+                                .spacing(4)
+                                .into()
                             } else {
-                                title
+                                widget::label(title, tok, named(&format!("vc-{i}"), Role::ListItem))
                             };
                             mouse_area(
-                                container(widget::label(
-                                    body,
-                                    tok,
-                                    named(&format!("vc-{i}"), Role::ListItem),
-                                ))
-                                .width(Length::Fill)
-                                .height(Length::Fill)
-                                .padding(8)
-                                .style(move |_| icedtea::style::card(tok, open)),
+                                container(face)
+                                    .width(Length::Fill)
+                                    .height(Length::Fill)
+                                    .padding(8)
+                                    .style(move |_| icedtea::style::card(tok, open)),
                             )
                             .on_press(Message::ExpandCard(i))
                             .into()
                         },
                         named("vc", Role::List),
                     ))
-                    .height(Length::Fill),
+                    .height(260),
                 ]
                 .spacing(8)
-                .height(Length::Fill)
                 .into()
             }
             "log" => column![widget::log_view(
@@ -3872,6 +3879,7 @@ impl Gallery {
                     ))
                     .width(Length::Fixed(420.0))
                     .into(),
+                    tok,
                 )
             }
             "list-detail" => pattern::list_detail(

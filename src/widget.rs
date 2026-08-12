@@ -1473,7 +1473,8 @@ fn selectable_style(
     tok: Tokens,
 ) -> impl Fn(&iced::Theme, iced::widget::text_editor::Status) -> iced::widget::text_editor::Style {
     move |_t, _s| iced::widget::text_editor::Style {
-        background: iced::Background::Color(tok.canvas),
+        // Transparent so value fields read as body text, not a dark editor slab.
+        background: iced::Background::Color(Color::TRANSPARENT),
         border: iced::Border {
             color: Color::TRANSPARENT,
             width: 0.0,
@@ -3101,7 +3102,8 @@ pub fn virtual_column<'a, M: Clone + 'a>(
             move |win| {
                 let mut col = Column::new();
                 for i in win.range() {
-                    col = col.push(row(i));
+                    let h = heights.get(i).copied().unwrap_or(0.0);
+                    col = col.push(container(row(i)).width(Length::Fill).height(h).clip(true));
                 }
                 col
             },

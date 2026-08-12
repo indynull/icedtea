@@ -28,13 +28,14 @@ pub struct Entry {
 /// group cannot be swapped. One row per public surface.
 #[rustfmt::skip]
 pub const ENTRIES: &[Entry] = &[
-    Entry { id: "button", title: "Button", group: "Controls", page: "controls" },
-    Entry { id: "split-button", title: "Split button", group: "Controls", page: "controls" },
-    Entry { id: "toggle-button", title: "Toggle button", group: "Controls", page: "controls" },
+    // Interactive toggles first so the gallery fold shows inject targets.
     Entry { id: "checkbox", title: "Checkbox", group: "Controls", page: "controls" },
     Entry { id: "radio", title: "Radio", group: "Controls", page: "controls" },
     Entry { id: "switch", title: "Switch", group: "Controls", page: "controls" },
     Entry { id: "slider", title: "Slider", group: "Controls", page: "controls" },
+    Entry { id: "button", title: "Button", group: "Controls", page: "controls" },
+    Entry { id: "split-button", title: "Split button", group: "Controls", page: "controls" },
+    Entry { id: "toggle-button", title: "Toggle button", group: "Controls", page: "controls" },
     Entry { id: "text-input", title: "Text input", group: "Fields", page: "fields" },
     Entry { id: "password", title: "Password", group: "Fields", page: "fields" },
     Entry { id: "secret", title: "Secret field", group: "Fields", page: "fields" },
@@ -62,17 +63,19 @@ pub const ENTRIES: &[Entry] = &[
     Entry { id: "code", title: "Code", group: "Content", page: "code" },
     Entry { id: "image", title: "Image", group: "Content", page: "image" },
     Entry { id: "selectable", title: "Selectable", group: "Content", page: "selectable" },
-    Entry { id: "list", title: "List", group: "Collections", page: "list" },
+    // Virtual column first so open-face inject is above the fold.
     Entry { id: "virtual-column", title: "Virtual column", group: "Collections", page: "list" },
+    Entry { id: "list", title: "List", group: "Collections", page: "list" },
     Entry { id: "log", title: "Log", group: "Collections", page: "log" },
     Entry { id: "grid", title: "Item grid", group: "Collections", page: "grid" },
     Entry { id: "table", title: "Data table", group: "Collections", page: "table" },
     Entry { id: "tree", title: "Tree", group: "Collections", page: "tree" },
-    Entry { id: "document-tabs", title: "Document tabs", group: "Collections", page: "sections" },
-    Entry { id: "tabs", title: "Tabs", group: "Collections", page: "sections" },
+    // Accordion and expander above the fold for inject proof.
     Entry { id: "accordion", title: "Accordion", group: "Collections", page: "sections" },
     Entry { id: "expander", title: "Expander", group: "Collections", page: "sections" },
     Entry { id: "pagination", title: "Pagination", group: "Collections", page: "sections" },
+    Entry { id: "tabs", title: "Tabs", group: "Collections", page: "sections" },
+    Entry { id: "document-tabs", title: "Document tabs", group: "Collections", page: "sections" },
     Entry { id: "theme", title: "Theme", group: "Chrome", page: "theme" },
     Entry { id: "colors", title: "Colors", group: "Chrome", page: "colors" },
     Entry { id: "keys", title: "Keys", group: "Chrome", page: "keys" },

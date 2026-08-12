@@ -84,14 +84,11 @@ pub fn hairline(tok: Tokens) -> container::Style {
     }
 }
 
-pub fn dim_backdrop(tok: Tokens) -> container::Style {
+pub fn dim_backdrop(_tok: Tokens) -> container::Style {
+    // Black wash so the sheet sits above the scene on light and dark colorways.
+    // Canvas-tinted alpha was nearly invisible on dark themes.
     container::Style {
-        background: Some(Background::Color(Color::from_rgba(
-            tok.canvas.r,
-            tok.canvas.g,
-            tok.canvas.b,
-            0.72,
-        ))),
+        background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.55))),
         snap: false,
         ..container::Style::default()
     }

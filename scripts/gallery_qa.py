@@ -389,8 +389,10 @@ DEFAULT_INTERACT: list[dict[str, str]] = [
     {
         "match": "accordion",
         "name": "sections-expand",
-        "script": "expand true\nacc 0\n",
-        "expect": "expander open; first accordion open",
+        # Idle starts with Files open (acc 0). Toggle Appearance so the
+        # open section changes; expander starts closed.
+        "script": "expand true\nacc 1\n",
+        "expect": "expander open; Appearance accordion open",
     },
     {
         "match": "tree:",

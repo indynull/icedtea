@@ -778,7 +778,7 @@ pub fn main_window<'a, M: Clone + 'a>(
     .into()
 }
 
-/// In-window modal on a dim backdrop.
+/// In-window modal: scene, dim wash, then the centered sheet.
 ///
 /// ```
 /// use icedtea::a11y::A11y;
@@ -789,10 +789,30 @@ pub fn main_window<'a, M: Clone + 'a>(
 /// let _: icedtea::Element<'_, ()> = pattern::modal_card(
 ///     widget::label(" ", tok, A11y::new("dim", icedtea::a11y::Role::Status)),
 ///     pattern::dialog_sheet("Save", "Overwrite?", ("Save".into(), ()), None, tok),
+///     tok,
 /// );
 /// ```
-pub fn modal_card<'a, M: 'a>(backdrop: Element<'a, M>, card: Element<'a, M>) -> Element<'a, M> {
-    layout::overlay_center(backdrop, card)
+pub fn modal_card<'a, M: 'a>(
+    backdrop: Element<'a, M>,
+    card: Element<'a, M>,
+    tok: Tokens,
+) -> Element<'a, M> {
+    Stack::new()
+        .push(backdrop)
+        .push(
+            container(Space::new().width(Length::Fill).height(Length::Fill))
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .style(move |_| style::dim_backdrop(tok)),
+        )
+        .push(
+            container(card)
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .center_x(Length::Fill)
+                .center_y(Length::Fill),
+        )
+        .into()
 }
 
 /// A confirm / message / save sheet.
@@ -1499,7 +1519,7 @@ mod tests {
         let tabs = Tabs::new(["A"]);
         let _: Element<'_, ()> = tab_view(&tabs, lab("b"), |_| (), |_| (), tok);
         let _: Element<'_, ()> = main_window(lab("m"), lab("t"), lab("c"), lab("s"), tok);
-        let _: Element<'_, ()> = modal_card(lab("b"), lab("c"));
+        let _: Element<'_, ()> = modal_card(lab("b"), lab("c"), tok);
         let _: Element<'_, ()> = context_menu(
             table.iter().cloned(),
             iced::Point::ORIGIN,
@@ -1609,7 +1629,7 @@ mod tests {
         paint(&mut nv);
         let mut tv = tab_view(&tabs, lab("b"), |_| (), |_| (), tok);
         paint(&mut tv);
-        let mut mc = modal_card(lab("b"), lab("c"));
+        let mut mc = modal_card(lab("b"), lab("c"), tok);
         paint(&mut mc);
         let mut cb = command_bar(table.iter(), tok, ltr);
         paint(&mut cb);

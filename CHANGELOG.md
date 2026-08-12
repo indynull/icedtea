@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+`pattern::modal_card` takes tokens and paints a black dim wash over the
+scene. `virtual_column` clamps each mounted row to its height so open
+faces grow. `selectable` paints on a transparent field (value rows no
+longer sit in a dark editor slab).
+
 ## 0.4.0 — 2026-08-12
 
 `pattern::workspace` calls `pane` with each leaf id. `list_view`
