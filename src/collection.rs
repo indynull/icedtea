@@ -1132,10 +1132,7 @@ mod tests {
             viewport,
         };
         let win = window_after_scroll(prev, prev.scroll, viewport, row_h, n, 4, None);
-        assert!(
-            win.end > win.start,
-            "past-end scroll must still mount rows, got {win:?}"
-        );
+        assert!(win.end > win.start);
         let max_scroll = n as f32 * row_h - viewport;
         assert!((win.scroll - max_scroll).abs() < 0.01);
         let tall: Vec<f32> = (0..25).map(|_| 80.0).collect();
@@ -1154,10 +1151,7 @@ mod tests {
             None,
         );
         let remount = window_after_scroll_var(deep, deep.scroll, 200.0, &short, 4, None);
-        assert!(
-            remount.end > remount.start,
-            "after shorter heights, clamp must remount rows, got {remount:?}"
-        );
+        assert!(remount.end > remount.start);
         let short_total: f32 = short.iter().sum();
         assert!(remount.scroll <= (short_total - 200.0).max(0.0) + 0.01);
     }

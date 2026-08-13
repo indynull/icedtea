@@ -28,16 +28,21 @@ pub struct Entry {
 /// group cannot be swapped. One row per public surface.
 #[rustfmt::skip]
 pub const ENTRIES: &[Entry] = &[
-    // Inject targets first (checkbox/radio/switch/slider) so after-interact
-    // shots prove M3 state faces; buttons follow for filled/tonal/text variants.
+    // Inject targets first (checkbox/radio/switch/slider). New desktop
+    // Material controls next so idle shots still show them above the fold.
     Entry { id: "checkbox", title: "Checkbox", group: "Controls", page: "controls" },
     Entry { id: "radio", title: "Radio", group: "Controls", page: "controls" },
     Entry { id: "switch", title: "Switch", group: "Controls", page: "controls" },
     Entry { id: "slider", title: "Slider", group: "Controls", page: "controls" },
+    Entry { id: "range-slider", title: "Range slider", group: "Controls", page: "controls" },
+    Entry { id: "segmented-button", title: "Segmented button", group: "Controls", page: "controls" },
+    Entry { id: "icon-button", title: "Icon button", group: "Controls", page: "controls" },
+    Entry { id: "checkbox-indeterminate", title: "Indeterminate checkbox", group: "Controls", page: "controls" },
     Entry { id: "button", title: "Button", group: "Controls", page: "controls" },
     Entry { id: "split-button", title: "Split button", group: "Controls", page: "controls" },
     Entry { id: "toggle-button", title: "Toggle button", group: "Controls", page: "controls" },
     Entry { id: "text-input", title: "Text input", group: "Fields", page: "fields" },
+    Entry { id: "field-support", title: "Field support", group: "Fields", page: "fields" },
     Entry { id: "password", title: "Password", group: "Fields", page: "fields" },
     Entry { id: "secret", title: "Secret field", group: "Fields", page: "fields" },
     Entry { id: "value-field", title: "Value field", group: "Fields", page: "fields" },
@@ -76,14 +81,18 @@ pub const ENTRIES: &[Entry] = &[
     Entry { id: "colors", title: "Colors", group: "Chrome", page: "colors" },
     Entry { id: "keys", title: "Keys", group: "Chrome", page: "keys" },
     Entry { id: "cheatsheet", title: "Cheatsheet", group: "Chrome", page: "keys" },
-    Entry { id: "card", title: "Card", group: "Chrome", page: "marks" },
-    Entry { id: "rule", title: "Rule", group: "Chrome", page: "marks" },
+    // Filter chips first so selected/idle faces are above the fold on Marks.
+    Entry { id: "filter-chips", title: "Filter chips", group: "Chrome", page: "marks" },
     Entry { id: "chip", title: "Chip", group: "Chrome", page: "marks" },
     Entry { id: "badge", title: "Badge", group: "Chrome", page: "marks" },
+    Entry { id: "card", title: "Card", group: "Chrome", page: "marks" },
+    Entry { id: "rule", title: "Rule", group: "Chrome", page: "marks" },
     Entry { id: "wrap", title: "Wrap", group: "Chrome", page: "marks" },
     Entry { id: "banner", title: "Banner", group: "Chrome", page: "marks" },
     Entry { id: "command-bar", title: "Command bar", group: "Chrome", page: "chrome-rows" },
     Entry { id: "context-menu", title: "Context menu", group: "Chrome", page: "chrome-rows" },
+    Entry { id: "sectioned-menu", title: "Sectioned menu", group: "Chrome", page: "chrome-rows" },
+    Entry { id: "cascade-menu", title: "Cascade menu", group: "Chrome", page: "chrome-rows" },
     Entry { id: "breadcrumb", title: "Breadcrumb", group: "Chrome", page: "chrome-rows" },
     Entry { id: "menu", title: "Menu", group: "Chrome", page: "chrome-rows" },
     Entry { id: "toolbar", title: "Toolbar", group: "Chrome", page: "chrome-rows" },
@@ -91,6 +100,8 @@ pub const ENTRIES: &[Entry] = &[
     Entry { id: "busy", title: "Busy overlay", group: "Chrome", page: "feedback" },
     Entry { id: "toast", title: "Toast", group: "Chrome", page: "feedback" },
     Entry { id: "scrollbar", title: "Scrollbar", group: "Chrome", page: "feedback" },
+    // Side sheet first so open-state inject is above the fold on Dialogs.
+    Entry { id: "side-sheet", title: "Side sheet", group: "Patterns", page: "dialogs" },
     Entry { id: "dialogs", title: "Dialogs", group: "Patterns", page: "dialogs" },
     Entry { id: "list-detail", title: "List/detail", group: "Patterns", page: "list-detail" },
     Entry { id: "inspector", title: "Inspector", group: "Patterns", page: "inspector" },
@@ -191,7 +202,7 @@ mod tests {
         assert_eq!(get("checkbox").unwrap().page, "controls");
         for page in pages() {
             let title = page_title(page);
-            assert!(!title.is_empty(), "{page}");
+            assert!(!title.is_empty());
             assert_ne!(title, "Page", "{page}");
         }
         assert_eq!(page_title("no-such-page"), "Page");
@@ -211,13 +222,10 @@ mod tests {
             "button",
             "list",
         ] {
-            assert!(get(id).is_some(), "{id}");
+            assert!(get(id).is_some());
         }
         for id in crate::m3::mapping::deleted_ids() {
-            assert!(
-                get(id).is_none(),
-                "deleted M3 surface still catalogued: {id}"
-            );
+            assert!(get(id).is_none());
         }
         for name in [
             "install.md",
@@ -260,13 +268,18 @@ mod tests {
         ];
         let ctors = [
             ("button", "themed_button"),
+            ("segmented-button", "segmented_button"),
+            ("icon-button", "icon_button"),
             ("split-button", "split_button"),
             ("toggle-button", "toggle_button"),
             ("checkbox", "themed_checkbox"),
+            ("checkbox-indeterminate", "checkbox_indeterminate"),
             ("radio", "themed_radio"),
             ("switch", "themed_switch"),
             ("slider", "themed_slider"),
+            ("range-slider", "range_slider"),
             ("text-input", "themed_text_input"),
+            ("field-support", "field_support"),
             ("password", "password_input"),
             ("secret", "secret_field"),
             ("value-field", "value_field"),
@@ -305,11 +318,14 @@ mod tests {
             ("card", "group_box"),
             ("rule", "rule_h"),
             ("chip", "chip"),
+            ("filter-chips", "filter_chips"),
             ("badge", "badge"),
             ("wrap", "wrap"),
             ("banner", "banner"),
             ("command-bar", "command_bar"),
             ("context-menu", "context_menu"),
+            ("sectioned-menu", "sectioned_menu"),
+            ("cascade-menu", "cascade_menu"),
             ("breadcrumb", "breadcrumb"),
             ("menu", "menu_bar"),
             ("toolbar", "toolbar"),
@@ -318,6 +334,7 @@ mod tests {
             ("toast", "toast_view"),
             ("scrollbar", "themed_scroll"),
             ("dialogs", "dialog_sheet"),
+            ("side-sheet", "side_sheet"),
             ("list-detail", "list_detail"),
             ("inspector", "inspector"),
             ("workspace", "workspace"),
@@ -451,13 +468,18 @@ mod tests {
         let layout = include_str!("layout/recipes.rs");
         let map = [
             ("button", "themed_button", widget),
+            ("segmented-button", "segmented_button", widget),
+            ("icon-button", "icon_button", widget),
             ("split-button", "split_button", widget),
             ("toggle-button", "toggle_button", widget),
             ("checkbox", "themed_checkbox", widget),
+            ("checkbox-indeterminate", "checkbox_indeterminate", widget),
             ("radio", "themed_radio", widget),
             ("switch", "themed_switch", widget),
             ("slider", "themed_slider", widget),
+            ("range-slider", "range_slider", widget),
             ("text-input", "themed_text_input", widget),
+            ("field-support", "field_support", widget),
             ("password", "password_input", widget),
             ("secret", "secret_field", widget),
             ("value-field", "value_field", widget),
@@ -496,11 +518,14 @@ mod tests {
             ("card", "group_box", widget),
             ("rule", "rule_h", widget),
             ("chip", "chip", widget),
+            ("filter-chips", "filter_chips", widget),
             ("badge", "badge", widget),
             ("wrap", "wrap", layout),
             ("banner", "banner", widget),
             ("command-bar", "command_bar", pattern),
             ("context-menu", "context_menu", pattern),
+            ("sectioned-menu", "sectioned_menu", pattern),
+            ("cascade-menu", "cascade_menu", pattern),
             ("breadcrumb", "breadcrumb", widget),
             ("menu", "menu_bar", pattern),
             ("toolbar", "toolbar", pattern),
@@ -509,6 +534,7 @@ mod tests {
             ("toast", "toast_view", widget),
             ("scrollbar", "themed_scroll", widget),
             ("dialogs", "dialog_sheet", pattern),
+            ("side-sheet", "side_sheet", pattern),
             ("list-detail", "list_detail", pattern),
             ("inspector", "inspector", pattern),
             ("workspace", "workspace", pattern),
@@ -653,7 +679,7 @@ mod tests {
         let root = include_str!("lib.rs");
         let tour = root.split("#![cfg_attr").next().unwrap_or(root);
         for heading in ["First compose", "Boot", "Keys", "Tokens", "Scope"] {
-            assert!(tour.contains(heading), "tour missing {heading}");
+            assert!(tour.contains(heading));
         }
         assert!(tour.contains("file.save"));
         assert!(!tour.contains("catalog id"));
@@ -684,7 +710,7 @@ mod tests {
         ];
         for (text, needles) in pages {
             for n in needles.iter().copied() {
-                assert!(text.contains(n), "cookbook missing {n}");
+                assert!(text.contains(n));
             }
             assert!(!text.to_ascii_lowercase().contains("gallery"));
             assert!(!text.contains("Nop"));

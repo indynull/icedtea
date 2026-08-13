@@ -32,7 +32,8 @@ use crate::theme::Tokens;
 use crate::typo;
 use crate::variant::Variant;
 use crate::widget::{
-    group_box, label, meta, tab_bar, themed_button, themed_scroll, themed_text_input,
+    dismiss_button, group_box, label, meta, tab_bar, themed_button, themed_scroll,
+    themed_text_input,
 };
 
 /// Group actions by the id prefix before `.` (`file.save` → `file`).
@@ -888,6 +889,261 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
         &A11y::new(title, Role::Dialog),
     )
 }
+/// One titled group of menu actions (M3 menu section).
+#[derive(Debug, Clone)]
+pub struct MenuSection<M> {
+    pub title: Option<String>,
+    pub actions: Vec<Action<M>>,
+}
+
+impl<M> MenuSection<M> {
+    pub fn new(title: impl Into<String>, actions: impl IntoIterator<Item = Action<M>>) -> Self {
+        Self {
+            title: {
+                let t = title.into();
+                if t.is_empty() {
+                    None
+                } else {
+                    Some(t)
+                }
+            },
+            actions: actions.into_iter().collect(),
+        }
+    }
+
+    pub fn untitled(actions: impl IntoIterator<Item = Action<M>>) -> Self {
+        Self {
+            title: None,
+            actions: actions.into_iter().collect(),
+        }
+    }
+}
+
+fn menu_section_divider<'a, M: 'a>(tok: Tokens) -> Element<'a, M> {
+    container(Space::new().width(Length::Fill).height(1))
+        .width(Length::Fill)
+        .padding([4, 0])
+        .style(move |_| style::hairline(tok))
+        .into()
+}
+
+/// Vertical menu list with optional section titles and hairline dividers.
+///
+/// Use for context menus and cascading flyouts. Actions still come from
+/// the application table.
+///
+/// ```
+/// use icedtea::action::Action;
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::pattern::{self, MenuSection};
+/// use icedtea::theme;
+/// let tok = theme::named("dark").tokens;
+/// let save = Action::new("file.save", "Save", ());
+/// let _: icedtea::Element<'_, ()> = pattern::sectioned_menu(
+///     vec![MenuSection::new("File", [save])],
+///     tok,
+///     A11y::new("menu", Role::Menu),
+/// );
+/// ```
+pub fn sectioned_menu<'a, M: Clone + 'a>(
+    sections: impl IntoIterator<Item = MenuSection<M>>,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let sections: Vec<_> = sections.into_iter().collect();
+    let mut col = Column::new().spacing(2).padding(6).width(Length::Fill);
+    for (si, sec) in sections.into_iter().enumerate() {
+        if si > 0 {
+            col = col.push(menu_section_divider(tok));
+        }
+        if let Some(title) = sec.title {
+            col = col.push(
+                container(meta(title.clone(), tok, A11y::new(title, Role::Header))).padding([4, 8]),
+            );
+        }
+        for a in sec.actions {
+            col = col.push(themed_button(
+                a.title.clone(),
+                a.invoke(),
+                tok,
+                Variant::Ghost,
+                A11y::new(a.title.clone(), Role::MenuItem).with_disabled(!a.enabled),
+            ));
+        }
+    }
+    crate::a11y::attach(
+        container(col)
+            .style(move |_| style::raised_card(tok))
+            .into(),
+        &a11y,
+    )
+}
+
+/// Two-level cascade: primary list, optional open submenu panel.
+///
+/// The application owns which primary row is expanded (`open_sub`).
+/// Sub items share the same message type as top-level actions.
+///
+/// ```
+/// use icedtea::action::Action;
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// let tok = theme::named("dark").tokens;
+/// let open = Action::new("file.open", "Open", 0usize);
+/// let recent = vec![Action::new("file.recent.1", "notes.txt", 1usize)];
+/// let on_open = |i: Option<usize>| i.map(|n| n + 10).unwrap_or(0);
+/// let _: icedtea::Element<'_, usize> = pattern::cascade_menu(
+///     vec![(open, Some(recent))],
+///     Some(0),
+///     on_open,
+///     tok,
+///     A11y::new("File", Role::Menu),
+/// );
+/// ```
+pub fn cascade_menu<'a, M: Clone + 'a>(
+    entries: impl IntoIterator<Item = (Action<M>, Option<Vec<Action<M>>>)>,
+    open_sub: Option<usize>,
+    on_open_sub: impl Fn(Option<usize>) -> M + Copy + 'a,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let entries: Vec<_> = entries.into_iter().collect();
+    let mut primary = Column::new().spacing(2).padding(6);
+    for (i, (act, kids)) in entries.iter().enumerate() {
+        let has_sub = kids.as_ref().map(|k| !k.is_empty()).unwrap_or(false);
+        let title = if has_sub {
+            format!("{} ▸", act.title)
+        } else {
+            act.title.clone()
+        };
+        let press = if has_sub {
+            Some(on_open_sub(if open_sub == Some(i) {
+                None
+            } else {
+                Some(i)
+            }))
+        } else {
+            act.invoke()
+        };
+        primary = primary.push(themed_button(
+            title.clone(),
+            press,
+            tok,
+            if open_sub == Some(i) {
+                Variant::Quiet
+            } else {
+                Variant::Ghost
+            },
+            A11y::new(title, Role::MenuItem).with_disabled(!act.enabled),
+        ));
+    }
+    let left = container(primary)
+        .style(move |_| style::raised_card(tok))
+        .width(Length::Fixed(200.0));
+    let mut row = Row::new().spacing(4).align_y(Alignment::Start).push(left);
+    if let Some(i) = open_sub {
+        if let Some((_, Some(kids))) = entries.get(i) {
+            if !kids.is_empty() {
+                row = row.push(sectioned_menu(
+                    vec![MenuSection::untitled(kids.clone())],
+                    tok,
+                    A11y::new("submenu", Role::Menu),
+                ));
+            }
+        }
+    }
+    crate::a11y::attach(row.into(), &a11y)
+}
+
+/// Docked supporting pane (M3 side sheet) over a dimmed scene.
+///
+/// `end` true docks trailing edge (LTR right). Body is application
+/// content; dismiss is optional.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let body = widget::label("Props", tok, A11y::new("Props", Role::Status));
+/// let _: icedtea::Element<'_, ()> = pattern::side_sheet(
+///     widget::label("Scene", tok, A11y::new("Scene", Role::Status)),
+///     "Inspector",
+///     body,
+///     Some(()),
+///     true,
+///     320.0,
+///     tok,
+/// );
+/// ```
+pub fn side_sheet<'a, M: Clone + 'a>(
+    backdrop: Element<'a, M>,
+    title: impl Into<String>,
+    body: Element<'a, M>,
+    on_dismiss: Option<M>,
+    end: bool,
+    width: f32,
+    tok: Tokens,
+) -> Element<'a, M> {
+    let title = title.into();
+    let mut head = Row::new()
+        .spacing(8)
+        .align_y(Alignment::Center)
+        .push(label(
+            title.clone(),
+            tok,
+            A11y::new(title.clone(), Role::Header),
+        ))
+        .push(Space::new().width(Length::Fill));
+    if let Some(m) = on_dismiss {
+        head = head.push(dismiss_button(
+            m,
+            tok,
+            A11y::button(format!("close {title}")),
+        ));
+    }
+    let sheet = container(
+        column![head, body]
+            .spacing(12)
+            .width(Length::Fill)
+            .height(Length::Fill),
+    )
+    .padding(16)
+    .width(Length::Fixed(width.max(200.0)))
+    .height(Length::Fill)
+    .style(move |_| style::dialog_sheet_face(tok));
+    let docked = if end {
+        container(
+            row![Space::new().width(Length::Fill), sheet]
+                .height(Length::Fill)
+                .width(Length::Fill),
+        )
+        .width(Length::Fill)
+        .height(Length::Fill)
+    } else {
+        container(
+            row![sheet, Space::new().width(Length::Fill)]
+                .height(Length::Fill)
+                .width(Length::Fill),
+        )
+        .width(Length::Fill)
+        .height(Length::Fill)
+    };
+    Stack::new()
+        .push(backdrop)
+        .push(
+            container(Space::new().width(Length::Fill).height(Length::Fill))
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .style(move |_| style::dim_backdrop(tok)),
+        )
+        .push(docked)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .into()
+}
 
 /// Card size for `n` actions inside `viewport`. Long lists cap and scroll.
 pub fn context_card_size(n: usize, viewport: Size) -> Size {
@@ -1322,6 +1578,137 @@ mod tests {
     use crate::action::Action;
     use crate::shortcut::Shortcut;
     use crate::theme::named;
+
+    #[test]
+    fn sectioned_cascade_and_side_sheet_build() {
+        let tok = crate::theme::named("dark").tokens;
+        let save = Action::new("file.save", "Save", ());
+        let open = Action::new("file.open", "Open", ());
+        let _: Element<'_, ()> = sectioned_menu(
+            vec![
+                MenuSection::new("File", [save.clone(), open.clone()]),
+                MenuSection::new("", [Action::new("app.about", "About", ())]),
+                MenuSection::untitled([Action::new("app.quit", "Quit", ())]),
+            ],
+            tok,
+            A11y::new("m", Role::Menu),
+        );
+        let _: Element<'_, Option<usize>> = cascade_menu(
+            vec![
+                (
+                    Action::new("file.recent", "Recent", None),
+                    Some(vec![Action::new("file.r1", "a", Some(0))]),
+                ),
+                (
+                    Action::new("file.more", "More", None),
+                    Some(vec![Action::new("file.m1", "b", Some(1))]),
+                ),
+                (Action::new("file.open", "Open", Some(9)), None),
+                (Action::new("file.none", "Empty", None), Some(vec![])),
+            ],
+            Some(0),
+            |i| i,
+            tok,
+            A11y::new("c", Role::Menu),
+        );
+        let _: Element<'_, Option<usize>> = cascade_menu(
+            vec![(
+                Action::new("file.recent", "Recent", None),
+                Some(vec![Action::new("file.r1", "a", Some(0))]),
+            )],
+            Some(99),
+            |i| i,
+            tok,
+            A11y::new("c-miss", Role::Menu),
+        );
+        let _: Element<'_, Option<usize>> = cascade_menu(
+            vec![(Action::new("x", "X", Some(1)), None)],
+            None,
+            |i| i,
+            tok,
+            A11y::new("c2", Role::Menu),
+        );
+        let body = label("x", tok, A11y::new("x", Role::Status));
+        let scene = label("s", tok, A11y::new("s", Role::Status));
+        let _: Element<'_, ()> = side_sheet(scene, "I", body, Some(()), true, 240.0, tok);
+        let body = label("x", tok, A11y::new("x", Role::Status));
+        let scene = label("s", tok, A11y::new("s", Role::Status));
+        let _: Element<'_, ()> = side_sheet(scene, "L", body, None, false, 100.0, tok);
+        assert!(MenuSection::<()>::untitled([]).title.is_none());
+        assert!(MenuSection::<()>::new("", []).title.is_none());
+        assert_eq!(MenuSection::<()>::new("T", []).title.as_deref(), Some("T"));
+        let _: Element<'_, ()> = menu_section_divider(tok);
+        assert!(style::hairline(tok).background.is_some());
+        assert!(style::dialog_sheet_face(tok).background.is_some());
+        assert!(style::dim_backdrop(tok).background.is_some());
+        assert!(style::raised_card(tok).background.is_some());
+        assert!(style::app_bar(tok).background.is_some());
+        assert!(style::panel(tok).background.is_some());
+        assert!(style::footer(tok).background.is_some());
+        assert!(style::shell(tok).background.is_some());
+        assert!(style::card(tok, true).background.is_some());
+        assert!(style::card(tok, false).background.is_some());
+        assert!(style::list_row(tok, true).background.is_some());
+        assert!(style::list_row(tok, false).background.is_some());
+        assert!(style::nav_rail(tok, true).background.is_some());
+        assert!(style::nav_rail(tok, false).background.is_some());
+        assert!(style::tab_indicator(tok).background.is_some());
+        let theme = crate::theme::iced_theme("dark", tok);
+        let _ = style::button_style(tok, Variant::Primary)(
+            &theme,
+            iced::widget::button::Status::Active,
+        );
+        let _ =
+            style::button_style(tok, Variant::Quiet)(&theme, iced::widget::button::Status::Hovered);
+        let _ =
+            style::button_style(tok, Variant::Ghost)(&theme, iced::widget::button::Status::Pressed);
+        let _ = style::button_style(tok, Variant::Danger)(
+            &theme,
+            iced::widget::button::Status::Disabled,
+        );
+        let _ = style::tab_style(tok, true)(&theme, iced::widget::button::Status::Active);
+        let _ = style::tab_style(tok, false)(&theme, iced::widget::button::Status::Hovered);
+        let _ = style::search_style(tok)(
+            &theme,
+            iced::widget::text_input::Status::Focused { is_hovered: false },
+        );
+        let _ = style::slider_style(tok)(&theme, iced::widget::slider::Status::Dragged);
+        let _ = style::progress_style(tok)(&theme);
+        let _ = style::rule_style(tok)(&theme);
+        let _ = style::scroll_style(tok)(
+            &theme,
+            iced::widget::scrollable::Status::Active {
+                is_horizontal_scrollbar_disabled: false,
+                is_vertical_scrollbar_disabled: false,
+            },
+        );
+        let _ = style::scroll_style(tok)(
+            &theme,
+            iced::widget::scrollable::Status::Hovered {
+                is_horizontal_scrollbar_hovered: true,
+                is_vertical_scrollbar_hovered: false,
+                is_horizontal_scrollbar_disabled: false,
+                is_vertical_scrollbar_disabled: false,
+            },
+        );
+        let _ = style::checkbox_style(tok)(
+            &theme,
+            iced::widget::checkbox::Status::Hovered { is_checked: true },
+        );
+        let _ = style::radio_style(tok)(
+            &theme,
+            iced::widget::radio::Status::Hovered { is_selected: true },
+        );
+        let _ = style::switch_style(tok)(
+            &theme,
+            iced::widget::toggler::Status::Disabled { is_toggled: false },
+        );
+        let _ = style::overlay_menu_style(tok)(&theme);
+        let _ = style::picker_style(tok)(
+            &theme,
+            iced::widget::pick_list::Status::Opened { is_hovered: true },
+        );
+    }
 
     #[test]
     fn pref_filter_and_patterns_build() {

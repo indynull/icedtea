@@ -483,6 +483,14 @@ fn parse_inject_line(line: &str) -> Option<Message> {
         "sounds" => Some(Message::Sounds(parts.next()? == "true")),
         "radio" => Some(Message::Radio(parts.next()?.parse().ok()?)),
         "slide" => Some(Message::Slide(parts.next()?.parse().ok()?)),
+        "segment" => Some(Message::Segment(parts.next()?.parse().ok()?)),
+        "range" => {
+            let lo: f32 = parts.next()?.parse().ok()?;
+            let hi: f32 = parts.next()?.parse().ok()?;
+            Some(Message::RangeSlide(lo, hi))
+        }
+        "filter" => Some(Message::FilterChip(parts.next()?.parse().ok()?)),
+        "sheet" => Some(Message::SideSheet(parts.next()? == "true")),
         "list" => Some(Message::ListSel(parts.next()?.parse().ok()?)),
         "opt" => Some(Message::OptSel(parts.next()?.parse().ok()?)),
         "expand-card" | "expand_card" => Some(Message::ExpandCard(parts.next()?.parse().ok()?)),
@@ -648,11 +656,18 @@ enum Message {
     CopyValue,
     TimeStep(TimeClock, TimeField),
     Slide(f32),
+    RangeSlide(f32, f32),
+    Segment(usize),
     Check(bool),
     Optional(bool),
+    CheckTri(icedtea::widget::CheckState),
+    FilterChip(usize),
     Switch(bool),
     Sounds(bool),
     Radio(u8),
+    CascadeOpen(Option<usize>),
+    SideSheet(bool),
+    SearchClear,
     Editor(icedtea::iced::widget::text_editor::Action),
     Field(&'static str, icedtea::iced::widget::text_editor::Action),
     CopyFields,
@@ -710,6 +725,13 @@ struct Gallery {
     sounds: bool,
     radio: u8,
     value: f32,
+    range_lo: f32,
+    range_hi: f32,
+    segment: usize,
+    check_tri: icedtea::widget::CheckState,
+    filter_on: Vec<bool>,
+    cascade_open: Option<usize>,
+    side_sheet: bool,
     number: String,
     date: DateValue,
     time: TimeValue,
@@ -864,6 +886,13 @@ impl Gallery {
             sounds: false,
             radio: 0,
             value: 0.4,
+            range_lo: 20.0,
+            range_hi: 80.0,
+            segment: 0,
+            check_tri: icedtea::widget::CheckState::Indeterminate,
+            filter_on: vec![true, false, true],
+            cascade_open: None,
+            side_sheet: false,
             number: "3".into(),
             date: DateValue {
                 year: 2026,
@@ -1397,10 +1426,24 @@ impl Gallery {
             }
             Message::Check(v) => self.checked = v,
             Message::Optional(v) => self.optional = v,
+            Message::CheckTri(v) => self.check_tri = v,
+            Message::FilterChip(i) => {
+                if let Some(slot) = self.filter_on.get_mut(i) {
+                    *slot = !*slot;
+                }
+            }
             Message::Switch(v) => self.on = v,
             Message::Sounds(v) => self.sounds = v,
             Message::Radio(v) => self.radio = v,
             Message::Slide(v) => self.value = v,
+            Message::RangeSlide(lo, hi) => {
+                self.range_lo = lo;
+                self.range_hi = hi;
+            }
+            Message::Segment(i) => self.segment = i,
+            Message::CascadeOpen(i) => self.cascade_open = i,
+            Message::SideSheet(on) => self.side_sheet = on,
+            Message::SearchClear => self.query = String::new(),
             Message::Editor(action) => {
                 self.editor.perform(action);
             }
@@ -2504,6 +2547,53 @@ impl Gallery {
             ]
             .spacing(8)
             .into(),
+            "range-slider" => widget::range_slider(
+                0.0..=100.0,
+                self.range_lo,
+                self.range_hi,
+                |(lo, hi)| Message::RangeSlide(lo, hi),
+                tok,
+                named("range", Role::Slider),
+            ),
+            "segmented-button" => widget::segmented_button(
+                &["Day".into(), "Week".into(), "Month".into()],
+                self.segment,
+                Message::Segment,
+                tok,
+                named("segment", Role::Group),
+            ),
+            "icon-button" => row![
+                widget::icon_button(
+                    icedtea::icon::Icon::Search,
+                    Some(Message::Note("search".into())),
+                    tok,
+                    Variant::Ghost,
+                    btn("Search"),
+                ),
+                widget::icon_button(
+                    icedtea::icon::Icon::Menu,
+                    Some(Message::Note("menu".into())),
+                    tok,
+                    Variant::Quiet,
+                    btn("Menu"),
+                ),
+                widget::icon_button(
+                    icedtea::icon::Icon::Close,
+                    None,
+                    tok,
+                    Variant::Ghost,
+                    btn("Close").with_disabled(true),
+                ),
+            ]
+            .spacing(8)
+            .into(),
+            "checkbox-indeterminate" => widget::checkbox_indeterminate(
+                "Select all",
+                self.check_tri,
+                Message::CheckTri,
+                tok,
+                named("tri", Role::Checkbox),
+            ),
             "progress" => widget::progress(
                 self.value,
                 Some(&widget::progress_label(self.value, Some("1 min"))),
@@ -2629,12 +2719,41 @@ impl Gallery {
                 layout::FILL,
                 named("body", Role::TextBox),
             ),
-            "search" => widget::search_input(
+            "search" => widget::search_input_clear(
                 &self.query,
                 Message::Query,
+                Some(Message::SearchClear),
                 tok,
                 named("search", Role::TextBox),
             ),
+            "field-support" => column![
+                widget::meta(
+                    "Supporting copy and error ink under a field.",
+                    tok,
+                    named("fs-hint", Role::Status),
+                ),
+                widget::field_support(
+                    widget::themed_text_input(
+                        "Email",
+                        &self.number,
+                        Message::Number,
+                        None,
+                        tok,
+                        named("email", Role::TextBox),
+                        None,
+                    ),
+                    Some("We never share your email."),
+                    if self.number.contains('@') {
+                        None
+                    } else {
+                        Some("Enter a valid address.")
+                    },
+                    tok,
+                    named("email-field", Role::Group),
+                ),
+            ]
+            .spacing(8)
+            .into(),
             "suggest" => column![
                 widget::meta(
                     "Suggest on any field. Pick fills the query.",
@@ -3635,6 +3754,13 @@ impl Gallery {
             ]
             .spacing(8)
             .into(),
+            "filter-chips" => widget::filter_chips(
+                &["Unread".into(), "Flagged".into(), "Attachments".into()],
+                &self.filter_on,
+                Message::FilterChip,
+                tok,
+                named("filters", Role::Group),
+            ),
             "badge" => widget::badge("New", tok, Variant::Primary, named("New", Role::Status)),
             "wrap" => {
                 let chips: Vec<Element<'_, Message>> = self
@@ -3954,6 +4080,122 @@ impl Gallery {
                     tok,
                 )
             }
+            "side-sheet" => {
+                let scene = container(
+                    column![
+                        widget::label("Document", tok, named("ss-doc", Role::Header)),
+                        widget::meta(
+                            "Open the inspector sheet for properties.",
+                            tok,
+                            named("ss-hint", Role::Status),
+                        ),
+                        widget::themed_button(
+                            if self.side_sheet {
+                                "Close sheet"
+                            } else {
+                                "Open sheet"
+                            },
+                            Some(Message::SideSheet(!self.side_sheet)),
+                            tok,
+                            Variant::Primary,
+                            btn("sheet-toggle"),
+                        ),
+                    ]
+                    .spacing(12)
+                    .padding(16),
+                )
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .style(move |_| icedtea::style::panel(tok));
+                if self.side_sheet {
+                    pattern::side_sheet(
+                        scene.into(),
+                        "Inspector",
+                        column![
+                            widget::meta("Name", tok, named("ss-k", Role::Status)),
+                            widget::label("notes.txt", tok, named("ss-v", Role::Status)),
+                        ]
+                        .spacing(8)
+                        .into(),
+                        Some(Message::SideSheet(false)),
+                        true,
+                        280.0,
+                        tok,
+                    )
+                } else {
+                    scene.into()
+                }
+            }
+            "sectioned-menu" => column![
+                widget::meta(
+                    "Sections with titles and hairline dividers.",
+                    tok,
+                    named("sm-hint", Role::Status),
+                ),
+                pattern::sectioned_menu(
+                    vec![
+                        pattern::MenuSection::new(
+                            "File",
+                            [
+                                Action::new("file.save", "Save", Message::Note("Save".into())),
+                                Action::new(
+                                    "file.export",
+                                    "Export…",
+                                    Message::Note("Export".into()),
+                                ),
+                            ],
+                        ),
+                        pattern::MenuSection::new(
+                            "Edit",
+                            [Action::new(
+                                "edit.copy",
+                                "Copy",
+                                Message::Note("Copy".into()),
+                            )],
+                        ),
+                    ],
+                    tok,
+                    named("sectioned", Role::Menu),
+                ),
+            ]
+            .spacing(8)
+            .into(),
+            "cascade-menu" => column![
+                widget::meta(
+                    "Primary row opens a submenu flyout.",
+                    tok,
+                    named("cm-hint", Role::Status),
+                ),
+                pattern::cascade_menu(
+                    vec![
+                        (
+                            Action::new("file.open", "Open", Message::Note("Open".into())),
+                            None,
+                        ),
+                        (
+                            Action::new("file.recent", "Recent", Message::Nop),
+                            Some(vec![
+                                Action::new(
+                                    "file.recent.1",
+                                    "notes.txt",
+                                    Message::Note("notes.txt".into()),
+                                ),
+                                Action::new(
+                                    "file.recent.2",
+                                    "todo.md",
+                                    Message::Note("todo.md".into()),
+                                ),
+                            ]),
+                        ),
+                    ],
+                    self.cascade_open,
+                    Message::CascadeOpen,
+                    tok,
+                    named("cascade", Role::Menu),
+                ),
+            ]
+            .spacing(8)
+            .into(),
             "list-detail" => pattern::list_detail(
                 widget::list_view(
                     &self.list_all,
@@ -4386,16 +4628,21 @@ impl Gallery {
 fn handled_ids() -> &'static [&'static str] {
     &[
         "button",
+        "segmented-button",
+        "icon-button",
         "split-button",
         "toggle-button",
         "checkbox",
+        "checkbox-indeterminate",
         "radio",
         "switch",
         "slider",
+        "range-slider",
         "progress",
         "progress-ring",
         "number",
         "text-input",
+        "field-support",
         "password",
         "secret",
         "value-field",
@@ -4430,6 +4677,7 @@ fn handled_ids() -> &'static [&'static str] {
         "card",
         "rule",
         "chip",
+        "filter-chips",
         "badge",
         "wrap",
         "banner",
@@ -4438,12 +4686,15 @@ fn handled_ids() -> &'static [&'static str] {
         "toolbar",
         "command-bar",
         "context-menu",
+        "sectioned-menu",
+        "cascade-menu",
         "status-bar",
         "scrollbar",
         "toast",
         "spinner",
         "busy",
         "dialogs",
+        "side-sheet",
         "list-detail",
         "inspector",
         "workspace",

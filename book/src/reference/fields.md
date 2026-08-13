@@ -151,3 +151,14 @@ Constructor: [`widget::time_picker`](https://docs.rs/icedtea/latest/icedtea/widg
 (12-hour or 24-hour, optional seconds). `TimeField` is the unit that
 steps. Disabled freezes the fields.
 
+### Field support
+
+**`field-support`** — Supporting or error text under a field.
+
+Constructor: [`widget::field_support`](https://docs.rs/icedtea/latest/icedtea/widget/fn.field_support.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea) ·
+[iced](https://crates.io/crates/iced)
+
+`support` is quiet helper copy. `error` uses the error role and wins when both are set.

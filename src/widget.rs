@@ -439,6 +439,202 @@ pub fn themed_checkbox<'a, M: Clone + 'a>(
     a11y::attach(c.into(), &a11y)
 }
 
+/// Three-state checkbox value (M3 indeterminate for “partial”).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CheckState {
+    #[default]
+    Unchecked,
+    Checked,
+    /// Partial selection (select-all over mixed children).
+    Indeterminate,
+}
+
+impl CheckState {
+    /// Next state on press: indeterminate and unchecked go checked; checked clears.
+    pub fn toggle(self) -> Self {
+        match self {
+            Self::Checked => Self::Unchecked,
+            Self::Unchecked | Self::Indeterminate => Self::Checked,
+        }
+    }
+}
+
+/// Map a binary checkbox flip into [`CheckState`].
+pub fn check_state_from_bool(on: bool) -> CheckState {
+    if on {
+        CheckState::Checked
+    } else {
+        CheckState::Unchecked
+    }
+}
+
+/// Checkbox with optional indeterminate (partial) state.
+///
+/// The application owns [`CheckState`]. Press cycles through
+/// [`CheckState::toggle`]. Disabled freezes the face.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget::{self, CheckState};
+/// let tok = theme::named("dark").tokens;
+/// let on_toggle = |s| s;
+/// let _: icedtea::Element<'_, CheckState> = widget::checkbox_indeterminate(
+///     "Select all",
+///     CheckState::Indeterminate,
+///     on_toggle,
+///     tok,
+///     A11y::new("Select all", Role::Checkbox),
+/// );
+/// ```
+pub fn checkbox_indeterminate<'a, M: Clone + 'a>(
+    label_s: impl Into<String>,
+    state: CheckState,
+    msg: impl Fn(CheckState) -> M + 'a,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let name = a11y.apply_name(label_s);
+    match state {
+        CheckState::Checked | CheckState::Unchecked => {
+            let on = matches!(state, CheckState::Checked);
+            themed_checkbox(
+                name,
+                on,
+                move |next| msg(check_state_from_bool(next)),
+                tok,
+                a11y.with_checked(on),
+            )
+        }
+        CheckState::Indeterminate => {
+            let s = tok.scheme();
+            let box_face = container(
+                text("−")
+                    .size(typo::META)
+                    .color(s.on_primary)
+                    .width(Length::Fill)
+                    .align_x(Alignment::Center),
+            )
+            .width(16)
+            .height(16)
+            .center_x(16)
+            .center_y(16)
+            .style(move |_| indeterminate_box_face(tok));
+            let row = row![
+                box_face,
+                text(name.clone()).size(typo::BODY).color(s.on_surface)
+            ]
+            .spacing(8)
+            .align_y(Alignment::Center);
+            if a11y.disabled {
+                return a11y::attach(row.into(), &a11y);
+            }
+            let next = state.toggle();
+            a11y::attach(mouse_area(row).on_press(msg(next)).into(), &a11y)
+        }
+    }
+}
+
+fn indeterminate_box_face(tok: Tokens) -> iced::widget::container::Style {
+    let s = tok.scheme();
+    let mut st = style::fill(s.primary, s.on_primary);
+    st.border = iced::border::Border {
+        color: s.primary,
+        width: 2.0,
+        radius: crate::m3::shape::Component::Field.radius(),
+    };
+    st
+}
+
+/// Exclusive choice among labeled segments (M3 segmented button).
+///
+/// The application owns the selected index. Press emits the new index.
+/// Disabled freezes all segments.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let on_pick = |i| i;
+/// let _: icedtea::Element<'_, usize> = widget::segmented_button(
+///     &["Day".into(), "Week".into(), "Month".into()],
+///     0,
+///     on_pick,
+///     tok,
+///     A11y::new("Range", Role::Group),
+/// );
+/// ```
+pub fn segmented_button<'a, M: Clone + 'a>(
+    labels: &[String],
+    selected: usize,
+    on_select: impl Fn(usize) -> M + Copy + 'a,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let mut r = Row::new().spacing(0).align_y(Alignment::Center);
+    for (i, label) in labels.iter().enumerate() {
+        let on = i == selected;
+        let face = themed_button_sized(
+            label.clone(),
+            if a11y.disabled {
+                None
+            } else {
+                Some(on_select(i))
+            },
+            tok,
+            if on { Variant::Primary } else { Variant::Quiet },
+            Length::Shrink,
+            Length::Fixed(control_height()),
+            A11y::button(label.clone())
+                .with_checked(on)
+                .with_disabled(a11y.disabled),
+        );
+        r = r.push(face);
+    }
+    a11y::attach(r.into(), &a11y)
+}
+
+/// Icon-only press control (toolbar density).
+///
+/// Same variant wash as labeled buttons. Disabled drops the press.
+///
+/// ```
+/// use icedtea::a11y::A11y;
+/// use icedtea::icon::Icon;
+/// use icedtea::theme;
+/// use icedtea::variant::Variant;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let open = ();
+/// let _: icedtea::Element<'_, ()> = widget::icon_button(
+///     Icon::Search,
+///     Some(open),
+///     tok,
+///     Variant::Ghost,
+///     A11y::button("Search"),
+/// );
+/// ```
+pub fn icon_button<'a, M: Clone + 'a>(
+    icon: Icon,
+    msg: Option<M>,
+    tok: Tokens,
+    variant: Variant,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let mut b = button(icon_svg(
+        icon,
+        tok,
+        A11y::new(a11y.name.clone(), Role::Image),
+    ))
+    .padding(8)
+    .style(style::button_style(tok, variant));
+    if let Some(m) = a11y.apply_message(msg) {
+        b = b.on_press(m);
+    }
+    a11y::attach(b.into(), &a11y)
+}
+
 /// A sliding on/off control.
 ///
 /// Same contract as checkbox: the application owns the bool. Disabled
@@ -604,10 +800,7 @@ pub fn themed_slider<'a, M: Clone + 'a>(
                 .width(Length::Fill)
                 .height(18)
                 .center_y(18)
-                .style(move |_| {
-                    let s = tok.scheme();
-                    style::fill(s.surface_container_highest, s.on_surface_variant)
-                })
+                .style(move |_| disabled_slider_face(tok))
                 .into(),
             &a11y,
         );
@@ -619,6 +812,88 @@ pub fn themed_slider<'a, M: Clone + 'a>(
             .style(style::slider_style(tok))
             .width(Length::Fill)
             .into(),
+        &a11y,
+    )
+}
+
+fn disabled_slider_face(tok: Tokens) -> iced::widget::container::Style {
+    let s = tok.scheme();
+    style::fill(s.surface_container_highest, s.on_surface_variant)
+}
+
+/// Clamp a low/high pair into `range` so `low <= high`.
+pub fn clamp_range_pair(range: std::ops::RangeInclusive<f32>, low: f32, high: f32) -> (f32, f32) {
+    let (min, max) = (*range.start(), *range.end());
+    let low = low.clamp(min, max).min(high.clamp(min, max));
+    let high = high.clamp(min, max).max(low);
+    (low, high)
+}
+
+/// New pair after the low thumb moves.
+pub fn range_pair_after_low(low: f32, high: f32) -> (f32, f32) {
+    (low.min(high), high)
+}
+
+/// New pair after the high thumb moves.
+pub fn range_pair_after_high(low: f32, high: f32) -> (f32, f32) {
+    (low, high.max(low))
+}
+
+/// Inclusive low/high pair on one range (M3 range slider as two linked thumbs).
+///
+/// The application owns `low` and `high`. Messages are the clamped pair
+/// with `low <= high`. Disabled freezes both thumbs.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let on_change = |(lo, hi)| (lo, hi);
+/// let _: icedtea::Element<'_, (f32, f32)> = widget::range_slider(
+///     0.0..=100.0,
+///     20.0,
+///     80.0,
+///     on_change,
+///     tok,
+///     A11y::new("price", Role::Slider),
+/// );
+/// ```
+pub fn range_slider<'a, M: Clone + 'a>(
+    range: std::ops::RangeInclusive<f32>,
+    low: f32,
+    high: f32,
+    msg: impl Fn((f32, f32)) -> M + Copy + 'a,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let (low, high) = clamp_range_pair(range.clone(), low, high);
+    let lo = themed_slider(
+        range.clone(),
+        low,
+        move |v| msg(range_pair_after_low(v, high)),
+        tok,
+        A11y::new(format!("{} low", a11y.name), Role::Slider).with_disabled(a11y.disabled),
+    );
+    let hi = themed_slider(
+        range,
+        high,
+        move |v| msg(range_pair_after_high(low, v)),
+        tok,
+        A11y::new(format!("{} high", a11y.name), Role::Slider).with_disabled(a11y.disabled),
+    );
+    let s = tok.scheme();
+    a11y::attach(
+        column![
+            lo,
+            text(format!("{low:.0} – {high:.0}"))
+                .size(typo::META)
+                .color(s.on_surface_variant),
+            hi,
+        ]
+        .spacing(4)
+        .width(Length::Fill)
+        .into(),
         &a11y,
     )
 }
@@ -976,6 +1251,61 @@ pub fn themed_text_input<'a, M: Clone + 'a>(
         }
     }
     a11y::attach(i.into(), &a11y)
+}
+
+/// Field stack with optional supporting or error text under the control.
+///
+/// `support` is quiet helper copy. `error` paints error role ink and wins
+/// when both are set. Pass an already-built field as `child`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let on_input = |s| s;
+/// let field = widget::themed_text_input(
+///     "Email",
+///     "",
+///     on_input,
+///     None,
+///     tok,
+///     A11y::new("Email", Role::TextBox),
+///     None,
+/// );
+/// let _: icedtea::Element<'_, String> = widget::field_support(
+///     field,
+///     Some("We never share your email."),
+///     None,
+///     tok,
+///     A11y::new("Email field", Role::Group),
+/// );
+/// ```
+pub fn field_support<'a, M: 'a>(
+    child: Element<'a, M>,
+    support: Option<&str>,
+    error: Option<&str>,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let s = tok.scheme();
+    let mut col = column![child].spacing(4).width(Length::Fill);
+    if let Some(err) = error.filter(|t| !t.is_empty()) {
+        col = col.push(
+            text(err.to_string())
+                .size(typo::META)
+                .color(s.error)
+                .width(Length::Fill),
+        );
+    } else if let Some(help) = support.filter(|t| !t.is_empty()) {
+        col = col.push(
+            text(help.to_string())
+                .size(typo::META)
+                .color(s.on_surface_variant)
+                .width(Length::Fill),
+        );
+    }
+    a11y::attach(col.into(), &a11y)
 }
 
 /// Text field plus a keyboard-complete pick list. The application
@@ -1456,24 +1786,61 @@ pub fn search_input<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    a11y::attach(
-        row![
-            icon_svg(Icon::Search, tok, A11y::new("search", Role::Image)),
-            themed_text_input(
-                "Search",
-                value,
-                on_input,
-                None,
+    search_input_clear(value, on_input, None, tok, a11y)
+}
+
+/// Search field with optional clear control when non-empty.
+///
+/// `on_clear` empties the query. When `None`, behaves like [`search_input`].
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let on_input = |s| s;
+/// let clear = String::new();
+/// let _: icedtea::Element<'_, String> = widget::search_input_clear(
+///     "q",
+///     on_input,
+///     Some(clear),
+///     tok,
+///     A11y::new("Search", Role::TextBox),
+/// );
+/// ```
+pub fn search_input_clear<'a, M: Clone + 'a>(
+    value: &str,
+    on_input: impl Fn(String) -> M + 'a,
+    on_clear: Option<M>,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let mut r = row![
+        icon_svg(Icon::Search, tok, A11y::new("search", Role::Image)),
+        themed_text_input(
+            "Search",
+            value,
+            on_input,
+            None,
+            tok,
+            a11y.child(Role::TextBox),
+            None,
+        ),
+    ]
+    .spacing(8)
+    .align_y(Alignment::Center);
+    if !value.is_empty() {
+        if let Some(clear) = on_clear {
+            r = r.push(icon_button(
+                Icon::Close,
+                if a11y.disabled { None } else { Some(clear) },
                 tok,
-                a11y.child(Role::TextBox),
-                None,
-            ),
-        ]
-        .spacing(8)
-        .align_y(Alignment::Center)
-        .into(),
-        &a11y,
-    )
+                Variant::Ghost,
+                A11y::button("Clear search").with_disabled(a11y.disabled),
+            ));
+        }
+    }
+    a11y::attach(r.into(), &a11y)
 }
 
 /// Pick one string from a list.
@@ -2185,13 +2552,64 @@ pub fn dismiss_button<'a, M: Clone + 'a>(msg: M, tok: Tokens, a11y: A11y) -> Ele
 }
 
 fn chip_wash(tok: Tokens, variant: Variant) -> iced::Color {
+    chip_face(tok, variant).0
+}
+
+/// Chip fill, ink, and border for a variant (M3 filter: Quiet = outline, Primary = selected fill).
+pub fn chip_face(
+    tok: Tokens,
+    variant: Variant,
+) -> (iced::Color, iced::Color, iced::border::Border) {
     let s = tok.scheme();
+    let r = crate::m3::shape::Component::Chip.radius();
     match variant {
-        Variant::Primary => s.secondary_container,
-        Variant::Danger => s.error_container,
-        Variant::Success => crate::theme::mix(s.success, s.surface, 0.20),
-        Variant::Warning => crate::theme::mix(s.warning, s.surface, 0.20),
-        Variant::Quiet | Variant::Ghost | Variant::Chip => s.secondary_container,
+        // Selected / assist filled
+        Variant::Primary | Variant::Chip => (
+            s.secondary_container,
+            s.on_secondary_container,
+            iced::border::Border {
+                color: Color::TRANSPARENT,
+                width: 0.0,
+                radius: r,
+            },
+        ),
+        // Idle filter outline (must differ from selected fill)
+        Variant::Quiet | Variant::Ghost => (
+            Color::TRANSPARENT,
+            s.on_surface,
+            iced::border::Border {
+                color: s.outline,
+                width: 1.0,
+                radius: r,
+            },
+        ),
+        Variant::Danger => (
+            s.error_container,
+            s.on_error_container,
+            iced::border::Border {
+                color: Color::TRANSPARENT,
+                width: 0.0,
+                radius: r,
+            },
+        ),
+        Variant::Success => (
+            crate::theme::mix(s.success, s.surface, 0.20),
+            s.on_surface,
+            iced::border::Border {
+                color: Color::TRANSPARENT,
+                width: 0.0,
+                radius: r,
+            },
+        ),
+        Variant::Warning => (
+            crate::theme::mix(s.warning, s.surface, 0.20),
+            s.on_surface,
+            iced::border::Border {
+                color: Color::TRANSPARENT,
+                width: 0.0,
+                radius: r,
+            },
+        ),
     }
 }
 
@@ -2235,14 +2653,7 @@ pub fn chip<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let title = a11y.apply_name(title);
-    let s = tok.scheme();
-    let ink = match variant {
-        Variant::Danger => s.on_error_container,
-        Variant::Primary | Variant::Quiet | Variant::Ghost | Variant::Chip => {
-            s.on_secondary_container
-        }
-        Variant::Success | Variant::Warning => s.on_surface,
-    };
+    let (wash, ink, border) = chip_face(tok, variant);
     let mut line = row![text(title.clone()).size(typo::META).color(ink)]
         .spacing(4)
         .align_y(Alignment::Center);
@@ -2253,14 +2664,9 @@ pub fn chip<'a, M: Clone + 'a>(
             A11y::button(format!("dismiss {title}")).with_disabled(a11y.disabled),
         ));
     }
-    let wash = chip_wash(tok, variant);
     let face = container(line).padding([8, 12]).style(move |_| {
         let mut st = style::fill(wash, ink);
-        st.border = iced::border::Border {
-            color: iced::Color::TRANSPARENT,
-            width: 0.0,
-            radius: crate::m3::Component::Chip.radius(),
-        };
+        st.border = border;
         st
     });
     let body: Element<'a, M> = if let Some(msg) = a11y.apply_message(press) {
@@ -2269,6 +2675,52 @@ pub fn chip<'a, M: Clone + 'a>(
         face.into()
     };
     a11y::attach(body, &a11y)
+}
+
+/// Multi-select filter chips (M3 filter chip set).
+///
+/// The application owns which indices are on. Press toggles one index.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let on_toggle = |i| i;
+/// let _: icedtea::Element<'_, usize> = widget::filter_chips(
+///     &["Unread".into(), "Flagged".into()],
+///     &[true, false],
+///     on_toggle,
+///     tok,
+///     A11y::new("Filters", Role::Group),
+/// );
+/// ```
+pub fn filter_chips<'a, M: Clone + 'a>(
+    labels: &[String],
+    selected: &[bool],
+    on_toggle: impl Fn(usize) -> M + Copy + 'a,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let mut r = Row::new().spacing(8).align_y(Alignment::Center);
+    for (i, label) in labels.iter().enumerate() {
+        let on = selected.get(i).copied().unwrap_or(false);
+        r = r.push(chip(
+            label.clone(),
+            if a11y.disabled {
+                None
+            } else {
+                Some(on_toggle(i))
+            },
+            None,
+            tok,
+            if on { Variant::Primary } else { Variant::Quiet },
+            A11y::button(label.clone())
+                .with_checked(on)
+                .with_disabled(a11y.disabled),
+        ));
+    }
+    a11y::attach(r.into(), &a11y)
 }
 
 /// A count or status mark.
@@ -4059,10 +4511,7 @@ mod tests {
         );
         let idle = radio_idle_face(tok, false);
         assert_eq!(idle.border.color, tok.scheme().outline);
-        assert!(
-            idle.border.radius.top_left >= 8.0,
-            "disabled radio face must stay circular, not desktop None"
-        );
+        assert!(idle.border.radius.top_left >= 8.0);
         let on = radio_idle_face(tok, true);
         assert_eq!(
             on.background,
@@ -4091,6 +4540,148 @@ mod tests {
             tok,
             role("s", Role::Slider).with_value("0.5"),
         );
+        let _: Element<'_, ()> = range_slider(
+            0.0..=100.0,
+            10.0,
+            90.0,
+            |_| (),
+            tok,
+            role("rs", Role::Slider),
+        );
+        assert_eq!(CheckState::Indeterminate.toggle(), CheckState::Checked);
+        assert_eq!(CheckState::Checked.toggle(), CheckState::Unchecked);
+        assert_eq!(CheckState::Unchecked.toggle(), CheckState::Checked);
+        let tri_face = indeterminate_box_face(tok);
+        assert_eq!(
+            tri_face.background,
+            Some(iced::Background::Color(tok.scheme().primary))
+        );
+        assert_eq!(tri_face.border.color, tok.scheme().primary);
+        assert_eq!(check_state_from_bool(true), CheckState::Checked);
+        assert_eq!(check_state_from_bool(false), CheckState::Unchecked);
+        let off_slide = disabled_slider_face(tok);
+        assert_eq!(
+            off_slide.background,
+            Some(iced::Background::Color(
+                tok.scheme().surface_container_highest
+            ))
+        );
+        let _: Element<'_, ()> = checkbox_indeterminate(
+            "all",
+            CheckState::Indeterminate,
+            |_| (),
+            tok,
+            role("tri", Role::Checkbox),
+        );
+        let _: Element<'_, ()> = checkbox_indeterminate(
+            "on",
+            CheckState::Checked,
+            |_| (),
+            tok,
+            role("tri-on", Role::Checkbox),
+        );
+        let _: Element<'_, ()> = checkbox_indeterminate(
+            "off",
+            CheckState::Unchecked,
+            |_| (),
+            tok,
+            role("tri-off", Role::Checkbox).with_disabled(true),
+        );
+        let _: Element<'_, ()> = checkbox_indeterminate(
+            "ind-d",
+            CheckState::Indeterminate,
+            |_| (),
+            tok,
+            role("tri-d", Role::Checkbox).with_disabled(true),
+        );
+        let _: Element<'_, ()> = segmented_button(
+            &["A".into(), "B".into()],
+            1,
+            |_| (),
+            tok,
+            role("seg", Role::Group),
+        );
+        let _: Element<'_, ()> = segmented_button(
+            &["A".into()],
+            0,
+            |_| (),
+            tok,
+            role("seg-d", Role::Group).with_disabled(true),
+        );
+        let _: Element<'_, ()> = icon_button(
+            Icon::Search,
+            Some(()),
+            tok,
+            Variant::Ghost,
+            A11y::button("s"),
+        );
+        let _: Element<'_, ()> = icon_button(
+            Icon::Close,
+            None,
+            tok,
+            Variant::Quiet,
+            A11y::button("c").with_disabled(true),
+        );
+        let field = themed_text_input("x", "", |_| (), None, tok, role("f", Role::TextBox), None);
+        let _: Element<'_, ()> = field_support(
+            field,
+            Some("help"),
+            Some("err"),
+            tok,
+            role("fs", Role::Group),
+        );
+        let field2 =
+            themed_text_input("y", "v", |_| (), None, tok, role("f2", Role::TextBox), None);
+        let _: Element<'_, ()> =
+            field_support(field2, Some("only"), None, tok, role("fs2", Role::Group));
+        let field3 = themed_text_input("z", "", |_| (), None, tok, role("f3", Role::TextBox), None);
+        let _: Element<'_, ()> = field_support(field3, None, None, tok, role("fs3", Role::Group));
+        let _: Element<'_, ()> = filter_chips(
+            &["a".into(), "b".into()],
+            &[true, false],
+            |_| (),
+            tok,
+            role("fc", Role::Group),
+        );
+        let _: Element<'_, ()> = filter_chips(
+            &["a".into()],
+            &[],
+            |_| (),
+            tok,
+            role("fc-d", Role::Group).with_disabled(true),
+        );
+        // Selected filter chip (Primary) must paint differently from idle (Quiet).
+        let (on_bg, on_ink, on_border) = chip_face(tok, Variant::Primary);
+        let (off_bg, off_ink, off_border) = chip_face(tok, Variant::Quiet);
+        assert_ne!(on_bg, off_bg);
+        assert_ne!(on_ink, off_ink);
+        assert_ne!(on_border.color, off_border.color);
+        assert!(on_border.width < off_border.width || off_border.width >= 1.0);
+        let _: Element<'_, ()> =
+            search_input_clear("q", |_| (), Some(()), tok, role("sc", Role::TextBox));
+        let _: Element<'_, ()> =
+            search_input_clear("", |_| (), Some(()), tok, role("sc0", Role::TextBox));
+        let _: Element<'_, ()> = search_input_clear(
+            "q",
+            |_| (),
+            None,
+            tok,
+            role("sc-n", Role::TextBox).with_disabled(true),
+        );
+        let _: Element<'_, ()> = range_slider(
+            0.0..=10.0,
+            2.0,
+            8.0,
+            |_| (),
+            tok,
+            role("rs-d", Role::Slider).with_disabled(true),
+        );
+        assert_eq!(clamp_range_pair(0.0..=100.0, -10.0, 200.0), (0.0, 100.0));
+        assert_eq!(clamp_range_pair(0.0..=100.0, 80.0, 20.0), (20.0, 20.0));
+        assert_eq!(range_pair_after_low(50.0, 40.0), (40.0, 40.0));
+        assert_eq!(range_pair_after_low(10.0, 40.0), (10.0, 40.0));
+        assert_eq!(range_pair_after_high(10.0, 5.0), (10.0, 10.0));
+        assert_eq!(range_pair_after_high(10.0, 50.0), (10.0, 50.0));
         let _: Element<'_, ()> =
             progress(0.2, None, tok, role("p", Role::Progress).with_value("0.2"));
         let _: Element<'_, ()> = progress(
@@ -5153,7 +5744,7 @@ mod tests {
             A11y::new("api-token", Role::Group),
         );
         let search_src = src
-            .split("pub fn search_input")
+            .split("pub fn search_input_clear")
             .nth(1)
             .unwrap()
             .split("pub fn themed_pick_list")
@@ -5161,6 +5752,7 @@ mod tests {
             .unwrap();
         assert!(!search_src.contains("apply_name(value)"));
         assert!(search_src.contains("a11y.child(Role::TextBox)"));
+        assert!(src.contains("pub fn search_input_clear"));
         let vf_src = src
             .split("pub fn value_field")
             .nth(1)
@@ -5168,14 +5760,8 @@ mod tests {
             .split("pub fn textarea")
             .next()
             .unwrap();
-        assert!(
-            vf_src.contains("label_width") && vf_src.contains("Length::Fixed"),
-            "value_field must fix the label gutter so stacked rows align"
-        );
-        assert!(
-            vf_src.contains("Length::Fill"),
-            "value fills after the gutter"
-        );
+        assert!(vf_src.contains("label_width") && vf_src.contains("Length::Fixed"));
+        assert!(vf_src.contains("Length::Fill"));
     }
 
     #[test]
@@ -5445,10 +6031,7 @@ mod tests {
             .split("fn markdown_style")
             .next()
             .unwrap();
-        assert!(
-            md.contains("iced_selection::markdown::view"),
-            "markdown_view must use structured selectable markdown layout"
-        );
+        assert!(md.contains("iced_selection::markdown::view"));
         assert!(!md.contains("Rich::with_spans"));
     }
 
@@ -6122,7 +6705,7 @@ mod tests {
         let pad = stick_align_pad(n, h, viewport);
         let content = n as f32 * h + pad;
         let max_s = (content - viewport).max(0.0);
-        assert!((max_s % h).abs() < 1e-3, "max_s={max_s} pad={pad}");
+        assert!((max_s % h).abs() < 1e-3);
         assert_eq!(stick_align_pad(5, 20.0, 200.0), 0.0);
         assert_eq!(stick_align_pad(10, 0.0, 100.0), 0.0);
         // max_scroll already a multiple of row_h → no pad.
@@ -6427,14 +7010,8 @@ mod tests {
             .filter(|b| b.x > 1.0 && b.x < 40.0 && b.width > 24.0 && b.width < 280.0)
             .map(|b| b.x)
             .collect();
-        assert!(
-            lefts.iter().any(|x| (*x - 12.0).abs() < 2.0),
-            "title and body should sit on the 12px card inset, got {lefts:?}"
-        );
-        assert!(
-            !lefts.iter().any(|x| (*x - 24.0).abs() < 2.0),
-            "header must not add a second 12px inset, got {lefts:?}"
-        );
+        assert!(lefts.iter().any(|x| (*x - 12.0).abs() < 2.0));
+        assert!(!lefts.iter().any(|x| (*x - 24.0).abs() < 2.0));
     }
 
     #[test]
@@ -6497,7 +7074,7 @@ mod tests {
                 A11y::new("img", Role::Image),
             );
             let size = layout_size(&mut el, iced::Size::new(400.0, 400.0));
-            assert_eq!(size, iced::Size::new(120.0, 80.0), "{fit:?}");
+            assert_eq!(size, iced::Size::new(120.0, 80.0));
         }
     }
 

@@ -27,8 +27,18 @@ pub const MAP: &[MapRow] = &[
         fate: Fate::Map,
     },
     MapRow {
+        id: "segmented-button",
+        m3: "Segmented button",
+        fate: Fate::Map,
+    },
+    MapRow {
+        id: "icon-button",
+        m3: "Icon button",
+        fate: Fate::Map,
+    },
+    MapRow {
         id: "split-button",
-        m3: "Button (segmented)",
+        m3: "Button (split)",
         fate: Fate::Map,
     },
     MapRow {
@@ -39,6 +49,11 @@ pub const MAP: &[MapRow] = &[
     MapRow {
         id: "checkbox",
         m3: "Checkbox",
+        fate: Fate::Map,
+    },
+    MapRow {
+        id: "checkbox-indeterminate",
+        m3: "Checkbox (indeterminate)",
         fate: Fate::Map,
     },
     MapRow {
@@ -56,10 +71,20 @@ pub const MAP: &[MapRow] = &[
         m3: "Slider",
         fate: Fate::Map,
     },
+    MapRow {
+        id: "range-slider",
+        m3: "Slider (range)",
+        fate: Fate::Map,
+    },
     // Fields
     MapRow {
         id: "text-input",
         m3: "Text field",
+        fate: Fate::Map,
+    },
+    MapRow {
+        id: "field-support",
+        m3: "Text field (supporting / error)",
         fate: Fate::Map,
     },
     MapRow {
@@ -257,6 +282,11 @@ pub const MAP: &[MapRow] = &[
         fate: Fate::Map,
     },
     MapRow {
+        id: "filter-chips",
+        m3: "Chip (filter set)",
+        fate: Fate::Map,
+    },
+    MapRow {
         id: "badge",
         m3: "Badge",
         fate: Fate::Map,
@@ -279,6 +309,16 @@ pub const MAP: &[MapRow] = &[
     MapRow {
         id: "context-menu",
         m3: "Menus",
+        fate: Fate::Map,
+    },
+    MapRow {
+        id: "sectioned-menu",
+        m3: "Menus (sections)",
+        fate: Fate::Map,
+    },
+    MapRow {
+        id: "cascade-menu",
+        m3: "Menus (cascade)",
         fate: Fate::Map,
     },
     MapRow {
@@ -320,6 +360,11 @@ pub const MAP: &[MapRow] = &[
     MapRow {
         id: "dialogs",
         m3: "Dialogs",
+        fate: Fate::Map,
+    },
+    MapRow {
+        id: "side-sheet",
+        m3: "Side sheets",
         fate: Fate::Map,
     },
     MapRow {

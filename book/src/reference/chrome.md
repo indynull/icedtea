@@ -235,3 +235,39 @@ Constructor: [`widget::busy_overlay`](https://docs.rs/icedtea/latest/icedtea/wid
 
 When `busy` is false the child is unmodified. Advance spinner
 `phase` while true.
+
+### Filter chips
+
+**`filter-chips`** — Multi-select filter chip set.
+
+Constructor: [`widget::filter_chips`](https://docs.rs/icedtea/latest/icedtea/widget/fn.filter_chips.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea) ·
+[iced](https://crates.io/crates/iced)
+
+The application owns which indices are on. Press toggles one chip.
+
+### Sectioned menu
+
+**`sectioned-menu`** — Menu list with optional section titles and dividers.
+
+Constructor: [`pattern::sectioned_menu`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.sectioned_menu.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
+[icedtea](https://crates.io/crates/icedtea) ·
+[iced](https://crates.io/crates/iced)
+
+Pass [`MenuSection`](https://docs.rs/icedtea/latest/icedtea/pattern/struct.MenuSection.html) groups of actions.
+
+### Cascade menu
+
+**`cascade-menu`** — Two-level menu with an optional open submenu.
+
+Constructor: [`pattern::cascade_menu`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.cascade_menu.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
+[icedtea](https://crates.io/crates/icedtea) ·
+[iced](https://crates.io/crates/iced)
+
+The application owns which primary row is expanded.

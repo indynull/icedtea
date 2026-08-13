@@ -159,3 +159,15 @@ Constructor: [`pattern::main_window`](https://docs.rs/icedtea/latest/icedtea/pat
 
 Pass the four regions as `Element`s. [First window](../first-window.md)
 is the smaller form: toolbar plus one control.
+
+### Side sheet
+
+**`side-sheet`** — Docked supporting pane over a dimmed scene.
+
+Constructor: [`pattern::side_sheet`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.side_sheet.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
+[icedtea](https://crates.io/crates/icedtea) ·
+[iced](https://crates.io/crates/iced)
+
+`end` docks the trailing edge. Optional dismiss closes the sheet.

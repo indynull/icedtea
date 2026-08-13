@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+Desktop Material controls: segmented button, icon button, range slider,
+indeterminate checkbox (`CheckState`), field supporting/error text,
+filter chip set, sectioned and cascade menus, side sheet. Search gains
+an optional clear control (`search_input_clear`).
+
 Desktop flat shape: every `m3::Component` uses M3 shape None (0 dp)
 rectangular chrome. Tab active state is a 3dp underbar, not a full border.
 

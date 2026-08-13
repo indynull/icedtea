@@ -437,10 +437,7 @@ mod tests {
         let body = src.split("#[cfg(test)]").next().unwrap();
         assert!(body.contains("with_layer"));
         assert!(body.contains("struct ClipLayer"));
-        assert!(
-            body.contains("self.content.as_widget().size()"),
-            "ClipLayer must follow child size (table rows Shrink, list Fill)"
-        );
+        assert!(body.contains("self.content.as_widget().size()"));
     }
 
     #[test]
@@ -461,16 +458,8 @@ mod tests {
         let node = Widget::<(), iced::Theme, iced::Renderer>::layout(
             &mut clip, &mut tree, &renderer, &limits,
         );
-        assert!(
-            (node.size().height - 240.0).abs() < 0.5,
-            "ClipLayer must occupy the parent height, got {}",
-            node.size().height
-        );
-        assert!(
-            (node.size().width - 320.0).abs() < 0.5,
-            "ClipLayer must occupy the parent width, got {}",
-            node.size().width
-        );
+        assert!((node.size().height - 240.0).abs() < 0.5);
+        assert!((node.size().width - 320.0).abs() < 0.5);
     }
 
     #[test]

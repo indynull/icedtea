@@ -472,8 +472,8 @@ mod tests {
         let db = system.raw().db();
         let sans_name = db.family_name(&DbFamily::SansSerif).to_string();
         let mono_name = db.family_name(&DbFamily::Monospace).to_string();
-        assert!(!sans_name.is_empty(), "sans family name should be set");
-        assert!(!mono_name.is_empty(), "mono family name should be set");
+        assert!(!sans_name.is_empty());
+        assert!(!mono_name.is_empty());
         let normal = fontdb::Query {
             families: &[DbFamily::SansSerif],
             weight: fontdb::Weight::NORMAL,
@@ -498,18 +498,9 @@ mod tests {
         let normal_face = db.face(normal_id).expect("normal face info");
         let bold_face = db.face(bold_id).expect("bold face info");
         let mono_face = db.face(mono_id).expect("mono face info");
-        assert!(
-            !normal_face.monospaced,
-            "UI normal must not be monospaced (got {sans_name})"
-        );
-        assert!(
-            !bold_face.monospaced,
-            "UI bold must not be monospaced (got {sans_name}); was Menlo-style fallback"
-        );
-        assert!(
-            mono_face.monospaced,
-            "Monospace generic must bind a monospaced face (got {mono_name})"
-        );
+        assert!(!normal_face.monospaced);
+        assert!(!bold_face.monospaced);
+        assert!(mono_face.monospaced);
         assert_eq!(bold_face.weight.0, 700);
     }
 }

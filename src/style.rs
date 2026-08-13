@@ -737,10 +737,7 @@ mod tests {
             zebra.background,
             Some(Background::Color(s.surface_container_high))
         );
-        assert_ne!(
-            zebra.background, selected.background,
-            "zebra must not use selection wash"
-        );
+        assert_ne!(zebra.background, selected.background);
         let idle = table_cell(tok, false, false, false);
         assert_eq!(idle.background, Some(Background::Color(Color::TRANSPARENT)));
         let focus_only = table_cell(tok, false, true, false);

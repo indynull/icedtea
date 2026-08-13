@@ -380,8 +380,8 @@ DEFAULT_INTERACT: list[dict[str, str]] = [
     {
         "match": "controls:",
         "name": "controls-toggles",
-        "script": "check true\nswitch true\nsounds true\nradio 1\nslide 0.75\n",
-        "expect": "Accept and Sounds on; Option B; slider at 75%",
+        "script": "check true\nswitch true\nsounds true\nradio 1\nslide 0.75\nsegment 1\nrange 15 90\n",
+        "expect": "Accept and Sounds on; Option B; slider 75%; Week segment; range 15-90",
     },
     {
         "match": "list:",
@@ -417,6 +417,18 @@ DEFAULT_INTERACT: list[dict[str, str]] = [
         "name": "grid-pick",
         "script": "grid 2\n",
         "expect": "grid tile 2 selected",
+    },
+    {
+        "match": "marks:",
+        "name": "filter-chips-toggle",
+        "script": "filter 0\nfilter 1\n",
+        "expect": "filter chips toggled; selected vs outline idle visible",
+    },
+    {
+        "match": "dialogs:",
+        "name": "side-sheet-open",
+        "script": "sheet true\n",
+        "expect": "side sheet open over dim scene",
     },
 ]
 

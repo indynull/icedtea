@@ -272,10 +272,7 @@ mod tests {
         assert!(joined.contains('A'));
         assert!(joined.contains("B line"));
         assert!(joined.contains("C line"));
-        assert!(
-            joined.contains("\n\n"),
-            "plain extract separates top-level blocks: {joined:?}"
-        );
+        assert!(joined.contains("\n\n"));
         let start = joined.find('A').unwrap();
         let end = joined.find("C line").unwrap() + "C line".len();
         let multi = copy_range(&joined, start, end);
@@ -285,10 +282,7 @@ mod tests {
         let bare: Vec<_> = markdown::parse("```\nplain code\n```").collect();
         let bare_spans = markdown_document_spans(&bare, &settings);
         let bare_joined: String = bare_spans.iter().map(|s| s.text.as_ref()).collect();
-        assert!(
-            bare_joined.contains("plain code"),
-            "empty line list falls back to code body: {bare_joined:?}"
-        );
+        assert!(bare_joined.contains("plain code"));
         // Empty `lines` uses the raw `code` field (host items sometimes omit lines).
         let empty_lines = [Item::CodeBlock {
             language: None,
@@ -348,10 +342,7 @@ fn b() {}
         assert!(plain.contains("———"));
         assert!(plain.contains("alt text"));
         assert!(plain.contains("title here") || plain.contains('('));
-        assert!(
-            plain.contains("[table]"),
-            "table cells private; marker keeps one surface: {plain:?}"
-        );
+        assert!(plain.contains("[table]"));
         // Nested depth uses single newline between list kids when present.
         let nested: Vec<_> = markdown::parse("- outer\n  - inner\n").collect();
         let nested_plain = markdown_plain(&nested);

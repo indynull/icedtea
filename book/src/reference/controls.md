@@ -99,3 +99,51 @@ Constructor: [`widget::themed_slider`](https://docs.rs/icedtea/latest/icedtea/wi
 
 Pass min, max, and the current value. The message is the new value
 while the thumb moves. Disabled ignores drag.
+
+### Segmented button
+
+**`segmented-button`** — Exclusive choice among labeled segments.
+
+Constructor: [`widget::segmented_button`](https://docs.rs/icedtea/latest/icedtea/widget/fn.segmented_button.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea) ·
+[iced](https://crates.io/crates/iced)
+
+The application owns the selected index. Press emits the new index. Disabled freezes every segment.
+
+### Icon button
+
+**`icon-button`** — Icon-only press control for dense toolbars.
+
+Constructor: [`widget::icon_button`](https://docs.rs/icedtea/latest/icedtea/widget/fn.icon_button.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea) ·
+[iced](https://crates.io/crates/iced)
+
+`Variant` picks the wash. Disabled drops the press.
+
+### Range slider
+
+**`range-slider`** — Inclusive low and high values on one range.
+
+Constructor: [`widget::range_slider`](https://docs.rs/icedtea/latest/icedtea/widget/fn.range_slider.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea) ·
+[iced](https://crates.io/crates/iced)
+
+Messages are the clamped pair with `low <= high`. Disabled freezes both thumbs.
+
+### Indeterminate checkbox
+
+**`checkbox-indeterminate`** — Three-state checkbox including partial selection.
+
+Constructor: [`widget::checkbox_indeterminate`](https://docs.rs/icedtea/latest/icedtea/widget/fn.checkbox_indeterminate.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea) ·
+[iced](https://crates.io/crates/iced)
+
+Uses [`CheckState`](https://docs.rs/icedtea/latest/icedtea/widget/enum.CheckState.html). Press follows `CheckState::toggle`.
