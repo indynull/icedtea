@@ -114,6 +114,14 @@ impl Tokens {
         s.error = self.danger;
         s.success = self.success;
         s.warning = self.warning;
+        // Community colorways only list short aliases. Recompute "on" roles
+        // for solid fills so switch thumbs / button labels are not stuck on
+        // the M3 baseline (e.g. dark purple on_primary next to gruvbox primary).
+        s.on_primary = ink_on_fill(self.primary, self.text, self.canvas);
+        s.on_secondary = ink_on_fill(self.accent, self.text, self.canvas);
+        s.on_error = ink_on_fill(self.danger, self.text, self.canvas);
+        s.on_success = ink_on_fill(self.success, self.text, self.canvas);
+        s.on_warning = ink_on_fill(self.warning, self.text, self.canvas);
         s.surface = self.canvas;
         s.surface_container = self.surface;
         s.surface_container_high = self.panel;
@@ -136,6 +144,17 @@ impl Tokens {
         s.inverse_primary = self.primary;
         self.full = s;
         self
+    }
+}
+
+/// Ink that contrasts with a solid fill using the colorway's text/canvas pair.
+fn ink_on_fill(fill: Color, light: Color, dark: Color) -> Color {
+    let on_light = (relative_luma(light) - relative_luma(fill)).abs();
+    let on_dark = (relative_luma(dark) - relative_luma(fill)).abs();
+    if on_light >= on_dark {
+        light
+    } else {
+        dark
     }
 }
 
@@ -912,6 +931,29 @@ mod tests {
             let again: Tokens = baseline.into();
             assert_eq!(again.scheme(), baseline);
         }
+    }
+
+    #[test]
+    fn community_on_primary_is_not_m3_baseline_purple() {
+        // Gruvbox (and other catalog colorways) set primary from JSON but used
+        // to leave on_primary as scheme_dark's purple (#381E72). Switch thumbs
+        // and filled-control ink read that residual as an out-of-palette blue.
+        let g = named("gruvbox").tokens.scheme();
+        let m3_dark = crate::m3::scheme_dark();
+        assert_eq!(g.primary, named("gruvbox").tokens.primary);
+        assert_ne!(g.on_primary, m3_dark.on_primary);
+        assert_eq!(
+            g.on_primary,
+            ink_on_fill(
+                g.primary,
+                named("gruvbox").tokens.text,
+                named("gruvbox").tokens.canvas
+            )
+        );
+        let nord = named("nord").tokens.scheme();
+        assert_ne!(nord.on_primary, m3_dark.on_primary);
+        // Solid fills use contrasting pair ink.
+        assert_ne!(g.on_primary, g.primary);
     }
 
     #[test]

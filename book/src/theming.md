@@ -8,7 +8,9 @@ Styling is Rust: semantic tokens plus mixing rules.
 Short token fields map onto M3 roles (`Tokens::scheme()` for the full
 scheme). Aliases: `canvas`/`surface`/`panel`/`text`/`muted`/`primary`/
 `accent`/`danger`/`border`/`selection`. Baseline light/dark keep exact
-M3 containers; community colorways sync containers from aliases.
+M3 containers; community colorways sync containers from aliases and
+recompute solid-fill `on_*` roles (`on_primary` and the rest) for
+contrast on those fills.
 Washes use scheme state layers (`hover_fill` / `pressed_fill`). Desktop
 control corners are M3 shape **None** (see [foundations](./m3-foundations.md)).
 Constructors take `Tokens`.

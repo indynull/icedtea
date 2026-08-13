@@ -5,41 +5,24 @@
 Desktop Material controls: segmented button, icon button, range slider,
 indeterminate checkbox (`CheckState`), field supporting/error text,
 filter chip set, sectioned and cascade menus, side sheet. Search gains
-an optional clear control (`search_input_clear`).
+an optional clear control (`search_input_clear`). Filter chips use
+outline idle and filled selected.
 
-Desktop flat shape: every `m3::Component` uses M3 shape None (0 dp)
-rectangular chrome. Tab active state is a 3dp underbar, not a full border.
+Desktop chrome is M3 shape None (0 dp). Tabs use a 3dp primary underbar.
+Table selection is secondary container, separate from zebra stripes.
 
-Control paint paths read M3 roles through `Tokens::scheme()`: body and
-meta ink (`on_surface` / `on_surface_variant`), code and selectable
-editors (`surface_container_highest`, outline, secondary-container
-selection), scroll rail (low container + outline thumb), progress ring
-track, image slot placeholder, busy scrim, list and table selection vs
-zebra, hyperlinks and markdown links as primary.
+Catalog constructors paint through `Tokens::scheme()`. Community
+colorways recompute solid-fill `on_*` roles (including `on_primary`)
+from text/canvas contrast so switch thumbs and filled ink stay on the
+colorway.
 
-Material Design 3 foundations live under `m3`: color `Scheme` roles
-(light and dark baselines), type scale, shape, elevation, density on a
-4dp grid, and `ControlState`. `Tokens` seed from those schemes;
-`Tokens::scheme()` exposes the role map. Light and dark colorways use
-the M3 baselines. The guide has an M3 foundations chapter.
-
-Control faces paint from M3 roles and states: filled / tonal / text /
-error buttons, secondary-container chips and selected list rows, text
-fields with outline and primary focus ring, checkbox / radio / switch /
-slider / progress with state layers. Tabs use a primary underbar;
-dialogs use elevated sheets; menu and toolbar use app-bar surface.
-Cards use elevated surface containers. Disabled content uses the M3
-12% / 38% on-surface layers. Catalog inventory is complete in
-`m3::mapping` (map / desktop / delete). Deleted surfaces and
-constructors are gone (`sparkline`, `display_reading`, `rich_cell`,
-`masked_input`, `color_swatch`, `teaching_tip`, `placeholder_skeleton`,
-`document_tabs`, `job_strip`, `DocumentTabs`, `Job`) — no dual path.
-
-Catalog surfaces without an M3 counterpart are gone from the public
-catalog and gallery: mask, color, sparkline, display, rich-cell,
-document-tabs, pad, callout, group-box, skeleton, teaching-tip, and
-jobs. Apps that used those constructors need replacements or own
-widgets.
+Material Design 3 foundations live under `m3`: color `Scheme` roles,
+type scale, shape, elevation, density, and `ControlState`. Light and
+dark keep the M3 baselines. Catalog inventory is `m3::mapping`.
+Deleted surfaces without an M3 counterpart are gone (`sparkline`,
+`display_reading`, `rich_cell`, `masked_input`, `color_swatch`,
+`teaching_tip`, `placeholder_skeleton`, `document_tabs`, `job_strip`,
+and related types).
 
 ## 0.4.0 — 2026-08-12
 

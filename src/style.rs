@@ -816,6 +816,18 @@ mod tests {
     }
 
     #[test]
+    fn switch_on_thumb_uses_scheme_on_primary() {
+        let tok = named("gruvbox").tokens;
+        let s = tok.scheme();
+        let theme = crate::theme::iced_theme("gruvbox", tok);
+        let st = switch_style(tok)(&theme, toggler::Status::Active { is_toggled: true });
+        assert_eq!(st.background, Background::Color(s.primary));
+        assert_eq!(st.foreground, Background::Color(s.on_primary));
+        // Residual M3 dark on_primary would be this purple-blue.
+        assert_ne!(s.on_primary, crate::m3::scheme_dark().on_primary);
+    }
+
+    #[test]
     fn styles_cover_states_and_variants() {
         let tok = named("dark").tokens;
         let theme = crate::theme::iced_theme("dark", tok);
