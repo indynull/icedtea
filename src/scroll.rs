@@ -8,9 +8,9 @@ use iced::advanced::{Clipboard, Renderer as _, Shell};
 use iced::mouse;
 use iced::{Background, Color, Element, Event, Length, Rectangle, Size};
 
-use crate::chrome::{Corner, SCROLL_HANDLE_MIN, SCROLL_RAIL_WIDTH};
+use crate::chrome::{SCROLL_HANDLE_MIN, SCROLL_RAIL_WIDTH};
 use crate::collection::{scroll_from_rail, scroller_span};
-use crate::theme::{mix, Tokens};
+use crate::theme::Tokens;
 
 #[derive(Default)]
 struct State {
@@ -196,17 +196,19 @@ where
         _viewport: &Rectangle,
     ) {
         let bounds = layout.bounds();
+        let scheme = self.tok.scheme();
+        let rail_r = crate::m3::shape::Component::Button.radius();
         renderer.fill_quad(
             renderer::Quad {
                 bounds,
                 border: iced::Border {
                     color: Color::TRANSPARENT,
                     width: 0.0,
-                    radius: Corner::Soft.radius(),
+                    radius: rail_r,
                 },
                 ..renderer::Quad::default()
             },
-            Background::Color(self.tok.panel),
+            Background::Color(scheme.surface_container_low),
         );
         let (off, len) = thumb(self.content, self.viewport, self.scroll, bounds.height);
         if len <= 0.0 {
@@ -224,11 +226,11 @@ where
                 border: iced::Border {
                     color: Color::TRANSPARENT,
                     width: 0.0,
-                    radius: Corner::Soft.radius(),
+                    radius: rail_r,
                 },
                 ..renderer::Quad::default()
             },
-            Background::Color(mix(self.tok.text, self.tok.canvas, 0.35)),
+            Background::Color(scheme.outline),
         );
     }
 }

@@ -51,8 +51,8 @@ shows, focus that field with `iced::widget::operation::focus`.
 
 There is no dedicated shell constructor. Compose search,
 `list_detail`, `Tabs { closable: false }`, and a footer
-(`status_bar`). `style::shell` uses `Corner::None` for a flush card;
-use that preset, not a second radius type.
+(`status_bar`). `style::shell` uses M3 Component radius (desktop None)
+for a flush rectangular card.
 
 ```rust
 // Pinned tabs

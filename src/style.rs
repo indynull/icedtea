@@ -10,13 +10,13 @@ use iced::{Background, Color, Shadow};
 
 use crate::chrome::Elevation;
 use crate::m3::color::{face, layer_on};
-use crate::m3::shape::Shape;
+use crate::m3::shape::Component;
 use crate::m3::ControlState;
 use crate::theme::{hover_fill, Tokens};
 use crate::variant::Variant;
 
-fn shape_radius(s: Shape) -> iced::border::Radius {
-    s.radius()
+fn component_radius(c: Component) -> iced::border::Radius {
+    c.radius()
 }
 
 fn button_status(status: button::Status) -> ControlState {
@@ -38,7 +38,7 @@ pub fn fill(bg: Color, fg: Color) -> container::Style {
     }
 }
 
-/// M3 filled / elevated card (surface container, medium corners).
+/// M3 filled / elevated card (surface container; desktop Component radius).
 pub fn card(tok: Tokens, focus: bool) -> container::Style {
     let s = tok.scheme();
     container::Style {
@@ -47,7 +47,7 @@ pub fn card(tok: Tokens, focus: bool) -> container::Style {
         border: Border {
             color: if focus { s.primary } else { s.outline_variant },
             width: if focus { 2.0 } else { 1.0 },
-            radius: shape_radius(Shape::Medium),
+            radius: component_radius(Component::Card),
         },
         shadow: Elevation::Level1.shadow(),
         snap: false,
@@ -63,7 +63,7 @@ pub fn raised_card(tok: Tokens) -> container::Style {
         border: Border {
             color: s.outline_variant,
             width: 0.0,
-            radius: shape_radius(Shape::Medium),
+            radius: component_radius(Component::Card),
         },
         shadow: Elevation::Level2.shadow(),
         snap: false,
@@ -78,7 +78,7 @@ pub fn shell(tok: Tokens) -> container::Style {
         border: Border {
             color: s.outline,
             width: 1.0,
-            radius: shape_radius(Shape::None),
+            radius: component_radius(Component::Shell),
         },
         shadow: Shadow::default(),
         snap: false,
@@ -137,6 +137,40 @@ pub fn list_row_hover(tok: Tokens, selected: bool) -> container::Style {
     }
 }
 
+/// Data-table cell faces (M3 list/data-table selection, not zebra-as-selection).
+///
+/// - **Selected row:** secondary container across the whole row (one wash).
+/// - **Focused cell:** 2dp primary outline on that wash (or primary container
+///   when the row is not selected).
+/// - **Zebra:** quiet `surface_container_high` — never secondary container.
+pub fn table_cell(tok: Tokens, selected: bool, focused: bool, zebra: bool) -> container::Style {
+    let s = tok.scheme();
+    let mut st = if selected {
+        fill(s.secondary_container, s.on_secondary_container)
+    } else if zebra {
+        fill(s.surface_container_high, s.on_surface)
+    } else {
+        fill(Color::TRANSPARENT, s.on_surface)
+    };
+    if focused {
+        if selected {
+            st.border = Border {
+                color: s.primary,
+                width: 2.0,
+                radius: 0.0.into(),
+            };
+        } else {
+            st = fill(s.primary_container, s.on_primary_container);
+            st.border = Border {
+                color: s.primary,
+                width: 2.0,
+                radius: 0.0.into(),
+            };
+        }
+    }
+    st
+}
+
 pub fn callout(tok: Tokens, kind: crate::toast::ToastKind) -> container::Style {
     let s = tok.scheme();
     let (bg, fg, border) = match kind {
@@ -159,7 +193,7 @@ pub fn callout(tok: Tokens, kind: crate::toast::ToastKind) -> container::Style {
         border: Border {
             color: border,
             width: 1.0,
-            radius: shape_radius(Shape::ExtraSmall),
+            radius: component_radius(Component::Card),
         },
         shadow: Shadow::default(),
         snap: false,
@@ -179,6 +213,14 @@ pub fn skeleton(tok: Tokens) -> container::Style {
 /// - Chip → tonal (assist chip container)
 /// - Danger → filled error
 /// - Success / Warning → filled tonal with desktop roles
+fn button_border(comp: Component) -> Border {
+    Border {
+        color: Color::TRANSPARENT,
+        width: 0.0,
+        radius: component_radius(comp),
+    }
+}
+
 fn button_face(
     tok: Tokens,
     variant: Variant,
@@ -186,19 +228,11 @@ fn button_face(
 ) -> (Color, Color, Border, Shadow) {
     let s = tok.scheme();
     let surface = s.surface;
+    let pill = button_border(Component::Button);
     match variant {
         Variant::Primary => {
             let (bg, fg) = face(s.primary, s.on_primary, surface, state);
-            (
-                bg,
-                fg,
-                Border {
-                    color: Color::TRANSPARENT,
-                    width: 0.0,
-                    radius: shape_radius(Shape::Full),
-                },
-                Shadow::default(),
-            )
+            (bg, fg, pill, Shadow::default())
         }
         Variant::Quiet => {
             let (bg, fg) = face(
@@ -207,16 +241,7 @@ fn button_face(
                 surface,
                 state,
             );
-            (
-                bg,
-                fg,
-                Border {
-                    color: Color::TRANSPARENT,
-                    width: 0.0,
-                    radius: shape_radius(Shape::Full),
-                },
-                Shadow::default(),
-            )
+            (bg, fg, pill, Shadow::default())
         }
         Variant::Ghost => {
             let (bg, fg) = match state {
@@ -229,16 +254,7 @@ fn button_face(
                 ControlState::Pressed => (layer_on(surface, s.primary, 0.12), s.primary),
                 _ => (Color::TRANSPARENT, s.primary),
             };
-            (
-                bg,
-                fg,
-                Border {
-                    color: Color::TRANSPARENT,
-                    width: 0.0,
-                    radius: shape_radius(Shape::Full),
-                },
-                Shadow::default(),
-            )
+            (bg, fg, pill, Shadow::default())
         }
         Variant::Chip => {
             let (bg, fg) = face(
@@ -247,55 +263,19 @@ fn button_face(
                 surface,
                 state,
             );
-            (
-                bg,
-                fg,
-                Border {
-                    color: Color::TRANSPARENT,
-                    width: 0.0,
-                    radius: shape_radius(Shape::Full),
-                },
-                Shadow::default(),
-            )
+            (bg, fg, button_border(Component::Chip), Shadow::default())
         }
         Variant::Danger => {
             let (bg, fg) = face(s.error, s.on_error, surface, state);
-            (
-                bg,
-                fg,
-                Border {
-                    color: Color::TRANSPARENT,
-                    width: 0.0,
-                    radius: shape_radius(Shape::Full),
-                },
-                Shadow::default(),
-            )
+            (bg, fg, pill, Shadow::default())
         }
         Variant::Success => {
             let (bg, fg) = face(s.success, s.on_success, surface, state);
-            (
-                bg,
-                fg,
-                Border {
-                    color: Color::TRANSPARENT,
-                    width: 0.0,
-                    radius: shape_radius(Shape::Full),
-                },
-                Shadow::default(),
-            )
+            (bg, fg, pill, Shadow::default())
         }
         Variant::Warning => {
             let (bg, fg) = face(s.warning, s.on_warning, surface, state);
-            (
-                bg,
-                fg,
-                Border {
-                    color: Color::TRANSPARENT,
-                    width: 0.0,
-                    radius: shape_radius(Shape::Full),
-                },
-                Shadow::default(),
-            )
+            (bg, fg, pill, Shadow::default())
         }
     }
 }
@@ -317,7 +297,8 @@ pub fn button_style(
     }
 }
 
-/// M3 secondary tab: active primary label + bottom indicator; hover state layer.
+/// M3 secondary tab *label* only — flush; active indicator is
+/// [`crate::widget::tab_bar`]'s underbar, not a full iced border.
 pub fn tab_style(
     tok: Tokens,
     active: bool,
@@ -332,20 +313,6 @@ pub fn tab_style(
             }
             _ => Some(Background::Color(Color::TRANSPARENT)),
         };
-        // Active: primary underline (2dp) on the bottom edge.
-        let border = if active {
-            Border {
-                color: s.primary,
-                width: 2.0,
-                radius: shape_radius(Shape::None),
-            }
-        } else {
-            Border {
-                color: Color::TRANSPARENT,
-                width: 0.0,
-                radius: shape_radius(Shape::None),
-            }
-        };
         button::Style {
             background: bg,
             text_color: if active {
@@ -353,10 +320,24 @@ pub fn tab_style(
             } else {
                 s.on_surface_variant
             },
-            border,
+            border: Border {
+                color: Color::TRANSPARENT,
+                width: 0.0,
+                radius: component_radius(Component::Tab),
+            },
             shadow: Shadow::default(),
             snap: false,
         }
+    }
+}
+
+/// Active tab underbar (3dp primary). Separate from the label button.
+pub fn tab_indicator(tok: Tokens) -> container::Style {
+    let s = tok.scheme();
+    container::Style {
+        background: Some(Background::Color(s.primary)),
+        snap: false,
+        ..container::Style::default()
     }
 }
 
@@ -369,7 +350,7 @@ pub fn dialog_sheet_face(tok: Tokens) -> container::Style {
         border: Border {
             color: s.outline_variant,
             width: 0.0,
-            radius: shape_radius(Shape::ExtraLarge),
+            radius: component_radius(Component::Dialog),
         },
         shadow: Elevation::Level3.shadow(),
         snap: false,
@@ -385,7 +366,7 @@ pub fn app_bar(tok: Tokens) -> container::Style {
         border: Border {
             color: s.outline_variant,
             width: 0.0,
-            radius: shape_radius(Shape::None),
+            radius: component_radius(Component::AppBar),
         },
         shadow: Elevation::Level0.shadow(),
         snap: false,
@@ -421,7 +402,7 @@ pub fn search_style(tok: Tokens) -> impl Fn(&iced::Theme, text_input::Status) ->
             border: Border {
                 color: border_color,
                 width,
-                radius: shape_radius(Shape::ExtraSmall),
+                radius: component_radius(Component::Field),
             },
             icon: s.on_surface_variant,
             placeholder: s.on_surface_variant,
@@ -446,7 +427,7 @@ pub fn picker_style(tok: Tokens) -> impl Fn(&iced::Theme, pick_list::Status) -> 
             border: Border {
                 color: if hot { s.primary } else { s.outline },
                 width: if hot { 2.0 } else { 1.0 },
-                radius: shape_radius(Shape::ExtraSmall),
+                radius: component_radius(Component::Field),
             },
         }
     }
@@ -460,7 +441,7 @@ pub fn overlay_menu_style(tok: Tokens) -> impl Fn(&iced::Theme) -> overlay_menu:
             background: Background::Color(s.surface_container),
             border: Border {
                 width: 1.0,
-                radius: shape_radius(Shape::ExtraSmall),
+                radius: component_radius(Component::Field),
                 color: s.outline_variant,
             },
             text_color: s.on_surface,
@@ -507,7 +488,7 @@ pub fn checkbox_style(tok: Tokens) -> impl Fn(&iced::Theme, checkbox::Status) ->
             border: Border {
                 color: border_c,
                 width: 2.0,
-                radius: shape_radius(Shape::ExtraSmall),
+                radius: component_radius(Component::Field),
             },
             text_color: Some(if disabled {
                 layer_on(s.surface, s.on_surface, 0.38)
@@ -584,7 +565,7 @@ pub fn switch_style(tok: Tokens) -> impl Fn(&iced::Theme, toggler::Status) -> to
             foreground_border_width: 0.0,
             foreground_border_color: Color::TRANSPARENT,
             text_color: Some(s.on_surface),
-            border_radius: Some(shape_radius(Shape::Full)),
+            border_radius: Some(component_radius(Component::Button)),
             padding_ratio: 0.2,
         }
     }
@@ -607,7 +588,7 @@ pub fn slider_style(tok: Tokens) -> impl Fn(&iced::Theme, slider::Status) -> sli
                 border: Border {
                     color: Color::TRANSPARENT,
                     width: 0.0,
-                    radius: shape_radius(Shape::Full),
+                    radius: component_radius(Component::Button),
                 },
             },
             handle: slider::Handle {
@@ -629,7 +610,7 @@ pub fn progress_style(tok: Tokens) -> impl Fn(&iced::Theme) -> progress_bar::Sty
             border: Border {
                 color: Color::TRANSPARENT,
                 width: 0.0,
-                radius: shape_radius(Shape::Full),
+                radius: component_radius(Component::Button),
             },
         }
     }
@@ -640,7 +621,7 @@ pub fn rule_style(tok: Tokens) -> impl Fn(&iced::Theme) -> rule::Style {
         let s = tok.scheme();
         rule::Style {
             color: s.outline_variant,
-            radius: shape_radius(Shape::None),
+            radius: component_radius(Component::Shell),
             fill_mode: rule::FillMode::Full,
             snap: false,
         }
@@ -655,14 +636,14 @@ pub fn scroll_style(tok: Tokens) -> impl Fn(&iced::Theme, scrollable::Status) ->
             border: Border {
                 color: Color::TRANSPARENT,
                 width: 0.0,
-                radius: shape_radius(Shape::Full),
+                radius: component_radius(Component::Button),
             },
             scroller: scrollable::Scroller {
                 background: Background::Color(s.outline),
                 border: Border {
                     color: Color::TRANSPARENT,
                     width: 0.0,
-                    radius: shape_radius(Shape::Full),
+                    radius: component_radius(Component::Button),
                 },
             },
         };
@@ -676,7 +657,7 @@ pub fn scroll_style(tok: Tokens) -> impl Fn(&iced::Theme, scrollable::Status) ->
                 border: Border {
                     color: s.outline,
                     width: 1.0,
-                    radius: shape_radius(Shape::ExtraSmall),
+                    radius: component_radius(Component::Field),
                 },
                 shadow: Shadow::default(),
                 icon: s.on_surface,
@@ -733,6 +714,43 @@ mod tests {
     }
 
     #[test]
+    fn table_cell_faces_separate_selection_from_zebra() {
+        let tok = named("dark").tokens;
+        let s = tok.scheme();
+        // Selected row is one secondary wash; focus adds primary outline.
+        let focused_sel = table_cell(tok, true, true, true);
+        assert_eq!(
+            focused_sel.background,
+            Some(Background::Color(s.secondary_container))
+        );
+        assert_eq!(focused_sel.border.color, s.primary);
+        assert!(focused_sel.border.width >= 2.0);
+        let selected = table_cell(tok, true, false, true);
+        assert_eq!(
+            selected.background,
+            Some(Background::Color(s.secondary_container))
+        );
+        assert_eq!(selected.text_color, Some(s.on_secondary_container));
+        assert_eq!(selected.border.width, 0.0);
+        let zebra = table_cell(tok, false, false, true);
+        assert_eq!(
+            zebra.background,
+            Some(Background::Color(s.surface_container_high))
+        );
+        assert_ne!(
+            zebra.background, selected.background,
+            "zebra must not use selection wash"
+        );
+        let idle = table_cell(tok, false, false, false);
+        assert_eq!(idle.background, Some(Background::Color(Color::TRANSPARENT)));
+        let focus_only = table_cell(tok, false, true, false);
+        assert_eq!(
+            focus_only.background,
+            Some(Background::Color(s.primary_container))
+        );
+    }
+
+    #[test]
     fn text_field_focus_uses_primary_outline() {
         let tok = named("light").tokens;
         let s = tok.scheme();
@@ -770,7 +788,11 @@ mod tests {
         );
         let active = tab_style(tok, true)(&theme, button::Status::Active);
         assert_eq!(active.text_color, s.primary);
-        assert_eq!(active.border.color, s.primary);
+        // Label is flush; underbar is tab_indicator, not a full border.
+        assert_eq!(active.border.width, 0.0);
+        assert_eq!(active.border.color, Color::TRANSPARENT);
+        let bar = tab_indicator(tok);
+        assert_eq!(bar.background, Some(Background::Color(s.primary)));
         let idle = tab_style(tok, false)(&theme, button::Status::Hovered);
         assert_eq!(idle.text_color, s.on_surface_variant);
         assert!(idle.background.is_some());
@@ -780,6 +802,20 @@ mod tests {
         assert!(pressed.background.is_some());
         let sk = skeleton(tok);
         assert!(sk.background.is_some());
+        // Desktop flat: every component is M3 shape None (0 dp).
+        assert_eq!(
+            crate::m3::shape::Component::Button.shape(),
+            crate::m3::shape::Shape::None
+        );
+        assert_eq!(
+            crate::m3::shape::Component::Field.shape(),
+            crate::m3::shape::Shape::None
+        );
+        assert_eq!(
+            card(tok, false).border.radius,
+            component_radius(crate::m3::shape::Component::Card)
+        );
+        assert_eq!(card(tok, false).border.radius, 0.0.into());
     }
 
     #[test]
@@ -847,9 +883,11 @@ mod tests {
         let _ = r(&theme, radio::Status::Hovered { is_selected: false });
         let sw = switch_style(tok);
         let _ = sw(&theme, toggler::Status::Active { is_toggled: true });
+        let _ = sw(&theme, toggler::Status::Active { is_toggled: false });
         let _ = sw(&theme, toggler::Status::Hovered { is_toggled: true });
         let _ = sw(&theme, toggler::Status::Hovered { is_toggled: false });
         let _ = sw(&theme, toggler::Status::Disabled { is_toggled: true });
+        let _ = sw(&theme, toggler::Status::Disabled { is_toggled: false });
         let sl = slider_style(tok);
         let _ = sl(&theme, slider::Status::Active);
         let _ = sl(&theme, slider::Status::Hovered);

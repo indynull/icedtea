@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+Desktop flat shape: every `m3::Component` uses M3 shape None (0 dp)
+rectangular chrome. Tab active state is a 3dp underbar, not a full border.
+
+Control paint paths read M3 roles through `Tokens::scheme()`: body and
+meta ink (`on_surface` / `on_surface_variant`), code and selectable
+editors (`surface_container_highest`, outline, secondary-container
+selection), scroll rail (low container + outline thumb), progress ring
+track, image slot placeholder, busy scrim, list and table selection vs
+zebra, hyperlinks and markdown links as primary.
+
 Material Design 3 foundations live under `m3`: color `Scheme` roles
 (light and dark baselines), type scale, shape, elevation, density on a
 4dp grid, and `ControlState`. `Tokens` seed from those schemes;
@@ -9,14 +19,14 @@ Material Design 3 foundations live under `m3`: color `Scheme` roles
 the M3 baselines. The guide has an M3 foundations chapter.
 
 Control faces paint from M3 roles and states: filled / tonal / text /
-error buttons (full shape), secondary-container chips and selected
-list rows, text fields with outline and primary focus ring, checkbox /
-radio / switch / slider / progress with state layers. Tabs use a
-primary indicator; dialogs use elevated sheets; menu and toolbar use
-app-bar surface. Cards use medium corners and elevation. Disabled
-content uses the M3 12% / 38% on-surface layers. Catalog inventory is
-complete in `m3::mapping` (map / desktop / delete). Deleted surfaces
-and constructors are gone (`sparkline`, `display_reading`, `rich_cell`,
+error buttons, secondary-container chips and selected list rows, text
+fields with outline and primary focus ring, checkbox / radio / switch /
+slider / progress with state layers. Tabs use a primary underbar;
+dialogs use elevated sheets; menu and toolbar use app-bar surface.
+Cards use elevated surface containers. Disabled content uses the M3
+12% / 38% on-surface layers. Catalog inventory is complete in
+`m3::mapping` (map / desktop / delete). Deleted surfaces and
+constructors are gone (`sparkline`, `display_reading`, `rich_cell`,
 `masked_input`, `color_swatch`, `teaching_tip`, `placeholder_skeleton`,
 `document_tabs`, `job_strip`, `DocumentTabs`, `Job`) — no dual path.
 
@@ -67,7 +77,8 @@ Controls, theme, and host faces.
 
 `themed_slider` steps continuous ranges (~100 positions) so a `0..=1`
 drag is not stuck on the endpoints. `progress` fills its host at 8px
-girth; `progress_ring` track mixes text into surface. `split_button`
+girth; `progress_ring` uses the scheme track under a primary arc.
+`split_button`
 takes overflow rows from a chevron menu. Chrome icons use solid black
 fills so iced's svg recolor tints them on macOS Metal as well as
 Linux and Windows. `light` and `dark` are a neutral desktop pair.

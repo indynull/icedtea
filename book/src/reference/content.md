@@ -83,10 +83,11 @@ Constructor: [`widget::markdown_view`](https://docs.rs/icedtea/latest/icedtea/wi
 [iced](https://crates.io/crates/iced)
 
 Parse with `MarkdownDoc::parse`, then view the items. Truncate by
-slicing the source before parse. Links use `Tokens.accent`. Real
-markdown layout (headings, lists, code frames). Drag-select within a
-block; Ctrl+C / Cmd+C copies the range. Copy the whole document with
-`icedtea::copy_text` on `doc.source`.
+slicing the source before parse. Links and inline code use
+`Tokens::scheme()` (`primary`, `on_surface`, `surface_container_high`).
+Real markdown layout (headings, lists, code frames). Drag-select
+within a block; Ctrl+C / Cmd+C copies the range. Copy the whole
+document with `icedtea::copy_text` on `doc.source`.
 
 ### Code
 

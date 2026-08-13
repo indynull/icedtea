@@ -2,8 +2,10 @@
 
 - Spacing on a **4 dp grid**; default density 8 dp gap, 48 dp touch targets.
 - Controls show M3 states: enabled, disabled, hovered, focused, pressed, selected/error where defined.
-- Surfaces use token roles only (no one-off hex).
-- Type hierarchy: label < body < title (M3 type scale).
+- Surfaces use token roles only (`Tokens::scheme()`); no one-off hex.
+- Desktop chrome is **rectangular** (M3 shape None / 0 dp). Rounded pills are ugly unless intentional geometry (slider thumb).
+- Type hierarchy: label < body < title (M3 type scale via `typo`).
+- Data table: selected row ≠ zebra stripe; focused cell is outline on selection wash.
 
 # Gallery QA rubric
 
@@ -61,7 +63,7 @@ For each interactive control, the gallery should show or inject:
 | Loading | Slot collapses or static blank with no spinner/progress |
 | Error | No error face when the constructor has one |
 
-Busy, toast, jobs, progress: motion or value must be **perceivable** in
+Busy, toast, progress: motion or value must be **perceivable** in
 the shot (not a zero-width bar).
 
 ## 5. Affordance and honesty

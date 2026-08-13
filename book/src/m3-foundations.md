@@ -32,8 +32,12 @@ UI text still uses platform sans (`typo::UI`); code uses `typo::MONO`.
 
 ## Shape and elevation
 
-`m3::Shape` / `chrome::Corner` use the M3 corner scale (4 / 8 / 12 / 16 / 28 dp).
-`m3::Elevation` uses tonal surface containers plus optional shadow.
+`m3::Shape` is the full M3 scale (0 / 4 / 8 / 12 / 16 / 28 dp and Full).
+Public controls map through `m3::Component` and, for **desktop flat**
+chrome, every family uses shape **None** (0 dp) so cards, fields, and
+buttons stay rectangular. Switch thumbs stay circular via geometry, not
+container radius. `m3::Elevation` uses tonal surface containers plus
+optional shadow.
 
 ## Density
 

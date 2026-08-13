@@ -264,7 +264,7 @@ where
                 border: iced::Border {
                     color: Color::TRANSPARENT,
                     width: 0.0,
-                    radius: crate::chrome::Corner::Tight.radius(),
+                    radius: crate::m3::shape::Component::AppBar.radius(),
                 },
                 ..renderer::Quad::default()
             },
@@ -288,7 +288,7 @@ where
                 wrapping: text::Wrapping::default(),
             },
             Point::new(bounds.x + self.padding.left, bounds.center_y()),
-            self.tok.text,
+            self.tok.scheme().on_surface,
             *viewport,
         );
     }
@@ -506,7 +506,7 @@ where
                 border: iced::Border {
                     color: Color::TRANSPARENT,
                     width: 0.0,
-                    radius: crate::chrome::Corner::Tight.radius(),
+                    radius: crate::m3::shape::Component::AppBar.radius(),
                 },
                 ..renderer::Quad::default()
             },
@@ -521,10 +521,11 @@ where
             height: side,
         };
         let handle = svg::Handle::from_memory(Icon::Chevron.bytes());
+        let s = self.tok.scheme();
         let color = if self.disabled {
-            self.tok.muted
+            s.on_surface_variant
         } else {
-            self.tok.text
+            s.on_surface
         };
         renderer.draw_svg(svg::Svg::new(handle).color(color), icon_bounds, *viewport);
     }

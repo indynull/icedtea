@@ -182,10 +182,9 @@ pub fn chip_fill(tok: Tokens) -> Color {
     tok.scheme().secondary_container
 }
 
-/// Primary wash used for selected rows.
+/// Primary wash used for selected rows (M3 secondary container).
 pub fn selection_fill(tok: Tokens) -> Color {
-    // Prefer explicit selection (M3 secondary_container when seeded from Scheme).
-    tok.selection
+    tok.scheme().secondary_container
 }
 
 /// Mix `color` toward white.
@@ -418,15 +417,17 @@ impl Tokens {
         relative_luma(self.canvas) < 0.45
     }
 
-    /// Derived washes and chrome colors. Named colorways stay the input.
+    /// Derived washes and chrome colors from [`Self::scheme`].
     ///
     /// ```
     /// let tok = icedtea::theme::named("dark").tokens;
     /// let faces = tok.faces();
-    /// assert_eq!(faces.link, tok.accent);
+    /// let s = tok.scheme();
+    /// assert_eq!(faces.link, s.primary);
     /// assert_eq!(faces.hover, icedtea::theme::hover_fill(tok));
     /// ```
     pub fn faces(self) -> Faces {
+        let s = self.scheme();
         Faces {
             hover: hover_fill(self),
             pressed: pressed_fill(self),
@@ -436,11 +437,11 @@ impl Tokens {
             text_on_surface: text_on(self, self.surface),
             text_on_panel: text_on(self, self.panel),
             text_on_primary: text_on(self, self.primary),
-            scrollbar: mix(self.text, self.canvas, 0.35),
-            input_cursor: self.primary,
-            input_selection: self.selection,
-            link: self.accent,
-            focus: self.primary,
+            scrollbar: s.outline,
+            input_cursor: s.primary,
+            input_selection: s.secondary_container,
+            link: s.primary,
+            focus: s.primary,
         }
     }
 }
@@ -1149,14 +1150,16 @@ mod tests {
     #[test]
     fn faces_derive_from_tokens() {
         let tok = named("dark").tokens;
+        let s = tok.scheme();
         let faces = tok.faces();
-        assert_eq!(faces.link, tok.accent);
+        assert_eq!(faces.link, s.primary);
         assert_eq!(faces.hover, hover_fill(tok));
         assert_eq!(faces.pressed, pressed_fill(tok));
         assert_eq!(faces.chip, chip_fill(tok));
         assert_eq!(faces.selection, selection_fill(tok));
-        assert_eq!(faces.input_selection, tok.selection);
-        assert_eq!(faces.focus, tok.primary);
+        assert_eq!(faces.input_selection, s.secondary_container);
+        assert_eq!(faces.focus, s.primary);
+        assert_eq!(faces.scrollbar, s.outline);
         assert_eq!(text_on(tok, tok.canvas), tok.text);
         let red = Color::from_rgb8(200, 40, 40);
         assert!(relative_luma(lighten(red, 0.4)) > relative_luma(red));

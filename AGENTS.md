@@ -50,9 +50,11 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   hints, and the command palette.
 - **Material Design 3** foundations in `m3` (color roles, type scale,
   shape, elevation, density, control states). `theme::Tokens` seeds from
-  `m3::Scheme` (baseline light/dark). Named colorways plus high-contrast
-  remain; apps may register more that implement the same roles. See
-  `m3::mapping` for catalog inventory. `theme::mix` builds washes.
+  `m3::Scheme` (baseline light/dark); `Tokens::scheme()` returns the
+  stored scheme. Desktop chrome uses `m3::Component` → shape **None**
+  (0 dp, rectangular). Named colorways plus high-contrast remain; apps
+  may register more that implement the same roles. See `m3::mapping`
+  for catalog inventory. `theme::mix` builds washes.
 - User-facing text uses `typo::UI` (`Font::DEFAULT`, platform sans).
   Code uses `typo::MONO` (`Font::MONOSPACE`). Never bundle a font
   file. Apps that want a named family load it on the iced application

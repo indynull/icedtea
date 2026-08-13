@@ -14,6 +14,6 @@ pub mod type_scale;
 pub use color::{scheme_dark, scheme_light, Scheme};
 pub use density::{Density, DensityName, GRID};
 pub use elevation::Elevation;
-pub use shape::{Corner, Shape};
+pub use shape::{Component, Corner, Shape};
 pub use state::ControlState;
 pub use type_scale::{TypeRole, TypeScale};

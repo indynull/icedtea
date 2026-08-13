@@ -66,23 +66,24 @@ fn nav_item<'a>(
         .width(Length::Fill)
         .style(move |_theme, status| {
             let hover = matches!(status, button::Status::Hovered | button::Status::Pressed);
+            let s = tok.scheme();
             let bg = if selected {
-                tok.selection
+                s.secondary_container
             } else if hover {
                 icedtea::theme::hover_fill(tok)
             } else {
                 icedtea::iced::Color::TRANSPARENT
             };
             let fg = if selected {
-                tok.selection_text
+                s.on_secondary_container
             } else {
-                tok.text
+                s.on_surface
             };
             button::Style {
                 background: Some(icedtea::iced::Background::Color(bg)),
                 text_color: fg,
                 border: icedtea::iced::border::Border {
-                    radius: icedtea::chrome::Corner::Tight.radius(),
+                    radius: icedtea::m3::shape::Component::Button.radius(),
                     ..icedtea::iced::border::Border::default()
                 },
                 ..button::Style::default()
@@ -155,15 +156,16 @@ fn group_header<'a>(
     tok: Tokens,
     first: bool,
 ) -> Element<'a, Message> {
+    let s = tok.scheme();
     button(
         row![
             text(if expanded { "▾" } else { "▸" })
                 .size(icedtea::typo::TITLE)
-                .color(tok.muted),
+                .color(s.on_surface_variant),
             text(name)
                 .size(icedtea::typo::TITLE)
                 .font(icedtea::typo::UI_BOLD)
-                .color(tok.text),
+                .color(s.on_surface),
         ]
         .spacing(8)
         .align_y(Alignment::Center),
@@ -177,15 +179,16 @@ fn group_header<'a>(
     .width(Length::Fill)
     .style(move |_theme, status| {
         let hover = matches!(status, button::Status::Hovered | button::Status::Pressed);
+        let s = tok.scheme();
         button::Style {
             background: Some(icedtea::iced::Background::Color(if hover {
                 icedtea::theme::hover_fill(tok)
             } else {
                 icedtea::iced::Color::TRANSPARENT
             })),
-            text_color: tok.text,
+            text_color: s.on_surface,
             border: icedtea::iced::border::Border {
-                radius: icedtea::chrome::Corner::Tight.radius(),
+                radius: icedtea::m3::shape::Component::Button.radius(),
                 ..icedtea::iced::border::Border::default()
             },
             ..button::Style::default()
@@ -213,11 +216,12 @@ fn scene_card<'a>(child: Element<'a, Message>, tok: Tokens) -> Element<'a, Messa
 }
 
 fn page_fills(page: &str) -> bool {
+    // "list" scrolls: virtual-column + list + pagination share one page;
+    // Fill clips the list to a one-row strip under the expand cards.
     matches!(
         page,
         "code"
             | "tree"
-            | "list"
             | "list-detail"
             | "table"
             | "log"
@@ -2242,7 +2246,7 @@ impl Gallery {
             text(title)
                 .size(icedtea::typo::PAGE)
                 .font(icedtea::typo::UI_BOLD)
-                .color(tok.text),
+                .color(tok.scheme().on_surface),
             widget::meta(page_job(self.page), tok, named("page-job", Role::Status),),
             card,
         ]
@@ -2274,7 +2278,7 @@ impl Gallery {
                 text(e.title)
                     .size(icedtea::typo::TITLE)
                     .font(icedtea::typo::UI_BOLD)
-                    .color(tok.text),
+                    .color(tok.scheme().on_surface),
             );
             if let Some(job) = widget_job(e.id) {
                 col = col.push(widget::meta(
@@ -3261,7 +3265,7 @@ impl Gallery {
                     OVERSCAN,
                     Message::ListScroll,
                     "No messages match",
-                    move |_| tok.muted,
+                    move |_| tok.scheme().on_surface_variant,
                     Some(icedtea::iced::widget::Id::from("gallery-list")),
                     if self.list_card {
                         icedtea::collection::RowFace::Card {
@@ -3273,12 +3277,9 @@ impl Gallery {
                     named("list", Role::List),
                 ))
                 .width(Length::Fill)
-                .height(Length::Fill);
+                .height(Length::Fixed(280.0));
                 // Pagination is the next catalog section on this page.
-                column![filters, list]
-                    .spacing(0)
-                    .height(Length::Fill)
-                    .into()
+                column![filters, list].spacing(0).into()
             }
             "virtual-column" => {
                 let titles: Vec<String> = (0..self.list_all.len())
@@ -3964,7 +3965,7 @@ impl Gallery {
                     OVERSCAN,
                     Message::ListScroll,
                     "No rows",
-                    move |_| tok.muted,
+                    move |_| tok.scheme().on_surface_variant,
                     Some(icedtea::iced::widget::Id::from("gallery-list-detail")),
                     icedtea::collection::RowFace::FLUSH,
                     named("list", Role::List),

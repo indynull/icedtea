@@ -79,13 +79,17 @@
 //! # Tokens (Material Design 3)
 //!
 //! [`theme::named`] picks a colorway seeded from M3 schemes
-//! ([`m3::scheme_light`] / [`m3::scheme_dark`]). [`theme::mix`] builds washes:
+//! ([`m3::scheme_light`] / [`m3::scheme_dark`]). Control paint paths
+//! read roles through [`Tokens::scheme`](theme::Tokens::scheme). Short
+//! fields (`primary`, `text`, …) are aliases of those roles.
+//! [`theme::mix`] builds washes:
 //!
 //! ```
 //! use icedtea::theme;
 //! let tok = theme::named("dark").tokens;
-//! let wash = theme::selection_fill(tok);
-//! assert_eq!(wash, tok.selection);
+//! let s = tok.scheme();
+//! assert_eq!(theme::selection_fill(tok), s.secondary_container);
+//! assert_eq!(s.on_surface, tok.text);
 //! ```
 //!
 //! # A widget

@@ -76,7 +76,7 @@ pub fn slider_step(range: std::ops::RangeInclusive<f32>) -> f32 {
 
 pub fn icon_style(tok: Tokens) -> impl Fn(&iced::Theme, svg::Status) -> svg::Style {
     move |_t, _s| svg::Style {
-        color: Some(tok.text),
+        color: Some(tok.scheme().on_surface),
     }
 }
 
@@ -126,7 +126,7 @@ pub fn label<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Elemen
     a11y::attach(
         text(s)
             .size(typo::BODY)
-            .color(tok.text)
+            .color(tok.scheme().on_surface)
             .font(typo::UI)
             .into(),
         &a11y,
@@ -139,7 +139,7 @@ pub fn display_line<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) ->
     a11y::attach(
         text(s)
             .size(typo::META)
-            .color(tok.muted)
+            .color(tok.scheme().on_surface_variant)
             .font(typo::UI)
             .width(Length::Fill)
             .align_x(Alignment::End)
@@ -157,7 +157,7 @@ pub fn figure_display<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) 
             text(ch.to_string())
                 .size(typo::DISPLAY)
                 .font(typo::UI_BOLD)
-                .color(tok.text),
+                .color(tok.scheme().on_surface),
         );
     }
     a11y::attach(r.into(), &a11y)
@@ -165,7 +165,13 @@ pub fn figure_display<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) 
 
 pub fn meta<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
     let s = a11y.apply_name(s);
-    a11y::attach(text(s).size(typo::META).color(tok.muted).into(), &a11y)
+    a11y::attach(
+        text(s)
+            .size(typo::META)
+            .color(tok.scheme().on_surface_variant)
+            .into(),
+        &a11y,
+    )
 }
 
 /// A monospace panel the user can drag-select and copy.
@@ -230,7 +236,7 @@ pub fn hyperlink<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let title = a11y.apply_name(title);
-    let mut b = button(text(title).size(typo::BODY).color(tok.accent))
+    let mut b = button(text(title).size(typo::BODY).color(tok.scheme().primary))
         .padding(0)
         .style(style::button_style(tok, Variant::Ghost));
     if let Some(m) = a11y.apply_message(Some(msg)) {
@@ -512,7 +518,9 @@ where
                     .center_x(16)
                     .center_y(16)
                     .style(move |_| radio_idle_face(tok, on)),
-                text(name.clone()).size(typo::BODY).color(tok.muted),
+                text(name.clone())
+                    .size(typo::BODY)
+                    .color(tok.scheme().on_surface_variant),
             ]
             .spacing(8)
             .align_y(Alignment::Center)
@@ -529,16 +537,18 @@ where
 }
 
 fn radio_idle_face(tok: Tokens, on: bool) -> iced::widget::container::Style {
+    let s = tok.scheme();
+    // Circle geometry (not Component::Field — desktop None would paint a square).
     iced::widget::container::Style {
         background: Some(iced::Background::Color(if on {
-            tok.primary
+            s.primary
         } else {
             Color::TRANSPARENT
         })),
         border: iced::border::Border {
-            color: tok.muted,
-            width: 1.0,
-            radius: 8.0.into(),
+            color: s.outline,
+            width: 2.0,
+            radius: crate::m3::shape::Shape::Full.radius(),
         },
         ..iced::widget::container::Style::default()
     }
@@ -594,7 +604,10 @@ pub fn themed_slider<'a, M: Clone + 'a>(
                 .width(Length::Fill)
                 .height(18)
                 .center_y(18)
-                .style(move |_| style::fill(tok.panel, tok.muted))
+                .style(move |_| {
+                    let s = tok.scheme();
+                    style::fill(s.surface_container_highest, s.on_surface_variant)
+                })
                 .into(),
             &a11y,
         );
@@ -696,12 +709,13 @@ pub fn progress_ring<'a, M: 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let (start, end) = ring_angles(value);
-    // Track must contrast with the card surface (panel alone is often white).
-    let track = crate::theme::mix(tok.text, tok.surface, 0.12);
+    // M3 progress track: surface_container_highest under the primary arc.
+    let s = tok.scheme();
+    let track = s.surface_container_highest;
     let ring = Canvas::new(ArcRing {
         start,
         end,
-        color: tok.primary,
+        color: s.primary,
         track,
     })
     .width(56)
@@ -754,7 +768,13 @@ pub fn busy_overlay<'a, M: Clone + 'a>(
                 .height(Length::Fill)
                 .center_x(Length::Fill)
                 .center_y(Length::Fill)
-                .style(move |_| style::fill(Color::from_rgba(0.0, 0.0, 0.0, 0.35), tok.text)),
+                .style(move |_| {
+                    let scrim = tok.scheme().scrim;
+                    style::fill(
+                        Color::from_rgba(scrim.r, scrim.g, scrim.b, 0.32),
+                        tok.scheme().on_surface,
+                    )
+                }),
         ]
         .into(),
         &a11y,
@@ -778,7 +798,7 @@ pub fn spinner<'a, M: 'a>(tok: Tokens, phase: f32, a11y: A11y) -> Element<'a, M>
     a11y::attach(
         Canvas::new(SpinnerDots {
             phase: phase.rem_euclid(1.0),
-            color: tok.accent,
+            color: tok.scheme().primary,
         })
         .width(56)
         .height(56)
@@ -833,7 +853,10 @@ pub fn image_slot<'a, M: Clone + 'a>(
             )
             .width(width)
             .height(height)
-            .style(move |_| style::fill(crate::theme::chip_fill(tok), tok.text))
+            .style(move |_| {
+                let s = tok.scheme();
+                style::fill(s.surface_container_high, s.on_surface)
+            })
             .into(),
             &a11y,
         ),
@@ -849,7 +872,10 @@ pub fn image_slot<'a, M: Clone + 'a>(
                 .padding(12)
                 .into(),
             )
-            .style(move |_| style::fill(crate::theme::chip_fill(tok), tok.text))
+            .style(move |_| {
+                let s = tok.scheme();
+                style::fill(s.surface_container_high, s.on_surface)
+            })
             .into(),
             &a11y,
         ),
@@ -1308,17 +1334,20 @@ pub fn selectable<'a, M: Clone + 'a>(
 fn selectable_style(
     tok: Tokens,
 ) -> impl Fn(&iced::Theme, iced::widget::text_editor::Status) -> iced::widget::text_editor::Style {
-    move |_t, _s| iced::widget::text_editor::Style {
-        // Transparent so value fields read as body text, not a dark editor slab.
-        background: iced::Background::Color(Color::TRANSPARENT),
-        border: iced::Border {
-            color: Color::TRANSPARENT,
-            width: 0.0,
-            radius: 0.0.into(),
-        },
-        placeholder: tok.muted,
-        value: tok.text,
-        selection: tok.selection,
+    move |_t, _s| {
+        let s = tok.scheme();
+        iced::widget::text_editor::Style {
+            // Transparent so value fields read as body text, not a dark editor slab.
+            background: iced::Background::Color(Color::TRANSPARENT),
+            border: iced::Border {
+                color: Color::TRANSPARENT,
+                width: 0.0,
+                radius: 0.0.into(),
+            },
+            placeholder: s.on_surface_variant,
+            value: s.on_surface,
+            selection: s.secondary_container,
+        }
     }
 }
 
@@ -1376,12 +1405,13 @@ pub fn highlighted_code<'a, M: Clone + 'a>(
 }
 
 fn editor_frame(tok: Tokens) -> iced::widget::container::Style {
+    let s = tok.scheme();
     iced::widget::container::Style {
-        background: Some(iced::Background::Color(tok.panel)),
+        background: Some(iced::Background::Color(s.surface_container_highest)),
         border: iced::Border {
-            color: tok.border,
+            color: s.outline_variant,
             width: 1.0,
-            radius: crate::chrome::Corner::Tight.radius(),
+            radius: crate::m3::shape::Component::Field.radius(),
         },
         ..iced::widget::container::Style::default()
     }
@@ -1390,16 +1420,19 @@ fn editor_frame(tok: Tokens) -> iced::widget::container::Style {
 pub fn editor_style(
     tok: Tokens,
 ) -> impl Fn(&iced::Theme, iced::widget::text_editor::Status) -> iced::widget::text_editor::Style {
-    move |_t, _s| iced::widget::text_editor::Style {
-        background: iced::Background::Color(tok.panel),
-        border: iced::Border {
-            color: tok.border,
-            width: 1.0,
-            radius: crate::chrome::Corner::Tight.radius(),
-        },
-        placeholder: tok.muted,
-        value: tok.text,
-        selection: tok.selection,
+    move |_t, _s| {
+        let s = tok.scheme();
+        iced::widget::text_editor::Style {
+            background: iced::Background::Color(s.surface_container_highest),
+            border: iced::Border {
+                color: s.outline_variant,
+                width: 1.0,
+                radius: crate::m3::shape::Component::Field.radius(),
+            },
+            placeholder: s.on_surface_variant,
+            value: s.on_surface,
+            selection: s.secondary_container,
+        }
     }
 }
 
@@ -1481,10 +1514,14 @@ where
             .map(ToString::to_string)
             .unwrap_or_default();
         return a11y::attach(
-            container(text(shown).size(typo::BODY).color(tok.muted))
-                .padding(pad())
-                .style(move |_| style::panel(tok))
-                .into(),
+            container(
+                text(shown)
+                    .size(typo::BODY)
+                    .color(tok.scheme().on_surface_variant),
+            )
+            .padding(pad())
+            .style(move |_| style::panel(tok))
+            .into(),
             &a11y,
         );
     }
@@ -1728,7 +1765,7 @@ fn time_colon<'a, M: 'a>(tok: Tokens) -> Element<'a, M> {
         text(":")
             .size(typo::BODY)
             .font(typo::UI_BOLD)
-            .color(tok.text),
+            .color(tok.scheme().on_surface),
     )
     .padding(Padding {
         top: 8.0,
@@ -2061,20 +2098,21 @@ pub fn markdown_view<'a, M: Clone + 'a>(
 }
 
 fn markdown_style(tok: Tokens) -> markdown::Style {
+    let s = tok.scheme();
     let mut style = markdown::Style::from_palette(iced::theme::Palette {
-        background: tok.canvas,
-        text: tok.text,
-        primary: tok.primary,
-        success: tok.success,
-        warning: tok.warning,
-        danger: tok.danger,
+        background: s.surface,
+        text: s.on_surface,
+        primary: s.primary,
+        success: s.success,
+        warning: s.warning,
+        danger: s.error,
     });
     style.font = typo::UI;
-    style.inline_code_color = tok.text;
+    style.inline_code_color = s.on_surface;
     style.inline_code_font = typo::MONO;
     style.code_block_font = typo::MONO;
-    style.link_color = tok.accent;
-    style.inline_code_highlight.background = iced::Background::Color(tok.panel);
+    style.link_color = s.primary;
+    style.inline_code_highlight.background = iced::Background::Color(s.surface_container_high);
     style
 }
 
@@ -2221,7 +2259,7 @@ pub fn chip<'a, M: Clone + 'a>(
         st.border = iced::border::Border {
             color: iced::Color::TRANSPARENT,
             width: 0.0,
-            radius: crate::m3::Shape::Full.radius(),
+            radius: crate::m3::Component::Chip.radius(),
         };
         st
     });
@@ -2254,12 +2292,13 @@ pub fn badge<'a, M: 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let title = a11y.apply_name(title);
+    let s = tok.scheme();
     let ink = match variant {
-        Variant::Danger => tok.danger,
-        Variant::Primary => tok.primary,
-        Variant::Success => tok.success,
-        Variant::Warning => tok.warning,
-        _ => tok.muted,
+        Variant::Danger => s.error,
+        Variant::Primary => s.primary,
+        Variant::Success => s.success,
+        Variant::Warning => s.warning,
+        _ => s.on_surface_variant,
     };
     let wash = chip_wash(tok, variant);
     a11y::attach(
@@ -2608,7 +2647,7 @@ pub fn log_view<'a, M: Clone + 'a>(
                 container(
                     text(line.to_string())
                         .size(typo::META)
-                        .color(tok.text)
+                        .color(tok.scheme().on_surface)
                         .font(typo::MONO),
                 )
                 .width(Length::Fill)
@@ -2775,9 +2814,10 @@ fn two_line_row<'a, M: 'a>(
 ) -> Element<'a, M> {
     // ~7px/char at body size; leave room for pad + rail neighbor.
     let title = ellipsize_line(title, 42);
+    let on = tok.scheme().on_surface;
     let mut col = column![text(title)
         .size(typo::BODY)
-        .color(tok.text)
+        .color(on)
         .font(typo::UI)
         .width(Length::Fill)
         .wrapping(iced::widget::text::Wrapping::None)]
@@ -2815,9 +2855,10 @@ fn card_row<'a, M: 'a>(
     meter: Option<f32>,
     tok: Tokens,
 ) -> Element<'a, M> {
+    let on = tok.scheme().on_surface;
     let mut col = column![text(title.to_string())
         .size(typo::BODY)
-        .color(tok.text)
+        .color(on)
         .font(if selected { typo::UI_BOLD } else { typo::UI })
         .width(Length::Fill)
         .wrapping(iced::widget::text::Wrapping::Word)]
@@ -3097,13 +3138,12 @@ pub fn item_grid<'a, M: Clone + 'a>(
             if i < labels.len() {
                 let s = labels[i].clone();
                 let on = selected == Some(i);
-                // Ghost idle is transparent so every unselected tile matches;
-                // Quiet's idle wash can look uneven under capture/hover.
+                // M3: selected tile = tonal (secondary container); idle = ghost.
                 let tile = themed_button_sized(
                     s.clone(),
                     a11y.apply_message(Some(on_select(i))),
                     tok,
-                    if on { Variant::Primary } else { Variant::Ghost },
+                    if on { Variant::Quiet } else { Variant::Ghost },
                     Length::Fill,
                     Length::Fill,
                     A11y::new(s.clone(), Role::ListItem)
@@ -3277,21 +3317,13 @@ where
                             let focused = cursor == Some((i, c));
                             let value = model.cell(i, c).to_string();
                             let w = col_w(c);
-                            let bg = if focused {
-                                tok.selection
-                            } else if selected {
-                                crate::theme::selection_fill(tok)
-                            } else if stripe {
-                                crate::theme::chip_fill(tok)
-                            } else {
-                                iced::Color::TRANSPARENT
-                            };
-                            let face =
-                                container(text(value.clone()).size(typo::BODY).color(tok.text))
-                                    .width(w)
-                                    .height(h)
-                                    .padding([8, 8])
-                                    .style(move |_| style::fill(bg, tok.text));
+                            let cell_style = style::table_cell(tok, selected, focused, stripe);
+                            let ink = cell_style.text_color.unwrap_or(tok.scheme().on_surface);
+                            let face = container(text(value.clone()).size(typo::BODY).color(ink))
+                                .width(w)
+                                .height(h)
+                                .padding([8, 8])
+                                .style(move |_| cell_style);
                             let cell: Element<'a, M> = if disabled {
                                 face.into()
                             } else {
@@ -3304,7 +3336,7 @@ where
                                 cell,
                                 &A11y::new(format!("{i}:{c}"), Role::ListItem)
                                     .with_value(value)
-                                    .with_checked(focused)
+                                    .with_checked(focused || selected)
                                     .with_disabled(disabled),
                             ))
                         };
@@ -3470,28 +3502,49 @@ pub fn tab_bar<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let mut r = Row::new().spacing(0).align_y(Alignment::Center);
+    let mut r = Row::new().spacing(0).align_y(Alignment::End);
     for (i, title) in tabs.titles.iter().enumerate() {
+        let active = i == tabs.active;
         let mut tab = button(text(title.clone()).size(typo::META))
             .padding([12, 16])
-            .style(style::tab_style(tok, i == tabs.active));
+            .style(style::tab_style(tok, active));
         if !a11y.disabled {
             tab = tab.on_press(on_select(i));
         }
-        let mut cell = row![tab].spacing(2).align_y(Alignment::Center);
-        if tabs.closable {
-            cell = cell.push(dismiss_button(
-                on_close(i),
-                tok,
-                A11y::button(format!("close {title}")).with_disabled(a11y.disabled),
-            ));
-        }
+        // Underbar only under this label: column Shrink → bar Fill of that width.
+        let bar_h = if active { 3.0_f32 } else { 0.0_f32 };
+        let indicator = container(Space::new().height(bar_h))
+            .width(Length::Fill)
+            .style(move |_| {
+                if active {
+                    style::tab_indicator(tok)
+                } else {
+                    style::fill(Color::TRANSPARENT, tok.scheme().on_surface)
+                }
+            });
+        let label_col = column![tab, indicator].spacing(0).width(Length::Shrink);
+        let cell: Element<'a, M> = if tabs.closable {
+            row![
+                label_col,
+                dismiss_button(
+                    on_close(i),
+                    tok,
+                    A11y::button(format!("close {title}")).with_disabled(a11y.disabled),
+                )
+            ]
+            .spacing(2)
+            .align_y(Alignment::Center)
+            .width(Length::Shrink)
+            .into()
+        } else {
+            label_col.into()
+        };
         r = r.push(a11y::attach(
-            container(cell).padding([0, 0]).into(),
-            &A11y::new(title.clone(), Role::Tab).with_checked(i == tabs.active),
+            cell,
+            &A11y::new(title.clone(), Role::Tab).with_checked(active),
         ));
     }
-    // M3 tab strip sits on surface; outline hairline under the row.
+    // Strip sits on app-bar surface; outline hairline under the row.
     let strip = column![
         r,
         container(Space::new().width(Length::Fill).height(1)).style(move |_| style::hairline(tok)),
@@ -3520,12 +3573,13 @@ fn disclosure_header<'a, M: Clone + 'a>(
     let title = title.into();
     // Unicode disclosure triangles (tree_view / Finder / VS Code style).
     let mark = if open { "▾" } else { "▸" };
+    let s = tok.scheme();
     let face = row![
         text(title.clone())
             .size(typo::BODY)
-            .color(tok.text)
+            .color(s.on_surface)
             .width(Length::Fill),
-        text(mark).size(typo::BODY).color(tok.muted),
+        text(mark).size(typo::BODY).color(s.on_surface_variant),
     ]
     .spacing(8)
     .align_y(Alignment::Center)
@@ -3637,11 +3691,12 @@ impl From<f32> for Peek {
 
 fn peek_clip<'a, M: 'a>(child: Element<'a, M>, h: f32, tok: Tokens) -> Element<'a, M> {
     let fade_h = 12.0_f32.min(h * 0.4).max(4.0);
-    let mut clear = tok.surface;
+    let surface = tok.scheme().surface;
+    let mut clear = surface;
     clear.a = 0.0;
     let grad = Linear::new(Radians(std::f32::consts::FRAC_PI_2))
         .add_stop(0.0, clear)
-        .add_stop(1.0, tok.surface);
+        .add_stop(1.0, surface);
     let fade = container(Space::new().width(Length::Fill).height(fade_h))
         .width(Length::Fill)
         .height(fade_h)
@@ -4002,8 +4057,17 @@ mod tests {
             tok,
             role("on", Role::Radio).with_disabled(true),
         );
-        let _ = radio_idle_face(tok, true);
-        let _ = radio_idle_face(tok, false);
+        let idle = radio_idle_face(tok, false);
+        assert_eq!(idle.border.color, tok.scheme().outline);
+        assert!(
+            idle.border.radius.top_left >= 8.0,
+            "disabled radio face must stay circular, not desktop None"
+        );
+        let on = radio_idle_face(tok, true);
+        assert_eq!(
+            on.background,
+            Some(iced::Background::Color(tok.scheme().primary))
+        );
         assert_eq!(
             scroll_delta_pixels(iced::mouse::ScrollDelta::Lines { x: 0.0, y: -2.0 }, 20.0),
             40.0
@@ -4681,8 +4745,9 @@ mod tests {
         assert_ne!(doc.hash, parse("# Other").hash);
         let _: Element<'_, ()> = markdown_view(&doc.items, tok, |_| (), role("md", Role::Group));
         let md = markdown_style(tok);
-        assert_eq!(md.link_color, tok.accent);
-        assert_eq!(md.inline_code_color, tok.text);
+        let s = tok.scheme();
+        assert_eq!(md.link_color, s.primary);
+        assert_eq!(md.inline_code_color, s.on_surface);
         assert_eq!(md.inline_code_font, typo::MONO);
         let cut = parse(&"# title\n\nbody".repeat(8)[..20]);
         assert!(cut.source.len() <= 20);
@@ -4739,6 +4804,24 @@ mod tests {
                 tok,
                 role("err", Role::Image),
             ),
+            image_slot(
+                ImageSlot::Loading,
+                48.0,
+                48.0,
+                tok,
+                role("load", Role::Image),
+            ),
+            image_slot(
+                ImageSlot::Ready {
+                    handle: iced::widget::image::Handle::from_bytes(TEST_PNG),
+                    fit: iced::ContentFit::Contain,
+                },
+                48.0,
+                48.0,
+                tok,
+                role("img", Role::Image),
+            ),
+            progress_ring(0.5, Some("half"), tok, role("pr", Role::Progress)),
             number_input(3.0, |_| (), tok, role("n", Role::SpinButton)),
             textarea(
                 &code,
@@ -5273,7 +5356,30 @@ mod tests {
         assert_eq!(select_only(click.clone()), click);
         let drag = Action::Drag(iced::Point::new(4.0, 5.0));
         assert_eq!(select_only(drag.clone()), drag);
-        let _ = selectable_style(named("dark").tokens);
+        let tok = named("dark").tokens;
+        let theme = crate::theme::iced_theme("dark", tok);
+        let s = tok.scheme();
+        let sel = selectable_style(tok)(&theme, iced::widget::text_editor::Status::Active);
+        assert_eq!(sel.value, s.on_surface);
+        assert_eq!(sel.placeholder, s.on_surface_variant);
+        assert_eq!(sel.selection, s.secondary_container);
+        let frame = editor_frame(tok);
+        assert_eq!(
+            frame.background,
+            Some(iced::Background::Color(s.surface_container_highest))
+        );
+        assert_eq!(frame.border.color, s.outline_variant);
+        let ed = editor_style(tok)(&theme, iced::widget::text_editor::Status::Active);
+        assert_eq!(ed.value, s.on_surface);
+        assert_eq!(ed.selection, s.secondary_container);
+        // Disabled slider face uses scheme track colors (style closure).
+        let _: Element<'_, ()> = themed_slider(
+            0.0..=1.0,
+            0.5,
+            |_| (),
+            tok,
+            A11y::new("off", Role::Slider).with_disabled(true),
+        );
     }
 
     #[test]

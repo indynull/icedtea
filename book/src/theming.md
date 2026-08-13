@@ -5,12 +5,13 @@ Colorways seed **Material Design 3** schemes (`m3::Scheme`). See [Material Desig
 
 Styling is Rust: semantic tokens plus mixing rules.
 
-Tokens: `canvas`, `surface`, `panel`, `text`, `muted`, `primary`,
-`accent`, `success`, `warning`, `danger`, `border`, `selection`,
-`selection-text`. Washes (hover, pressed, chip) come from
-[`theme::mix`](https://docs.rs/icedtea/latest/icedtea/theme/fn.mix.html).
-`Tokens::faces` adds lighten/darken, text-on-wash, scrollbar, input,
-link, and focus. Constructors still take `Tokens`.
+Short token fields map onto M3 roles (`Tokens::scheme()` for the full
+scheme). Aliases: `canvas`/`surface`/`panel`/`text`/`muted`/`primary`/
+`accent`/`danger`/`border`/`selection`. Baseline light/dark keep exact
+M3 containers; community colorways sync containers from aliases.
+Washes use scheme state layers (`hover_fill` / `pressed_fill`). Desktop
+control corners are M3 shape **None** (see [foundations](./m3-foundations.md)).
+Constructors take `Tokens`.
 
 Built-in names are 40 palettes: `dark`, `light`, `high-contrast`, and
 community colorways (Solarized, Gruvbox, Catppuccin, Nord, Tokyo Night,
@@ -19,9 +20,10 @@ Dracula, Everforest, Kanagawa, Ayu, GitHub, and others).
 and `theme::code_highlight` pick UI tokens and the iced highlighter
 face together. Register more on `ThemeCatalog`. `Boot.theme` is a
 concrete name and defaults to `dark`. `light` and `dark` are a
-neutral desktop pair (not a community skin). `markdown_view` paints inline
-code and links from `Tokens` (`text`, `panel`, `accent`). Truncation
-is slicing the source before `MarkdownDoc::parse`.
+neutral desktop pair (not a community skin). `markdown_view` paints
+inline code and links from `Tokens::scheme()` (`on_surface`,
+`surface_container_high`, `primary`). Truncation is slicing the source
+before `MarkdownDoc::parse`.
 
 ```rust
 let mut cat = icedtea::theme::ThemeCatalog::new();

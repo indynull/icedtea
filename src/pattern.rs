@@ -216,7 +216,9 @@ pub fn command_bar<'a, M: Clone + 'a>(
             left: 2.0,
         }));
     for a in actions {
-        let face = text(a.title.clone()).size(typo::META).color(tok.muted);
+        let face = text(a.title.clone())
+            .size(typo::META)
+            .color(tok.scheme().on_surface_variant);
         let mut b = button(face)
             .padding([2, 6])
             .style(style::button_style(tok, Variant::Ghost));
@@ -476,7 +478,7 @@ pub fn about_page<'a, M: Clone + 'a>(
     group_box(
         cat.t("about"),
         column![
-            text(name).size(typo::PAGE).color(tok.text),
+            text(name).size(typo::PAGE).color(tok.scheme().on_surface),
             meta(version, tok, A11y::new(version, Role::Status)),
             meta(license, tok, A11y::new(license, Role::Status)),
             meta(credits, tok, A11y::new(credits, Role::Status)),
