@@ -216,6 +216,9 @@ mod tests {
         let (dbg, dfg) = face(s.primary, s.on_primary, s.surface, ControlState::Disabled);
         assert_ne!(dbg, s.primary);
         assert_ne!(dfg, s.on_primary);
+        let _ = face(s.primary, s.on_primary, s.surface, ControlState::Focused);
+        let _ = face(s.primary, s.on_primary, s.surface, ControlState::Selected);
+        let _ = face(s.primary, s.on_primary, s.surface, ControlState::Error);
         let layered = layer_on(s.primary, s.on_primary, 0.08);
         assert_ne!(layered, s.primary);
     }

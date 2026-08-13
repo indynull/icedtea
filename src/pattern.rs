@@ -787,7 +787,14 @@ pub fn tab_view<'a, M: Clone + 'a>(
     tok: Tokens,
 ) -> Element<'a, M> {
     column![
-        tab_bar(tabs, on_select, on_close, tok, A11y::new("tabs", Role::Tab)),
+        tab_bar(
+            tabs,
+            on_select,
+            on_close,
+            0.0,
+            tok,
+            A11y::new("tabs", Role::Tab)
+        ),
         body
     ]
     .spacing(0)
@@ -1636,16 +1643,43 @@ mod tests {
     use crate::shortcut::Shortcut;
     use crate::theme::named;
 
+    fn draw_once<M: Clone>(el: &mut Element<'_, M>) {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::renderer::Style;
+        use iced::advanced::widget::Tree;
+        use iced::mouse;
+        use iced::{Font, Pixels, Point, Rectangle, Size, Theme};
+        let mut tree = Tree::new(el.as_widget());
+        let mut renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(200.0, 400.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let viewport = Rectangle::new(Point::ORIGIN, Size::new(200.0, 400.0));
+        el.as_widget().draw(
+            &tree,
+            &mut renderer,
+            &Theme::Dark,
+            &Style::default(),
+            layout,
+            mouse::Cursor::Unavailable,
+            &viewport,
+        );
+    }
+
     #[test]
     fn nav_rail_builds_selected_and_empty() {
         let tok = crate::theme::named("dark").tokens;
-        let _: Element<'_, usize> = nav_rail(
+        let mut rail: Element<'_, usize> = nav_rail(
             ["Inbox", "Sent"],
             0,
             |i| i,
             tok,
             A11y::new("rail", Role::List),
         );
+        draw_once(&mut rail);
         let _: Element<'_, usize> = nav_rail(
             ["Inbox"],
             1,
@@ -1713,7 +1747,8 @@ mod tests {
         );
         let body = label("x", tok, A11y::new("x", Role::Status));
         let scene = label("s", tok, A11y::new("s", Role::Status));
-        let _: Element<'_, ()> = side_sheet(scene, "I", body, Some(()), true, 240.0, tok);
+        let mut sheet: Element<'_, ()> = side_sheet(scene, "I", body, Some(()), true, 240.0, tok);
+        draw_once(&mut sheet);
         let body = label("x", tok, A11y::new("x", Role::Status));
         let scene = label("s", tok, A11y::new("s", Role::Status));
         let _: Element<'_, ()> = side_sheet(scene, "L", body, None, false, 100.0, tok);

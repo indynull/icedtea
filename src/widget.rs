@@ -770,10 +770,27 @@ pub fn scroll_delta_x(delta: iced::mouse::ScrollDelta) -> f32 {
     }
 }
 
+/// Tick count and end labels for [`themed_slider`].
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SliderMarks<'a> {
+    pub ticks: usize,
+    pub min: &'a str,
+    pub max: &'a str,
+}
+
+impl SliderMarks<'static> {
+    pub const NONE: Self = Self {
+        ticks: 0,
+        min: "",
+        max: "",
+    };
+}
+
 /// Pick a number on a range.
 ///
 /// Pass min, max, and the current value. The message is the new value
-/// while the thumb moves. Disabled ignores drag.
+/// while the thumb moves. Disabled ignores drag. `marks` paints ticks
+/// and end labels when set.
 ///
 ///
 /// ```
@@ -786,6 +803,7 @@ pub fn scroll_delta_x(delta: iced::mouse::ScrollDelta) -> f32 {
 ///     0.0..=1.0,
 ///     0.4,
 ///     on_change,
+///     widget::SliderMarks { ticks: 5, min: "0", max: "1" },
 ///     tok,
 ///     A11y::new("vol", Role::Slider).with_value("0.4"),
 /// );
@@ -794,30 +812,55 @@ pub fn themed_slider<'a, M: Clone + 'a>(
     range: std::ops::RangeInclusive<f32>,
     value: f32,
     msg: impl Fn(f32) -> M + 'a,
+    marks: SliderMarks<'a>,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    if a11y.disabled {
+    let slider_el: Element<'a, M> = if a11y.disabled {
         let _ = (range, value, msg);
-        return a11y::attach(
-            container(Space::new().width(Length::Fill).height(4))
-                .width(Length::Fill)
-                .height(18)
-                .center_y(18)
-                .style(move |_| disabled_slider_face(tok))
-                .into(),
-            &a11y,
-        );
-    }
-    let step = slider_step(range.clone());
-    a11y::attach(
+        container(Space::new().width(Length::Fill).height(4))
+            .width(Length::Fill)
+            .height(18)
+            .center_y(18)
+            .style(move |_| disabled_slider_face(tok))
+            .into()
+    } else {
+        let step = slider_step(range.clone());
         slider(range, value, msg)
             .step(step)
             .style(style::slider_style(tok))
             .width(Length::Fill)
-            .into(),
-        &a11y,
-    )
+            .into()
+    };
+    let s = tok.scheme();
+    let mut col = Column::new().spacing(2).width(Length::Fill);
+    if marks.ticks > 1 {
+        let mut ticks = Row::new().width(Length::Fill);
+        for i in 0..marks.ticks {
+            if i > 0 {
+                ticks = ticks.push(Space::new().width(Length::Fill));
+            }
+            ticks = ticks.push(
+                container(Space::new().width(1).height(6))
+                    .style(move |_| style::fill(s.outline_variant, s.on_surface)),
+            );
+        }
+        col = col.push(ticks);
+    }
+    col = col.push(slider_el);
+    if !marks.min.is_empty() || !marks.max.is_empty() {
+        col = col.push(
+            row![
+                text(marks.min)
+                    .size(typo::META)
+                    .color(s.on_surface_variant)
+                    .width(Length::Fill),
+                text(marks.max).size(typo::META).color(s.on_surface_variant),
+            ]
+            .width(Length::Fill),
+        );
+    }
+    a11y::attach(col.into(), &a11y)
 }
 
 fn disabled_slider_face(tok: Tokens) -> iced::widget::container::Style {
@@ -876,6 +919,7 @@ pub fn range_slider<'a, M: Clone + 'a>(
         range.clone(),
         low,
         move |v| msg(range_pair_after_low(v, high)),
+        SliderMarks::NONE,
         tok,
         A11y::new(format!("{} low", a11y.name), Role::Slider).with_disabled(a11y.disabled),
     );
@@ -883,6 +927,7 @@ pub fn range_slider<'a, M: Clone + 'a>(
         range,
         high,
         move |v| msg(range_pair_after_high(low, v)),
+        SliderMarks::NONE,
         tok,
         A11y::new(format!("{} high", a11y.name), Role::Slider).with_disabled(a11y.disabled),
     );
@@ -921,28 +966,52 @@ pub fn progress_label(value: f32, remaining: Option<&str>) -> String {
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let _: icedtea::Element<'_, ()> =
-///     widget::progress(0.4, None, tok, A11y::new("p", Role::Progress).with_value("0.4"));
+/// let copy = widget::progress_label(0.4, Some("12s"));
+/// let _: icedtea::Element<'_, ()> = widget::progress(
+///     0.4,
+///     Some(0.7),
+///     Some(copy.as_str()),
+///     tok,
+///     A11y::new("p", Role::Progress).with_value("0.4"),
+/// );
 /// ```
 pub fn progress<'a, M: 'a>(
     value: f32,
+    buffer: Option<f32>,
     copy: Option<&str>,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    // Bar defaults to Fill; the column must also Fill or the bar collapses
-    // to zero width inside a shrink parent.
-    let bar = progress_bar(0.0..=1.0, value.clamp(0.0, 1.0))
-        .style(style::progress_style(tok))
-        .length(Length::Fill)
-        .girth(8);
+    let value = value.clamp(0.0, 1.0);
+    let buf = buffer.unwrap_or(value).clamp(0.0, 1.0).max(value);
+    let v = (value * 100.0).round() as u16;
+    let b = ((buf * 100.0).round() as u16).saturating_sub(v);
+    let rest = 100u16.saturating_sub(v.saturating_add(b)).max(1);
+    let s = tok.scheme();
+    let bar: Element<'a, M> = container(
+        row![
+            container(Space::new().height(8))
+                .width(Length::FillPortion(v.max(1)))
+                .style(move |_| style::fill(s.primary, s.on_primary)),
+            container(Space::new().height(8))
+                .width(Length::FillPortion(b.max(1)))
+                .style(move |_| style::fill(s.secondary_container, s.on_secondary_container)),
+            container(Space::new().height(8))
+                .width(Length::FillPortion(rest))
+                .style(move |_| style::fill(s.surface_container_highest, s.on_surface)),
+        ]
+        .width(Length::Fill),
+    )
+    .width(Length::Fill)
+    .height(8)
+    .into();
     let el = if let Some(c) = copy.filter(|s| !s.is_empty()) {
         column![bar, meta(c, tok, A11y::new(c, Role::Status))]
             .spacing(4)
             .width(Length::Fill)
             .into()
     } else {
-        bar.into()
+        bar
     };
     a11y::attach(el, &a11y)
 }
@@ -2286,7 +2355,7 @@ impl MarkdownDoc {
         self.items
             .iter()
             .take(index)
-            .map(markdown_item_extent)
+            .map(crate::select::markdown_item_extent)
             .sum()
     }
 }
@@ -2300,59 +2369,6 @@ fn markdown_measure_style() -> markdown::Style {
         warning: iced::Color::WHITE,
         danger: iced::Color::WHITE,
     })
-}
-
-fn markdown_text_len(text: &markdown::Text) -> usize {
-    text.spans(markdown_measure_style())
-        .iter()
-        .map(|s| s.text.len())
-        .sum()
-}
-
-fn markdown_item_extent(item: &markdown::Item) -> f32 {
-    const TEXT: f32 = 16.0;
-    const SPACING: f32 = 16.0 * 0.875;
-    const COL: f32 = 64.0;
-    match item {
-        markdown::Item::Heading(level, text) => {
-            let size = match level {
-                markdown::HeadingLevel::H1 => TEXT * 2.0,
-                markdown::HeadingLevel::H2 => TEXT * 1.75,
-                markdown::HeadingLevel::H3 => TEXT * 1.5,
-                markdown::HeadingLevel::H4 => TEXT * 1.25,
-                markdown::HeadingLevel::H5 | markdown::HeadingLevel::H6 => TEXT,
-            };
-            let lines = ((markdown_text_len(text) as f32) / COL).ceil().max(1.0);
-            size * 1.3 * lines + TEXT * 0.5 + SPACING
-        }
-        markdown::Item::Paragraph(text) => {
-            let lines = ((markdown_text_len(text) as f32) / COL).ceil().max(1.0);
-            lines * TEXT * 1.4 + SPACING
-        }
-        markdown::Item::CodeBlock { code, lines, .. } => {
-            let n = lines.len().max(code.lines().count()).max(1) as f32;
-            n * TEXT * 0.75 * 1.5 + 24.0 + SPACING
-        }
-        markdown::Item::List { bullets, .. } => {
-            bullets
-                .iter()
-                .map(|b| {
-                    let kids = match b {
-                        markdown::Bullet::Point { items }
-                        | markdown::Bullet::Task { items, .. } => items,
-                    };
-                    TEXT + kids.iter().map(markdown_item_extent).sum::<f32>()
-                })
-                .sum::<f32>()
-                + SPACING
-        }
-        markdown::Item::Image { .. } => 160.0 + SPACING,
-        markdown::Item::Quote(items) => {
-            items.iter().map(markdown_item_extent).sum::<f32>() + 16.0 + SPACING
-        }
-        markdown::Item::Rule => 24.0 + SPACING,
-        markdown::Item::Table { rows, .. } => (1 + rows.len()) as f32 * TEXT * 1.8 + SPACING,
-    }
 }
 
 /// Jump list of headings. The application owns history. `selected` is
@@ -3705,7 +3721,7 @@ pub fn item_grid<'a, M: Clone + 'a>(
 ///     rows: vec![vec!["lib.rs".into()]],
 ///     sort_col: None,
 ///     sort_asc: true,
-///     checks: Vec::new(),
+///     checks: vec![false],
 /// };
 /// let cols = icedtea::collection::ColumnLayout::new(vec![120.0]);
 /// #[derive(Clone, Copy)]
@@ -4016,6 +4032,32 @@ pub fn tree_view<'a, M: Clone + 'a>(
     )
 }
 
+/// Map a More-list title back to its tab index.
+pub fn tab_overflow_index(titles: &[String], chosen: &str) -> usize {
+    titles.iter().position(|t| t == chosen).unwrap_or(0)
+}
+
+/// How many titles fit in `max_width` before the More control.
+pub fn tab_visible_count(titles: &[String], max_width: f32) -> usize {
+    if titles.is_empty() {
+        return 0;
+    }
+    if max_width <= 0.0 {
+        return titles.len();
+    }
+    let mut used = 0.0;
+    let mut visible = 0;
+    for title in titles {
+        let w = (title.len() as f32) * 7.0 + 48.0;
+        if visible > 0 && used + w > max_width - 72.0 {
+            break;
+        }
+        used += w;
+        visible += 1;
+    }
+    visible.max(1).min(titles.len())
+}
+
 /// A tab bar over a body the application paints.
 ///
 /// `Tabs { closable: false }` is pinned sections. Select sends the
@@ -4040,6 +4082,7 @@ pub fn tree_view<'a, M: Clone + 'a>(
 ///     &tabs,
 ///     on_select,
 ///     on_close,
+///     480.0,
 ///     tok,
 ///     A11y::new("tabs", Role::Tab),
 /// );
@@ -4048,29 +4091,44 @@ pub fn tab_bar<'a, M: Clone + 'a>(
     tabs: &Tabs,
     on_select: impl Fn(usize) -> M + Copy + 'a,
     on_close: impl Fn(usize) -> M + Copy + 'a,
+    max_width: f32,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
+    let visible = tab_visible_count(&tabs.titles, max_width);
     let mut r = Row::new().spacing(0).align_y(Alignment::End);
-    for (i, title) in tabs.titles.iter().enumerate() {
+    for (i, title) in tabs.titles.iter().enumerate().take(visible) {
         let active = i == tabs.active;
-        let mut tab = button(text(title.clone()).size(typo::META))
+        let badge = tabs.badges.get(i).filter(|s| !s.is_empty()).cloned();
+        let label_row = if let Some(b) = badge {
+            row![
+                text(title.clone()).size(typo::META),
+                self::badge(
+                    b,
+                    tok,
+                    Variant::Primary,
+                    A11y::new("tab-badge", Role::Status)
+                ),
+            ]
+            .spacing(6)
+            .align_y(Alignment::Center)
+        } else {
+            row![text(title.clone()).size(typo::META)].align_y(Alignment::Center)
+        };
+        let mut tab = button(label_row)
             .padding([12, 16])
             .style(style::tab_style(tok, active));
         if !a11y.disabled {
             tab = tab.on_press(on_select(i));
         }
         // Underbar only under this label: column Shrink → bar Fill of that width.
-        let bar_h = if active { 3.0_f32 } else { 0.0_f32 };
-        let indicator = container(Space::new().height(bar_h))
-            .width(Length::Fill)
-            .style(move |_| {
-                if active {
-                    style::tab_indicator(tok)
-                } else {
-                    style::fill(Color::TRANSPARENT, tok.scheme().on_surface)
-                }
-            });
+        let indicator = if active {
+            container(Space::new().height(3.0))
+                .width(Length::Fill)
+                .style(move |_| style::tab_indicator(tok))
+        } else {
+            container(Space::new().height(0.0)).width(Length::Fill)
+        };
         let label_col = column![tab, indicator].spacing(0).width(Length::Shrink);
         let cell: Element<'a, M> = if tabs.closable {
             row![
@@ -4091,6 +4149,17 @@ pub fn tab_bar<'a, M: Clone + 'a>(
         r = r.push(a11y::attach(
             cell,
             &A11y::new(title.clone(), Role::Tab).with_checked(active),
+        ));
+    }
+    if visible < tabs.titles.len() {
+        let all = tabs.titles.clone();
+        let hidden: Vec<String> = all[visible..].to_vec();
+        r = r.push(themed_pick_list(
+            hidden,
+            None,
+            move |title: String| on_select(tab_overflow_index(&all, &title)),
+            tok,
+            A11y::new("more-tabs", Role::ComboBox).with_disabled(a11y.disabled),
         ));
     }
     // Strip sits on app-bar surface; outline hairline under the row.
@@ -4634,6 +4703,7 @@ mod tests {
             0.0..=1.0,
             0.5,
             |_| (),
+            SliderMarks::NONE,
             tok,
             role("s", Role::Slider).with_value("0.5"),
         );
@@ -4779,10 +4849,16 @@ mod tests {
         assert_eq!(range_pair_after_low(10.0, 40.0), (10.0, 40.0));
         assert_eq!(range_pair_after_high(10.0, 5.0), (10.0, 10.0));
         assert_eq!(range_pair_after_high(10.0, 50.0), (10.0, 50.0));
-        let _: Element<'_, ()> =
-            progress(0.2, None, tok, role("p", Role::Progress).with_value("0.2"));
+        let _: Element<'_, ()> = progress(
+            0.2,
+            None,
+            None,
+            tok,
+            role("p", Role::Progress).with_value("0.2"),
+        );
         let _: Element<'_, ()> = progress(
             0.5,
+            Some(0.8),
             Some("50% · 1 min"),
             tok,
             role("pc", Role::Progress).with_value("0.5"),
@@ -5307,9 +5383,17 @@ mod tests {
         );
         let mut tabs = Tabs::new(["A", "B"]);
         tabs.closable = true;
-        let _: Element<'_, ()> = tab_bar(&tabs, |_| (), |_| (), tok, role("tabs", Role::Tab));
+        let _: Element<'_, ()> =
+            tab_bar(&tabs, |_| (), |_| (), 120.0, tok, role("tabs", Role::Tab));
         let open_tabs = Tabs::new(["A"]);
-        let _: Element<'_, ()> = tab_bar(&open_tabs, |_| (), |_| (), tok, role("tabs", Role::Tab));
+        let _: Element<'_, ()> = tab_bar(
+            &open_tabs,
+            |_| (),
+            |_| (),
+            0.0,
+            tok,
+            role("tabs", Role::Tab),
+        );
         let acc = Accordion { open: Some(0) };
         let _: Element<'_, ()> = accordion_view(
             &["A".into()],
@@ -6110,6 +6194,7 @@ mod tests {
             0.0..=1.0,
             0.5,
             |_| (),
+            SliderMarks::NONE,
             tok,
             A11y::new("off", Role::Slider).with_disabled(true),
         );
@@ -6192,12 +6277,167 @@ mod tests {
             crate::select::MarkdownPointer::Move(0.0),
         );
         st = crate::select::markdown_select(&doc.items, st, crate::select::MarkdownPointer::Press);
+        let end_y = doc
+            .items
+            .iter()
+            .map(crate::select::markdown_item_extent)
+            .sum::<f32>();
         st = crate::select::markdown_select(
             &doc.items,
             st,
-            crate::select::MarkdownPointer::Move(80.0),
+            crate::select::MarkdownPointer::Move(end_y),
         );
-        assert!(!st.span.is_empty() || st.dragging);
+        let mut painted: Element<'_, crate::select::MarkdownPointer> = markdown_view(
+            &doc.items,
+            Some(&st.span),
+            |ev| ev,
+            tok,
+            |_| crate::select::MarkdownPointer::Release,
+            A11y::new("md-span", Role::Group),
+        );
+        draw_once(&mut painted);
+        assert!(st.span.text(&doc.items).contains("Title"));
+        assert!(st.span.text(&doc.items).contains("First"));
+    }
+
+    #[test]
+    fn list_slots_and_table_checks_still_virtualize() {
+        let tok = named("dark").tokens;
+        let list = VecList {
+            items: (0..40)
+                .map(|i| {
+                    crate::collection::ListRow::new(format!("r{i}"))
+                        .with_leading(crate::collection::RowSlot::Check(i == 0))
+                        .with_trailing(crate::collection::RowSlot::Icon(Icon::Search))
+                })
+                .collect(),
+        };
+        let win = VisibleWindow::new(120.0);
+        let mut el: Element<'_, usize> = list_view(
+            &list,
+            &Sel::None,
+            |i| i,
+            tok,
+            win,
+            24.0,
+            2,
+            |_| 0,
+            "Empty",
+            |_| tok.muted,
+            None,
+            RowFace::FLUSH,
+            |i| i,
+            A11y::new("slotted", Role::List),
+        );
+        draw_once(&mut el);
+        let empty_model = VecList::default();
+        let mut empty_slots: Element<'_, ()> = list_view(
+            &empty_model,
+            &Sel::None,
+            |_| (),
+            tok,
+            win,
+            24.0,
+            0,
+            |_| (),
+            "Empty",
+            |_| tok.muted,
+            None,
+            RowFace::FLUSH,
+            |_| (),
+            A11y::new("empty-slots", Role::List),
+        );
+        draw_once(&mut empty_slots);
+        let table = TableModel {
+            headers: vec!["N".into()],
+            rows: (0..40).map(|i| vec![format!("{i}")]).collect(),
+            sort_col: None,
+            sort_asc: true,
+            checks: (0..40).map(|i| i % 2 == 0).collect(),
+        };
+        let cols = crate::collection::ColumnLayout::new(vec![80.0]);
+        let mut dt: Element<'_, usize> = data_table(
+            &table,
+            &Sel::None,
+            None,
+            &cols,
+            false,
+            win,
+            24.0,
+            2,
+            |_, _| 0,
+            |_| 0,
+            |_| 0,
+            |_| 0,
+            |i| i,
+            tok,
+            A11y::new("checks", Role::Table),
+        );
+        draw_once(&mut dt);
+        let _: Element<'_, ()> = themed_slider(
+            0.0..=1.0,
+            0.2,
+            |_| (),
+            SliderMarks {
+                ticks: 3,
+                min: "lo",
+                max: "hi",
+            },
+            tok,
+            A11y::new("ticked", Role::Slider),
+        );
+        let _: Element<'_, ()> = themed_slider(
+            0.0..=1.0,
+            0.2,
+            |_| (),
+            SliderMarks::NONE,
+            tok,
+            A11y::new("plain", Role::Slider).with_disabled(true),
+        );
+        let mut buf: Element<'_, ()> = progress(
+            0.3,
+            Some(0.6),
+            Some("30% · 4s"),
+            tok,
+            A11y::new("buf", Role::Progress),
+        );
+        draw_once(&mut buf);
+        let mut zero: Element<'_, ()> =
+            progress(0.0, Some(0.0), None, tok, A11y::new("zero", Role::Progress));
+        draw_once(&mut zero);
+        let tabs = Tabs::new(["A", "B", "C", "D", "E"]).with_badge(0, "2");
+        let mut ov: Element<'_, usize> =
+            tab_bar(&tabs, |i| i, |_| 0, 80.0, tok, A11y::new("ov", Role::Tab));
+        draw_once(&mut ov);
+        let _: Element<'_, usize> =
+            tab_bar(&tabs, |i| i, |_| 0, 0.0, tok, A11y::new("all", Role::Tab));
+        assert_eq!(tab_overflow_index(&tabs.titles, "C"), 2);
+        assert_eq!(tab_overflow_index(&tabs.titles, "nope"), 0);
+        assert_eq!(tab_visible_count(&[], 100.0), 0);
+        assert_eq!(tab_visible_count(&tabs.titles, 0.0), 5);
+        assert!(tab_visible_count(&tabs.titles, 80.0) < 5);
+        assert_eq!(tab_visible_count(&["A".into()], 10.0), 1);
+        let dead_slots = VecList {
+            items: vec![crate::collection::ListRow::new("x")
+                .with_leading(crate::collection::RowSlot::Check(true))],
+        };
+        let mut dead_check: Element<'_, ()> = list_view(
+            &dead_slots,
+            &Sel::None,
+            |_| (),
+            tok,
+            win,
+            24.0,
+            0,
+            |_| (),
+            "Empty",
+            |_| tok.muted,
+            None,
+            RowFace::FLUSH,
+            |_| (),
+            A11y::new("dead-check", Role::List).with_disabled(true),
+        );
+        draw_once(&mut dead_check);
     }
 
     #[test]
@@ -6514,7 +6754,7 @@ mod tests {
             |_| tok.muted,
             None,
             RowFace::FLUSH,
-            |_| window,
+            |_| sep_win,
             A11y::new("sep-list", Role::List),
         );
         let mut sep_tree = Tree::new(sep_el.as_widget());
@@ -6940,6 +7180,110 @@ mod tests {
     }
 
     #[test]
+    fn checkbox_indeterminate_and_range_slider_emit() {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::mouse;
+        use iced::{Event, Font, Pixels, Point, Rectangle, Size};
+        let tok = named("dark").tokens;
+        let press = |el: &mut Element<'_, CheckState>, at: Point| {
+            let mut tree = Tree::new(el.as_widget());
+            let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+                Font::DEFAULT,
+                Pixels::from(16u32),
+            ));
+            let limits = Limits::new(Size::ZERO, Size::new(240.0, 80.0));
+            let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+            let layout = Layout::new(&node);
+            let viewport = Rectangle::new(Point::ORIGIN, Size::new(240.0, 80.0));
+            let mut clipboard = clipboard::Null;
+            let mut messages = Vec::new();
+            {
+                let mut shell = iced::advanced::Shell::new(&mut messages);
+                el.as_widget_mut().update(
+                    &mut tree,
+                    &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                    layout,
+                    mouse::Cursor::Available(at),
+                    &renderer,
+                    &mut clipboard,
+                    &mut shell,
+                    &viewport,
+                );
+            }
+            messages
+        };
+        let mut box_el: Element<'_, CheckState> = checkbox_indeterminate(
+            "all",
+            CheckState::Unchecked,
+            |s| s,
+            tok,
+            A11y::new("all", Role::Checkbox),
+        );
+        assert!(!press(&mut box_el, Point::new(8.0, 8.0)).is_empty());
+        let mut range_el: Element<'_, (f32, f32)> = range_slider(
+            0.0..=100.0,
+            20.0,
+            80.0,
+            |pair| pair,
+            tok,
+            A11y::new("span", Role::Slider),
+        );
+        let mut tree = Tree::new(range_el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(240.0, 80.0));
+        let node = range_el
+            .as_widget_mut()
+            .layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let viewport = Rectangle::new(Point::ORIGIN, Size::new(240.0, 80.0));
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            range_el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(Point::new(40.0, 8.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+            range_el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::CursorMoved {
+                    position: Point::new(80.0, 8.0),
+                }),
+                layout,
+                mouse::Cursor::Available(Point::new(80.0, 8.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+            range_el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::CursorMoved {
+                    position: Point::new(80.0, 48.0),
+                }),
+                layout,
+                mouse::Cursor::Available(Point::new(80.0, 48.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        let _ = messages;
+    }
+
+    #[test]
     fn disabled_radio_does_not_emit_on_press() {
         use iced::advanced::clipboard;
         use iced::advanced::layout::{Layout, Limits};
@@ -6994,6 +7338,11 @@ mod tests {
             0.0..=1.0,
             0.5,
             |_| 1u8,
+            SliderMarks {
+                ticks: 4,
+                min: "0",
+                max: "1",
+            },
             tok,
             A11y::new("vol", Role::Slider).with_disabled(true),
         );

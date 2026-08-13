@@ -135,6 +135,7 @@ mod tests {
         ] {
             assert_eq!(c.shape(), Shape::None, "{c:?}");
             assert_eq!(c.shape().dp(), 0.0);
+            assert_eq!(std::hint::black_box(c.radius()).top_left, 0.0);
         }
     }
 }

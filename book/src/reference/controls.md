@@ -97,8 +97,9 @@ Constructor: [`widget::themed_slider`](https://docs.rs/icedtea/latest/icedtea/wi
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
-Pass min, max, and the current value. The message is the new value
-while the thumb moves. Disabled ignores drag.
+Pass min, max, and the current value. `SliderMarks` paints ticks and
+end labels. The message is the new value while the thumb moves.
+Disabled ignores drag.
 
 ### Segmented button
 

@@ -16,8 +16,9 @@ Constructor: [`widget::progress`](https://docs.rs/icedtea/latest/icedtea/widget/
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
-Pass the fraction. Values outside 0..=1 clamp. No message; it is a
-readout.
+Pass the fraction. Optional buffer is a second fill on the same track.
+`progress_label` builds the remaining-time copy. Values outside 0..=1
+clamp. No message; it is a readout.
 
 ### Progress ring
 

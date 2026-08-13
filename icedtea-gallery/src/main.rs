@@ -607,9 +607,9 @@ enum Message {
     MdJump(usize),
     MdLink(String),
     MdPointer(icedtea::select::MarkdownPointer),
-    Rail(usize),
     ListCheck(usize),
     TableCheck(usize),
+    Rail(usize),
     Note(String),
     Pad(&'static str),
     DismissChip(usize),
@@ -776,6 +776,8 @@ struct Gallery {
     editor: Content,
     fields: icedtea::field::Selectables,
     md: MarkdownDoc,
+    md_sel: icedtea::select::MarkdownSelect,
+    rail: usize,
     /// Virtual window for the List page only (not list-detail).
     list_window: VisibleWindow,
     /// Virtual window for list-detail (full seed; must not stomp List page).
@@ -789,8 +791,6 @@ struct Gallery {
     opt_sel: Selection,
     md_jump: Option<usize>,
     md_heads: Vec<icedtea::widget::MdHeading>,
-    md_sel: icedtea::select::MarkdownSelect,
-    rail: usize,
     note: String,
     chips: Vec<String>,
     wrap_chips: Vec<String>,
@@ -842,7 +842,9 @@ struct Gallery {
 impl Gallery {
     fn new(direction: Direction) -> (Self, Task<Message>) {
         let tokens = theme::named("dark").tokens;
-        let mut tabs = Tabs::new(["Notes", "Guide", "Changelog"]);
+        let mut tabs = Tabs::new(["Notes", "Guide", "Changelog", "Archive", "Drafts"])
+            .with_badge(0, "2")
+            .with_badge(1, "9");
         tabs.closable = true;
         let mut actions = ActionTable::new();
         actions.insert(
@@ -1628,10 +1630,6 @@ impl Gallery {
                     self.note = self.md_sel.span.text(&self.md.items);
                 }
             }
-            Message::Rail(i) => {
-                self.rail = i;
-                self.note = format!("Rail {i}");
-            }
             Message::ListCheck(i) => {
                 if let Some(row) = self.list.items.get_mut(i) {
                     row.leading = match row.leading {
@@ -1641,6 +1639,9 @@ impl Gallery {
                         other => other,
                     };
                 }
+                if let Some(on) = self.table.checks.get_mut(i) {
+                    let _ = on;
+                }
                 self.note = format!("Check {i}");
             }
             Message::TableCheck(i) => {
@@ -1648,6 +1649,10 @@ impl Gallery {
                     *on = !*on;
                 }
                 self.note = format!("Row {i}");
+            }
+            Message::Rail(i) => {
+                self.rail = i;
+                self.note = format!("Rail {i}");
             }
             Message::Note(s) => self.note = s,
             Message::Pad(key) => match key {
@@ -2577,6 +2582,11 @@ impl Gallery {
                     0.0..=1.0,
                     self.value,
                     Message::Slide,
+                    widget::SliderMarks {
+                        ticks: 5,
+                        min: "0",
+                        max: "1",
+                    },
                     tok,
                     named("value", Role::Slider).with_value(self.value.to_string()),
                 ),
@@ -2635,12 +2645,16 @@ impl Gallery {
                 tok,
                 named("tri", Role::Checkbox),
             ),
-            "progress" => widget::progress(
-                self.value,
-                Some(&widget::progress_label(self.value, Some("1 min"))),
-                tok,
-                named("progress", Role::Progress).with_value(self.value.to_string()),
-            ),
+            "progress" => {
+                let copy = widget::progress_label(self.value, Some("1 min"));
+                widget::progress(
+                    self.value,
+                    Some((self.value + 0.2).min(1.0)),
+                    Some(copy.as_str()),
+                    tok,
+                    named("progress", Role::Progress).with_value(self.value.to_string()),
+                )
+            }
             "progress-ring" => widget::progress_ring(
                 self.value,
                 Some(&widget::progress_label(self.value, None)),
@@ -3594,6 +3608,7 @@ impl Gallery {
                     &self.pinned,
                     Message::PinTab,
                     |_| Message::Nop,
+                    self.window_width.max(320.0),
                     tok,
                     named("tabs-pinned", Role::Tab),
                 ),
@@ -3602,6 +3617,7 @@ impl Gallery {
                     &self.tabs,
                     Message::Tab,
                     Message::CloseTab,
+                    220.0,
                     tok,
                     named("tabs", Role::Tab),
                 ),
@@ -4333,7 +4349,7 @@ impl Gallery {
                             self.rail,
                             Message::Rail,
                             tok,
-                            named("places-rail", Role::List),
+                            named("rail", Role::List),
                         ),
                         place("home", "Mail"),
                         place("files", "Files"),
@@ -4760,6 +4776,7 @@ fn handled_ids() -> &'static [&'static str] {
         "workspace",
         "tool-panel",
         "drawer",
+        "nav-rail",
         "navigation",
         "tab-view",
         "preferences",

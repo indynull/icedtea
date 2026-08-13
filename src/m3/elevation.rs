@@ -74,5 +74,6 @@ mod tests {
         assert!(Elevation::Level1.shadow().blur_radius > 0.0);
         assert!(Elevation::Raised.shadow().blur_radius > 0.0);
         assert!(Elevation::Level5.shadow().blur_radius >= Elevation::Level3.shadow().blur_radius);
+        let _ = Elevation::Level4.shadow();
     }
 }
