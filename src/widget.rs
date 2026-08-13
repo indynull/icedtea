@@ -3790,8 +3790,10 @@ pub fn tab_bar<'a, M: Clone + 'a>(
     a11y::attach(r.into(), &a11y)
 }
 
-/// Title on the start edge, `Icon::Chevron` on the end. Open rotates
-/// the chevron 180° (dropdown face).
+/// Title on the start edge, disclosure mark on the end.
+///
+/// Closed: ▸ (right). Open: ▾ (down). Same twisty as folders and tree
+/// rows — not a 180° flip of a down chevron (that painted as ^ open).
 fn disclosure_header<'a, M: Clone + 'a>(
     title: impl Into<String>,
     open: bool,
@@ -3801,19 +3803,14 @@ fn disclosure_header<'a, M: Clone + 'a>(
     inset: Padding,
 ) -> Element<'a, M> {
     let title = title.into();
-    let angle = if open { std::f32::consts::PI } else { 0.0 };
-    let handle = svg::Handle::from_memory(Icon::Chevron.bytes());
-    let chevron = svg(handle)
-        .width(16.0)
-        .height(16.0)
-        .rotation(angle)
-        .style(icon_style(tok));
+    // Unicode disclosure triangles (tree_view / Finder / VS Code style).
+    let mark = if open { "▾" } else { "▸" };
     let face = row![
         text(title.clone())
             .size(typo::BODY)
             .color(tok.text)
             .width(Length::Fill),
-        chevron,
+        text(mark).size(typo::BODY).color(tok.muted),
     ]
     .spacing(8)
     .align_y(Alignment::Center)
@@ -6605,9 +6602,10 @@ mod tests {
             .split("pub fn accordion_view")
             .next()
             .unwrap();
-        assert!(head.contains("Icon::Chevron"));
         assert!(head.contains("Length::Fill"));
-        assert!(!head.contains("▾"));
+        // Closed ▸ / open ▾ (not a 180°-rotated SVG that reads as ^).
+        assert!(head.contains("▾"));
+        assert!(head.contains("▸"));
     }
 
     #[test]
