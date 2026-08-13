@@ -393,6 +393,11 @@ pub const MAP: &[MapRow] = &[
         fate: Fate::Desktop,
     },
     MapRow {
+        id: "nav-rail",
+        m3: "Navigation rail",
+        fate: Fate::Map,
+    },
+    MapRow {
         id: "navigation",
         m3: "Navigation",
         fate: Fate::Map,

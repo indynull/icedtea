@@ -693,6 +693,63 @@ pub fn navigation_view<'a, M: Clone + 'a>(
     }
 }
 
+/// Compact destination rail beside content (desktop map of M3 navigation rail).
+///
+/// Selected row uses `style::nav_rail`. Press emits the destination index.
+/// Empty `items` is an empty column.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::pattern;
+/// use icedtea::theme;
+/// let tok = theme::named("dark").tokens;
+/// let on_pick = |i| i;
+/// let _: icedtea::Element<'_, usize> = pattern::nav_rail(
+///     ["Inbox", "Sent"],
+///     0,
+///     on_pick,
+///     tok,
+///     A11y::new("rail", Role::List),
+/// );
+/// ```
+pub fn nav_rail<'a, M: Clone + 'a>(
+    items: impl IntoIterator<Item = impl Into<String>>,
+    selected: usize,
+    on_select: impl Fn(usize) -> M + Copy + 'a,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let items: Vec<String> = items.into_iter().map(Into::into).collect();
+    let mut col = Column::new().spacing(4).width(Length::Fill);
+    for (i, title) in items.iter().enumerate() {
+        let on = i == selected;
+        let face = container(crate::widget::themed_button(
+            title.clone(),
+            if a11y.disabled {
+                None
+            } else {
+                Some(on_select(i))
+            },
+            tok,
+            if on { Variant::Quiet } else { Variant::Ghost },
+            A11y::button(title.clone())
+                .with_checked(on)
+                .with_disabled(a11y.disabled),
+        ))
+        .width(Length::Fill)
+        .style(move |_| style::nav_rail(tok, on));
+        col = col.push(face);
+    }
+    crate::a11y::attach(
+        container(col)
+            .width(72)
+            .padding(8)
+            .style(move |_| style::panel(tok))
+            .into(),
+        &a11y,
+    )
+}
+
 /// Tabs plus a filling body.
 ///
 /// Select and close messages. The application paints the body for the
@@ -1578,6 +1635,32 @@ mod tests {
     use crate::action::Action;
     use crate::shortcut::Shortcut;
     use crate::theme::named;
+
+    #[test]
+    fn nav_rail_builds_selected_and_empty() {
+        let tok = crate::theme::named("dark").tokens;
+        let _: Element<'_, usize> = nav_rail(
+            ["Inbox", "Sent"],
+            0,
+            |i| i,
+            tok,
+            A11y::new("rail", Role::List),
+        );
+        let _: Element<'_, usize> = nav_rail(
+            ["Inbox"],
+            1,
+            |i| i,
+            tok,
+            A11y::new("rail-off", Role::List).with_disabled(true),
+        );
+        let _: Element<'_, usize> = nav_rail(
+            Vec::<String>::new(),
+            0,
+            |i| i,
+            tok,
+            A11y::new("rail-empty", Role::List).with_disabled(true),
+        );
+    }
 
     #[test]
     fn sectioned_cascade_and_side_sheet_build() {

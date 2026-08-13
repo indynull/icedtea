@@ -602,6 +602,7 @@ enum Message {
     MdJump(usize),
     MdLink(String),
     MdPointer(icedtea::select::MarkdownPointer),
+    Rail(usize),
     Note(String),
     Pad(&'static str),
     DismissChip(usize),
@@ -782,6 +783,7 @@ struct Gallery {
     md_jump: Option<usize>,
     md_heads: Vec<icedtea::widget::MdHeading>,
     md_sel: icedtea::select::MarkdownSelect,
+    rail: usize,
     note: String,
     chips: Vec<String>,
     wrap_chips: Vec<String>,
@@ -1016,6 +1018,7 @@ impl Gallery {
             },
             md,
             md_sel: icedtea::select::MarkdownSelect::default(),
+            rail: 0,
             list_window: VisibleWindow::new(400.0),
             list_detail_window: VisibleWindow::new(400.0),
             table_window: VisibleWindow::new(360.0),
@@ -1616,6 +1619,10 @@ impl Gallery {
                 if !self.md_sel.span.is_empty() {
                     self.note = self.md_sel.span.text(&self.md.items);
                 }
+            }
+            Message::Rail(i) => {
+                self.rail = i;
+                self.note = format!("Rail {i}");
             }
             Message::Note(s) => self.note = s,
             Message::Pad(key) => match key {
@@ -4249,6 +4256,13 @@ impl Gallery {
                 layout::fixed(260.0),
                 tok,
             ),
+            "nav-rail" => pattern::nav_rail(
+                ["Inbox", "Sent", "Drafts"],
+                self.rail,
+                Message::Rail,
+                tok,
+                named("rail", Role::List),
+            ),
             "navigation" => {
                 let here = self.nav.current();
                 let place = |id: &'static str, title: &'static str| {
@@ -4286,6 +4300,13 @@ impl Gallery {
                 pattern::navigation_view(
                     column![
                         widget::label("Places", tok, named("Places", Role::Header)),
+                        pattern::nav_rail(
+                            ["Mail", "Files", "Settings"],
+                            self.rail,
+                            Message::Rail,
+                            tok,
+                            named("places-rail", Role::List),
+                        ),
                         place("home", "Mail"),
                         place("files", "Files"),
                         place("settings", "Settings"),

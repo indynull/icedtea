@@ -77,6 +77,18 @@ Constructor: [`pattern::tool_panel`](https://docs.rs/icedtea/latest/icedtea/patt
 Title plus body. `on_dock` is the Dock control. Empty body is title
 chrome only.
 
+### Navigation rail
+
+**`nav-rail`** — Compact destination list beside content.
+
+Constructor: [`pattern::nav_rail`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.nav_rail.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
+[icedtea](https://crates.io/crates/icedtea)
+
+Selected row uses the rail wash. Press emits the destination index.
+Empty items paint an empty column.
+
 ### Navigation view
 
 **`navigation`** — Sidebar beside content, or a stack with Back.

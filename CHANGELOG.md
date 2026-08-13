@@ -3,7 +3,8 @@
 ## Unreleased
 
 `markdown_view` drag-selects across blocks via `select::markdown_select`
-and `MarkdownSpan` (layout stays structured).
+and `MarkdownSpan` (layout stays structured). Navigation rail is
+`pattern::nav_rail`.
 
 Desktop Material controls: segmented button, icon button, range slider,
 indeterminate checkbox (`CheckState`), field supporting/error text,
