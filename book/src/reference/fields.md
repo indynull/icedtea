@@ -53,11 +53,14 @@ Constructor: [`widget::value_field`](https://docs.rs/icedtea/latest/icedtea/widg
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Meta label, selectable value, optional Copy `Action`. Bind the text
-with `field::Selectables` (`get` is `Option`, unbound `perform` is a
-no-op). Mono face for paths and ids. Same select-and-copy contract as
-body and code: app-owned buffer, `select_only`, range via
-`Content::selection()` and `icedtea::copy_text`. See
+Meta label in a fixed gutter, selectable value (fill), optional Copy
+`Action`. Pass `layout::FORM_LABEL` (140px, same as `layout::form`) so
+stacked rows align; pass another width when the stack needs a wider
+gutter. Bind the text with `field::Selectables` (`get` is `Option`,
+unbound `perform` is a no-op). Mono face for paths and ids. Same
+select-and-copy contract as body and code: app-owned buffer,
+`select_only`, range via `Content::selection()` and
+`icedtea::copy_text`. See
 [Content: Select and copy](content.md#select-and-copy) and
 [`select`](https://docs.rs/icedtea/latest/icedtea/select/index.html).
 

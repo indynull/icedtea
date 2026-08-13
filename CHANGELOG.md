@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+`value_field` takes `label_width` so multi-row stacks share a gutter;
+pass `layout::FORM_LABEL` (140px, same as `layout::form`).
+
+`themed_slider` steps continuous ranges (~100 positions) so a `0..=1`
+drag is not stuck on the endpoints. `progress` fills its host and uses
+an 8px girth; `progress_ring` track mixes text into surface. Lists and
+tables paint through `ClipLayer` (scissor) so virtual panes do not bleed.
+`split_button` takes overflow rows and opens them from a chevron menu.
+`collection::page_range` / `page_count` page application-owned sets.
+`list_detail` pads the list rail and detail inset. Gallery list page:
+search, Unread/Flagged buckets, and pagination over a 1000-row seed;
+list and list-detail keep separate selection and scroll windows.
+
 `pattern::modal_card` takes tokens and paints a black dim wash over the
 scene. `virtual_column` clamps each mounted row to its height so open
 faces grow. `selectable` paints on a transparent field (value rows no

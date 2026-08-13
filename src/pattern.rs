@@ -1509,6 +1509,12 @@ mod tests {
         let dead_res: Vec<&Action<()>> = disabled.iter().collect();
         let _: Element<'_, ()> =
             command_palette_view("q", &dead_res, 0, |_| (), |_| (), None, |_| (), None, tok);
+        // Long hit lists scroll inside a fixed height (n > 12).
+        let mut many = ActionTable::new();
+        for i in 0..20 {
+            many.insert(Action::new(format!("cmd.{i}"), format!("Command {i}"), ()));
+        }
+        let many_res: Vec<&Action<()>> = many.iter().collect();
         let _: Element<'_, ()> = status_page("Empty", "Nothing", Some(("New".into(), ())), tok);
         let _: Element<'_, ()> = status_page("Empty", "Nothing", None, tok);
         let _: Element<'_, ()> = about_page("App", "0.1.0", "MIT", "us", tok, &cat);
@@ -1567,6 +1573,9 @@ mod tests {
         paint(&mut sb);
         let mut pal = command_palette_view("", &res, 0, |_| (), |_| (), None, |_| (), None, tok);
         paint(&mut pal);
+        let mut many_pal =
+            command_palette_view("c", &many_res, 0, |_| (), |_| (), None, |_| (), None, tok);
+        paint(&mut many_pal);
         let ask = crate::palette::Prompt {
             action: "go.line".into(),
             label: "Line".into(),

@@ -217,6 +217,7 @@ fn page_fills(page: &str) -> bool {
         page,
         "code"
             | "tree"
+            | "list"
             | "list-detail"
             | "table"
             | "log"
@@ -245,13 +246,13 @@ fn page_job(page: &str) -> &'static str {
         "code" => "Highlighted source. Select a range and copy.",
         "image" => "The slot keeps its box while loading or on error.",
         "selectable" => "Body text the user can drag-select and copy.",
-        "list" => "Virtualized rows. Cards wrap a long title; flush rows are one line.",
+        "list" => "Search and Unread/Flagged at the top filter the virtualized list. Pagination pages a large set.",
         "virtual-column" => "App-built expand cards; only the viewport slice mounts.",
         "log" => "Virtualized lines for a growing log.",
         "grid" => "Tiles that share a row height.",
         "table" => "Columns stay in layout order. Frozen leading columns stay in view.",
         "tree" => "Folders expand in place. Leaves select.",
-        "sections" => "Tabs, an accordion, an expander, and pagination.",
+        "sections" => "Tabs, an accordion, and an expander.",
         "theme" => "Named colorways. Follow the desktop light/dark pair and accent.",
         "colors" => "Semantic tokens and mixes. These are the paints widgets use.",
         "keys" => "The action table drives shortcuts. The cheatsheet lists them.",
@@ -326,6 +327,21 @@ fn sample_mail(i: usize) -> ListRow {
         _ => "Last week",
     })
 }
+
+/// Unread / flagged flags for sample mail row `i` (same seed as [`sample_mail`]).
+fn sample_mail_flags(i: usize) -> (bool, bool) {
+    (i % 3 != 0, i % 5 == 0)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ListBucket {
+    All,
+    Unread,
+    Flagged,
+}
+
+/// Rows per page for the List + Pagination demo. Application owns paging.
+const LIST_PER_PAGE: usize = 25;
 
 fn list_meter(i: usize) -> f32 {
     ((i % 5) as f32 + 1.0) / 5.0
@@ -405,7 +421,7 @@ fn tour_caption_for(page: &str) -> &'static str {
         "code" => "Code: select and copy",
         "image" => "Image: slot keeps its box",
         "selectable" => "Selectable: drag to copy",
-        "list" => "List: cards and variable height",
+        "list" => "List: cards, filters, and pagination",
         "log" => "Log: virtualized lines",
         "grid" => "Item grid: shared row tiles",
         "table" => "Table: frozen leading columns",
@@ -567,6 +583,8 @@ enum Message {
     Expand(bool),
     Page(usize),
     Sort(usize),
+    ListFilter(String),
+    ListBucket(ListBucket),
     Tree(u64),
     TreeSelect(u64),
     ListScroll(VisibleWindow),
@@ -619,7 +637,6 @@ enum Message {
     AskLine,
     TableHScroll(f32),
     ListFace(bool),
-    OptScroll(VisibleWindow),
     FocusName,
     Secret(String),
     RevealSecret,
@@ -706,11 +723,26 @@ struct Gallery {
     tabs: Tabs,
     accordion: Accordion,
     expander_open: bool,
-    page_i: usize,
+    /// 0-based page index for the List + Pagination demo.
+    list_page: usize,
     table: TableModel,
     tree: TreeNode,
     tree_sel: Option<u64>,
+    /// Full mail seed; filter + page slice into [`Self::list`].
+    list_all: VecList,
+    /// (unread, flagged) parallel to `list_all`.
+    list_flags: Vec<(bool, bool)>,
+    list_filter: String,
+    list_bucket: ListBucket,
+    /// Rows matching the current filter (all pages).
+    list_matched: usize,
+    /// Current page of the List demo (what `list_view` paints).
     list: VecList,
+    /// Selection for the List page (indices into the current page slice).
+    list_sel: Selection,
+    /// Selection for list-detail (indices into `list_all`).
+    list_detail_sel: Selection,
+    /// Selection for the table demo (row indices into `table.rows`).
     sel: Selection,
     actions: ActionTable<Message>,
     nav: NavStack,
@@ -718,7 +750,10 @@ struct Gallery {
     editor: Content,
     fields: icedtea::field::Selectables,
     md: MarkdownDoc,
+    /// Virtual window for the List page only (not list-detail).
     list_window: VisibleWindow,
+    /// Virtual window for list-detail (full seed; must not stomp List page).
+    list_detail_window: VisibleWindow,
     table_window: VisibleWindow,
     table_cursor: (usize, usize),
     table_cols: icedtea::collection::ColumnLayout,
@@ -772,7 +807,6 @@ struct Gallery {
     drawer_open: bool,
     cheat_q: String,
     last_sel: Option<String>,
-    opt_window: VisibleWindow,
     list_heights: Vec<f32>,
     list_card: bool,
     vc_window: VisibleWindow,
@@ -854,7 +888,7 @@ impl Gallery {
             tabs,
             accordion: Accordion { open: Some(0) },
             expander_open: false,
-            page_i: 0,
+            list_page: 0,
             table: TableModel {
                 headers: vec!["Name".into(), "Role".into(), "Status".into(), "Path".into()],
                 rows: (0..1_000)
@@ -896,9 +930,18 @@ impl Gallery {
                 ],
             ),
             tree_sel: None,
+            list_all: VecList {
+                items: (0..1_000).map(sample_mail).collect(),
+            },
+            list_flags: (0..1_000).map(sample_mail_flags).collect(),
+            list_filter: String::new(),
+            list_bucket: ListBucket::All,
+            list_matched: 1_000,
             list: VecList {
                 items: (0..1_000).map(sample_mail).collect(),
             },
+            list_sel: Selection::Single(0),
+            list_detail_sel: Selection::Single(0),
             sel: Selection::Single(0),
             actions,
             nav: NavStack::new("home"),
@@ -950,6 +993,7 @@ impl Gallery {
             },
             md,
             list_window: VisibleWindow::new(400.0),
+            list_detail_window: VisibleWindow::new(400.0),
             table_window: VisibleWindow::new(360.0),
             table_cursor: (0, 0),
             table_cols: {
@@ -1053,7 +1097,6 @@ impl Gallery {
             drawer_open: true,
             cheat_q: String::new(),
             last_sel: None,
-            opt_window: VisibleWindow::new(140.0),
             list_heights: Vec::new(),
             list_card: true,
             vc_window: VisibleWindow::new(220.0),
@@ -1061,8 +1104,9 @@ impl Gallery {
             expand_open: None,
         };
         gallery.list_heights = list_row_heights(&gallery.list, gallery.list_card);
+        gallery.refresh_list_view();
         gallery.vc_heights =
-            icedtea::collection::expand_card_heights(gallery.list.len(), 52.0, &[]);
+            icedtea::collection::expand_card_heights(gallery.list_all.len(), 52.0, &[]);
         gallery.apply_theme_pref();
         gallery.clamp_nav();
         if tour_wanted() {
@@ -1106,6 +1150,74 @@ impl Gallery {
         self.pointer.x > side
     }
 
+    /// Rebuild the list page from `list_all` using search, bucket, and page.
+    /// Application owns filter + pagination; the list paints one page.
+    fn refresh_list_view(&mut self) {
+        let q = self.list_filter.to_ascii_lowercase();
+        let mut matched = Vec::new();
+        for (i, row) in self.list_all.items.iter().enumerate() {
+            let (unread, flagged) = self.list_flags.get(i).copied().unwrap_or((false, false));
+            match self.list_bucket {
+                ListBucket::All => {}
+                ListBucket::Unread if !unread => continue,
+                ListBucket::Flagged if !flagged => continue,
+                _ => {}
+            }
+            if !q.is_empty() {
+                let title_hit = row.title.to_ascii_lowercase().contains(&q);
+                let meta_hit = row
+                    .meta
+                    .as_ref()
+                    .is_some_and(|m| m.to_ascii_lowercase().contains(&q));
+                if !title_hit && !meta_hit {
+                    continue;
+                }
+            }
+            matched.push(row.clone());
+        }
+        self.list_matched = matched.len();
+        let pages = icedtea::collection::page_count(self.list_matched, LIST_PER_PAGE);
+        if pages == 0 {
+            self.list_page = 0;
+        } else if self.list_page >= pages {
+            self.list_page = pages - 1;
+        }
+        let range =
+            icedtea::collection::page_range(self.list_matched, self.list_page, LIST_PER_PAGE);
+        self.list = VecList {
+            items: matched[range].to_vec(),
+        };
+        self.list_heights = list_row_heights(&self.list, self.list_card);
+        let n = self.list.items.len();
+        if n == 0 {
+            self.list_sel = Selection::None;
+        } else if let Some(i) = self.list_sel.primary() {
+            if i >= n {
+                self.list_sel.select_single(n - 1);
+            }
+        }
+        let total: f32 = self.list_heights.iter().sum();
+        let vp = self.list_window.viewport.max(1.0);
+        let scroll = self.list_window.scroll.clamp(0.0, (total - vp).max(0.0));
+        let mut win = icedtea::collection::visible_window_var(
+            scroll,
+            vp,
+            &self.list_heights,
+            OVERSCAN,
+            self.list_sel.primary(),
+        );
+        if n > 0 && win.end <= win.start {
+            win = icedtea::collection::visible_window_var(
+                0.0,
+                vp,
+                &self.list_heights,
+                OVERSCAN,
+                self.list_sel.primary(),
+            );
+        }
+        self.list_window = win;
+    }
+
     fn field(&self, id: &str) -> &Content {
         self.fields
             .get(id)
@@ -1141,10 +1253,16 @@ impl Gallery {
     fn copy_value(&self) -> String {
         match self.page {
             "markdown" => self.md.source.clone(),
-            "list" | "list-detail" => self
-                .sel
+            "list" => self
+                .list_sel
                 .primary()
                 .and_then(|i| self.list.items.get(i))
+                .map(|r| r.title.clone())
+                .unwrap_or_default(),
+            "list-detail" => self
+                .list_detail_sel
+                .primary()
+                .and_then(|i| self.list_all.items.get(i))
                 .map(|r| r.title.clone())
                 .unwrap_or_default(),
             "table" => self
@@ -1411,14 +1529,24 @@ impl Gallery {
             }
             Message::Acc(i) => self.accordion.toggle(i),
             Message::Expand(open) => self.expander_open = open,
-            Message::Page(i) => self.page_i = i,
+            Message::Page(i) => {
+                self.list_page = i;
+                self.list_window.scroll = 0.0;
+                self.refresh_list_view();
+            }
             Message::Sort(c) => self.table.sort(c),
             Message::Tree(id) => {
                 let _ = icedtea::collection::tree_toggle(&mut self.tree, id);
                 fill_lazy_folder(&mut self.tree, id);
             }
             Message::TreeSelect(id) => self.tree_sel = Some(id),
-            Message::ListScroll(w) => self.list_window = w,
+            Message::ListScroll(w) => {
+                if self.page == "list-detail" {
+                    self.list_detail_window = w;
+                } else {
+                    self.list_window = w;
+                }
+            }
             Message::VcScroll(w) => self.vc_window = w,
             Message::ExpandCard(i) => {
                 self.expand_open = if self.expand_open == Some(i) {
@@ -1429,10 +1557,16 @@ impl Gallery {
                 let open: Vec<(usize, f32)> =
                     self.expand_open.map(|j| (j, 140.0)).into_iter().collect();
                 self.vc_heights =
-                    icedtea::collection::expand_card_heights(self.list.len(), 52.0, &open);
+                    icedtea::collection::expand_card_heights(self.list_all.len(), 52.0, &open);
             }
             Message::TableScroll(w) => self.table_window = w,
-            Message::ListSel(i) => self.sel.select_single(i),
+            Message::ListSel(i) => {
+                if self.page == "list-detail" {
+                    self.list_detail_sel.select_single(i);
+                } else {
+                    self.list_sel.select_single(i);
+                }
+            }
             Message::LogScroll(w) => self.log_window = w,
             Message::Mask(s) => self.mask = s,
             Message::SuggestPick(i) => {
@@ -1632,9 +1766,12 @@ impl Gallery {
                         self.table_cursor = (r, c);
                         self.sel.select_single(r);
                     } else if self.page == "list" {
-                        let next =
-                            press.step_index(self.sel.primary().unwrap_or(0), self.list.len(), 10);
-                        self.sel.select_single(next);
+                        let next = press.step_index(
+                            self.list_sel.primary().unwrap_or(0),
+                            self.list.len(),
+                            10,
+                        );
+                        self.list_sel.select_single(next);
                     }
                 }
             }
@@ -1708,9 +1845,20 @@ impl Gallery {
             Message::TableHScroll(x) => self.table_cols.set_h_scroll(x),
             Message::ListFace(card) => {
                 self.list_card = card;
-                self.list_heights = list_row_heights(&self.list, card);
+                self.refresh_list_view();
             }
-            Message::OptScroll(w) => self.opt_window = w,
+            Message::ListFilter(q) => {
+                self.list_filter = q;
+                self.list_page = 0;
+                self.list_window.scroll = 0.0;
+                self.refresh_list_view();
+            }
+            Message::ListBucket(b) => {
+                self.list_bucket = b;
+                self.list_page = 0;
+                self.list_window.scroll = 0.0;
+                self.refresh_list_view();
+            }
             Message::FocusName => {
                 return icedtea::iced::widget::operation::focus(icedtea::iced::widget::Id::new(
                     "gallery-name",
@@ -2211,7 +2359,7 @@ impl Gallery {
             }
             "split-button" => column![
                 widget::meta(
-                    "Primary action plus a more menu. Idle and disabled.",
+                    "Primary action plus a chevron menu. Idle and disabled.",
                     tok,
                     named("split-hint", Role::Status),
                 ),
@@ -2219,14 +2367,20 @@ impl Gallery {
                     widget::split_button(
                         "Save",
                         Message::Note("Save".into()),
-                        Message::Note("More".into()),
+                        [
+                            ("Save As…".into(), Message::Note("Save As…".into())),
+                            ("Export…".into(), Message::Note("Export…".into())),
+                        ],
                         tok,
                         btn("Save"),
                     ),
                     widget::split_button(
                         "Save",
                         Message::Note("Save".into()),
-                        Message::Note("More".into()),
+                        [
+                            ("Save As…".into(), Message::Note("Save As…".into())),
+                            ("Export…".into(), Message::Note("Export…".into())),
+                        ],
                         tok,
                         btn("Save off").with_disabled(true),
                     ),
@@ -2508,7 +2662,7 @@ impl Gallery {
                 let copy = Action::new("value.copy", "Copy", Message::CopyFields);
                 column![
                     widget::meta(
-                        "Labeled value. Select, then Copy.",
+                        "Labeled value with a shared form gutter. Select, then Copy.",
                         tok,
                         named("value-hint", Role::Status),
                     ),
@@ -2518,6 +2672,7 @@ impl Gallery {
                         |a| Message::Field("path", a),
                         Some(&copy),
                         icedtea::typo::FontFace::Mono,
+                        icedtea::layout::FORM_LABEL,
                         tok,
                         self.direction,
                         named("value-path", Role::Group),
@@ -2528,6 +2683,7 @@ impl Gallery {
                         |a| Message::Field("id", a),
                         None,
                         icedtea::typo::FontFace::Mono,
+                        icedtea::layout::FORM_LABEL,
                         tok,
                         self.direction,
                         named("value-id", Role::Group).with_disabled(true),
@@ -2657,7 +2813,7 @@ impl Gallery {
                 let copy = Action::new("edit.copy", "Copy", Message::CopyFields);
                 column![
                     widget::meta(
-                        "Inspector rows and a transcript. Copy posts the first selection.",
+                        "Inspector rows share a form label gutter. Copy posts the first selection.",
                         tok,
                         named("select-hint", Role::Status),
                     ),
@@ -2667,6 +2823,7 @@ impl Gallery {
                         |a| Message::Field("path", a),
                         Some(&copy),
                         icedtea::typo::FontFace::Mono,
+                        icedtea::layout::FORM_LABEL,
                         tok,
                         self.direction,
                         named("path", Role::Group),
@@ -2677,6 +2834,7 @@ impl Gallery {
                         |a| Message::Field("id", a),
                         Some(&copy),
                         icedtea::typo::FontFace::Mono,
+                        icedtea::layout::FORM_LABEL,
                         tok,
                         self.direction,
                         named("id", Role::Group),
@@ -2687,6 +2845,7 @@ impl Gallery {
                         |a| Message::Field("host", a),
                         None,
                         icedtea::typo::FontFace::Mono,
+                        icedtea::layout::FORM_LABEL,
                         tok,
                         self.direction,
                         named("host", Role::Group),
@@ -2697,6 +2856,7 @@ impl Gallery {
                         |a| Message::Field("clock", a),
                         None,
                         icedtea::typo::FontFace::Ui,
+                        icedtea::layout::FORM_LABEL,
                         tok,
                         self.direction,
                         named("clock", Role::Group),
@@ -3131,44 +3291,101 @@ impl Gallery {
                 tok,
                 named("docs", Role::Link),
             ),
-            "list" => column![
-                row![
-                    widget::themed_button(
-                        "Flush",
-                        Some(Message::ListFace(false)),
-                        tok,
-                        if self.list_card {
-                            Variant::Ghost
-                        } else {
-                            Variant::Quiet
-                        },
-                        btn("list-flush"),
-                    ),
-                    widget::themed_button(
-                        "Card",
-                        Some(Message::ListFace(true)),
-                        tok,
-                        if self.list_card {
-                            Variant::Quiet
-                        } else {
-                            Variant::Ghost
-                        },
-                        btn("list-card"),
-                    ),
-                ]
-                .spacing(8),
-                // Fixed height: multi-host list + virtual_column both used Fill
-                // and the main list collapsed to one row.
-                container(widget::list_view(
+            "list" => {
+                let range = icedtea::collection::page_range(
+                    self.list_matched,
+                    self.list_page,
+                    LIST_PER_PAGE,
+                );
+                let count = if self.list_matched == 0 {
+                    format!("0 / {}", self.list_all.len())
+                } else {
+                    format!(
+                        "{}–{} of {} (page {})",
+                        range.start + 1,
+                        range.end,
+                        self.list_matched,
+                        self.list_page + 1
+                    )
+                };
+                let filters = container(
+                    column![
+                        widget::search_input(
+                            &self.list_filter,
+                            Message::ListFilter,
+                            tok,
+                            named("list-filter", Role::TextBox),
+                        ),
+                        row![
+                            widget::themed_radio(
+                                "All",
+                                ListBucket::All,
+                                Some(self.list_bucket),
+                                Message::ListBucket,
+                                tok,
+                                named("list-all", Role::Radio)
+                                    .with_checked(self.list_bucket == ListBucket::All),
+                            ),
+                            widget::themed_radio(
+                                "Unread",
+                                ListBucket::Unread,
+                                Some(self.list_bucket),
+                                Message::ListBucket,
+                                tok,
+                                named("list-unread", Role::Radio)
+                                    .with_checked(self.list_bucket == ListBucket::Unread),
+                            ),
+                            widget::themed_radio(
+                                "Flagged",
+                                ListBucket::Flagged,
+                                Some(self.list_bucket),
+                                Message::ListBucket,
+                                tok,
+                                named("list-flagged", Role::Radio)
+                                    .with_checked(self.list_bucket == ListBucket::Flagged),
+                            ),
+                            Space::new().width(Length::Fill),
+                            widget::meta(count, tok, named("list-count", Role::Status)),
+                            widget::themed_radio(
+                                "One line",
+                                false,
+                                Some(self.list_card),
+                                Message::ListFace,
+                                tok,
+                                named("list-one-line", Role::Radio).with_checked(!self.list_card),
+                            ),
+                            widget::themed_radio(
+                                "Cards",
+                                true,
+                                Some(self.list_card),
+                                Message::ListFace,
+                                tok,
+                                named("list-cards", Role::Radio).with_checked(self.list_card),
+                            ),
+                        ]
+                        .spacing(12)
+                        .align_y(Alignment::Center),
+                    ]
+                    .spacing(8),
+                )
+                .width(Length::Fill)
+                .padding(Padding {
+                    top: 8.0,
+                    right: 10.0,
+                    bottom: 8.0,
+                    left: 10.0,
+                })
+                .style(move |_| icedtea::style::panel(tok));
+                let list = container(widget::list_view(
                     &self.list,
-                    &self.sel,
+                    &self.list_sel,
                     Message::ListSel,
                     tok,
                     self.list_window,
                     icedtea::collection::RowHeights::PerRow(&self.list_heights),
                     OVERSCAN,
                     Message::ListScroll,
-                    "No rows",
+                    "No messages match",
                     move |_| tok.muted,
                     Some(icedtea::iced::widget::Id::from("gallery-list")),
                     if self.list_card {
@@ -3180,30 +3397,17 @@ impl Gallery {
                     },
                     named("list", Role::List),
                 ))
-                .height(220),
-                widget::meta("Filter", tok, named("opt-hint", Role::Status),),
-                container(widget::list_view(
-                    &self.options,
-                    &self.opt_sel,
-                    Message::OptSel,
-                    tok,
-                    self.opt_window,
-                    36.0,
-                    1,
-                    Message::OptScroll,
-                    "No options",
-                    move |_| tok.muted,
-                    None,
-                    icedtea::collection::RowFace::FLUSH,
-                    named("options", Role::List),
-                ))
-                .height(110),
-            ]
-            .spacing(8)
-            .into(),
+                .width(Length::Fill)
+                .height(Length::Fill);
+                // Pagination is the next catalog section on this page.
+                column![filters, list]
+                    .spacing(0)
+                    .height(Length::Fill)
+                    .into()
+            }
             "virtual-column" => {
-                let titles: Vec<String> = (0..self.list.len())
-                    .map(|i| self.list.title(i).to_string())
+                let titles: Vec<String> = (0..self.list_all.len())
+                    .map(|i| self.list_all.title(i).to_string())
                     .collect();
                 let open_at = self.expand_open;
                 column![
@@ -3429,9 +3633,9 @@ impl Gallery {
                 )
             }
             "pagination" => widget::pagination(
-                40,
-                self.page_i,
-                10,
+                self.list_matched,
+                self.list_page,
+                LIST_PER_PAGE,
                 Message::Page,
                 tok,
                 named("pages", Role::Group),
@@ -3890,11 +4094,11 @@ impl Gallery {
             }
             "list-detail" => pattern::list_detail(
                 widget::list_view(
-                    &self.list,
-                    &self.sel,
+                    &self.list_all,
+                    &self.list_detail_sel,
                     Message::ListSel,
                     tok,
-                    self.list_window,
+                    self.list_detail_window,
                     48.0,
                     OVERSCAN,
                     Message::ListScroll,
@@ -3906,9 +4110,9 @@ impl Gallery {
                 ),
                 {
                     let title = self
-                        .sel
+                        .list_detail_sel
                         .primary()
-                        .and_then(|i| self.list.items.get(i))
+                        .and_then(|i| self.list_all.items.get(i))
                         .map(|row| row.title.as_str())
                         .unwrap_or("Select a message");
                     column![
@@ -3925,10 +4129,9 @@ impl Gallery {
                         ),
                     ]
                     .spacing(8)
-                    .padding(8)
                     .into()
                 },
-                layout::fixed(320.0),
+                layout::fixed(260.0),
                 tok,
             ),
             "navigation" => {
@@ -4646,7 +4849,7 @@ mod tests {
         }
         assert!(g.checked);
         assert!(g.on);
-        assert_eq!(g.sel.primary(), Some(2));
+        assert_eq!(g.list_sel.primary(), Some(2));
         assert!(g.expander_open);
     }
 
@@ -4705,7 +4908,7 @@ mod tests {
             icedtea::layout::CursorEvent::Context,
         ));
         assert!(g.context.is_some());
-        assert_eq!(g.sel.primary(), Some(3));
+        assert_eq!(g.list_sel.primary(), Some(3));
         let _ = g.view();
         let _ = g.update(super::Message::CopyValue);
         g.page = "markdown";

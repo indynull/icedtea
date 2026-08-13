@@ -339,6 +339,243 @@ where
     }
 }
 
+/// Chevron face of a split button: opens an iced overlay menu of `items`.
+pub fn split_more<'a, M: Clone + 'a>(
+    items: Vec<(String, M)>,
+    tok: Tokens,
+    disabled: bool,
+    height: f32,
+) -> Element<'a, M> {
+    SplitMore::new(items, tok, disabled, height).into()
+}
+
+struct SplitMore<'a, Message> {
+    labels: Vec<String>,
+    on_select: Box<dyn Fn(String) -> Message + 'a>,
+    tok: Tokens,
+    disabled: bool,
+    height: f32,
+    menu_class: menu::StyleFn<'a, Theme>,
+    last_status: Option<TitleStatus>,
+}
+
+impl<'a, Message: Clone + 'a> SplitMore<'a, Message> {
+    fn new(items: Vec<(String, Message)>, tok: Tokens, disabled: bool, height: f32) -> Self {
+        let labels: Vec<String> = items.iter().map(|(s, _)| s.clone()).collect();
+        let on_select = Box::new(move |option: String| {
+            items
+                .iter()
+                .find(|(s, _)| s == &option)
+                .map(|(_, m)| m.clone())
+                .expect("split menu option matches a label")
+        });
+        Self {
+            labels,
+            on_select,
+            tok,
+            disabled,
+            height,
+            menu_class: Box::new(style::overlay_menu_style(tok)),
+            last_status: None,
+        }
+    }
+}
+
+impl<'a, Message, Renderer> Widget<Message, Theme, Renderer> for SplitMore<'a, Message>
+where
+    Message: Clone + 'a,
+    Renderer: text::Renderer<Font = iced::Font> + iced::advanced::svg::Renderer + 'a,
+{
+    fn tag(&self) -> tree::Tag {
+        tree::Tag::of::<State>()
+    }
+
+    fn state(&self) -> tree::State {
+        tree::State::new(State::new())
+    }
+
+    fn size(&self) -> Size<Length> {
+        Size {
+            width: Length::Fixed(self.height),
+            height: Length::Fixed(self.height),
+        }
+    }
+
+    fn layout(
+        &mut self,
+        _tree: &mut Tree,
+        _renderer: &Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        let size = limits
+            .width(Length::Fixed(self.height))
+            .height(Length::Fixed(self.height))
+            .resolve(
+                Length::Fixed(self.height),
+                Length::Fixed(self.height),
+                Size::new(self.height, self.height),
+            );
+        layout::Node::new(size)
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        _renderer: &Renderer,
+        _clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        _viewport: &Rectangle,
+    ) {
+        if self.disabled || self.labels.is_empty() {
+            return;
+        }
+        let state = tree.state.downcast_mut::<State>();
+        match event {
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left))
+            | Event::Touch(touch::Event::FingerPressed { .. }) => {
+                let over = cursor.is_over(layout.bounds());
+                let next = press_open_state(state.is_open, over);
+                if next != state.is_open {
+                    state.is_open = next;
+                    if state.is_open {
+                        state.hovered_option = None;
+                    }
+                    shell.capture_event();
+                    shell.request_redraw();
+                }
+            }
+            Event::Keyboard(keyboard::Event::KeyPressed { key, .. })
+                if escape_closes(state.is_open)
+                    && matches!(key, keyboard::Key::Named(Named::Escape)) =>
+            {
+                state.is_open = false;
+                shell.capture_event();
+                shell.request_redraw();
+            }
+            _ => {}
+        }
+        let status = title_status(state.is_open, cursor.is_over(layout.bounds()));
+        if let Event::Window(window::Event::RedrawRequested(_)) = event {
+            self.last_status = Some(status);
+        } else if self.last_status.is_some_and(|last| last != status) {
+            shell.request_redraw();
+        }
+    }
+
+    fn mouse_interaction(
+        &self,
+        _tree: &Tree,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        _viewport: &Rectangle,
+        _renderer: &Renderer,
+    ) -> mouse::Interaction {
+        if !self.disabled && cursor.is_over(layout.bounds()) {
+            mouse::Interaction::Pointer
+        } else {
+            mouse::Interaction::default()
+        }
+    }
+
+    fn draw(
+        &self,
+        _tree: &Tree,
+        renderer: &mut Renderer,
+        _theme: &Theme,
+        _style: &renderer::Style,
+        layout: Layout<'_>,
+        _cursor: mouse::Cursor,
+        viewport: &Rectangle,
+    ) {
+        use crate::icon::Icon;
+        use iced::advanced::svg;
+
+        let bounds = layout.bounds();
+        let status = self.last_status.unwrap_or(TitleStatus::Active);
+        let fill = if self.disabled {
+            Color::TRANSPARENT
+        } else {
+            title_fill(self.tok, status)
+        };
+        renderer.fill_quad(
+            renderer::Quad {
+                bounds,
+                border: iced::Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: crate::chrome::Corner::Tight.radius(),
+                },
+                ..renderer::Quad::default()
+            },
+            Background::Color(fill),
+        );
+        // Fixed 16px chevron, centered — never pad-crush into round-cap dots.
+        let side = 16.0_f32.min(bounds.width).min(bounds.height);
+        let icon_bounds = Rectangle {
+            x: bounds.center_x() - side / 2.0,
+            y: bounds.center_y() - side / 2.0,
+            width: side,
+            height: side,
+        };
+        let handle = svg::Handle::from_memory(Icon::Chevron.bytes());
+        let color = if self.disabled {
+            self.tok.muted
+        } else {
+            self.tok.text
+        };
+        renderer.draw_svg(svg::Svg::new(handle).color(color), icon_bounds, *viewport);
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'_>,
+        renderer: &Renderer,
+        viewport: &Rectangle,
+        translation: Vector,
+    ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
+        if self.disabled || self.labels.is_empty() {
+            return None;
+        }
+        let state = tree.state.downcast_mut::<State>();
+        if !state.is_open {
+            return None;
+        }
+        let bounds = layout.bounds();
+        let font = renderer.default_font();
+        let pad = Padding::from(TITLE_PAD);
+        let width = overlay_list_width(&self.labels, pad, typo::BODY as f32);
+        let on_select = &self.on_select;
+        let menu = Menu::new(
+            &mut state.menu,
+            &self.labels,
+            &mut state.hovered_option,
+            |option| pick_and_close(&mut state.is_open, on_select, option),
+            None,
+            &self.menu_class,
+        )
+        .width(width)
+        .padding(pad)
+        .font(font)
+        .text_size(Pixels::from(typo::BODY));
+        Some(menu.overlay(
+            layout.position() + translation,
+            *viewport,
+            bounds.height,
+            Length::Shrink,
+        ))
+    }
+}
+
+impl<'a, Message: Clone + 'a> From<SplitMore<'a, Message>> for Element<'a, Message> {
+    fn from(value: SplitMore<'a, Message>) -> Self {
+        Self::new(value)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -394,6 +631,13 @@ mod tests {
         let empty: Element<'_, ()> = drop_menu("Help", vec!["About".into()], |_| (), tok);
         let _ = empty;
         assert!(overlay_list_width(&[] as &[&str], Padding::from(TITLE_PAD), 14.0) >= 160.0);
+        let _: Element<'_, u8> = split_more(
+            vec![("Save As…".into(), 1u8), ("Export…".into(), 2)],
+            tok,
+            false,
+            30.0,
+        );
+        let _: Element<'_, u8> = split_more(vec![], tok, true, 30.0);
     }
 
     fn key_press(named: Named) -> Event {
@@ -708,5 +952,256 @@ mod tests {
             &mut messages,
         );
         assert!(messages.is_empty());
+    }
+
+    #[test]
+    fn split_more_opens_overlay_and_selects() {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::Limits;
+        use iced::advanced::renderer::Style;
+        use iced::advanced::widget::{Tree, Widget};
+        use iced::Font;
+
+        let tok = named("dark").tokens;
+        let mut widget = SplitMore::new(
+            vec![("Save As…".into(), 1u8), ("Export…".into(), 2)],
+            tok,
+            false,
+            30.0,
+        );
+        let mut tree = Tree::new(&widget as &dyn Widget<u8, Theme, iced_tiny_skia::Renderer>);
+        let mut renderer = iced_tiny_skia::Renderer::new(Font::DEFAULT, Pixels::from(16u32));
+        let limits = Limits::new(Size::ZERO, Size::new(800.0, 600.0));
+        let node = Widget::<u8, Theme, iced_tiny_skia::Renderer>::layout(
+            &mut widget,
+            &mut tree,
+            &renderer,
+            &limits,
+        );
+        let layout = Layout::new(&node);
+        let bounds = layout.bounds();
+        let over = mouse::Cursor::Available(Point::new(
+            bounds.x + bounds.width / 2.0,
+            bounds.y + bounds.height / 2.0,
+        ));
+        let away = mouse::Cursor::Available(Point::new(400.0, 400.0));
+        let viewport = Rectangle::new(Point::ORIGIN, Size::new(800.0, 600.0));
+        let mut clipboard = clipboard::Null;
+        let style = Style::default();
+        let theme = Theme::Dark;
+
+        assert_eq!(
+            Widget::<u8, Theme, iced_tiny_skia::Renderer>::mouse_interaction(
+                &widget, &tree, layout, away, &viewport, &renderer,
+            ),
+            mouse::Interaction::default()
+        );
+        assert_eq!(
+            Widget::<u8, Theme, iced_tiny_skia::Renderer>::mouse_interaction(
+                &widget, &tree, layout, over, &viewport, &renderer,
+            ),
+            mouse::Interaction::Pointer
+        );
+
+        let mut messages = Vec::new();
+        {
+            let mut shell = Shell::new(&mut messages);
+            Widget::<u8, Theme, iced_tiny_skia::Renderer>::update(
+                &mut widget,
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                over,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+            Widget::<u8, Theme, iced_tiny_skia::Renderer>::update(
+                &mut widget,
+                &mut tree,
+                &Event::Window(window::Event::RedrawRequested(std::time::Instant::now())),
+                layout,
+                over,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        Widget::<u8, Theme, iced_tiny_skia::Renderer>::draw(
+            &widget,
+            &tree,
+            &mut renderer,
+            &theme,
+            &style,
+            layout,
+            over,
+            &viewport,
+        );
+        assert!(Widget::<u8, Theme, iced_tiny_skia::Renderer>::overlay(
+            &mut widget,
+            &mut tree,
+            layout,
+            &renderer,
+            &viewport,
+            Vector::ZERO,
+        )
+        .is_some());
+
+        {
+            let mut ov = Widget::<u8, Theme, iced_tiny_skia::Renderer>::overlay(
+                &mut widget,
+                &mut tree,
+                layout,
+                &renderer,
+                &viewport,
+                Vector::ZERO,
+            )
+            .expect("open overflow");
+            let node = ov
+                .as_overlay_mut()
+                .layout(&renderer, Size::new(800.0, 600.0));
+            let ol = Layout::new(&node);
+            let at = Point::new(ol.bounds().x + 8.0, ol.bounds().y + 8.0);
+            let cursor = mouse::Cursor::Available(at);
+            {
+                let mut shell = iced::advanced::Shell::new(&mut messages);
+                ov.as_overlay_mut().update(
+                    &Event::Mouse(mouse::Event::CursorMoved { position: at }),
+                    ol,
+                    cursor,
+                    &renderer,
+                    &mut clipboard,
+                    &mut shell,
+                );
+                ov.as_overlay_mut().update(
+                    &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                    ol,
+                    cursor,
+                    &renderer,
+                    &mut clipboard,
+                    &mut shell,
+                );
+            }
+        }
+        assert!(messages.contains(&1));
+
+        {
+            let mut shell = Shell::new(&mut messages);
+            Widget::<u8, Theme, iced_tiny_skia::Renderer>::update(
+                &mut widget,
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                over,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+            Widget::<u8, Theme, iced_tiny_skia::Renderer>::update(
+                &mut widget,
+                &mut tree,
+                &key_press(Named::Escape),
+                layout,
+                over,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+            Widget::<u8, Theme, iced_tiny_skia::Renderer>::update(
+                &mut widget,
+                &mut tree,
+                &Event::Touch(touch::Event::FingerPressed {
+                    id: touch::Finger(0),
+                    position: Point::new(bounds.x + 2.0, bounds.y + 2.0),
+                }),
+                layout,
+                over,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+
+        // Disabled and empty skip interaction.
+        let mut dead = SplitMore::new(vec![("X".into(), 9u8)], tok, true, 30.0);
+        let mut dead_tree = Tree::new(&dead as &dyn Widget<u8, Theme, iced_tiny_skia::Renderer>);
+        let dead_node = Widget::<u8, Theme, iced_tiny_skia::Renderer>::layout(
+            &mut dead,
+            &mut dead_tree,
+            &renderer,
+            &limits,
+        );
+        let dead_layout = Layout::new(&dead_node);
+        {
+            let mut shell = Shell::new(&mut messages);
+            Widget::<u8, Theme, iced_tiny_skia::Renderer>::update(
+                &mut dead,
+                &mut dead_tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                dead_layout,
+                over,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        Widget::<u8, Theme, iced_tiny_skia::Renderer>::draw(
+            &dead,
+            &dead_tree,
+            &mut renderer,
+            &theme,
+            &style,
+            dead_layout,
+            over,
+            &viewport,
+        );
+        assert!(Widget::<u8, Theme, iced_tiny_skia::Renderer>::overlay(
+            &mut dead,
+            &mut dead_tree,
+            dead_layout,
+            &renderer,
+            &viewport,
+            Vector::ZERO,
+        )
+        .is_none());
+
+        let mut empty = SplitMore::new(Vec::<(String, u8)>::new(), tok, false, 30.0);
+        let mut empty_tree = Tree::new(&empty as &dyn Widget<u8, Theme, iced_tiny_skia::Renderer>);
+        let empty_node = Widget::<u8, Theme, iced_tiny_skia::Renderer>::layout(
+            &mut empty,
+            &mut empty_tree,
+            &renderer,
+            &limits,
+        );
+        let empty_layout = Layout::new(&empty_node);
+        {
+            let mut shell = Shell::new(&mut messages);
+            Widget::<u8, Theme, iced_tiny_skia::Renderer>::update(
+                &mut empty,
+                &mut empty_tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                empty_layout,
+                over,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(Widget::<u8, Theme, iced_tiny_skia::Renderer>::overlay(
+            &mut empty,
+            &mut empty_tree,
+            empty_layout,
+            &renderer,
+            &viewport,
+            Vector::ZERO,
+        )
+        .is_none());
     }
 }

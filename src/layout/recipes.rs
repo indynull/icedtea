@@ -13,6 +13,14 @@ pub const FILL: Length = Length::Fill;
 /// Hug content on this axis.
 pub const SHRINK: Length = Length::Shrink;
 
+/// Default form label gutter (px). Stacked [`crate::widget::value_field`]
+/// rows and [`form`] share this so multi-row labels align.
+///
+/// ```
+/// assert_eq!(icedtea::layout::FORM_LABEL, 140.0);
+/// ```
+pub const FORM_LABEL: f32 = 140.0;
+
 /// Fixed length in pixels.
 ///
 /// ```
@@ -322,6 +330,8 @@ pub fn grid<'a, M: 'a>(cells: Vec<Element<'a, M>>, columns: usize, spacing: u32)
 }
 
 /// Form: label/field pairs stacked. RTL puts the field first.
+///
+/// Labels use [`FORM_LABEL`] so stacked rows share one gutter.
 pub fn form<'a, M: 'a>(
     rows_in: impl IntoIterator<Item = (Element<'a, M>, Element<'a, M>)>,
     spacing: u32,
@@ -329,7 +339,7 @@ pub fn form<'a, M: 'a>(
 ) -> Element<'a, M> {
     let mut col = Column::new().spacing(spacing);
     for (label, field) in rows_in {
-        let label = container(label).width(Length::Fixed(140.0));
+        let label = container(label).width(Length::Fixed(FORM_LABEL));
         let field = container(field).width(Length::Fill);
         let pair = match dir {
             Direction::Ltr => Row::new().push(label).push(field),
@@ -454,7 +464,8 @@ mod tests {
         assert_eq!(wrap_rows(3, 20.0, 4.0, 0.0), 1);
         let (def, min) = window_size_from_dock(DockSpec::default());
         assert!(def.width >= min.width);
-        let (l, f) = form_columns(400.0, 140.0);
+        assert_eq!(FORM_LABEL, 140.0);
+        let (l, f) = form_columns(400.0, FORM_LABEL);
         assert!(l >= 80.0 && f > 0.0);
         let card = overlay_card(iced::Size::new(800.0, 600.0), 640.0, 480.0);
         assert!(card.width <= 640.0);

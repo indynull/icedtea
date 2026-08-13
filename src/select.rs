@@ -281,6 +281,14 @@ mod tests {
         let multi = copy_range(&joined, start, end);
         assert!(multi.contains('A') && multi.contains('B') && multi.contains('C'));
         assert!(multi.matches('\n').count() >= 2);
+        // Fence with no line tokens still contributes the raw code body.
+        let bare: Vec<_> = markdown::parse("```\nplain code\n```").collect();
+        let bare_spans = markdown_document_spans(&bare, &settings);
+        let bare_joined: String = bare_spans.iter().map(|s| s.text.as_ref()).collect();
+        assert!(
+            bare_joined.contains("plain code"),
+            "empty line list falls back to code body: {bare_joined:?}"
+        );
     }
 
     #[test]

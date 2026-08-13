@@ -66,6 +66,8 @@ pub const ENTRIES: &[Entry] = &[
     // Virtual column first so open-face inject is above the fold.
     Entry { id: "virtual-column", title: "Virtual column", group: "Collections", page: "list" },
     Entry { id: "list", title: "List", group: "Collections", page: "list" },
+    // Pages a large set; lives with list, not disclosure chrome.
+    Entry { id: "pagination", title: "Pagination", group: "Collections", page: "list" },
     Entry { id: "log", title: "Log", group: "Collections", page: "log" },
     Entry { id: "grid", title: "Item grid", group: "Collections", page: "grid" },
     Entry { id: "table", title: "Data table", group: "Collections", page: "table" },
@@ -73,7 +75,6 @@ pub const ENTRIES: &[Entry] = &[
     // Accordion and expander above the fold for inject proof.
     Entry { id: "accordion", title: "Accordion", group: "Collections", page: "sections" },
     Entry { id: "expander", title: "Expander", group: "Collections", page: "sections" },
-    Entry { id: "pagination", title: "Pagination", group: "Collections", page: "sections" },
     Entry { id: "tabs", title: "Tabs", group: "Collections", page: "sections" },
     Entry { id: "document-tabs", title: "Document tabs", group: "Collections", page: "sections" },
     Entry { id: "theme", title: "Theme", group: "Chrome", page: "theme" },

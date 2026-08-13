@@ -1163,6 +1163,49 @@ mod tests {
     }
 
     #[test]
+    fn past_end_scroll_still_mounts_rows_when_content_exists() {
+        // Paint path must use this clamp: unclamped scroll past content blanks the list.
+        let row_h = 40.0;
+        let viewport = 200.0;
+        let n = 50;
+        let prev = VisibleWindow {
+            start: 40,
+            end: 50,
+            scroll: 9_000.0,
+            viewport,
+        };
+        let win = window_after_scroll(prev, prev.scroll, viewport, row_h, n, 4, None);
+        assert!(
+            win.end > win.start,
+            "past-end scroll must still mount rows, got {win:?}"
+        );
+        let max_scroll = n as f32 * row_h - viewport;
+        assert!((win.scroll - max_scroll).abs() < 0.01);
+        let tall: Vec<f32> = (0..25).map(|_| 80.0).collect();
+        let short: Vec<f32> = (0..25).map(|_| 40.0).collect();
+        let deep = window_after_scroll_var(
+            VisibleWindow {
+                start: 0,
+                end: 10,
+                scroll: tall.iter().sum::<f32>(),
+                viewport: 200.0,
+            },
+            tall.iter().sum(),
+            200.0,
+            &tall,
+            4,
+            None,
+        );
+        let remount = window_after_scroll_var(deep, deep.scroll, 200.0, &short, 4, None);
+        assert!(
+            remount.end > remount.start,
+            "after shorter heights, clamp must remount rows, got {remount:?}"
+        );
+        let short_total: f32 = short.iter().sum();
+        assert!(remount.scroll <= (short_total - 200.0).max(0.0) + 0.01);
+    }
+
+    #[test]
     fn scroller_keeps_a_usable_handle_on_tall_content() {
         let (y, h) = scroller_span(900.0 * 60.0, 400.0, 0.0, 400.0, 24.0);
         assert_eq!(h, 24.0);

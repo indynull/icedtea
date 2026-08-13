@@ -303,6 +303,16 @@ def place_window(display: str, wid: str, x: int, y: int, w: int, h: int) -> None
     _run(["wmctrl", "-i", "-a", wid], env=env)
 
 
+def pointer_clear_hover(display: str) -> None:
+    """Park the pointer on the root so no control stays in Hovered style."""
+    env = os.environ.copy()
+    env["DISPLAY"] = display
+    try:
+        _run(["xdotool", "mousemove", "8", "8"], env=env, timeout=1.0)
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass
+
+
 def capture_window(display: str, wid: str, dest: Path) -> dict:
     env = os.environ.copy()
     env["DISPLAY"] = display
@@ -682,6 +692,8 @@ def main() -> int:
         ) -> None:
             nonlocal shot_i
             place_window(display, wid, 40, 48, args.client_w, args.client_h)
+            pointer_clear_hover(display)
+            time.sleep(0.05)
             name = f"{shot_i:02d}-beat{beat:02d}-{kind}-{slug(name_extra)[:40]}"
             shot_rel = f"shots/{name}.png"
             shot_path = out / shot_rel

@@ -34,13 +34,12 @@ use iced::{Alignment, Background, Color, Element, Length, Padding, Radians};
 
 use crate::chrome::SCROLL_RAIL_WIDTH;
 use crate::host_canvas::{ArcRing, SpinnerDots};
-use crate::scroll::ScrollRail;
+use crate::scroll::{ClipLayer, ScrollRail};
 
 use crate::a11y::{self, A11y, Role};
 use crate::collection::{
-    page_range, virtual_pads, visible_window, visible_window_var, window_after_scroll,
-    window_after_scroll_var, Accordion, ListModel, RowFace, RowHeights, Selection, Tabs, TreeNode,
-    VisibleWindow,
+    page_range, virtual_pads, window_after_scroll, window_after_scroll_var, Accordion, ListModel,
+    RowFace, RowHeights, Selection, Tabs, TreeNode, VisibleWindow,
 };
 use crate::i18n::Direction;
 use crate::icon::Icon;
@@ -53,6 +52,23 @@ use crate::variant::Variant;
 /// Shared padding for controls.
 fn pad() -> Padding {
     Padding::from([8, 12])
+}
+
+/// Outer height of a standard padded control (body type + vertical pad).
+fn control_height() -> f32 {
+    typo::BODY as f32 + 16.0
+}
+
+/// Step for a continuous [`themed_slider`] range (~100 positions).
+///
+/// iced's slider defaults to step `1`, so a `0.0..=1.0` range only hits
+/// the endpoints and feels broken under drag.
+pub fn slider_step(range: std::ops::RangeInclusive<f32>) -> f32 {
+    let span = (*range.end() - *range.start()).abs();
+    if span == 0.0 {
+        return f32::EPSILON;
+    }
+    (span / 100.0).max(span * 1e-6)
 }
 
 pub fn icon_style(tok: Tokens) -> impl Fn(&iced::Theme, svg::Status) -> svg::Style {
@@ -391,42 +407,40 @@ pub fn themed_button_sized<'a, M: Clone + 'a>(
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let _: icedtea::Element<'_, ()> =
-///     widget::split_button("Save", (), (), tok, A11y::button("Save"));
+/// let _: icedtea::Element<'_, i32> = widget::split_button(
+///     "Save",
+///     0,
+///     vec![("Save As…".into(), 1), ("Export…".into(), 2)],
+///     tok,
+///     A11y::button("Save"),
+/// );
 /// ```
 pub fn split_button<'a, M: Clone + 'a>(
     title: impl Into<String>,
     primary: M,
-    more: M,
+    overflow: impl IntoIterator<Item = (String, M)>,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
     let title = a11y.apply_name(title);
     let primary_msg = (!a11y.disabled).then_some(primary);
-    let more_msg = (!a11y.disabled).then_some(more);
+    let items: Vec<(String, M)> = overflow.into_iter().collect();
+    let h = control_height();
     a11y::attach(
         row![
-            themed_button(
+            themed_button_sized(
                 title.clone(),
                 primary_msg,
                 tok,
                 Variant::Primary,
+                Length::Shrink,
+                Length::Fixed(h),
                 A11y::button(&title).with_disabled(a11y.disabled),
             ),
-            {
-                let mut more = button(icon_svg(Icon::Chevron, tok, A11y::new("more", Role::Image)))
-                    .padding(pad())
-                    .style(style::button_style(tok, Variant::Quiet));
-                if let Some(m) = a11y.apply_message(more_msg) {
-                    more = more.on_press(m);
-                }
-                a11y::attach(
-                    more.into(),
-                    &A11y::button("more").with_disabled(a11y.disabled),
-                )
-            },
+            crate::menubar::split_more(items, tok, a11y.disabled, h),
         ]
         .spacing(2)
+        .align_y(Alignment::Center)
         .into(),
         &a11y,
     )
@@ -675,9 +689,12 @@ pub fn themed_slider<'a, M: Clone + 'a>(
             &a11y,
         );
     }
+    let step = slider_step(range.clone());
     a11y::attach(
         slider(range, value, msg)
+            .step(step)
             .style(style::slider_style(tok))
+            .width(Length::Fill)
             .into(),
         &a11y,
     )
@@ -711,10 +728,16 @@ pub fn progress<'a, M: 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let bar = progress_bar(0.0..=1.0, value.clamp(0.0, 1.0)).style(style::progress_style(tok));
+    // Bar defaults to Fill; the column must also Fill or the bar collapses
+    // to zero width inside a shrink parent.
+    let bar = progress_bar(0.0..=1.0, value.clamp(0.0, 1.0))
+        .style(style::progress_style(tok))
+        .length(Length::Fill)
+        .girth(8);
     let el = if let Some(c) = copy.filter(|s| !s.is_empty()) {
         column![bar, meta(c, tok, A11y::new(c, Role::Status))]
             .spacing(4)
+            .width(Length::Fill)
             .into()
     } else {
         bar.into()
@@ -763,17 +786,20 @@ pub fn progress_ring<'a, M: 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let (start, end) = ring_angles(value);
+    // Track must contrast with the card surface (panel alone is often white).
+    let track = crate::theme::mix(tok.text, tok.surface, 0.12);
     let ring = Canvas::new(ArcRing {
         start,
         end,
         color: tok.primary,
-        track: tok.panel,
+        track,
     })
     .width(56)
     .height(56);
     let el = if let Some(c) = copy.filter(|s| !s.is_empty()) {
         column![ring, meta(c, tok, A11y::new(c, Role::Status))]
             .spacing(4)
+            .width(Length::Fill)
             .into()
     } else {
         ring.into()
@@ -1298,8 +1324,10 @@ pub fn secret_field<'a, M: Clone + 'a>(
 
 /// A labeled read-only value the user can select and copy.
 ///
-/// Meta label, then [`selectable`], then an optional Copy
-/// [`crate::action::Action`]. The application posts
+/// Meta label in a fixed gutter, then [`selectable`] (fill), then an
+/// optional Copy [`crate::action::Action`]. Pass
+/// [`crate::layout::FORM_LABEL`] so multi-row stacks share one column
+/// (same gutter as [`crate::layout::form`]). The application posts
 /// [`crate::field::Selectables::copy`] with [`crate::copy_text`].
 /// Mono face for paths and ids; UI face for prose. Disabled still
 /// allows select-and-copy.
@@ -1309,6 +1337,7 @@ pub fn secret_field<'a, M: Clone + 'a>(
 /// use icedtea::a11y::{A11y, Role};
 /// use icedtea::action::Action;
 /// use icedtea::i18n::Direction;
+/// use icedtea::layout;
 /// use icedtea::theme;
 /// use icedtea::typo::FontFace;
 /// use icedtea::widget;
@@ -1327,6 +1356,7 @@ pub fn secret_field<'a, M: Clone + 'a>(
 ///     on_select,
 ///     Some(&copy),
 ///     FontFace::Mono,
+///     layout::FORM_LABEL,
 ///     tok,
 ///     Direction::Ltr,
 ///     A11y::new("Path", Role::Group),
@@ -1339,18 +1369,27 @@ pub fn value_field<'a, M: Clone + 'a>(
     on_action: impl Fn(text_editor::Action) -> M + 'a,
     copy: Option<&crate::action::Action<M>>,
     face: typo::FontFace,
+    label_width: f32,
     tok: Tokens,
     dir: Direction,
     a11y: A11y,
 ) -> Element<'a, M> {
     let title = title.into();
-    let label = meta(
+    let label = container(meta(
         title.clone(),
         tok,
         a11y.child(Role::Status).with_value(title.clone()),
-    );
-    let value = selectable(content, on_action, tok, face, a11y.child(Role::TextBox));
-    let mut kids: Vec<Element<'a, M>> = vec![label, value];
+    ))
+    .width(Length::Fixed(label_width.max(1.0)));
+    let value = container(selectable(
+        content,
+        on_action,
+        tok,
+        face,
+        a11y.child(Role::TextBox),
+    ))
+    .width(Length::Fill);
+    let mut kids: Vec<Element<'a, M>> = vec![label.into(), value.into()];
     if let Some(copy) = copy {
         kids.push(themed_button(
             copy.title.clone(),
@@ -2846,11 +2885,14 @@ pub fn log_view<'a, M: Clone + 'a>(
     // Stick uses iced Anchor::End: raw offset 0 is the tail. Mount that
     // tail until on_scroll reports the reversed (visual) offset.
     let scroll = if window.end == 0 {
-        crate::layout::end_offset(n as f32 * h, viewport)
+        stick_scroll_snapped(n, h, viewport)
     } else {
         window.scroll.max(0.0)
     };
     let (top, win, bot) = virtual_pads(n, h, scroll, viewport, overscan, None);
+    // Extra bottom pad so anchor_bottom max-scroll is a multiple of row_h
+    // (otherwise the first visible line is a fractional band under the clip).
+    let align_pad = stick_align_pad(n, h, viewport);
     let mut col = Column::new().spacing(0);
     if n == 0 {
         col = col.push(meta("No lines", tok, A11y::new("No lines", Role::Status)));
@@ -2867,10 +2909,11 @@ pub fn log_view<'a, M: Clone + 'a>(
                 )
                 .width(Length::Fill)
                 .height(h)
-                .padding([2, 8]),
+                .padding([2, 8])
+                .clip(true),
             );
         }
-        col = col.push(Space::new().height(Length::Fixed(bot)));
+        col = col.push(Space::new().height(Length::Fixed(bot + align_pad)));
     }
     let prev = window;
     themed_scroll(
@@ -2920,15 +2963,24 @@ where
         } else {
             prev.viewport.max(1.0)
         };
+        // Clamp at paint time (same as wheel/rail). Unclamped past-end
+        // scroll after a face/height change can mount an empty window.
         let win = match heights {
-            RowHeights::Uniform(h) => {
-                visible_window(prev.scroll, viewport, h.max(0.0), len, overscan, cover)
-            }
+            RowHeights::Uniform(h) => window_after_scroll(
+                prev,
+                prev.scroll,
+                viewport,
+                h.max(0.0),
+                len,
+                overscan,
+                cover,
+            ),
             RowHeights::PerRow(hs) => {
-                visible_window_var(prev.scroll, viewport, hs, overscan, cover)
+                window_after_scroll_var(prev, prev.scroll, viewport, hs, overscan, cover)
             }
         };
-        let shift = heights.offset(win.start) - prev.scroll;
+        let scroll = win.scroll;
+        let shift = heights.offset(win.start) - scroll;
         let emit = move |y: f32| {
             on_scroll(match heights {
                 RowHeights::Uniform(h) => {
@@ -2939,32 +2991,74 @@ where
                 }
             })
         };
-        let mut frame = container(rows(win))
+        // shift is often negative (overscan + partial first row). ClipLayer
+        // scissors so card backgrounds cannot cover chrome above the list.
+        let mut inner = container(rows(win))
             .width(crate::layout::FILL)
-            .height(crate::layout::FILL)
             .padding(Padding {
                 top: shift,
                 right: 0.0,
                 bottom: 0.0,
                 left: 0.0,
-            })
-            .clip(true);
+            });
         if let Some(id) = scroll_id.clone() {
-            frame = frame.id(id);
+            inner = inner.id(id);
         }
-        let pane = mouse_area(frame).on_scroll(move |delta| {
+        let frame = container(inner)
+            .width(crate::layout::FILL)
+            .height(crate::layout::FILL);
+        let pane = mouse_area(ClipLayer::new(frame)).on_scroll(move |delta| {
             let max_s = (content - viewport).max(0.0);
-            emit((prev.scroll + scroll_delta_pixels(delta, step)).clamp(0.0, max_s))
+            emit((scroll + scroll_delta_pixels(delta, step)).clamp(0.0, max_s))
         });
         row![
             pane,
-            Element::from(ScrollRail::new(content, viewport, prev.scroll, emit, tok)),
+            Element::from(ScrollRail::new(content, viewport, scroll, emit, tok)),
         ]
+        .spacing(4)
         .width(crate::layout::FILL)
         .height(crate::layout::FILL)
         .into()
     })
     .into()
+}
+
+/// Stick-to-end scroll snapped to a row boundary so the first painted
+/// line is whole (raw `end_offset` can leave a fractional top band).
+fn stick_scroll_snapped(n: usize, row_h: f32, viewport: f32) -> f32 {
+    let max_s = crate::layout::end_offset(n as f32 * row_h, viewport);
+    if row_h > 0.0 {
+        (max_s / row_h).floor() * row_h
+    } else {
+        max_s
+    }
+}
+
+/// Bottom pad so content height makes max-scroll a multiple of `row_h`.
+fn stick_align_pad(n: usize, row_h: f32, viewport: f32) -> f32 {
+    if row_h <= 0.0 {
+        return 0.0;
+    }
+    let max_s = crate::layout::end_offset(n as f32 * row_h, viewport);
+    if max_s <= 0.0 {
+        return 0.0;
+    }
+    let r = max_s % row_h;
+    if r < 1e-3 {
+        0.0
+    } else {
+        row_h - r
+    }
+}
+
+/// Truncate for a one-line face so the rail does not bisect a glyph.
+fn ellipsize_line(s: &str, max_chars: usize) -> String {
+    let chars: Vec<char> = s.chars().collect();
+    if max_chars == 0 || chars.len() <= max_chars {
+        return s.to_string();
+    }
+    let keep = max_chars.saturating_sub(1);
+    format!("{}…", chars[..keep].iter().collect::<String>())
 }
 
 fn two_line_row<'a, M: 'a>(
@@ -2975,24 +3069,34 @@ fn two_line_row<'a, M: 'a>(
     row_h: f32,
     tok: Tokens,
 ) -> Element<'a, M> {
-    let mut col = column![text(title.to_string())
+    // ~7px/char at body size; leave room for pad + rail neighbor.
+    let title = ellipsize_line(title, 42);
+    let mut col = column![text(title)
         .size(typo::BODY)
         .color(tok.text)
         .font(typo::UI)
+        .width(Length::Fill)
         .wrapping(iced::widget::text::Wrapping::None)]
-    .spacing(2);
+    .spacing(2)
+    .width(Length::Fill);
     if let Some(m) = meta_s.filter(|s| !s.is_empty()) {
         col = col.push(
-            text(m.to_string())
+            text(ellipsize_line(m, 48))
                 .size(typo::META)
                 .color(meta_color)
+                .width(Length::Fill)
                 .wrapping(iced::widget::text::Wrapping::None),
         );
     }
     container(col)
         .width(Length::Fill)
         .height(row_h)
-        .padding(8)
+        .padding(Padding {
+            top: 8.0,
+            right: 12.0,
+            bottom: 8.0,
+            left: 8.0,
+        })
         .clip(true)
         .style(move |_| style::list_row(tok, selected))
         .into()
@@ -3289,11 +3393,13 @@ pub fn item_grid<'a, M: Clone + 'a>(
             if i < labels.len() {
                 let s = labels[i].clone();
                 let on = selected == Some(i);
+                // Ghost idle is transparent so every unselected tile matches;
+                // Quiet's idle wash can look uneven under capture/hover.
                 let tile = themed_button_sized(
                     s.clone(),
                     a11y.apply_message(Some(on_select(i))),
                     tok,
-                    if on { Variant::Primary } else { Variant::Quiet },
+                    if on { Variant::Primary } else { Variant::Ghost },
                     Length::Fill,
                     Length::Fill,
                     A11y::new(s.clone(), Role::ListItem)
@@ -4153,8 +4259,11 @@ mod tests {
             Variant::Danger,
             btn("D").with_disabled(true),
         );
-        let _: Element<'_, ()> = split_button("S", (), (), tok, btn("S"));
-        let _: Element<'_, ()> = split_button("S", (), (), tok, btn("S").with_disabled(true));
+        let _: Element<'_, i32> = split_button("S", 0, vec![("As…".into(), 1)], tok, btn("S"));
+        let _: Element<'_, i32> = split_button("S", 0, vec![], tok, btn("S").with_disabled(true));
+        assert!((slider_step(0.0..=1.0) - 0.01).abs() < f32::EPSILON);
+        assert!(slider_step(0.0..=1.0) < 1.0);
+        assert!((slider_step(10.0..=10.0) - f32::EPSILON).abs() < 1e-12);
         let _: Element<'_, ()> = toggle_button("T", true, (), tok, btn("T").with_checked(true));
         let _: Element<'_, ()> = toggle_button("T", false, (), tok, btn("T").with_checked(false));
         let _: Element<'_, ()> = toggle_button(
@@ -4412,6 +4521,7 @@ mod tests {
             |_| (),
             Some(&copy),
             typo::FontFace::Mono,
+            crate::layout::FORM_LABEL,
             tok,
             Direction::Ltr,
             role("vf", Role::Group),
@@ -4422,6 +4532,7 @@ mod tests {
             |_| (),
             None,
             typo::FontFace::Ui,
+            crate::layout::FORM_LABEL,
             tok,
             Direction::Rtl,
             role("vf-off", Role::Group).with_disabled(true),
@@ -5179,6 +5290,7 @@ mod tests {
             |_| (),
             Some(&copy),
             typo::FontFace::Mono,
+            crate::layout::FORM_LABEL,
             tok,
             Direction::Ltr,
             role("vf", Role::Group).with_disabled(true),
@@ -5290,6 +5402,21 @@ mod tests {
             .unwrap();
         assert!(!search_src.contains("apply_name(value)"));
         assert!(search_src.contains("a11y.child(Role::TextBox)"));
+        let vf_src = src
+            .split("pub fn value_field")
+            .nth(1)
+            .unwrap()
+            .split("pub fn textarea")
+            .next()
+            .unwrap();
+        assert!(
+            vf_src.contains("label_width") && vf_src.contains("Length::Fixed"),
+            "value_field must fix the label gutter so stacked rows align"
+        );
+        assert!(
+            vf_src.contains("Length::Fill"),
+            "value fills after the gutter"
+        );
     }
 
     #[test]
@@ -6189,6 +6316,46 @@ mod tests {
             A11y::new("log-drive", Role::List),
         );
         let _ = drive_scroll(&mut el);
+    }
+
+    #[test]
+    fn stick_scroll_snaps_to_row_boundary() {
+        // 200 lines * 20px, viewport 250 → raw end 3750; snap to 3740.
+        let s = stick_scroll_snapped(200, 20.0, 250.0);
+        assert_eq!(s % 20.0, 0.0);
+        assert!(s <= crate::layout::end_offset(4000.0, 250.0));
+        assert_eq!(s, 3740.0);
+        assert_eq!(stick_scroll_snapped(5, 20.0, 200.0), 0.0);
+        assert_eq!(
+            stick_scroll_snapped(10, 0.0, 100.0),
+            crate::layout::end_offset(0.0, 100.0)
+        );
+    }
+
+    #[test]
+    fn stick_align_pad_makes_max_scroll_row_aligned() {
+        let n = 200usize;
+        let h = 20.0f32;
+        let viewport = 250.0f32;
+        let pad = stick_align_pad(n, h, viewport);
+        let content = n as f32 * h + pad;
+        let max_s = (content - viewport).max(0.0);
+        assert!((max_s % h).abs() < 1e-3, "max_s={max_s} pad={pad}");
+        assert_eq!(stick_align_pad(5, 20.0, 200.0), 0.0);
+        assert_eq!(stick_align_pad(10, 0.0, 100.0), 0.0);
+        // max_scroll already a multiple of row_h → no pad.
+        assert_eq!(stick_align_pad(100, 20.0, 200.0), 0.0);
+    }
+
+    #[test]
+    fn ellipsize_line_keeps_short_and_trims_long() {
+        assert_eq!(ellipsize_line("short", 42), "short");
+        assert_eq!(ellipsize_line("any", 0), "any");
+        let long = "Quarterly notes for Lisbon and the Berlin office";
+        let e = ellipsize_line(long, 20);
+        assert!(e.ends_with('…'));
+        assert_eq!(e.chars().count(), 20);
+        assert!(!e.contains("office"));
     }
 
     fn drive_scroll(el: &mut Element<'_, f32>) -> Vec<f32> {
