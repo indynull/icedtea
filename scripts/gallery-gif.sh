@@ -70,6 +70,7 @@ if [[ "${ICEDTEA_GALLERY_ISOLATED:-1}" != "0" && -z "${ICEDTEA_GALLERY_NESTED:-}
   fi
   echo "gallery-gif: recording inside Xephyr :$display_n"
   export DISPLAY=":$display_n"
+  unset WAYLAND_DISPLAY
   export ICEDTEA_GALLERY_NESTED=1
   export ICEDTEA_GALLERY_ISOLATED=1
   set +e
