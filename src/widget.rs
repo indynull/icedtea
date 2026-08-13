@@ -79,8 +79,9 @@ pub fn icon_style(tok: Tokens) -> impl Fn(&iced::Theme, svg::Status) -> svg::Sty
 
 /// Paint a bundled chrome icon.
 ///
-/// Chrome set only (`Icon::Search`, `Close`, and the rest). Tokens tint
-/// the fill.
+/// Chrome set only (`Icon::Search`, `Close`, and the rest). Icons ship as
+/// black fills; tokens recolor non-transparent pixels (works on Linux,
+/// macOS Metal, and Windows).
 ///
 ///
 /// ```

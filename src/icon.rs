@@ -1,10 +1,18 @@
 //! Bundled chrome icons.
+//!
+//! SVGs are solid black fills (`fill="#000"`). iced's svg `color` style
+//! recolors non-transparent pixels, so tokens tint them on every host.
+//! Stroke/`currentColor` icons are avoided — they often rasterize empty
+//! under iced's Metal/wgpu path on macOS.
 
 /// Chrome icon set. Applications may add their own SVG bytes beside these.
+///
+/// Bytes are filled black paths for token recolor via [`crate::widget::icon_svg`].
 ///
 /// ```
 /// assert_eq!(icedtea::icon::Icon::Search.slug(), "search");
 /// assert!(icedtea::icon::Icon::Close.svg().contains("<svg"));
+/// assert!(icedtea::icon::Icon::Close.svg().contains("fill=\"#000\""));
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Icon {
@@ -77,9 +85,20 @@ mod tests {
     #[test]
     fn every_icon_has_svg_and_roundtrips() {
         for icon in Icon::ALL {
-            assert!(icon.svg().contains("<svg"));
+            let s = icon.svg();
+            assert!(s.contains("<svg"), "{}", icon.slug());
+            assert!(
+                s.contains("fill=\"#000\""),
+                "{} must use black fill for iced recolor on all hosts",
+                icon.slug()
+            );
+            assert!(
+                !s.contains("currentColor"),
+                "{} must not rely on currentColor (blank on macOS Metal)",
+                icon.slug()
+            );
             assert_eq!(Icon::from_slug(icon.slug()), Some(icon));
-            assert_eq!(icon.bytes(), icon.svg().as_bytes());
+            assert_eq!(icon.bytes(), s.as_bytes());
         }
         assert!(Icon::from_slug("nope").is_none());
     }

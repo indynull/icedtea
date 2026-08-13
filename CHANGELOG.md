@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+Chrome icons use solid black fills so iced's svg recolor tints them on
+macOS Metal as well as Linux and Windows (stroke/`currentColor` paths
+often rasterized empty on Metal).
+
 `value_field` takes `label_width` so multi-row stacks share a gutter;
 pass `layout::FORM_LABEL` (140px, same as `layout::form`).
 
