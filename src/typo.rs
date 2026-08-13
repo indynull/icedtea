@@ -398,6 +398,51 @@ mod tests {
     }
 
     #[test]
+    fn family_index_skips_emoji_and_empty_name_lists() {
+        let faces = vec![
+            FaceCover {
+                families: vec![],
+                monospaced: false,
+                weight: 400,
+                post_script_name: "Empty-400".into(),
+            },
+            FaceCover {
+                families: vec!["EmojiOne".into()],
+                monospaced: false,
+                weight: 400,
+                post_script_name: "EmojiOneColor".into(),
+            },
+            cover("Keep", false, 400),
+            cover("Keep", false, 700),
+        ];
+        let idx = family_index(&faces);
+        assert!(!idx.contains_key("EmojiOne"));
+        assert!(idx.contains_key("Keep"));
+        assert_eq!(
+            select_family(&faces, FamilyKind::Ui, &["Keep".into()], "x"),
+            "Keep"
+        );
+    }
+
+    #[test]
+    fn consider_skips_empty_and_duplicate_preferences() {
+        let faces = vec![
+            cover("A", false, 400),
+            cover("A", false, 700),
+            cover("B", false, 400),
+            cover("B", false, 700),
+        ];
+        // Empty pref entries are ignored; the same name is not tried twice.
+        let name = select_family(
+            &faces,
+            FamilyKind::Ui,
+            &["".into(), "A".into(), "A".into(), "B".into()],
+            "B",
+        );
+        assert_eq!(name, "A");
+    }
+
+    #[test]
     fn install_binds_usable_ui_and_mono_families() {
         install_platform_faces();
         let lock = font_system();

@@ -938,23 +938,42 @@ mod tests {
         let tok = named("dark").tokens;
         let accent = Color::from_rgb8(0, 122, 255);
         let canvas = Color::from_rgb8(40, 40, 40);
+        let surface = Color::from_rgb8(50, 50, 50);
+        let panel = Color::from_rgb8(60, 60, 60);
         let text = Color::from_rgb8(240, 240, 240);
+        let muted = Color::from_rgb8(160, 160, 160);
+        let border = Color::from_rgb8(90, 90, 90);
         let chrome = OsChrome {
             primary: Some(accent),
             canvas: Some(canvas),
+            surface: Some(surface),
+            panel: Some(panel),
             text: Some(text),
-            ..OsChrome::empty()
+            muted: Some(muted),
+            border: Some(border),
         };
         assert!(chrome.any());
         assert!(!OsChrome::empty().any());
         let on = apply_os_chrome(tok, true, chrome);
         assert_eq!(on.primary, accent);
         assert_eq!(on.canvas, canvas);
+        assert_eq!(on.surface, surface);
+        assert_eq!(on.panel, panel);
         assert_eq!(on.text, text);
         assert_eq!(on.selection_text, text);
-        assert_eq!(on.muted, tok.muted);
-        assert_eq!(on.panel, tok.panel);
+        assert_eq!(on.muted, muted);
+        assert_eq!(on.border, border);
         assert_ne!(on.selection, tok.selection);
+        // Partial chrome leaves unset fields on the colorway.
+        let partial = OsChrome {
+            primary: Some(accent),
+            canvas: Some(canvas),
+            text: Some(text),
+            ..OsChrome::empty()
+        };
+        let part = apply_os_chrome(tok, true, partial);
+        assert_eq!(part.muted, tok.muted);
+        assert_eq!(part.panel, tok.panel);
         assert_eq!(apply_os_chrome(tok, false, chrome), tok);
         assert_eq!(
             apply_os_chrome(tok, true, OsChrome::empty()).primary,

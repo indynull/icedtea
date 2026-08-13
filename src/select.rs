@@ -289,6 +289,15 @@ mod tests {
             bare_joined.contains("plain code"),
             "empty line list falls back to code body: {bare_joined:?}"
         );
+        // Empty `lines` uses the raw `code` field (host items sometimes omit lines).
+        let empty_lines = [Item::CodeBlock {
+            language: None,
+            code: "solo".into(),
+            lines: vec![],
+        }];
+        let empty_spans = markdown_document_spans(&empty_lines, &settings);
+        let empty_joined: String = empty_spans.iter().map(|s| s.text.as_ref()).collect();
+        assert_eq!(empty_joined, "solo");
     }
 
     #[test]
