@@ -6,7 +6,9 @@ Desktop Material controls: segmented button, icon button, range slider,
 indeterminate checkbox (`CheckState`), field supporting/error text,
 filter chip set, sectioned and cascade menus, side sheet. Search gains
 an optional clear control (`search_input_clear`). Filter chips use
-outline idle and filled selected.
+outline idle and filled selected. Segmented and split buttons share
+the labeled button height (body line box plus pad), not the 48dp
+touch floor.
 
 Desktop chrome is M3 shape None (0 dp). Tabs use a 3dp primary underbar.
 Table selection is secondary container, separate from zebra stripes.

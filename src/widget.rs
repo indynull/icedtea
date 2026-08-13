@@ -55,11 +55,15 @@ fn pad() -> Padding {
     Padding::from([8, 16])
 }
 
-/// Outer height of a standard padded control (body type + vertical pad).
+/// Outer height of a standard padded control (body line box + vertical pad).
 fn control_height() -> f32 {
-    // Prefer density touch target (Default 48dp) when body+pad is shorter.
-    let from_type = typo::BODY as f32 + 16.0;
-    from_type.max(crate::density::Density::default().touch_target() as f32)
+    // Same face as `themed_button` Shrink. Do not floor to the 48dp touch
+    // target: iced `Fixed(48)` + pad paints a 48px face, taller than
+    // labeled buttons on the same page.
+    let line = f32::from(
+        iced::widget::text::LineHeight::default().to_absolute(iced::Pixels(typo::BODY as f32)),
+    );
+    line + pad().top + pad().bottom
 }
 
 /// Step for a continuous [`themed_slider`] range (~100 positions).
@@ -5370,6 +5374,33 @@ mod tests {
         );
         assert!(rich.items.len() >= 8);
         assert!(rich.item_offset(rich.items.len()) > 100.0);
+    }
+
+    #[test]
+    fn split_and_segmented_match_button_height() {
+        let tok = named("dark").tokens;
+        let btn = |n: &str| A11y::button(n);
+        let max = iced::Size::new(800.0, 400.0);
+        let mut labeled = themed_button("Save", Some(()), tok, Variant::Primary, btn("Save"));
+        let mut split = split_button("Save", 0, vec![("As…".into(), 1)], tok, btn("Save"));
+        let mut segmented = segmented_button(
+            &["Day".into(), "Week".into(), "Month".into()],
+            0,
+            |i| i,
+            tok,
+            A11y::new("Range", Role::Group),
+        );
+        let labeled_h = layout_size(&mut labeled, max).height;
+        let split_h = layout_size(&mut split, max).height;
+        let segmented_h = layout_size(&mut segmented, max).height;
+        assert_eq!(
+            split_h, labeled_h,
+            "split_button height {split_h} != themed_button {labeled_h}"
+        );
+        assert_eq!(
+            segmented_h, labeled_h,
+            "segmented_button height {segmented_h} != themed_button {labeled_h}"
+        );
     }
 
     #[test]
