@@ -28,7 +28,8 @@ pub struct Entry {
 /// group cannot be swapped. One row per public surface.
 #[rustfmt::skip]
 pub const ENTRIES: &[Entry] = &[
-    // Interactive toggles first so the gallery fold shows inject targets.
+    // Inject targets first (checkbox/radio/switch/slider) so after-interact
+    // shots prove M3 state faces; buttons follow for filled/tonal/text variants.
     Entry { id: "checkbox", title: "Checkbox", group: "Controls", page: "controls" },
     Entry { id: "radio", title: "Radio", group: "Controls", page: "controls" },
     Entry { id: "switch", title: "Switch", group: "Controls", page: "controls" },

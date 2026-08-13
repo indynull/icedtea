@@ -51,12 +51,15 @@ use crate::variant::Variant;
 
 /// Shared padding for controls.
 fn pad() -> Padding {
-    Padding::from([8, 12])
+    // M3 small button: 8dp vertical, 16dp horizontal (4dp grid).
+    Padding::from([8, 16])
 }
 
 /// Outer height of a standard padded control (body type + vertical pad).
 fn control_height() -> f32 {
-    typo::BODY as f32 + 16.0
+    // Prefer density touch target (Default 48dp) when body+pad is shorter.
+    let from_type = typo::BODY as f32 + 16.0;
+    from_type.max(crate::density::Density::default().touch_target() as f32)
 }
 
 /// Step for a continuous [`themed_slider`] range (~100 positions).
@@ -105,72 +108,6 @@ pub fn icon_svg<'a, M: 'a>(icon: Icon, tok: Tokens, a11y: A11y) -> Element<'a, M
     )
 }
 
-/// Cell content. Not a markup parser. [`MarkdownDoc`] stays documents.
-///
-/// ```
-/// use icedtea::widget::RichCell;
-/// let cell = RichCell::Code("len()".into());
-/// assert!(matches!(cell, RichCell::Code(_)));
-/// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RichCell {
-    Plain(String),
-    Emphasis(String),
-    Code(String),
-    Link(String),
-}
-
-/// Paint a table or list cell: plain, emphasis, code, or link.
-///
-/// Not a markup parser. [`MarkdownDoc`] stays documents.
-///
-///
-/// ```
-/// use icedtea::a11y::{A11y, Role};
-/// use icedtea::theme;
-/// use icedtea::widget::{self, RichCell};
-/// let tok = theme::named("dark").tokens;
-/// let cell = RichCell::Code("len()".into());
-/// let _: icedtea::Element<'_, ()> =
-///     widget::rich_cell(&cell, None, tok, A11y::new("len", Role::Status));
-/// ```
-pub fn rich_cell<'a, M: Clone + 'a>(
-    cell: &RichCell,
-    on_link: Option<M>,
-    tok: Tokens,
-    a11y: A11y,
-) -> Element<'a, M> {
-    match cell {
-        RichCell::Plain(s) => label(s.clone(), tok, a11y),
-        RichCell::Emphasis(s) => {
-            let s = a11y.apply_name(s.clone());
-            a11y::attach(
-                text(s)
-                    .size(typo::BODY)
-                    .color(tok.text)
-                    .font(typo::UI_ITALIC)
-                    .into(),
-                &a11y,
-            )
-        }
-        RichCell::Code(s) => {
-            let s = a11y.apply_name(s.clone());
-            a11y::attach(
-                text(s)
-                    .size(typo::CODE)
-                    .color(tok.text)
-                    .font(typo::MONO)
-                    .into(),
-                &a11y,
-            )
-        }
-        RichCell::Link(s) => match on_link {
-            Some(m) => hyperlink(s.clone(), m, tok, a11y),
-            None => label(s.clone(), tok, a11y),
-        },
-    }
-}
-
 /// A line of body text.
 ///
 /// Platform sans. Empty string is an empty node; still pass `A11y`.
@@ -191,34 +128,6 @@ pub fn label<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Elemen
             .size(typo::BODY)
             .color(tok.text)
             .font(typo::UI)
-            .into(),
-        &a11y,
-    )
-}
-
-/// A large value for a compact tool, end-aligned.
-///
-/// Empty string is a blank reading. `display_line` is the smaller
-/// caption above it.
-///
-///
-/// ```
-/// use icedtea::a11y::{A11y, Role};
-/// use icedtea::theme;
-/// use icedtea::widget;
-/// let tok = theme::named("dark").tokens;
-/// let _: icedtea::Element<'_, ()> =
-///     widget::display_reading("24", tok, A11y::new("24", Role::Status));
-/// ```
-pub fn display_reading<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
-    let s = a11y.apply_name(s);
-    a11y::attach(
-        text(s)
-            .size(typo::DISPLAY)
-            .color(tok.text)
-            .font(typo::UI_BOLD)
-            .width(Length::Fill)
-            .align_x(Alignment::End)
             .into(),
         &a11y,
     )
@@ -852,53 +761,6 @@ pub fn busy_overlay<'a, M: Clone + 'a>(
     )
 }
 
-/// Map a series into canvas points. Empty input is empty output.
-pub fn spark_points(values: &[f32], width: f32, height: f32) -> Vec<(f32, f32)> {
-    if values.is_empty() || width <= 0.0 || height <= 0.0 {
-        return Vec::new();
-    }
-    let min = values.iter().copied().fold(f32::MAX, f32::min);
-    let max = values.iter().copied().fold(f32::MIN, f32::max);
-    let span = (max - min).max(1e-6);
-    let last = (values.len() - 1).max(1) as f32;
-    values
-        .iter()
-        .enumerate()
-        .map(|(i, v)| {
-            let x = i as f32 / last * width;
-            let y = height - (*v - min) / span * height;
-            (x, y)
-        })
-        .collect()
-}
-
-/// One-row series. Domain plots stay in the application.
-/// A tiny series chart.
-///
-/// Empty data paints an empty box.
-///
-///
-/// ```
-/// use icedtea::a11y::{A11y, Role};
-/// use icedtea::theme;
-/// use icedtea::widget;
-/// let tok = theme::named("dark").tokens;
-/// let _: icedtea::Element<'_, ()> =
-///     widget::sparkline(&[1.0, 3.0, 2.0], tok, A11y::new("spark", Role::Image));
-/// ```
-pub fn sparkline<'a, M: 'a>(values: &'a [f32], tok: Tokens, a11y: A11y) -> Element<'a, M> {
-    a11y::attach(
-        Canvas::new(crate::host_canvas::Sparkline {
-            points: spark_points(values, 160.0, 36.0),
-            color: tok.accent,
-        })
-        .width(160)
-        .height(36)
-        .into(),
-        &a11y,
-    )
-}
-
 /// Eight dots around a circle. `phase` (0..=1) lights them in turn.
 ///
 /// Advance `phase` each frame while work is running.
@@ -1040,72 +902,6 @@ pub fn number_input<'a, M: Clone + 'a>(
 /// Step a numeric value.
 pub fn step_number(value: f64, step: f64, min: f64, max: f64, dir: i32) -> f64 {
     (value + step * f64::from(dir)).clamp(min, max)
-}
-
-/// Fill `template` slots. `0` takes the next digit from `raw`; other
-/// characters are literals.
-pub fn apply_mask(template: &str, raw: &str) -> String {
-    let mut digits = raw.chars().filter(|c| c.is_ascii_digit());
-    let mut out = String::new();
-    for ch in template.chars() {
-        if ch == '0' {
-            match digits.next() {
-                Some(d) => out.push(d),
-                None => break,
-            }
-        } else if digits.clone().next().is_some() {
-            out.push(ch);
-        } else {
-            break;
-        }
-    }
-    out
-}
-
-fn mask_handler<'a, M: 'a>(
-    template: &'a str,
-    on_input: impl Fn(String) -> M + 'a,
-) -> impl Fn(String) -> M + 'a {
-    move |raw| on_input(apply_mask(template, &raw))
-}
-
-/// Text field that keeps `value` on `template` (date, time, card).
-/// Fill digit slots on a template (`0000-0000`).
-///
-/// Non-digit template characters stay put. Empty slots are blanks.
-///
-///
-/// ```
-/// use icedtea::a11y::{A11y, Role};
-/// use icedtea::theme;
-/// use icedtea::widget;
-/// let tok = theme::named("dark").tokens;
-/// let on_input = |s| s;
-/// let _: icedtea::Element<'_, String> = widget::masked_input(
-///     "000-00-0000",
-///     "",
-///     on_input,
-///     tok,
-///     A11y::new("ssn", Role::TextBox),
-/// );
-/// ```
-pub fn masked_input<'a, M: Clone + 'a>(
-    template: &'a str,
-    value: &str,
-    on_input: impl Fn(String) -> M + 'a,
-    tok: Tokens,
-    a11y: A11y,
-) -> Element<'a, M> {
-    let shown = apply_mask(template, value);
-    themed_text_input(
-        template,
-        &shown,
-        mask_handler(template, on_input),
-        None,
-        tok,
-        a11y,
-        None,
-    )
 }
 
 /// Single-line field. `input_id` is for `iced::widget::operation::focus`
@@ -2015,39 +1811,6 @@ pub fn time_picker<'a, M: Clone + 'a>(
     a11y::attach(row.into(), &a11y)
 }
 
-/// A swatch that opens a color pick.
-///
-/// The application owns the `Color`. Disabled keeps the swatch and
-/// drops the pick.
-///
-///
-/// ```
-/// use icedtea::a11y::A11y;
-/// use icedtea::theme;
-/// use icedtea::widget;
-/// let tok = theme::named("dark").tokens;
-/// let _: icedtea::Element<'_, ()> =
-///     widget::color_swatch(1, 120, 212, (), tok, A11y::button("color"));
-/// ```
-pub fn color_swatch<'a, M: Clone + 'a>(
-    r: u8,
-    g: u8,
-    b: u8,
-    msg: M,
-    tok: Tokens,
-    a11y: A11y,
-) -> Element<'a, M> {
-    let mut area = mouse_area(
-        container(Space::new().width(28).height(18))
-            .style(move |_| style::fill(iced::Color::from_rgb8(r, g, b), tok.text))
-            .padding(2),
-    );
-    if let Some(m) = a11y.apply_message(Some(msg)) {
-        area = area.on_press(m);
-    }
-    a11y::attach(area.into(), &a11y)
-}
-
 /// Parsed markdown the application owns. Parse in `update` (or a `Task`);
 /// [`markdown_view`] borrows the items. Truncation is slicing `source`
 /// before parse.
@@ -2384,12 +2147,13 @@ pub fn dismiss_button<'a, M: Clone + 'a>(msg: M, tok: Tokens, a11y: A11y) -> Ele
 }
 
 fn chip_wash(tok: Tokens, variant: Variant) -> iced::Color {
+    let s = tok.scheme();
     match variant {
-        Variant::Primary => crate::theme::selection_fill(tok),
-        Variant::Danger => crate::theme::mix(tok.danger, tok.canvas, 0.28),
-        Variant::Success => crate::theme::mix(tok.success, tok.canvas, 0.28),
-        Variant::Warning => crate::theme::mix(tok.warning, tok.canvas, 0.28),
-        Variant::Quiet | Variant::Ghost | Variant::Chip => crate::theme::chip_fill(tok),
+        Variant::Primary => s.secondary_container,
+        Variant::Danger => s.error_container,
+        Variant::Success => crate::theme::mix(s.success, s.surface, 0.20),
+        Variant::Warning => crate::theme::mix(s.warning, s.surface, 0.20),
+        Variant::Quiet | Variant::Ghost | Variant::Chip => s.secondary_container,
     }
 }
 
@@ -2433,9 +2197,13 @@ pub fn chip<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let title = a11y.apply_name(title);
+    let s = tok.scheme();
     let ink = match variant {
-        Variant::Danger => tok.danger,
-        _ => tok.text,
+        Variant::Danger => s.on_error_container,
+        Variant::Primary | Variant::Quiet | Variant::Ghost | Variant::Chip => {
+            s.on_secondary_container
+        }
+        Variant::Success | Variant::Warning => s.on_surface,
     };
     let mut line = row![text(title.clone()).size(typo::META).color(ink)]
         .spacing(4)
@@ -2448,9 +2216,15 @@ pub fn chip<'a, M: Clone + 'a>(
         ));
     }
     let wash = chip_wash(tok, variant);
-    let face = container(line)
-        .padding([4, 8])
-        .style(move |_| style::fill(wash, ink));
+    let face = container(line).padding([8, 12]).style(move |_| {
+        let mut st = style::fill(wash, ink);
+        st.border = iced::border::Border {
+            color: iced::Color::TRANSPARENT,
+            width: 0.0,
+            radius: crate::m3::Shape::Full.radius(),
+        };
+        st
+    });
     let body: Element<'a, M> = if let Some(msg) = a11y.apply_message(press) {
         mouse_area(face).on_press(msg).into()
     } else {
@@ -2528,9 +2302,9 @@ pub fn group_box<'a, M: 'a>(
             ]
             .spacing(8),
         )
-        .padding(12)
+        .padding(16)
         .width(Length::Fill)
-        .style(move |_| style::card(tok, false))
+        .style(move |_| style::raised_card(tok))
         .into(),
         &a11y,
     )
@@ -2720,77 +2494,6 @@ fn toast_style(
     kind: ToastKind,
 ) -> impl Fn(&iced::Theme) -> iced::widget::container::Style {
     move |_| style::callout(tok, kind)
-}
-
-/// A one-shot hint next to a control.
-///
-/// The application owns dismissed state. Empty body hides the tip.
-///
-///
-/// ```
-/// use icedtea::a11y::{A11y, Role};
-/// use icedtea::theme;
-/// use icedtea::widget;
-/// let tok = theme::named("dark").tokens;
-/// let _: icedtea::Element<'_, ()> = widget::teaching_tip(
-///     "Hint", "Press Ctrl+P", (), tok, A11y::new("Hint", Role::Tooltip),
-/// );
-/// ```
-pub fn teaching_tip<'a, M: Clone + 'a>(
-    title: impl Into<String>,
-    body: impl Into<String>,
-    dismiss: M,
-    tok: Tokens,
-    a11y: A11y,
-) -> Element<'a, M> {
-    let title = a11y.apply_name(title);
-    a11y::attach(
-        container(
-            column![
-                label(title.clone(), tok, A11y::new(title, Role::Header)),
-                meta(body, tok, A11y::new("tip-body", Role::Status)),
-                themed_button(
-                    "Got it",
-                    a11y.apply_message(Some(dismiss)),
-                    tok,
-                    Variant::Primary,
-                    A11y::button("Got it").with_disabled(a11y.disabled),
-                ),
-            ]
-            .spacing(8),
-        )
-        .padding(12)
-        .style(move |_| style::raised_card(tok))
-        .into(),
-        &a11y,
-    )
-}
-
-/// A placeholder block while content loads.
-///
-/// Size the box. No message.
-///
-///
-/// ```
-/// use icedtea::a11y::{A11y, Role};
-/// use icedtea::theme;
-/// use icedtea::widget;
-/// let tok = theme::named("dark").tokens;
-/// let _: icedtea::Element<'_, ()> =
-///     widget::placeholder_skeleton(tok, A11y::new("skel", Role::Status));
-/// ```
-pub fn placeholder_skeleton<'a, M: 'a>(tok: Tokens, a11y: A11y) -> Element<'a, M> {
-    a11y::attach(
-        column![
-            container(Space::new().width(Length::Fill).height(14))
-                .style(move |_| style::skeleton(tok)),
-            container(Space::new().width(Length::Fill).height(14))
-                .style(move |_| style::skeleton(tok)),
-        ]
-        .spacing(8)
-        .into(),
-        &a11y,
-    )
 }
 
 /// A themed scroller with a usable handle.
@@ -3767,10 +3470,10 @@ pub fn tab_bar<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let mut r = Row::new().spacing(4).align_y(Alignment::Center);
+    let mut r = Row::new().spacing(0).align_y(Alignment::Center);
     for (i, title) in tabs.titles.iter().enumerate() {
         let mut tab = button(text(title.clone()).size(typo::META))
-            .padding([6, 10])
+            .padding([12, 16])
             .style(style::tab_style(tok, i == tabs.active));
         if !a11y.disabled {
             tab = tab.on_press(on_select(i));
@@ -3784,11 +3487,22 @@ pub fn tab_bar<'a, M: Clone + 'a>(
             ));
         }
         r = r.push(a11y::attach(
-            container(cell).padding([2, 2]).into(),
+            container(cell).padding([0, 0]).into(),
             &A11y::new(title.clone(), Role::Tab).with_checked(i == tabs.active),
         ));
     }
-    a11y::attach(r.into(), &a11y)
+    // M3 tab strip sits on surface; outline hairline under the row.
+    let strip = column![
+        r,
+        container(Space::new().width(Length::Fill).height(1)).style(move |_| style::hairline(tok)),
+    ];
+    a11y::attach(
+        container(strip)
+            .width(Length::Fill)
+            .style(move |_| style::app_bar(tok))
+            .into(),
+        &a11y,
+    )
 }
 
 /// Title on the start edge, disclosure mark on the end.
@@ -4188,18 +3902,6 @@ mod tests {
         );
         assert_eq!(step_number(5.0, 1.0, 0.0, 10.0, 1), 6.0);
         assert_eq!(step_number(0.0, 1.0, 0.0, 10.0, -1), 0.0);
-        assert_eq!(apply_mask("0000-0000", "12345678"), "1234-5678");
-        assert_eq!(apply_mask("0000-0000", "12"), "12");
-        assert_eq!(apply_mask("00/00", "1299"), "12/99");
-        assert_eq!(apply_mask("0000-0000", "abcd"), "");
-        assert_eq!(mask_handler("0000-0000", |s| s)("12ab34".into()), "1234");
-        let _: Element<'_, ()> = masked_input(
-            "0000-0000",
-            "1234",
-            |_| (),
-            named("dark").tokens,
-            A11y::new("mask", Role::TextBox),
-        );
         assert!(A11y::button("x").with_disabled(true).disabled);
         assert_eq!(
             A11y::new("y", Role::Checkbox).with_checked(false).checked,
@@ -4214,15 +3916,6 @@ mod tests {
         let role = |n: &str, r: Role| A11y::new(n, r);
         let _: Element<'_, ()> = icon_svg(Icon::Search, tok, role("search", Role::Image));
         let _: Element<'_, ()> = label("Hi", tok, role("Hi", Role::Header));
-        let plain = RichCell::Plain("hi".into());
-        let _: Element<'_, ()> = rich_cell(&plain, None, tok, role("plain", Role::Status));
-        let em = RichCell::Emphasis("em".into());
-        let _: Element<'_, ()> = rich_cell(&em, None, tok, role("em", Role::Status));
-        let code = RichCell::Code("x".into());
-        let _: Element<'_, ()> = rich_cell(&code, None, tok, role("code", Role::Status));
-        let link = RichCell::Link("go".into());
-        let _: Element<'_, ()> = rich_cell(&link, Some(()), tok, role("go", Role::Link));
-        let _: Element<'_, ()> = rich_cell(&link, None, tok, role("go2", Role::Link));
         let _: Element<'_, ()> = meta("m", tok, role("m", Role::Status));
         let snippet = Content::with_text("fn");
         let _: Element<'_, ()> = code_block(&snippet, |_| (), tok, role("fn", Role::Group));
@@ -4237,7 +3930,6 @@ mod tests {
             Length::Fixed(Density::default().tile() as f32),
             btn("7"),
         );
-        let _: Element<'_, ()> = display_reading("24", tok, role("24", Role::Status));
         let _: Element<'_, ()> = display_line("6 × 4 =", tok, role("expr", Role::Status));
         let _: Element<'_, ()> = figure_display("12:40", tok, role("clock", Role::Status));
         let glyph = A11y::button("Backspace");
@@ -4353,12 +4045,6 @@ mod tests {
         );
         assert_eq!(progress_label(0.5, None), "50%");
         assert_eq!(progress_label(0.5, Some("1 min")), "50% · 1 min");
-        assert!(spark_points(&[], 10.0, 10.0).is_empty());
-        let pts = spark_points(&[1.0, 3.0, 2.0], 100.0, 20.0);
-        assert_eq!(pts.len(), 3);
-        assert!((pts[0].0 - 0.0).abs() < 0.01);
-        assert!(pts[1].1 < pts[0].1);
-        let _: Element<'_, ()> = sparkline(&[1.0, 2.0, 1.5], tok, role("spark", Role::Image));
         let _: Element<'_, ()> = image_slot(
             ImageSlot::Ready {
                 handle: iced::widget::image::Handle::from_bytes(TEST_PNG),
@@ -4593,7 +4279,6 @@ mod tests {
             tok,
             role("time-am", Role::SpinButton),
         );
-        let _: Element<'_, ()> = color_swatch(1, 2, 3, (), tok, btn("color"));
         let items = markdown::parse("# Hi");
         let items: Vec<_> = items.collect();
         let _: Element<'_, ()> = markdown_view(&items, tok, |_| (), role("md", Role::Group));
@@ -4677,8 +4362,6 @@ mod tests {
             ttl_ms: 10,
         };
         let _: Element<'_, ()> = toast_view(&toast, (), tok, role("t", Role::Status));
-        let _: Element<'_, ()> = teaching_tip("t", "b", (), tok, role("tip", Role::Tooltip));
-        let _: Element<'_, ()> = placeholder_skeleton(tok, role("sk", Role::Status));
         let list = VecList {
             items: vec![
                 crate::collection::ListRow::new("a").with_meta("meta"),
@@ -5073,7 +4756,6 @@ mod tests {
                 crate::layout::FILL,
                 role("code", Role::Group),
             ),
-            color_swatch(1, 2, 3, (), tok, btn("color")),
             chip("ok", None, None, tok, Variant::Success, btn("ok")),
             chip("x", None, Some(()), tok, Variant::Quiet, btn("x")),
             tooltip_wrap(
@@ -5091,8 +4773,6 @@ mod tests {
             ),
             banner("Hi", None, tok, role("ban", Role::Status)),
             info_bar(ToastKind::Info, "n", tok, role("ib", Role::Status)),
-            teaching_tip("t", "b", (), tok, role("tip", Role::Tooltip)),
-            placeholder_skeleton(tok, role("sk", Role::Status)),
         ];
         for el in &mut painted {
             draw_once(el);
@@ -5311,8 +4991,6 @@ mod tests {
             role("code", Role::Group).with_disabled(true),
         );
         draw_once(&mut dead_code);
-        let mut dead_sw = color_swatch(1, 2, 3, (), tok, btn("c").with_disabled(true));
-        draw_once(&mut dead_sw);
         let mut dead_x = dismiss_button((), tok, A11y::button("x").with_disabled(true));
         draw_once(&mut dead_x);
         let toast = Toast {

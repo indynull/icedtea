@@ -65,6 +65,8 @@ pub struct Tokens {
     pub border: Color,
     pub selection: Color,
     pub selection_text: Color,
+    /// Exact M3 scheme. [`Self::scheme`] returns this without mixing.
+    full: crate::m3::Scheme,
 }
 
 impl From<crate::m3::Scheme> for Tokens {
@@ -83,56 +85,57 @@ impl From<crate::m3::Scheme> for Tokens {
             border: s.outline,
             selection: s.secondary_container,
             selection_text: s.on_secondary_container,
+            full: s,
         }
     }
 }
 
 impl Tokens {
-    /// Reconstruct the full M3 scheme for this token face.
+    /// Full M3 scheme for this token face.
+    ///
+    /// Round-trips exactly when tokens were built from [`crate::m3::Scheme`]
+    /// (`light` / `dark` baselines). Community colorways keep container
+    /// roles from the light/dark baseline while short fields override
+    /// primary surface roles.
     pub fn scheme(self) -> crate::m3::Scheme {
-        let base = if self.canvas_is_dark() {
+        self.full
+    }
+
+    /// Rebuild `full` after short fields change (OS chrome, catalog).
+    fn sync_full_from_aliases(mut self) -> Self {
+        let base = if relative_luma(self.canvas) < 0.45 {
             crate::m3::scheme_dark()
         } else {
             crate::m3::scheme_light()
         };
-        crate::m3::Scheme {
-            primary: self.primary,
-            on_primary: base.on_primary,
-            primary_container: mix(self.primary, self.canvas, 0.25),
-            on_primary_container: self.text,
-            secondary: self.accent,
-            on_secondary: base.on_secondary,
-            secondary_container: self.selection,
-            on_secondary_container: self.selection_text,
-            tertiary: base.tertiary,
-            on_tertiary: base.on_tertiary,
-            tertiary_container: base.tertiary_container,
-            on_tertiary_container: base.on_tertiary_container,
-            error: self.danger,
-            on_error: base.on_error,
-            error_container: mix(self.danger, self.canvas, 0.20),
-            on_error_container: self.text,
-            surface: self.canvas,
-            on_surface: self.text,
-            on_surface_variant: self.muted,
-            surface_variant: mix(self.text, self.canvas, 0.12),
-            surface_container_lowest: self.canvas,
-            surface_container_low: mix(self.surface, self.canvas, 0.5),
-            surface_container: self.surface,
-            surface_container_high: self.panel,
-            surface_container_highest: mix(self.text, self.panel, 0.08),
-            outline: self.border,
-            outline_variant: mix(self.border, self.canvas, 0.5),
-            inverse_surface: self.text,
-            inverse_on_surface: self.canvas,
-            inverse_primary: self.primary,
-            scrim: Color::from_rgb(0.0, 0.0, 0.0),
-            shadow: Color::from_rgb(0.0, 0.0, 0.0),
-            success: self.success,
-            on_success: base.on_success,
-            warning: self.warning,
-            on_warning: base.on_warning,
-        }
+        let mut s = base;
+        s.primary = self.primary;
+        s.secondary = self.accent;
+        s.error = self.danger;
+        s.success = self.success;
+        s.warning = self.warning;
+        s.surface = self.canvas;
+        s.surface_container = self.surface;
+        s.surface_container_high = self.panel;
+        s.surface_container_low = mix(self.surface, self.canvas, 0.5);
+        s.surface_container_lowest = self.canvas;
+        s.surface_container_highest = mix(self.text, self.panel, 0.08);
+        s.surface_variant = mix(self.text, self.canvas, 0.12);
+        s.on_surface = self.text;
+        s.on_surface_variant = self.muted;
+        s.outline = self.border;
+        s.outline_variant = mix(self.border, self.canvas, 0.5);
+        s.secondary_container = self.selection;
+        s.on_secondary_container = self.selection_text;
+        s.primary_container = mix(self.primary, self.canvas, 0.25);
+        s.on_primary_container = self.text;
+        s.error_container = mix(self.danger, self.canvas, 0.20);
+        s.on_error_container = self.text;
+        s.inverse_surface = self.text;
+        s.inverse_on_surface = self.canvas;
+        s.inverse_primary = self.primary;
+        self.full = s;
+        self
     }
 }
 
@@ -174,9 +177,9 @@ pub fn pressed_fill(tok: Tokens) -> Color {
     crate::m3::color::state_pressed(tok.scheme())
 }
 
-/// Chip / quiet fill.
+/// Chip / assist fill (M3 secondary container).
 pub fn chip_fill(tok: Tokens) -> Color {
-    mix(tok.text, tok.canvas, 0.10)
+    tok.scheme().secondary_container
 }
 
 /// Primary wash used for selected rows.
@@ -256,7 +259,9 @@ fn tokens(
         border,
         selection: mix(primary, canvas, 0.28),
         selection_text: text,
+        full: crate::m3::scheme_dark(), // replaced by sync
     }
+    .sync_full_from_aliases()
 }
 
 const CATALOG_JSON: &str = include_str!("../assets/themes/catalog.json");
@@ -301,7 +306,9 @@ fn high_contrast() -> NamedTheme {
             border: rgb(0xFF, 0xFF, 0xFF),
             selection: rgb(0x00, 0x00, 0xAA),
             selection_text: rgb(0xFF, 0xFF, 0xFF),
-        },
+            full: crate::m3::scheme_dark(),
+        }
+        .sync_full_from_aliases(),
     }
 }
 
@@ -875,6 +882,7 @@ pub fn apply_os_chrome(tokens: Tokens, follow_os: bool, chrome: OsChrome) -> Tok
         if chrome.text.is_some() {
             tokens.selection_text = tokens.text;
         }
+        tokens = tokens.sync_full_from_aliases();
     }
     tokens
 }
@@ -882,6 +890,28 @@ pub fn apply_os_chrome(tokens: Tokens, follow_os: bool, chrome: OsChrome) -> Tok
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn scheme_roundtrip_preserves_baseline_roles() {
+        for (name, baseline) in [
+            ("light", crate::m3::scheme_light()),
+            ("dark", crate::m3::scheme_dark()),
+        ] {
+            let tok = named(name).tokens;
+            let s = tok.scheme();
+            assert_eq!(s, baseline, "{name} scheme() is exact M3 baseline");
+            assert_eq!(s.primary_container, baseline.primary_container);
+            assert_eq!(s.on_primary, baseline.on_primary);
+            assert_eq!(s.on_primary_container, baseline.on_primary_container);
+            assert_eq!(
+                s.surface_container_highest,
+                baseline.surface_container_highest
+            );
+            // From Scheme preserves full set.
+            let again: Tokens = baseline.into();
+            assert_eq!(again.scheme(), baseline);
+        }
+    }
 
     #[test]
     fn mix_is_opaque_between_endpoints() {

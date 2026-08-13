@@ -240,7 +240,7 @@ fn page_job(page: &str) -> &'static str {
     match page {
         "controls" => "Press a control. The status bar records the message.",
         "fields" => "Typed values the application owns. Select-and-copy is on for labeled rows.",
-        "readout" => "Progress, a ring, a sparkline, and an indeterminate spinner.",
+        "readout" => "Progress, a ring, and an indeterminate spinner.",
         "type" => "Labels, icons, links, and a tooltip.",
         "markdown" => "Rendered document. Drag to select; Ctrl+C copies the range.",
         "code" => "Highlighted source. Select a range and copy.",
@@ -256,9 +256,9 @@ fn page_job(page: &str) -> &'static str {
         "theme" => "Named colorways. Follow the desktop light/dark pair and accent.",
         "colors" => "Semantic tokens and mixes. These are the paints widgets use.",
         "keys" => "The action table drives shortcuts. The cheatsheet lists them.",
-        "marks" => "Cards, chips, badges, rules, and a teaching tip.",
+        "marks" => "Cards, chips, badges, and rules.",
         "chrome-rows" => "Menu, toolbar, status, breadcrumb, and the command bar.",
-        "feedback" => "Toasts, a job strip, scroll, and a busy overlay on a child.",
+        "feedback" => "Toasts, scroll, and a busy overlay on a child.",
         "dialogs" => "An in-window confirm sheet on a dim backdrop.",
         "list-detail" => "A list beside a detail pane. Pick a row; the right side is that row.",
         "inspector" => "Pick a file. The middle is the document. The right column is properties.",
@@ -285,14 +285,9 @@ fn widget_job(id: &str) -> Option<&'static str> {
             "Determinate fraction as a ring. Same value as the progress bar on this page."
         }
         "progress" => "Determinate bar. Same fraction as the ring.",
-        "sparkline" => "One-row series. Domain plots stay in the application.",
-        "display" => "A large value for a compact tool.",
         "busy" => "The switch is the busy flag. On, the child dims and eight dots spin.",
         "toast" => "Transient notice. The application owns the queue.",
-        "jobs" => "Background jobs. Progress ticks while the gallery is open.",
         "scrollbar" => "Themed scroller for panes that are not a list or table.",
-        "skeleton" => "Placeholder bars while content loads.",
-        "teaching-tip" => "A one-shot hint with a go action.",
         "workspace" => "Editor split: files on the left, Edit and Terminal as tabs. Drag the sash.",
         "drawer" => "A side pane that hides. Closed paints the content only.",
         "tool-panel" => {
@@ -432,7 +427,7 @@ fn tour_caption_for(page: &str) -> &'static str {
         "keys" => "Keys: shortcuts and cheatsheet",
         "marks" => "Marks: cards, chips, badges",
         "chrome-rows" => "Chrome: menu, toolbar, status",
-        "feedback" => "Feedback: busy overlay, toasts, jobs",
+        "feedback" => "Feedback: busy overlay, toasts, scroll",
         "dialogs" => "Dialogs: confirm on a dim card",
         "list-detail" => "List and detail: pick a row",
         "inspector" => "Inspector: list, body, properties",
@@ -572,8 +567,6 @@ enum Message {
     Tab(usize),
     CloseTab(usize),
     DockTool,
-    DocSel(usize),
-    DocClose(usize),
     DrawerToggle,
     Cheat(String),
     WsMove,
@@ -602,7 +595,6 @@ enum Message {
     DismissWrap(usize),
     DismissCardTag,
     BannerGo,
-    TipGo,
     Grid(usize),
     NavTo(&'static str),
     NavBack,
@@ -610,7 +602,6 @@ enum Message {
     StatusNew,
     Swatch,
     LogScroll(VisibleWindow),
-    Mask(String),
     SuggestPick(usize),
     Submit,
     Tick,
@@ -759,7 +750,6 @@ struct Gallery {
     table_cols: icedtea::collection::ColumnLayout,
     log_lines: Vec<String>,
     log_window: VisibleWindow,
-    mask: String,
     options: VecList,
     opt_sel: Selection,
     md_jump: Option<usize>,
@@ -770,7 +760,6 @@ struct Gallery {
     card_tag: bool,
     pad: String,
     banner_on: bool,
-    tip_on: bool,
     grid_sel: Option<usize>,
     pinned: Tabs,
     status_n: usize,
@@ -802,7 +791,6 @@ struct Gallery {
     ws_drag: SashDrag,
     collapsed: HashSet<&'static str>,
     tour_at: usize,
-    docs: icedtea::collection::DocumentTabs,
     ws: icedtea::workspace::DockNode,
     drawer_open: bool,
     cheat_q: String,
@@ -1010,7 +998,6 @@ impl Gallery {
                 })
                 .collect(),
             log_window: VisibleWindow::new(240.0),
-            mask: String::new(),
             options: {
                 let mut o = VecList::titles(["All"]);
                 o.items.push(icedtea::collection::ListRow::separator());
@@ -1033,7 +1020,6 @@ impl Gallery {
             card_tag: true,
             pad: String::new(),
             banner_on: true,
-            tip_on: true,
             grid_sel: None,
             pinned: Tabs::new(["Read", "Write"]),
             status_n: 0,
@@ -1075,13 +1061,6 @@ impl Gallery {
             ws_drag: SashDrag::default(),
             collapsed: HashSet::new(),
             tour_at: 0,
-            docs: {
-                let mut d =
-                    icedtea::collection::DocumentTabs::new(["notes.txt", "readme.md", "todo.md"]);
-                d.tabs.closable = true;
-                d.mark_dirty(0, true);
-                d
-            },
             ws: icedtea::workspace::DockNode::split(
                 Axis::Horizontal,
                 0.22,
@@ -1498,15 +1477,6 @@ impl Gallery {
                     self.note = "Outline docked on the right".into();
                 }
             }
-            Message::DocSel(i) => self.docs.tabs.select(i),
-            Message::DocClose(i) => {
-                if self.docs.close_needs_confirm(i) {
-                    self.docs.mark_dirty(i, false);
-                    self.toasts.push_warning("Unsaved changes discarded");
-                }
-                self.docs.tabs.closable = true;
-                let _ = self.docs.tabs.close(i);
-            }
             Message::DrawerToggle => self.drawer_open = !self.drawer_open,
             Message::Cheat(q) => self.cheat_q = q,
             Message::WsPress(i) => {
@@ -1568,7 +1538,6 @@ impl Gallery {
                 }
             }
             Message::LogScroll(w) => self.log_window = w,
-            Message::Mask(s) => self.mask = s,
             Message::SuggestPick(i) => {
                 if let Some(s) = self.suggests.get(i).cloned() {
                     return self.update(Message::Query(s));
@@ -1623,10 +1592,6 @@ impl Gallery {
             Message::BannerGo => {
                 self.banner_on = false;
                 self.note = "Install started".into();
-            }
-            Message::TipGo => {
-                self.tip_on = false;
-                self.note = "Hint dismissed".into();
             }
             Message::Grid(i) => {
                 self.grid_sel = Some(i);
@@ -2541,20 +2506,6 @@ impl Gallery {
                 tok,
                 named("progress", Role::Progress).with_value(self.value.to_string()),
             ),
-            "sparkline" => column![
-                widget::meta(
-                    "One-row series on tokens. Domain plots stay in the application.",
-                    tok,
-                    named("spark-hint", Role::Status),
-                ),
-                widget::sparkline(
-                    &[2.0, 4.0, 3.0, 6.0, 5.0, 8.0, 7.0],
-                    tok,
-                    named("spark", Role::Image)
-                ),
-            ]
-            .spacing(8)
-            .into(),
             "progress-ring" => widget::progress_ring(
                 self.value,
                 Some(&widget::progress_label(self.value, None)),
@@ -2567,31 +2518,6 @@ impl Gallery {
                 tok,
                 named("number", Role::SpinButton).with_value(self.number.clone()),
             ),
-            "mask" => column![
-                widget::meta(
-                    "Template 0000-0000. Digits fill slots; dashes are literals.",
-                    tok,
-                    named("mask-hint", Role::Status),
-                ),
-                widget::masked_input(
-                    "0000-0000",
-                    &self.mask,
-                    Message::Mask,
-                    tok,
-                    named("mask", Role::TextBox),
-                ),
-                widget::meta(
-                    if self.mask.is_empty() {
-                        "Type digits.".into()
-                    } else {
-                        self.mask.clone()
-                    },
-                    tok,
-                    named("mask-value", Role::Status),
-                ),
-            ]
-            .spacing(8)
-            .into(),
             "text-input" => column![
                 widget::themed_text_input(
                     "Name",
@@ -2801,14 +2727,7 @@ impl Gallery {
                 .spacing(12)
                 .into()
             }
-            "color" => widget::color_swatch(
-                if self.swatch { 0 } else { 1 },
-                120,
-                212,
-                Message::Swatch,
-                tok,
-                btn("color"),
-            ),
+
             "selectable" => {
                 let copy = Action::new("edit.copy", "Copy", Message::CopyFields);
                 column![
@@ -2885,51 +2804,7 @@ impl Gallery {
             ]
             .spacing(8)
             .into(),
-            "rich-cell" => column![
-                widget::meta(
-                    "Rust enum for a cell. Not a markup parser.",
-                    tok,
-                    named("rich-hint", Role::Status),
-                ),
-                widget::rich_cell(
-                    &widget::RichCell::Plain("Plain".into()),
-                    None,
-                    tok,
-                    named("plain-cell", Role::Status),
-                ),
-                widget::rich_cell(
-                    &widget::RichCell::Emphasis("Emphasis".into()),
-                    None,
-                    tok,
-                    named("em-cell", Role::Status),
-                ),
-                widget::rich_cell(
-                    &widget::RichCell::Code("code()".into()),
-                    None,
-                    tok,
-                    named("code-cell", Role::Status),
-                ),
-                widget::rich_cell(
-                    &widget::RichCell::Link("docs".into()),
-                    Some(Message::Note("docs".into())),
-                    tok,
-                    named("link-cell", Role::Link),
-                ),
-            ]
-            .spacing(8)
-            .into(),
-            "display" => column![
-                widget::meta(
-                    "Display reading and expression line on the type scale.",
-                    tok,
-                    named("display-hint", Role::Status),
-                ),
-                widget::display_line("6 × 4 =", tok, named("expr", Role::Status)),
-                widget::display_reading("24", tok, named("value", Role::Status)),
-                widget::figure_display("12:40", tok, named("clock", Role::Status)),
-            ]
-            .spacing(8)
-            .into(),
+
             "markdown" => {
                 let showing = self
                     .md_jump
@@ -3190,7 +3065,7 @@ impl Gallery {
                     ));
                 }
                 column![
-                    widget::display_reading(last, tok, named("last-key", Role::Status)),
+                    widget::label(last, tok, named("last-key", Role::Status)),
                     widget::meta(
                         "Type a letter, or Enter, Escape, an arrow, or a function key.",
                         tok,
@@ -3792,7 +3667,7 @@ impl Gallery {
                     )
                 };
                 column![
-                    widget::display_reading(
+                    widget::label(
                         if self.pad.is_empty() {
                             "0"
                         } else {
@@ -4020,20 +3895,6 @@ impl Gallery {
             ]
             .spacing(12)
             .into(),
-            "skeleton" => widget::placeholder_skeleton(tok, named("skeleton", Role::Status)),
-            "teaching-tip" => {
-                if self.tip_on {
-                    widget::teaching_tip(
-                        "Hint",
-                        "Press Ctrl+P",
-                        Message::TipGo,
-                        tok,
-                        named("Hint", Role::Tooltip),
-                    )
-                } else {
-                    widget::meta("Hint dismissed", tok, named("tip-done", Role::Status))
-                }
-            }
             "dialogs" => {
                 let backdrop = container(
                     column![
@@ -4293,30 +4154,7 @@ impl Gallery {
                 .spacing(12)
                 .into()
             }
-            "document-tabs" => {
-                let bodies = [
-                    "Draft the weekly recap. The first tab is dirty until you save.",
-                    "# Readme\n\nGallery document tabs close with a confirm when dirty.",
-                    "- [ ] Ship the tour GIF\n- [ ] Read the stills",
-                ];
-                let i = self.docs.tabs.active.min(bodies.len() - 1);
-                let body = column![
-                    widget::label(self.docs.title(i), tok, named("doc-title", Role::Header),),
-                    widget::meta(bodies[i], tok, named("doc-body", Role::Status)),
-                ]
-                .spacing(8)
-                .padding(12)
-                .into();
-                container(pattern::document_tabs(
-                    &self.docs,
-                    body,
-                    Message::DocSel,
-                    Message::DocClose,
-                    tok,
-                ))
-                .height(Length::Fixed(220.0))
-                .into()
-            }
+
             "inspector" => {
                 let id = self.tree_sel.unwrap_or(3);
                 let (name, kind, path, body) = match id {
@@ -4519,31 +4357,6 @@ impl Gallery {
             .spacing(8)
             .height(Length::Fill)
             .into(),
-            "jobs" => {
-                let p = (self.tick % 100) as f32 / 100.0;
-                let jobs = [
-                    icedtea::collection::Job {
-                        id: 1,
-                        title: "Index".into(),
-                        progress: Some(p),
-                    },
-                    icedtea::collection::Job {
-                        id: 2,
-                        title: "Check".into(),
-                        progress: Some(((p + 0.35) % 1.0).max(0.05)),
-                    },
-                ];
-                column![
-                    widget::meta(
-                        "Background jobs tick while the gallery is open.",
-                        tok,
-                        named("jobs-hint", Role::Status),
-                    ),
-                    pattern::job_strip(&jobs, tok, named("jobs", Role::Status)),
-                ]
-                .spacing(8)
-                .into()
-            }
             "main-window" => pattern::main_window(
                 pattern::menu_bar(&self.actions, tok, self.direction, &self.catalog),
                 pattern::toolbar(self.actions.iter(), tok, self.direction),
@@ -4854,8 +4667,6 @@ mod tests {
         assert_eq!(g.chips.len(), n - 1);
         let _ = g.update(super::Message::BannerGo);
         assert!(!g.banner_on);
-        let _ = g.update(super::Message::TipGo);
-        assert!(!g.tip_on);
         let _ = g.update(super::Message::Grid(2));
         assert_eq!(g.grid_sel, Some(2));
         let _ = g.update(super::Message::NavTo("files"));

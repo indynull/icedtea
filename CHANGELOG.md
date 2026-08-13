@@ -6,8 +6,19 @@ Material Design 3 foundations live under `m3`: color `Scheme` roles
 (light and dark baselines), type scale, shape, elevation, density on a
 4dp grid, and `ControlState`. `Tokens` seed from those schemes;
 `Tokens::scheme()` exposes the role map. Light and dark colorways use
-the M3 baselines; hover, pressed, and selection layers use M3 state
-mixes. The guide has an M3 foundations chapter.
+the M3 baselines. The guide has an M3 foundations chapter.
+
+Control faces paint from M3 roles and states: filled / tonal / text /
+error buttons (full shape), secondary-container chips and selected
+list rows, text fields with outline and primary focus ring, checkbox /
+radio / switch / slider / progress with state layers. Tabs use a
+primary indicator; dialogs use elevated sheets; menu and toolbar use
+app-bar surface. Cards use medium corners and elevation. Disabled
+content uses the M3 12% / 38% on-surface layers. Catalog inventory is
+complete in `m3::mapping` (map / desktop / delete). Deleted surfaces
+and constructors are gone (`sparkline`, `display_reading`, `rich_cell`,
+`masked_input`, `color_swatch`, `teaching_tip`, `placeholder_skeleton`,
+`document_tabs`, `job_strip`, `DocumentTabs`, `Job`) — no dual path.
 
 Catalog surfaces without an M3 counterpart are gone from the public
 catalog and gallery: mask, color, sparkline, display, rich-cell,

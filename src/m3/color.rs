@@ -143,15 +143,39 @@ pub fn mix(fg: Color, bg: Color, amount: f32) -> Color {
 }
 
 pub fn state_hover(scheme: Scheme) -> Color {
-    mix(scheme.on_surface, scheme.surface, 0.08)
+    layer_on(scheme.surface, scheme.on_surface, 0.08)
 }
 
 pub fn state_pressed(scheme: Scheme) -> Color {
-    mix(scheme.on_surface, scheme.surface, 0.12)
+    layer_on(scheme.surface, scheme.on_surface, 0.12)
 }
 
 pub fn state_selected(scheme: Scheme) -> Color {
-    mix(scheme.primary, scheme.surface, 0.12)
+    layer_on(scheme.surface, scheme.primary, 0.12)
+}
+
+/// Composite a state layer of `on` over `base` at the given opacity (0..=1).
+pub fn layer_on(base: Color, on: Color, opacity: f32) -> Color {
+    mix(on, base, opacity.clamp(0.0, 1.0))
+}
+
+/// M3 state layer over a container color, using content ink for the layer.
+pub fn face(
+    base: Color,
+    on: Color,
+    surface: Color,
+    state: super::state::ControlState,
+) -> (Color, Color) {
+    use super::state::ControlState;
+    match state {
+        ControlState::Disabled => (layer_on(surface, on, 0.12), layer_on(surface, on, 0.38)),
+        ControlState::Hovered => (layer_on(base, on, 0.08), on),
+        ControlState::Focused => (layer_on(base, on, 0.10), on),
+        ControlState::Pressed => (layer_on(base, on, 0.12), on),
+        ControlState::Selected => (layer_on(base, on, 0.12), on),
+        ControlState::Error => (base, on),
+        ControlState::Enabled => (base, on),
+    }
 }
 
 pub fn relative_luma(c: Color) -> f32 {
@@ -176,6 +200,24 @@ mod tests {
         assert_ne!(l.primary, d.primary);
         assert!(!l.is_dark());
         assert!(d.is_dark());
+    }
+
+    #[test]
+    fn state_layers_darken_or_shift_base() {
+        use crate::m3::ControlState;
+        let s = scheme_light();
+        let hover = state_hover(s);
+        let pressed = state_pressed(s);
+        assert_ne!(hover, s.surface);
+        assert_ne!(pressed, s.surface);
+        let (bg, fg) = face(s.primary, s.on_primary, s.surface, ControlState::Enabled);
+        assert_eq!(bg, s.primary);
+        assert_eq!(fg, s.on_primary);
+        let (dbg, dfg) = face(s.primary, s.on_primary, s.surface, ControlState::Disabled);
+        assert_ne!(dbg, s.primary);
+        assert_ne!(dfg, s.on_primary);
+        let layered = layer_on(s.primary, s.on_primary, 0.08);
+        assert_ne!(layered, s.primary);
     }
 
     #[test]

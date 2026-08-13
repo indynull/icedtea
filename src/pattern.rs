@@ -22,7 +22,7 @@ use iced::{Alignment, Element, Length, Padding, Point, Size};
 
 use crate::a11y::{A11y, Role};
 use crate::action::{Action, ActionTable};
-use crate::collection::{DocumentTabs, Tabs};
+use crate::collection::Tabs;
 use crate::i18n::{order, Catalog, Direction};
 use crate::icon::Icon;
 use crate::layout;
@@ -130,7 +130,7 @@ pub fn menu_bar<'a, M: Clone + 'a>(
     crate::a11y::attach(
         container(titles)
             .width(Length::Fill)
-            .style(move |_| style::panel(tok))
+            .style(move |_| style::app_bar(tok))
             .into(),
         &A11y::new("menubar", Role::Menu),
     )
@@ -171,7 +171,7 @@ pub fn toolbar<'a, M: Clone + 'a>(
     crate::a11y::attach(
         container(r)
             .width(Length::Fill)
-            .style(move |_| style::panel(tok))
+            .style(move |_| style::app_bar(tok))
             .into(),
         &A11y::new("toolbar", Role::Group),
     )
@@ -848,13 +848,14 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let title = title.into();
     let body = body.into();
+    // M3 dialog: cancel (text) then confirm (filled), trailing edge.
     let mut actions = Row::new().spacing(8);
     if let Some((t, m)) = cancel {
         actions = actions.push(themed_button(
             t.clone(),
             Some(m),
             tok,
-            Variant::Quiet,
+            Variant::Ghost,
             A11y::button(t),
         ));
     }
@@ -865,16 +866,24 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
         Variant::Primary,
         A11y::button(accept.0),
     ));
-    group_box(
-        title.clone(),
-        column![
-            label(body.clone(), tok, A11y::new(body, Role::Status)),
-            actions,
-        ]
-        .spacing(12)
+    let actions = container(actions)
+        .width(Length::Fill)
+        .align_x(Alignment::End);
+    crate::a11y::attach(
+        container(
+            column![
+                label(title.clone(), tok, A11y::new(title.clone(), Role::Header)),
+                label(body.clone(), tok, A11y::new(body, Role::Status)),
+                actions,
+            ]
+            .spacing(16)
+            .width(Length::Fill),
+        )
+        .padding(24)
+        .width(Length::Fixed(280.0))
+        .style(move |_| style::dialog_sheet_face(tok))
         .into(),
-        tok,
-        A11y::new(title, Role::Dialog),
+        &A11y::new(title, Role::Dialog),
     )
 }
 
@@ -978,48 +987,6 @@ pub fn context_menu<'a, M: Clone + 'a>(
         .width(Length::Fill)
         .height(Length::Fill)
         .into()
-}
-
-/// Closable document titles; dirty titles get a bullet.
-///
-/// Close confirm is the application's.
-///
-///
-/// ```
-/// use icedtea::a11y::{A11y, Role};
-/// use icedtea::collection::DocumentTabs;
-/// use icedtea::pattern;
-/// use icedtea::theme;
-/// use icedtea::widget;
-/// let tok = theme::named("dark").tokens;
-/// let mut docs = DocumentTabs::new(["lib.rs"]);
-/// docs.tabs.closable = true;
-/// #[derive(Clone, Copy)]
-/// enum Msg {
-///     Select(usize),
-///     Close(usize),
-/// }
-/// let on_select = Msg::Select;
-/// let on_close = Msg::Close;
-/// let _: icedtea::Element<'_, Msg> = pattern::document_tabs(
-///     &docs,
-///     widget::label("src", tok, A11y::new("src", Role::Status)),
-///     on_select,
-///     on_close,
-///     tok,
-/// );
-/// ```
-pub fn document_tabs<'a, M: Clone + 'a>(
-    docs: &DocumentTabs,
-    body: Element<'a, M>,
-    on_select: impl Fn(usize) -> M + Copy + 'a,
-    on_close: impl Fn(usize) -> M + Copy + 'a,
-    tok: Tokens,
-) -> Element<'a, M> {
-    let titles: Vec<String> = (0..docs.tabs.titles.len()).map(|i| docs.title(i)).collect();
-    let mut shown = docs.tabs.clone();
-    shown.titles = titles;
-    tab_view(&shown, body, on_select, on_close, tok)
 }
 
 /// Master, detail, and a side inspector stay in one row.
@@ -1347,44 +1314,6 @@ pub fn cheatsheet<'a, M: Clone + 'a>(
     )
 }
 
-/// Progress rows for background work.
-///
-/// The application owns job titles and fractions. Empty strip hides.
-///
-///
-/// ```
-/// use icedtea::a11y::{A11y, Role};
-/// use icedtea::collection::Job;
-/// use icedtea::pattern;
-/// use icedtea::theme;
-/// let tok = theme::named("dark").tokens;
-/// let jobs = [Job { id: 1, title: "Index".into(), progress: Some(0.4) }];
-/// let _: icedtea::Element<'_, ()> = pattern::job_strip(&jobs, tok, A11y::new("jobs", Role::Status));
-/// ```
-pub fn job_strip<'a, M: Clone + 'a>(
-    jobs: &[crate::collection::Job],
-    tok: Tokens,
-    a11y: A11y,
-) -> Element<'a, M> {
-    if jobs.is_empty() {
-        return crate::a11y::attach(Space::new().into(), &a11y);
-    }
-    let mut row = Row::new().spacing(12).padding([4, 8]);
-    for j in jobs {
-        let label_s = if let Some(p) = j.progress {
-            format!("{} {:>3.0}%", j.title, p * 100.0)
-        } else {
-            j.title.clone()
-        };
-        row = row.push(meta(
-            label_s.clone(),
-            tok,
-            A11y::new(j.title.clone(), Role::Status).with_value(label_s),
-        ));
-    }
-    crate::a11y::attach(row.into(), &a11y)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1651,11 +1580,15 @@ mod tests {
         paint(&mut cb);
         let mut dlg = dialog_sheet("Note", "Hello", ("OK".into(), ()), None, tok);
         paint(&mut dlg);
-        let mut docs = crate::collection::DocumentTabs::new(["a.rs"]);
-        docs.tabs.closable = true;
-        docs.mark_dirty(0, true);
-        let mut dt = document_tabs(&docs, lab("b"), |_| (), |_| (), tok);
-        paint(&mut dt);
+        let mut dlg2 = dialog_sheet(
+            "Save",
+            "Overwrite?",
+            ("Save".into(), ()),
+            Some(("Cancel".into(), ())),
+            tok,
+        );
+        paint(&mut dlg2);
+
         let mut insp = inspector(lab("l"), lab("d"), lab("p"), tok);
         paint(&mut insp);
         let root = crate::workspace::DockNode::leaf("edit", "Edit");
@@ -1690,22 +1623,6 @@ mod tests {
         extra.insert(dead);
         let mut miss = cheatsheet(&extra, "zzzz", tok);
         paint(&mut miss);
-        let jobs = [
-            crate::collection::Job {
-                id: 1,
-                title: "Index".into(),
-                progress: Some(0.4),
-            },
-            crate::collection::Job {
-                id: 2,
-                title: "Idle".into(),
-                progress: None,
-            },
-        ];
-        let mut js = job_strip(&jobs, tok, A11y::new("jobs", Role::Status));
-        paint(&mut js);
-        let mut none_jobs = job_strip(&[], tok, A11y::new("jobs-empty", Role::Status));
-        paint(&mut none_jobs);
         let root = crate::workspace::DockNode::tabs(
             vec![
                 crate::workspace::Panel::new("a", "A"),

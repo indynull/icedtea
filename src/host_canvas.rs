@@ -90,38 +90,3 @@ impl<Message> canvas::Program<Message> for SpinnerDots {
         vec![frame.into_geometry()]
     }
 }
-
-/// Polyline for [`crate::widget::sparkline`].
-#[derive(Clone)]
-pub(crate) struct Sparkline {
-    pub points: Vec<(f32, f32)>,
-    pub color: Color,
-}
-
-impl<Message> canvas::Program<Message> for Sparkline {
-    type State = ();
-
-    fn draw(
-        &self,
-        _state: &Self::State,
-        renderer: &Renderer,
-        _theme: &Theme,
-        bounds: Rectangle,
-        _cursor: mouse::Cursor,
-    ) -> Vec<canvas::Geometry> {
-        let mut frame = canvas::Frame::new(renderer, bounds.size());
-        if self.points.len() >= 2 {
-            let path = Path::new(|b| {
-                b.move_to(Point::new(self.points[0].0, self.points[0].1));
-                for &(x, y) in &self.points[1..] {
-                    b.line_to(Point::new(x, y));
-                }
-            });
-            frame.stroke(
-                &path,
-                Stroke::default().with_width(2.0).with_color(self.color),
-            );
-        }
-        vec![frame.into_geometry()]
-    }
-}

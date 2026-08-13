@@ -1,8 +1,9 @@
 # Compact tools
 
 A tool-sized window sets size on `Boot`. Tiles use
-`themed_button_sized` and `layout::pad`. The large reading uses
-`widget::display_reading`. Keys use `key::press` so Shift+8 is `*`.
+`themed_button_sized` and `layout::pad`. Large values use body text at
+`typo::DISPLAY` (or `m3::TypeRole::Display`) with platform bold. Keys
+use `key::press` so Shift+8 is `*`.
 
 ```rust,ignore
 use icedtea::density::Density;
@@ -29,15 +30,13 @@ fn main() -> icedtea::iced::Result {
 // match key::press(&event) { Some(Press::Character(s)) => ..., Some(Press::Enter) => ... }
 // Ctrl+S still goes through key::handle and Action shortcuts.
 
-// In view:
-// widget::display_line(expr, tok, a11y)
-// widget::display_reading(value, tok, a11y)
+// In view: large reading with typo::DISPLAY, keypad with layout::pad
 // layout::pad(tiles, 4, Density::default().space)
 ```
 
-A four-function keypad on `layout::pad`, `display_reading` for the
-value, and `key::press` for digits and Shift+8 as `*` is the compact
-tool shape. The application owns the arithmetic. The first window is
+A four-function keypad on `layout::pad`, a large reading for the value,
+and `key::press` for digits and Shift+8 as `*` is the compact tool
+shape. The application owns the arithmetic. The first window is
 [`examples/hello.rs`](https://github.com/indynull/icedtea/blob/master/examples/hello.rs).
 
 The caption on a tile can be a glyph; the accessible name stays
@@ -76,6 +75,5 @@ plus a copy `Action`. The application owns the copy message
 (`icedtea::copy_text`).
 
 - [`layout::pad`](https://docs.rs/icedtea/latest/icedtea/layout/fn.pad.html)
-- [`display_reading`](https://docs.rs/icedtea/latest/icedtea/widget/fn.display_reading.html)
 - [source](https://github.com/indynull/icedtea/blob/master/src/layout/recipes.rs)
 - [crates.io](https://crates.io/crates/icedtea)

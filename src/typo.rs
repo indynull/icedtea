@@ -38,18 +38,21 @@ pub const UI_ITALIC: Font = Font {
 /// Platform monospace — ids, paths, code.
 pub const MONO: Font = Font::MONOSPACE;
 
-/// Large reading (a tool's current value). On the 4px grid.
+// App-facing type steps map 1:1 onto Material Design 3 roles
+// (see [`crate::m3::TypeRole`]). Sizes are the M3 scale in dp.
+
+/// Large reading — M3 Display Small (36).
 pub const DISPLAY: u32 = 36;
-/// Page title.
-pub const PAGE: u32 = 18;
-/// Section / card title.
-pub const TITLE: u32 = 15;
-/// Body copy (default text size).
+/// Page title — M3 Title Large (22).
+pub const PAGE: u32 = 22;
+/// Section / card title — M3 Title Medium (16).
+pub const TITLE: u32 = 16;
+/// Body copy — M3 Body Medium (14).
 pub const BODY: u32 = 14;
-/// Meta, tabs, footer, keys.
+/// Meta, tabs, footer, keys — M3 Label Medium (12).
 pub const META: u32 = 12;
-/// Code / monospace.
-pub const CODE: u32 = 13;
+/// Code / monospace — M3 Body Small (12).
+pub const CODE: u32 = 12;
 
 /// Platform sans or mono for a body that paints as text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,7 +71,7 @@ impl FontFace {
     }
 }
 
-/// Named step on the type scale.
+/// Named step on the type scale (maps onto [`crate::m3::TypeRole`]).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TypeRole {
     Display,
@@ -80,20 +83,29 @@ pub enum TypeRole {
 }
 
 impl TypeRole {
-    /// Pixel size for this role.
+    /// Matching Material Design 3 type role.
+    pub fn m3(self) -> crate::m3::TypeRole {
+        match self {
+            Self::Display => crate::m3::TypeRole::DisplaySmall,
+            Self::Page => crate::m3::TypeRole::TitleLarge,
+            Self::Title => crate::m3::TypeRole::TitleMedium,
+            Self::Body => crate::m3::TypeRole::BodyMedium,
+            Self::Meta => crate::m3::TypeRole::LabelMedium,
+            Self::Code => crate::m3::TypeRole::BodySmall,
+        }
+    }
+
+    /// Pixel size for this role (M3 scale).
     ///
     /// ```
     /// assert_eq!(icedtea::typo::TypeRole::Body.size(), 14);
+    /// assert_eq!(
+    ///     icedtea::typo::TypeRole::Body.size() as f32,
+    ///     icedtea::m3::TypeRole::BodyMedium.scale().size
+    /// );
     /// ```
     pub fn size(self) -> u32 {
-        match self {
-            Self::Display => DISPLAY,
-            Self::Page => PAGE,
-            Self::Title => TITLE,
-            Self::Body => BODY,
-            Self::Meta => META,
-            Self::Code => CODE,
-        }
+        self.m3().scale().size as u32
     }
 
     pub fn font(self) -> Font {
@@ -308,7 +320,17 @@ mod tests {
         assert_eq!(MONO, Font::MONOSPACE);
         assert_eq!(TypeRole::Display.size(), DISPLAY);
         assert_eq!(TypeRole::Display.font(), UI_BOLD);
-        assert_eq!(DISPLAY % 4, 0);
+        // Constants track M3 scale (not forced onto the 4dp layout grid).
+        for role in [
+            TypeRole::Display,
+            TypeRole::Page,
+            TypeRole::Title,
+            TypeRole::Body,
+            TypeRole::Meta,
+            TypeRole::Code,
+        ] {
+            assert_eq!(role.size() as f32, role.m3().scale().size);
+        }
         assert_eq!(TypeRole::Page.size(), PAGE);
         assert_eq!(TypeRole::Title.size(), TITLE);
         assert_eq!(TypeRole::Body.size(), BODY);

@@ -1,4 +1,4 @@
-//! iced style closures painted from M3 [`crate::theme::Tokens`] roles.
+//! iced style closures painted from M3 roles and control states.
 
 use iced::border::Border;
 use iced::overlay::menu as overlay_menu;
@@ -8,12 +8,24 @@ use iced::widget::{
 };
 use iced::{Background, Color, Shadow};
 
-use crate::chrome::{Corner, Elevation};
-use crate::theme::{chip_fill, hover_fill, mix, pressed_fill, Tokens};
+use crate::chrome::Elevation;
+use crate::m3::color::{face, layer_on};
+use crate::m3::shape::Shape;
+use crate::m3::ControlState;
+use crate::theme::{hover_fill, Tokens};
 use crate::variant::Variant;
 
-fn radius(c: Corner) -> iced::border::Radius {
-    c.radius()
+fn shape_radius(s: Shape) -> iced::border::Radius {
+    s.radius()
+}
+
+fn button_status(status: button::Status) -> ControlState {
+    match status {
+        button::Status::Active => ControlState::Enabled,
+        button::Status::Hovered => ControlState::Hovered,
+        button::Status::Pressed => ControlState::Pressed,
+        button::Status::Disabled => ControlState::Disabled,
+    }
 }
 
 /// Solid fill container.
@@ -26,42 +38,47 @@ pub fn fill(bg: Color, fg: Color) -> container::Style {
     }
 }
 
+/// M3 filled / elevated card (surface container, medium corners).
 pub fn card(tok: Tokens, focus: bool) -> container::Style {
+    let s = tok.scheme();
     container::Style {
-        background: Some(Background::Color(tok.surface)),
-        text_color: Some(tok.text),
+        background: Some(Background::Color(s.surface_container_low)),
+        text_color: Some(s.on_surface),
         border: Border {
-            color: if focus { tok.primary } else { tok.border },
-            width: 1.0,
-            radius: radius(Corner::Tight),
+            color: if focus { s.primary } else { s.outline_variant },
+            width: if focus { 2.0 } else { 1.0 },
+            radius: shape_radius(Shape::Medium),
         },
-        shadow: Elevation::Flat.shadow(),
+        shadow: Elevation::Level1.shadow(),
         snap: false,
     }
 }
 
+/// M3 elevated card (level 2 surface + shadow).
 pub fn raised_card(tok: Tokens) -> container::Style {
+    let s = tok.scheme();
     container::Style {
-        background: Some(Background::Color(tok.surface)),
-        text_color: Some(tok.text),
+        background: Some(Background::Color(Elevation::Level2.surface(s))),
+        text_color: Some(s.on_surface),
         border: Border {
-            color: tok.border,
-            width: 1.0,
-            radius: radius(Corner::Soft),
+            color: s.outline_variant,
+            width: 0.0,
+            radius: shape_radius(Shape::Medium),
         },
-        shadow: Elevation::Raised.shadow(),
+        shadow: Elevation::Level2.shadow(),
         snap: false,
     }
 }
 
 pub fn shell(tok: Tokens) -> container::Style {
+    let s = tok.scheme();
     container::Style {
-        background: Some(Background::Color(tok.canvas)),
-        text_color: Some(tok.text),
+        background: Some(Background::Color(s.surface)),
+        text_color: Some(s.on_surface),
         border: Border {
-            color: tok.primary,
+            color: s.outline,
             width: 1.0,
-            radius: radius(Corner::None),
+            radius: shape_radius(Shape::None),
         },
         shadow: Shadow::default(),
         snap: false,
@@ -69,16 +86,19 @@ pub fn shell(tok: Tokens) -> container::Style {
 }
 
 pub fn panel(tok: Tokens) -> container::Style {
-    fill(tok.panel, tok.text)
+    let s = tok.scheme();
+    fill(s.surface_container_high, s.on_surface)
 }
 
 pub fn footer(tok: Tokens) -> container::Style {
-    fill(tok.panel, tok.muted)
+    let s = tok.scheme();
+    fill(s.surface_container_high, s.on_surface_variant)
 }
 
 pub fn hairline(tok: Tokens) -> container::Style {
+    let s = tok.scheme();
     container::Style {
-        background: Some(Background::Color(tok.border)),
+        background: Some(Background::Color(s.outline_variant)),
         snap: false,
         ..container::Style::default()
     }
@@ -96,34 +116,50 @@ pub fn dim_backdrop(tok: Tokens) -> container::Style {
     }
 }
 
+/// M3 list row: selected uses secondary container; idle is transparent.
 pub fn list_row(tok: Tokens, selected: bool) -> container::Style {
-    let bg = if selected {
-        tok.selection
+    let s = tok.scheme();
+    if selected {
+        fill(s.secondary_container, s.on_secondary_container)
     } else {
-        Color::TRANSPARENT
-    };
-    let fg = if selected {
-        tok.selection_text
+        fill(Color::TRANSPARENT, s.on_surface)
+    }
+}
+
+/// Hovered list row (state layer over surface).
+pub fn list_row_hover(tok: Tokens, selected: bool) -> container::Style {
+    let s = tok.scheme();
+    if selected {
+        let bg = layer_on(s.secondary_container, s.on_secondary_container, 0.08);
+        fill(bg, s.on_secondary_container)
     } else {
-        tok.text
-    };
-    fill(bg, fg)
+        fill(hover_fill(tok), s.on_surface)
+    }
 }
 
 pub fn callout(tok: Tokens, kind: crate::toast::ToastKind) -> container::Style {
-    let accent = match kind {
-        crate::toast::ToastKind::Info => tok.primary,
-        crate::toast::ToastKind::Success => tok.success,
-        crate::toast::ToastKind::Warning => tok.warning,
-        crate::toast::ToastKind::Danger => tok.danger,
+    let s = tok.scheme();
+    let (bg, fg, border) = match kind {
+        crate::toast::ToastKind::Info => (s.primary_container, s.on_primary_container, s.primary),
+        crate::toast::ToastKind::Success => (
+            layer_on(s.surface, s.success, 0.16),
+            s.on_surface,
+            s.success,
+        ),
+        crate::toast::ToastKind::Warning => (
+            layer_on(s.surface, s.warning, 0.16),
+            s.on_surface,
+            s.warning,
+        ),
+        crate::toast::ToastKind::Danger => (s.error_container, s.on_error_container, s.error),
     };
     container::Style {
-        background: Some(Background::Color(mix(accent, tok.canvas, 0.16))),
-        text_color: Some(tok.text),
+        background: Some(Background::Color(bg)),
+        text_color: Some(fg),
         border: Border {
-            color: accent,
+            color: border,
             width: 1.0,
-            radius: radius(Corner::Tight),
+            radius: shape_radius(Shape::ExtraSmall),
         },
         shadow: Shadow::default(),
         snap: false,
@@ -131,51 +167,136 @@ pub fn callout(tok: Tokens, kind: crate::toast::ToastKind) -> container::Style {
 }
 
 pub fn skeleton(tok: Tokens) -> container::Style {
-    fill(mix(tok.text, tok.canvas, 0.08), tok.muted)
+    let s = tok.scheme();
+    fill(s.surface_container_highest, s.on_surface_variant)
 }
 
-fn button_colors(tok: Tokens, variant: Variant, status: button::Status) -> (Color, Color) {
-    let hover = matches!(status, button::Status::Hovered | button::Status::Pressed);
-    let disabled = matches!(status, button::Status::Disabled);
-    let (bg, fg) = match variant {
-        Variant::Primary => (
-            mix(tok.primary, tok.canvas, if hover { 0.90 } else { 0.75 }),
-            tok.text,
-        ),
-        Variant::Danger => (
-            mix(tok.danger, tok.canvas, if hover { 0.55 } else { 0.35 }),
-            tok.danger,
-        ),
-        Variant::Success => (
-            mix(tok.success, tok.canvas, if hover { 0.55 } else { 0.35 }),
-            tok.success,
-        ),
-        Variant::Warning => (
-            mix(tok.warning, tok.canvas, if hover { 0.55 } else { 0.35 }),
-            tok.warning,
-        ),
-        Variant::Quiet => (
-            if hover {
-                pressed_fill(tok)
-            } else {
-                hover_fill(tok)
-            },
-            tok.text,
-        ),
-        Variant::Ghost => (
-            if hover {
-                hover_fill(tok)
-            } else {
-                Color::TRANSPARENT
-            },
-            tok.text,
-        ),
-        Variant::Chip => (chip_fill(tok), tok.muted),
-    };
-    if disabled {
-        (mix(bg, tok.canvas, 0.5), tok.muted)
-    } else {
-        (bg, fg)
+/// Map icedtea [`Variant`] onto M3 button color styles.
+///
+/// - Primary → filled
+/// - Quiet → filled tonal
+/// - Ghost → text
+/// - Chip → tonal (assist chip container)
+/// - Danger → filled error
+/// - Success / Warning → filled tonal with desktop roles
+fn button_face(
+    tok: Tokens,
+    variant: Variant,
+    state: ControlState,
+) -> (Color, Color, Border, Shadow) {
+    let s = tok.scheme();
+    let surface = s.surface;
+    match variant {
+        Variant::Primary => {
+            let (bg, fg) = face(s.primary, s.on_primary, surface, state);
+            (
+                bg,
+                fg,
+                Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: shape_radius(Shape::Full),
+                },
+                Shadow::default(),
+            )
+        }
+        Variant::Quiet => {
+            let (bg, fg) = face(
+                s.secondary_container,
+                s.on_secondary_container,
+                surface,
+                state,
+            );
+            (
+                bg,
+                fg,
+                Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: shape_radius(Shape::Full),
+                },
+                Shadow::default(),
+            )
+        }
+        Variant::Ghost => {
+            let (bg, fg) = match state {
+                ControlState::Disabled => {
+                    (Color::TRANSPARENT, layer_on(surface, s.on_surface, 0.38))
+                }
+                ControlState::Hovered | ControlState::Focused => {
+                    (layer_on(surface, s.primary, 0.08), s.primary)
+                }
+                ControlState::Pressed => (layer_on(surface, s.primary, 0.12), s.primary),
+                _ => (Color::TRANSPARENT, s.primary),
+            };
+            (
+                bg,
+                fg,
+                Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: shape_radius(Shape::Full),
+                },
+                Shadow::default(),
+            )
+        }
+        Variant::Chip => {
+            let (bg, fg) = face(
+                s.secondary_container,
+                s.on_secondary_container,
+                surface,
+                state,
+            );
+            (
+                bg,
+                fg,
+                Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: shape_radius(Shape::Full),
+                },
+                Shadow::default(),
+            )
+        }
+        Variant::Danger => {
+            let (bg, fg) = face(s.error, s.on_error, surface, state);
+            (
+                bg,
+                fg,
+                Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: shape_radius(Shape::Full),
+                },
+                Shadow::default(),
+            )
+        }
+        Variant::Success => {
+            let (bg, fg) = face(s.success, s.on_success, surface, state);
+            (
+                bg,
+                fg,
+                Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: shape_radius(Shape::Full),
+                },
+                Shadow::default(),
+            )
+        }
+        Variant::Warning => {
+            let (bg, fg) = face(s.warning, s.on_warning, surface, state);
+            (
+                bg,
+                fg,
+                Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: shape_radius(Shape::Full),
+                },
+                Shadow::default(),
+            )
+        }
     }
 }
 
@@ -184,237 +305,381 @@ pub fn button_style(
     variant: Variant,
 ) -> impl Fn(&iced::Theme, button::Status) -> button::Style {
     move |_theme, status| {
-        let (bg, fg) = button_colors(tok, variant, status);
+        let state = button_status(status);
+        let (bg, fg, border, shadow) = button_face(tok, variant, state);
         button::Style {
             background: Some(Background::Color(bg)),
             text_color: fg,
-            border: Border {
-                color: Color::TRANSPARENT,
-                width: 0.0,
-                radius: radius(if variant == Variant::Chip {
-                    Corner::Soft
-                } else {
-                    Corner::Tight
-                }),
-            },
-            shadow: Shadow::default(),
+            border,
+            shadow,
             snap: false,
         }
     }
 }
 
+/// M3 secondary tab: active primary label + bottom indicator; hover state layer.
 pub fn tab_style(
     tok: Tokens,
     active: bool,
 ) -> impl Fn(&iced::Theme, button::Status) -> button::Style {
     move |_theme, status| {
-        let bg = if active {
-            Some(Background::Color(mix(tok.primary, tok.canvas, 0.28)))
-        } else if matches!(status, button::Status::Hovered | button::Status::Pressed) {
-            Some(Background::Color(hover_fill(tok)))
+        let s = tok.scheme();
+        let state = button_status(status);
+        let bg = match (active, state) {
+            (true, _) => Some(Background::Color(Color::TRANSPARENT)),
+            (false, ControlState::Hovered | ControlState::Pressed) => {
+                Some(Background::Color(hover_fill(tok)))
+            }
+            _ => Some(Background::Color(Color::TRANSPARENT)),
+        };
+        // Active: primary underline (2dp) on the bottom edge.
+        let border = if active {
+            Border {
+                color: s.primary,
+                width: 2.0,
+                radius: shape_radius(Shape::None),
+            }
         } else {
-            None
+            Border {
+                color: Color::TRANSPARENT,
+                width: 0.0,
+                radius: shape_radius(Shape::None),
+            }
         };
         button::Style {
             background: bg,
-            text_color: if active { tok.text } else { tok.muted },
-            border: Border {
-                color: Color::TRANSPARENT,
-                width: 0.0,
-                radius: radius(Corner::None),
+            text_color: if active {
+                s.primary
+            } else {
+                s.on_surface_variant
             },
+            border,
             shadow: Shadow::default(),
             snap: false,
         }
     }
 }
 
+/// M3 dialog / sheet container: elevated surface container, large corners.
+pub fn dialog_sheet_face(tok: Tokens) -> container::Style {
+    let s = tok.scheme();
+    container::Style {
+        background: Some(Background::Color(Elevation::Level3.surface(s))),
+        text_color: Some(s.on_surface),
+        border: Border {
+            color: s.outline_variant,
+            width: 0.0,
+            radius: shape_radius(Shape::ExtraLarge),
+        },
+        shadow: Elevation::Level3.shadow(),
+        snap: false,
+    }
+}
+
+/// M3 top app bar / menu strip: surface container.
+pub fn app_bar(tok: Tokens) -> container::Style {
+    let s = tok.scheme();
+    container::Style {
+        background: Some(Background::Color(s.surface_container)),
+        text_color: Some(s.on_surface),
+        border: Border {
+            color: s.outline_variant,
+            width: 0.0,
+            radius: shape_radius(Shape::None),
+        },
+        shadow: Elevation::Level0.shadow(),
+        snap: false,
+    }
+}
+
+/// Navigation rail / drawer surface.
+pub fn nav_rail(tok: Tokens, selected: bool) -> container::Style {
+    let s = tok.scheme();
+    if selected {
+        fill(s.secondary_container, s.on_secondary_container)
+    } else {
+        fill(Color::TRANSPARENT, s.on_surface_variant)
+    }
+}
+
+/// M3 filled text field (surface container highest, outline, primary focus).
 pub fn search_style(tok: Tokens) -> impl Fn(&iced::Theme, text_input::Status) -> text_input::Style {
     move |_theme, status| {
-        let focused = matches!(status, text_input::Status::Focused { .. });
+        let s = tok.scheme();
+        let (border_color, width) = match status {
+            text_input::Status::Focused { .. } => (s.primary, 2.0),
+            text_input::Status::Hovered => (s.on_surface, 1.0),
+            text_input::Status::Disabled => (s.on_surface.scale_alpha(0.12), 1.0),
+            text_input::Status::Active => (s.outline, 1.0),
+        };
+        let bg = match status {
+            text_input::Status::Disabled => layer_on(s.surface, s.on_surface, 0.04),
+            _ => s.surface_container_highest,
+        };
         text_input::Style {
-            background: Background::Color(tok.panel),
+            background: Background::Color(bg),
             border: Border {
-                color: if focused { tok.primary } else { tok.border },
-                width: 1.0,
-                radius: radius(Corner::Tight),
+                color: border_color,
+                width,
+                radius: shape_radius(Shape::ExtraSmall),
             },
-            icon: tok.muted,
-            placeholder: tok.muted,
-            value: tok.text,
-            selection: tok.selection,
+            icon: s.on_surface_variant,
+            placeholder: s.on_surface_variant,
+            value: match status {
+                text_input::Status::Disabled => layer_on(s.surface, s.on_surface, 0.38),
+                _ => s.on_surface,
+            },
+            selection: s.secondary_container,
         }
     }
 }
 
 pub fn picker_style(tok: Tokens) -> impl Fn(&iced::Theme, pick_list::Status) -> pick_list::Style {
     move |_theme, status| {
+        let s = tok.scheme();
         let hot = !matches!(status, pick_list::Status::Active);
         pick_list::Style {
-            text_color: tok.text,
-            placeholder_color: tok.muted,
-            handle_color: tok.muted,
-            background: Background::Color(tok.panel),
+            text_color: s.on_surface,
+            placeholder_color: s.on_surface_variant,
+            handle_color: s.on_surface_variant,
+            background: Background::Color(s.surface_container_highest),
             border: Border {
-                color: if hot { tok.primary } else { tok.border },
-                width: 1.0,
-                radius: radius(Corner::Tight),
+                color: if hot { s.primary } else { s.outline },
+                width: if hot { 2.0 } else { 1.0 },
+                radius: shape_radius(Shape::ExtraSmall),
             },
         }
     }
 }
 
-/// Overlay list under a menu title: surface, hover selection, light shadow.
+/// Overlay menu: surface container, raised elevation.
 pub fn overlay_menu_style(tok: Tokens) -> impl Fn(&iced::Theme) -> overlay_menu::Style {
-    move |_theme| overlay_menu::Style {
-        background: Background::Color(tok.surface),
-        border: Border {
-            width: 1.0,
-            radius: radius(Corner::Tight),
-            color: tok.border,
-        },
-        text_color: tok.text,
-        selected_text_color: tok.selection_text,
-        selected_background: Background::Color(tok.selection),
-        shadow: Elevation::Raised.shadow(),
+    move |_theme| {
+        let s = tok.scheme();
+        overlay_menu::Style {
+            background: Background::Color(s.surface_container),
+            border: Border {
+                width: 1.0,
+                radius: shape_radius(Shape::ExtraSmall),
+                color: s.outline_variant,
+            },
+            text_color: s.on_surface,
+            selected_text_color: s.on_secondary_container,
+            selected_background: Background::Color(s.secondary_container),
+            shadow: Elevation::Level2.shadow(),
+        }
     }
 }
 
 pub fn checkbox_style(tok: Tokens) -> impl Fn(&iced::Theme, checkbox::Status) -> checkbox::Style {
     move |_theme, status| {
-        let (checked, disabled) = match status {
-            checkbox::Status::Active { is_checked } => (is_checked, false),
-            checkbox::Status::Hovered { is_checked } => (is_checked, false),
-            checkbox::Status::Disabled { is_checked } => (is_checked, true),
+        let s = tok.scheme();
+        let (checked, disabled, hovered) = match status {
+            checkbox::Status::Active { is_checked } => (is_checked, false, false),
+            checkbox::Status::Hovered { is_checked } => (is_checked, false, true),
+            checkbox::Status::Disabled { is_checked } => (is_checked, true, false),
+        };
+        let (bg, border_c, icon) = if disabled {
+            (
+                layer_on(s.surface, s.on_surface, 0.12),
+                layer_on(s.surface, s.on_surface, 0.38),
+                s.surface,
+            )
+        } else if checked {
+            let base = s.primary;
+            let bg = if hovered {
+                layer_on(base, s.on_primary, 0.08)
+            } else {
+                base
+            };
+            (bg, s.primary, s.on_primary)
+        } else {
+            let bg = if hovered {
+                layer_on(s.surface, s.on_surface, 0.08)
+            } else {
+                s.surface_container_highest
+            };
+            (bg, s.outline, s.on_primary)
         };
         checkbox::Style {
-            background: Background::Color(if checked { tok.primary } else { tok.panel }),
-            icon_color: tok.canvas,
+            background: Background::Color(bg),
+            icon_color: icon,
             border: Border {
-                color: if disabled { tok.muted } else { tok.primary },
-                width: 1.0,
-                radius: radius(Corner::Tight),
+                color: border_c,
+                width: 2.0,
+                radius: shape_radius(Shape::ExtraSmall),
             },
-            text_color: Some(if disabled { tok.muted } else { tok.text }),
+            text_color: Some(if disabled {
+                layer_on(s.surface, s.on_surface, 0.38)
+            } else {
+                s.on_surface
+            }),
         }
     }
 }
 
 pub fn radio_style(tok: Tokens) -> impl Fn(&iced::Theme, radio::Status) -> radio::Style {
     move |_theme, status| {
-        let selected = match status {
-            radio::Status::Active { is_selected } | radio::Status::Hovered { is_selected } => {
-                is_selected
-            }
+        let s = tok.scheme();
+        let (selected, hovered) = match status {
+            radio::Status::Active { is_selected } => (is_selected, false),
+            radio::Status::Hovered { is_selected } => (is_selected, true),
+        };
+        let bg = if hovered {
+            layer_on(s.surface, s.primary, 0.08)
+        } else {
+            s.surface_container_highest
         };
         radio::Style {
-            background: Background::Color(tok.panel),
+            background: Background::Color(bg),
             dot_color: if selected {
-                tok.primary
+                s.primary
             } else {
                 Color::TRANSPARENT
             },
-            border_width: 1.0,
-            border_color: tok.primary,
-            text_color: Some(tok.text),
+            border_width: 2.0,
+            border_color: if selected { s.primary } else { s.outline },
+            text_color: Some(s.on_surface),
         }
     }
 }
 
 pub fn switch_style(tok: Tokens) -> impl Fn(&iced::Theme, toggler::Status) -> toggler::Style {
     move |_theme, status| {
-        let on = match status {
-            toggler::Status::Active { is_toggled }
-            | toggler::Status::Hovered { is_toggled }
-            | toggler::Status::Disabled { is_toggled } => is_toggled,
+        let s = tok.scheme();
+        let (on, disabled, hovered) = match status {
+            toggler::Status::Active { is_toggled } => (is_toggled, false, false),
+            toggler::Status::Hovered { is_toggled } => (is_toggled, false, true),
+            toggler::Status::Disabled { is_toggled } => (is_toggled, true, false),
+        };
+        let track = if disabled {
+            layer_on(s.surface, s.on_surface, 0.12)
+        } else if on {
+            let base = s.primary;
+            if hovered {
+                layer_on(base, s.on_primary, 0.08)
+            } else {
+                base
+            }
+        } else {
+            let base = s.surface_container_highest;
+            if hovered {
+                layer_on(base, s.on_surface, 0.08)
+            } else {
+                base
+            }
+        };
+        let thumb = if disabled {
+            layer_on(s.surface, s.on_surface, 0.38)
+        } else if on {
+            s.on_primary
+        } else {
+            s.outline
         };
         toggler::Style {
-            background: Background::Color(if on { tok.primary } else { tok.panel }),
-            background_border_width: 1.0,
-            background_border_color: tok.border,
-            foreground: Background::Color(tok.surface),
+            background: Background::Color(track),
+            background_border_width: if on { 0.0 } else { 2.0 },
+            background_border_color: if on { Color::TRANSPARENT } else { s.outline },
+            foreground: Background::Color(thumb),
             foreground_border_width: 0.0,
             foreground_border_color: Color::TRANSPARENT,
-            text_color: Some(tok.text),
-            border_radius: Some(radius(Corner::Soft)),
+            text_color: Some(s.on_surface),
+            border_radius: Some(shape_radius(Shape::Full)),
             padding_ratio: 0.2,
         }
     }
 }
 
 pub fn slider_style(tok: Tokens) -> impl Fn(&iced::Theme, slider::Status) -> slider::Style {
-    move |_theme, _status| slider::Style {
-        rail: slider::Rail {
-            backgrounds: (Background::Color(tok.primary), Background::Color(tok.panel)),
-            width: 4.0,
-            border: Border {
-                color: tok.border,
-                width: 0.0,
-                radius: radius(Corner::Soft),
+    move |_theme, status| {
+        let s = tok.scheme();
+        let handle_r = match status {
+            slider::Status::Active => 10.0,
+            slider::Status::Hovered | slider::Status::Dragged => 12.0,
+        };
+        slider::Style {
+            rail: slider::Rail {
+                backgrounds: (
+                    Background::Color(s.primary),
+                    Background::Color(s.surface_container_highest),
+                ),
+                width: 4.0,
+                border: Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: shape_radius(Shape::Full),
+                },
             },
-        },
-        handle: slider::Handle {
-            shape: slider::HandleShape::Circle { radius: 7.0 },
-            background: Background::Color(tok.primary),
-            border_width: 0.0,
-            border_color: tok.border,
-        },
+            handle: slider::Handle {
+                shape: slider::HandleShape::Circle { radius: handle_r },
+                background: Background::Color(s.primary),
+                border_width: 0.0,
+                border_color: s.outline,
+            },
+        }
     }
 }
 
 pub fn progress_style(tok: Tokens) -> impl Fn(&iced::Theme) -> progress_bar::Style {
-    move |_theme| progress_bar::Style {
-        background: Background::Color(tok.panel),
-        bar: Background::Color(tok.primary),
-        border: Border {
-            color: tok.border,
-            width: 0.0,
-            radius: radius(Corner::Soft),
-        },
+    move |_theme| {
+        let s = tok.scheme();
+        progress_bar::Style {
+            background: Background::Color(s.surface_container_highest),
+            bar: Background::Color(s.primary),
+            border: Border {
+                color: Color::TRANSPARENT,
+                width: 0.0,
+                radius: shape_radius(Shape::Full),
+            },
+        }
     }
 }
 
 pub fn rule_style(tok: Tokens) -> impl Fn(&iced::Theme) -> rule::Style {
-    move |_theme| rule::Style {
-        color: tok.border,
-        radius: radius(Corner::None),
-        fill_mode: rule::FillMode::Full,
-        snap: false,
+    move |_theme| {
+        let s = tok.scheme();
+        rule::Style {
+            color: s.outline_variant,
+            radius: shape_radius(Shape::None),
+            fill_mode: rule::FillMode::Full,
+            snap: false,
+        }
     }
 }
 
 pub fn scroll_style(tok: Tokens) -> impl Fn(&iced::Theme, scrollable::Status) -> scrollable::Style {
     move |_theme, _status| {
+        let s = tok.scheme();
         let rail = scrollable::Rail {
-            background: Some(Background::Color(tok.panel)),
+            background: Some(Background::Color(s.surface_container_low)),
             border: Border {
                 color: Color::TRANSPARENT,
                 width: 0.0,
-                radius: radius(Corner::Soft),
+                radius: shape_radius(Shape::Full),
             },
             scroller: scrollable::Scroller {
-                background: Background::Color(mix(tok.text, tok.canvas, 0.35)),
+                background: Background::Color(s.outline),
                 border: Border {
                     color: Color::TRANSPARENT,
                     width: 0.0,
-                    radius: radius(Corner::Soft),
+                    radius: shape_radius(Shape::Full),
                 },
             },
         };
         scrollable::Style {
-            container: fill(Color::TRANSPARENT, tok.text),
+            container: fill(Color::TRANSPARENT, s.on_surface),
             vertical_rail: rail,
             horizontal_rail: rail,
             gap: None,
             auto_scroll: scrollable::AutoScroll {
-                background: Background::Color(tok.panel),
+                background: Background::Color(s.surface_container),
                 border: Border {
-                    color: tok.border,
+                    color: s.outline,
                     width: 1.0,
-                    radius: radius(Corner::Soft),
+                    radius: shape_radius(Shape::ExtraSmall),
                 },
                 shadow: Shadow::default(),
-                icon: tok.text,
+                icon: s.on_surface,
             },
         }
     }
@@ -425,6 +690,97 @@ mod tests {
     use super::*;
     use crate::theme::named;
     use crate::toast::ToastKind;
+
+    #[test]
+    fn filled_button_uses_m3_primary_roles() {
+        let tok = named("light").tokens;
+        let s = tok.scheme();
+        let theme = crate::theme::iced_theme("light", tok);
+        let f = button_style(tok, Variant::Primary);
+        let active = f(&theme, button::Status::Active);
+        assert_eq!(active.background, Some(Background::Color(s.primary)));
+        assert_eq!(active.text_color, s.on_primary);
+        let disabled = f(&theme, button::Status::Disabled);
+        assert_ne!(disabled.background, Some(Background::Color(s.primary)));
+        let tonal = button_style(tok, Variant::Quiet)(&theme, button::Status::Active);
+        assert_eq!(
+            tonal.background,
+            Some(Background::Color(s.secondary_container))
+        );
+        assert_eq!(tonal.text_color, s.on_secondary_container);
+        let ghost = button_style(tok, Variant::Ghost)(&theme, button::Status::Active);
+        assert_eq!(
+            ghost.background,
+            Some(Background::Color(Color::TRANSPARENT))
+        );
+        assert_eq!(ghost.text_color, s.primary);
+    }
+
+    #[test]
+    fn list_row_selected_is_secondary_container() {
+        let tok = named("dark").tokens;
+        let s = tok.scheme();
+        let row = list_row(tok, true);
+        assert_eq!(
+            row.background,
+            Some(Background::Color(s.secondary_container))
+        );
+        assert_eq!(row.text_color, Some(s.on_secondary_container));
+        let idle = list_row(tok, false);
+        assert_eq!(idle.background, Some(Background::Color(Color::TRANSPARENT)));
+        let _ = list_row_hover(tok, true);
+        let _ = list_row_hover(tok, false);
+    }
+
+    #[test]
+    fn text_field_focus_uses_primary_outline() {
+        let tok = named("light").tokens;
+        let s = tok.scheme();
+        let theme = crate::theme::iced_theme("light", tok);
+        let st = search_style(tok);
+        let focused = st(&theme, text_input::Status::Focused { is_hovered: false });
+        assert_eq!(focused.border.color, s.primary);
+        assert!(focused.border.width >= 2.0);
+        let active = st(&theme, text_input::Status::Active);
+        assert_eq!(active.border.color, s.outline);
+    }
+
+    #[test]
+    fn dialog_tabs_and_app_bar_use_m3_surfaces() {
+        let tok = named("dark").tokens;
+        let s = tok.scheme();
+        let theme = crate::theme::iced_theme("dark", tok);
+        let sheet = dialog_sheet_face(tok);
+        assert_eq!(
+            sheet.background,
+            Some(Background::Color(Elevation::Level3.surface(s)))
+        );
+        assert!(sheet.shadow.blur_radius > 0.0);
+        let bar = app_bar(tok);
+        assert_eq!(bar.background, Some(Background::Color(s.surface_container)));
+        let rail = nav_rail(tok, true);
+        assert_eq!(
+            rail.background,
+            Some(Background::Color(s.secondary_container))
+        );
+        let rail_idle = nav_rail(tok, false);
+        assert_eq!(
+            rail_idle.background,
+            Some(Background::Color(Color::TRANSPARENT))
+        );
+        let active = tab_style(tok, true)(&theme, button::Status::Active);
+        assert_eq!(active.text_color, s.primary);
+        assert_eq!(active.border.color, s.primary);
+        let idle = tab_style(tok, false)(&theme, button::Status::Hovered);
+        assert_eq!(idle.text_color, s.on_surface_variant);
+        assert!(idle.background.is_some());
+        let idle_active = tab_style(tok, false)(&theme, button::Status::Active);
+        assert_eq!(idle_active.border.width, 0.0);
+        let pressed = tab_style(tok, false)(&theme, button::Status::Pressed);
+        assert!(pressed.background.is_some());
+        let sk = skeleton(tok);
+        assert!(sk.background.is_some());
+    }
 
     #[test]
     fn styles_cover_states_and_variants() {
@@ -439,6 +795,10 @@ mod tests {
         let _ = footer(tok);
         let _ = hairline(tok);
         let _ = dim_backdrop(tok);
+        let _ = dialog_sheet_face(tok);
+        let _ = app_bar(tok);
+        let _ = nav_rail(tok, true);
+        let _ = nav_rail(tok, false);
         let _ = list_row(tok, true);
         let _ = list_row(tok, false);
         for k in [
@@ -478,6 +838,8 @@ mod tests {
         let _ = overlay_menu_style(tok)(&theme);
         let c = checkbox_style(tok);
         let _ = c(&theme, checkbox::Status::Active { is_checked: true });
+        let _ = c(&theme, checkbox::Status::Active { is_checked: false });
+        let _ = c(&theme, checkbox::Status::Hovered { is_checked: true });
         let _ = c(&theme, checkbox::Status::Hovered { is_checked: false });
         let _ = c(&theme, checkbox::Status::Disabled { is_checked: true });
         let r = radio_style(tok);
@@ -485,6 +847,7 @@ mod tests {
         let _ = r(&theme, radio::Status::Hovered { is_selected: false });
         let sw = switch_style(tok);
         let _ = sw(&theme, toggler::Status::Active { is_toggled: true });
+        let _ = sw(&theme, toggler::Status::Hovered { is_toggled: true });
         let _ = sw(&theme, toggler::Status::Hovered { is_toggled: false });
         let _ = sw(&theme, toggler::Status::Disabled { is_toggled: true });
         let sl = slider_style(tok);

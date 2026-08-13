@@ -854,49 +854,6 @@ impl Tabs {
     }
 }
 
-/// Document tabs with dirty flags. The application owns the documents.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DocumentTabs {
-    pub tabs: Tabs,
-    pub dirty: Vec<bool>,
-}
-
-impl DocumentTabs {
-    pub fn new(titles: impl IntoIterator<Item = impl Into<String>>) -> Self {
-        let tabs = Tabs::new(titles);
-        let dirty = vec![false; tabs.titles.len()];
-        Self { tabs, dirty }
-    }
-
-    pub fn mark_dirty(&mut self, i: usize, dirty: bool) {
-        if let Some(d) = self.dirty.get_mut(i) {
-            *d = dirty;
-        }
-    }
-
-    /// `Some(true)` when the tab is dirty and the app should confirm close.
-    pub fn close_needs_confirm(&self, i: usize) -> bool {
-        self.tabs.closable && self.dirty.get(i).copied().unwrap_or(false)
-    }
-
-    pub fn title(&self, i: usize) -> String {
-        let name = self.tabs.titles.get(i).cloned().unwrap_or_default();
-        if self.dirty.get(i).copied().unwrap_or(false) {
-            format!("• {name}")
-        } else {
-            name
-        }
-    }
-}
-
-/// Background job for the status strip.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Job {
-    pub id: u64,
-    pub title: String,
-    pub progress: Option<f32>,
-}
-
 /// Accordion: which section is open.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Accordion {
@@ -1330,18 +1287,5 @@ mod tests {
         assert_eq!(cols.width(0), 90.0);
         cols.reorder(9, 0);
         assert_eq!(cols.width(9), 96.0);
-        let mut docs = DocumentTabs::new(["a.rs", "b.rs"]);
-        docs.tabs.closable = true;
-        docs.mark_dirty(0, true);
-        assert!(docs.close_needs_confirm(0));
-        assert!(!docs.close_needs_confirm(1));
-        assert!(docs.title(0).starts_with('•'));
-        assert_eq!(docs.title(1), "b.rs");
-        let job = Job {
-            id: 1,
-            title: "Index".into(),
-            progress: Some(0.4),
-        };
-        assert_eq!(job.title, "Index");
     }
 }

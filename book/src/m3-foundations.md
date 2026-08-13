@@ -42,8 +42,10 @@ touch target.
 
 ## Components
 
-See `m3::mapping::MAP` for the catalog inventory (map / desktop / delete).
-Deleted surfaces have no dual path.
+Every public catalog id is listed in `m3::mapping::MAP` with fate
+**Map** (M3 component family), **Desktop** (desktop chrome in M3
+tokens), or **Delete** (removed; no dual path). Guide and gallery only
+host Map and Desktop rows.
 
 ## Control states
 
