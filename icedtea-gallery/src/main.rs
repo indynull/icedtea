@@ -320,11 +320,16 @@ fn sample_mail(i: usize) -> ListRow {
         "Team standup",
         "Invoice March",
     ];
-    ListRow::new(TITLES[i % TITLES.len()]).with_meta(match i % 3 {
-        0 => "This morning",
-        1 => "Yesterday",
-        _ => "Last week",
-    })
+    ListRow::new(TITLES[i % TITLES.len()])
+        .with_meta(match i % 3 {
+            0 => "This morning",
+            1 => "Yesterday",
+            _ => "Last week",
+        })
+        .with_leading(icedtea::collection::RowSlot::Check(i % 4 == 0))
+        .with_trailing(icedtea::collection::RowSlot::Icon(
+            icedtea::icon::Icon::Search,
+        ))
 }
 
 /// Unread / flagged flags for sample mail row `i` (same seed as [`sample_mail`]).
@@ -603,6 +608,8 @@ enum Message {
     MdLink(String),
     MdPointer(icedtea::select::MarkdownPointer),
     Rail(usize),
+    ListCheck(usize),
+    TableCheck(usize),
     Note(String),
     Pad(&'static str),
     DismissChip(usize),
@@ -929,6 +936,7 @@ impl Gallery {
                     .collect(),
                 sort_col: None,
                 sort_asc: true,
+                checks: (0..1_000).map(|i| i % 7 == 0).collect(),
             },
             tree: TreeNode::branch(
                 1,
@@ -1623,6 +1631,23 @@ impl Gallery {
             Message::Rail(i) => {
                 self.rail = i;
                 self.note = format!("Rail {i}");
+            }
+            Message::ListCheck(i) => {
+                if let Some(row) = self.list.items.get_mut(i) {
+                    row.leading = match row.leading {
+                        icedtea::collection::RowSlot::Check(on) => {
+                            icedtea::collection::RowSlot::Check(!on)
+                        }
+                        other => other,
+                    };
+                }
+                self.note = format!("Check {i}");
+            }
+            Message::TableCheck(i) => {
+                if let Some(on) = self.table.checks.get_mut(i) {
+                    *on = !*on;
+                }
+                self.note = format!("Row {i}");
             }
             Message::Note(s) => self.note = s,
             Message::Pad(key) => match key {
@@ -3411,6 +3436,7 @@ impl Gallery {
                     } else {
                         icedtea::collection::RowFace::FLUSH
                     },
+                    Message::ListCheck,
                     named("list", Role::List),
                 ))
                 .width(Length::Fill)
@@ -3535,6 +3561,7 @@ impl Gallery {
                     Message::Sort,
                     Message::TableScroll,
                     Message::TableHScroll,
+                    Message::TableCheck,
                     tok,
                     named("table", Role::Table),
                 ),
@@ -4228,6 +4255,7 @@ impl Gallery {
                     move |_| tok.scheme().on_surface_variant,
                     Some(icedtea::iced::widget::Id::from("gallery-list-detail")),
                     icedtea::collection::RowFace::FLUSH,
+                    Message::ListCheck,
                     named("list", Role::List),
                 ),
                 {

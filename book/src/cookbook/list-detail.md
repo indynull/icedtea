@@ -48,6 +48,7 @@ impl App {
             |_| tok.muted,
             None,
             icedtea::collection::RowFace::FLUSH,
+            Message::Select,
             A11y::new("files", Role::List),
         );
         let title = self

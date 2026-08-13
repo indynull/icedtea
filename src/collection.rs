@@ -217,6 +217,15 @@ pub fn scroll_from_rail(
 }
 
 /// List model: length, identity, borrowed title and optional meta.
+/// Leading or trailing glyph on a list row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum RowSlot {
+    #[default]
+    Empty,
+    Icon(crate::icon::Icon),
+    Check(bool),
+}
+
 pub trait ListModel {
     fn len(&self) -> usize;
     fn id(&self, index: usize) -> u64;
@@ -233,6 +242,16 @@ pub trait ListModel {
         let _ = index;
         false
     }
+
+    fn leading(&self, index: usize) -> RowSlot {
+        let _ = index;
+        RowSlot::Empty
+    }
+
+    fn trailing(&self, index: usize) -> RowSlot {
+        let _ = index;
+        RowSlot::Empty
+    }
 }
 
 /// One owned list row.
@@ -241,6 +260,8 @@ pub struct ListRow {
     pub title: String,
     pub meta: Option<String>,
     pub separator: bool,
+    pub leading: RowSlot,
+    pub trailing: RowSlot,
 }
 
 impl ListRow {
@@ -249,6 +270,8 @@ impl ListRow {
             title: title.into(),
             meta: None,
             separator: false,
+            leading: RowSlot::Empty,
+            trailing: RowSlot::Empty,
         }
     }
 
@@ -262,7 +285,19 @@ impl ListRow {
             title: String::new(),
             meta: None,
             separator: true,
+            leading: RowSlot::Empty,
+            trailing: RowSlot::Empty,
         }
+    }
+
+    pub fn with_leading(mut self, slot: RowSlot) -> Self {
+        self.leading = slot;
+        self
+    }
+
+    pub fn with_trailing(mut self, slot: RowSlot) -> Self {
+        self.trailing = slot;
+        self
     }
 }
 
@@ -299,6 +334,20 @@ impl ListModel for VecList {
 
     fn is_separator(&self, index: usize) -> bool {
         self.items.get(index).is_some_and(|r| r.separator)
+    }
+
+    fn leading(&self, index: usize) -> RowSlot {
+        self.items
+            .get(index)
+            .map(|r| r.leading)
+            .unwrap_or(RowSlot::Empty)
+    }
+
+    fn trailing(&self, index: usize) -> RowSlot {
+        self.items
+            .get(index)
+            .map(|r| r.trailing)
+            .unwrap_or(RowSlot::Empty)
     }
 }
 
@@ -655,6 +704,8 @@ pub struct TableModel {
     pub rows: Vec<Vec<String>>,
     pub sort_col: Option<usize>,
     pub sort_asc: bool,
+    /// When non-empty, `data_table` paints a leading checkbox column.
+    pub checks: Vec<bool>,
 }
 
 impl TableModel {
@@ -698,6 +749,7 @@ pub trait TableSource {
     fn column_count(&self) -> usize;
     fn header(&self, col: usize) -> &str;
     fn cell(&self, row: usize, col: usize) -> &str;
+    fn row_checked(&self, row: usize) -> Option<bool>;
 }
 
 impl TableSource for TableModel {
@@ -715,6 +767,10 @@ impl TableSource for TableModel {
 
     fn cell(&self, row: usize, col: usize) -> &str {
         TableModel::cell(self, row, col)
+    }
+
+    fn row_checked(&self, row: usize) -> Option<bool> {
+        self.checks.get(row).copied()
     }
 }
 
@@ -821,17 +877,28 @@ pub fn page_count(len: usize, per_page: usize) -> usize {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tabs {
     pub titles: Vec<String>,
+    pub badges: Vec<String>,
     pub active: usize,
     pub closable: bool,
 }
 
 impl Tabs {
     pub fn new(titles: impl IntoIterator<Item = impl Into<String>>) -> Self {
+        let titles: Vec<String> = titles.into_iter().map(Into::into).collect();
+        let badges = vec![String::new(); titles.len()];
         Self {
-            titles: titles.into_iter().map(Into::into).collect(),
+            titles,
+            badges,
             active: 0,
             closable: false,
         }
+    }
+
+    pub fn with_badge(mut self, index: usize, badge: impl Into<String>) -> Self {
+        if let Some(slot) = self.badges.get_mut(index) {
+            *slot = badge.into();
+        }
+        self
     }
 
     pub fn select(&mut self, i: usize) {
@@ -845,6 +912,9 @@ impl Tabs {
             return None;
         }
         let removed = self.titles.remove(i);
+        if i < self.badges.len() {
+            self.badges.remove(i);
+        }
         if self.active >= self.titles.len() {
             self.active = self.titles.len().saturating_sub(1);
         } else if i < self.active {
@@ -892,6 +962,9 @@ mod tests {
         assert!(!TitlesOnly.is_separator(0));
         assert!(TitlesOnly.meta(0).is_none());
         assert!(!TitlesOnly.is_empty());
+        assert_eq!(TitlesOnly.leading(0), RowSlot::Empty);
+        assert_eq!(TitlesOnly.trailing(0), RowSlot::Empty);
+        assert!(TableModel::default().row_checked(0).is_none());
     }
 
     #[test]
@@ -1044,6 +1117,7 @@ mod tests {
             rows: vec![vec!["b".into()], vec!["a".into()]],
             sort_col: None,
             sort_asc: true,
+            checks: Vec::new(),
         };
         table.sort(0);
         assert_eq!(table.cell(0, 0), "a");
@@ -1079,7 +1153,18 @@ mod tests {
         assert_eq!(page_range(5, 9, 10), 5..5);
         assert_eq!(page_count(0, 10), 0);
         assert_eq!(page_count(11, 10), 2);
-        let mut tabs = Tabs::new(["A", "B", "C"]);
+        let slotted = ListRow::new("a")
+            .with_leading(RowSlot::Check(true))
+            .with_trailing(RowSlot::Icon(crate::icon::Icon::Search));
+        let list = VecList {
+            items: vec![slotted, ListRow::separator()],
+        };
+        assert_eq!(list.leading(0), RowSlot::Check(true));
+        assert!(matches!(list.trailing(0), RowSlot::Icon(_)));
+        assert_eq!(list.leading(1), RowSlot::Empty);
+        assert_eq!(list.leading(9), RowSlot::Empty);
+        let mut tabs = Tabs::new(["A", "B", "C"]).with_badge(0, "2");
+        assert_eq!(tabs.badges[0], "2");
         tabs.closable = true;
         tabs.select(9);
         tabs.select(2);

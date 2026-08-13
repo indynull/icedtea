@@ -24,7 +24,9 @@ indices. Disabled drops row messages. `on_scroll` reports the window
 after a wheel or rail move. Pass `RowHeights::PerRow` for variable
 row heights (`visible_range_var`). `RowFace::Flush` is one clipped
 line. `RowFace::Card` is a surface, wrapped title, and an optional
-3px meter.
+3px meter. `ListModel::leading` / `trailing` paint `RowSlot::Icon` or
+`RowSlot::Check` on the same virtualized rows. `on_check` toggles a
+check slot.
 
 ### Virtual column
 
@@ -76,7 +78,8 @@ Constructor: [`widget::data_table`](https://docs.rs/icedtea/latest/icedtea/widge
 `TableModel` holds headers and rows. `on_cell` is (row, column).
 `on_sort` is the header click. `ColumnLayout` order is scroll order;
 `frozen` keeps the first *n* columns in view. `on_h_scroll` moves
-the rest. Empty rows still paint headers.
+the rest. `TableSource::row_checked` plus `on_check` paint a leading
+checkbox column. Empty rows still paint headers.
 
 ### Tree
 
@@ -100,8 +103,10 @@ Constructor: [`widget::tab_bar`](https://docs.rs/icedtea/latest/icedtea/widget/f
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-`Tabs { closable: false }` is pinned sections. Select sends the
-index. See also [`pattern::tab_view`](patterns.md#tab-view).
+`Tabs { closable: false }` is pinned sections. `with_badge` paints a
+count on a tab. When `max_width` is set and titles do not fit, extra
+tabs move into a More list. Select sends the index. See also
+[`pattern::tab_view`](patterns.md#tab-view).
 
 ### Accordion
 

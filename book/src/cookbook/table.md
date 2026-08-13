@@ -49,6 +49,7 @@ impl App {
             Message::Sort,
             Message::Scroll,
             |_| 0.0,
+            |_| (),
             tok,
             A11y::new("files", Role::Table),
         )

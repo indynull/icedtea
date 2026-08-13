@@ -3273,6 +3273,47 @@ fn ellipsize_line(s: &str, max_chars: usize) -> String {
     format!("{}…", chars[..keep].iter().collect::<String>())
 }
 
+fn row_slot_el<'a, M: Clone + 'a>(
+    slot: crate::collection::RowSlot,
+    index: usize,
+    on_check: impl Fn(usize) -> M + Copy + 'a,
+    tok: Tokens,
+    disabled: bool,
+) -> Element<'a, M> {
+    match slot {
+        crate::collection::RowSlot::Empty => Space::new().width(0).height(16).into(),
+        crate::collection::RowSlot::Icon(icon) => {
+            icon_svg(icon, tok, A11y::new("row-icon", Role::Image))
+        }
+        crate::collection::RowSlot::Check(on) => {
+            let s = tok.scheme();
+            let face = container(Space::new().width(10).height(10))
+                .width(16)
+                .height(16)
+                .center_x(16)
+                .center_y(16)
+                .style(move |_| {
+                    if on {
+                        style::fill(s.primary, s.on_primary)
+                    } else {
+                        let mut st = style::fill(Color::TRANSPARENT, s.on_surface);
+                        st.border = iced::border::Border {
+                            color: s.outline,
+                            width: 2.0,
+                            radius: crate::m3::shape::Component::Field.radius(),
+                        };
+                        st
+                    }
+                });
+            if disabled {
+                face.into()
+            } else {
+                mouse_area(face).on_press(on_check(index)).into()
+            }
+        }
+    }
+}
+
 fn two_line_row<'a, M: 'a>(
     title: &str,
     meta_s: Option<&str>,
@@ -3450,6 +3491,7 @@ pub fn virtual_column<'a, M: Clone + 'a>(
 /// enum Msg {
 ///     Select(usize),
 ///     Scroll(VisibleWindow),
+///     Check(usize),
 /// }
 /// let on_select = Msg::Select;
 /// let on_scroll = Msg::Scroll;
@@ -3466,6 +3508,7 @@ pub fn virtual_column<'a, M: Clone + 'a>(
 ///     |_| tok.danger,
 ///     None,
 ///     icedtea::collection::RowFace::FLUSH,
+///     Msg::Check,
 ///     A11y::new("list", Role::List),
 /// );
 /// ```
@@ -3483,6 +3526,7 @@ pub fn list_view<'a, M, L>(
     meta_color: impl Fn(usize) -> iced::Color + Copy + 'a,
     scroll_id: Option<Id>,
     face: RowFace<impl Fn(usize) -> f32 + Copy + 'a>,
+    on_check: impl Fn(usize) -> M + Copy + 'a,
     a11y: A11y,
 ) -> Element<'a, M>
 where
@@ -3542,7 +3586,7 @@ where
                                 tok,
                             ),
                         };
-                        let row: Element<'a, M> = if disabled {
+                        let body: Element<'a, M> = if disabled {
                             painted
                         } else {
                             mouse_area(painted)
@@ -3550,6 +3594,14 @@ where
                                 .on_right_press(on_select(i))
                                 .into()
                         };
+                        let row: Element<'a, M> = row![
+                            row_slot_el(model.leading(i), i, on_check, tok, disabled),
+                            body,
+                            row_slot_el(model.trailing(i), i, on_check, tok, disabled),
+                        ]
+                        .spacing(4)
+                        .align_y(Alignment::Center)
+                        .into();
                         col = col.push(a11y::attach(
                             row,
                             &A11y::new(name, Role::ListItem)
@@ -3653,6 +3705,7 @@ pub fn item_grid<'a, M: Clone + 'a>(
 ///     rows: vec![vec!["lib.rs".into()]],
 ///     sort_col: None,
 ///     sort_asc: true,
+///     checks: Vec::new(),
 /// };
 /// let cols = icedtea::collection::ColumnLayout::new(vec![120.0]);
 /// #[derive(Clone, Copy)]
@@ -3661,6 +3714,7 @@ pub fn item_grid<'a, M: Clone + 'a>(
 ///     Sort(usize),
 ///     Scroll(VisibleWindow),
 ///     HScroll(f32),
+///     Check(usize),
 /// }
 /// let on_cell = Msg::Cell;
 /// let on_sort = Msg::Sort;
@@ -3679,6 +3733,7 @@ pub fn item_grid<'a, M: Clone + 'a>(
 ///     on_sort,
 ///     on_scroll,
 ///     on_h_scroll,
+///     Msg::Check,
 ///     tok,
 ///     A11y::new("table", Role::Table),
 /// );
@@ -3696,6 +3751,7 @@ pub fn data_table<'a, M, T>(
     on_sort: impl Fn(usize) -> M + Copy + 'a,
     on_scroll: impl Fn(VisibleWindow) -> M + Copy + 'a,
     on_h_scroll: impl Fn(f32) -> M + Copy + 'a,
+    on_check: impl Fn(usize) -> M + Copy + 'a,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M>
@@ -3710,6 +3766,7 @@ where
     let h = row_h.max(0.0);
     let prev = window;
     let disabled = a11y.disabled;
+    let show_checks = (0..n.max(1)).any(|r| model.row_checked(r).is_some());
     let frozen_n = columns.frozen.min(order.len());
     let pin = order[..frozen_n].to_vec();
     let rest = order[frozen_n..].to_vec();
@@ -3723,6 +3780,14 @@ where
         }
     };
     let mut pin_head = Row::new().spacing(0);
+    if show_checks {
+        pin_head = pin_head.push(
+            container(Space::new().width(16).height(16))
+                .width(36)
+                .center_x(36)
+                .center_y(32),
+        );
+    }
     for c in &pin {
         let c = *c;
         let title = model.header(c).to_string();
@@ -3810,6 +3875,21 @@ where
                             ))
                         };
                         let mut pin_line = Row::new().spacing(0);
+                        if show_checks {
+                            let on = model.row_checked(i).unwrap_or(false);
+                            pin_line = pin_line.push(
+                                container(row_slot_el(
+                                    crate::collection::RowSlot::Check(on),
+                                    i,
+                                    on_check,
+                                    tok,
+                                    disabled,
+                                ))
+                                .width(36)
+                                .center_x(36)
+                                .center_y(h),
+                            );
+                        }
                         for c in &pin {
                             pin_line = paint_cell(pin_line, *c);
                         }
@@ -5063,6 +5143,7 @@ mod tests {
             |_| tok.muted,
             Some(Id::from("list-host")),
             RowFace::FLUSH,
+            |_| (),
             role("list", Role::List),
         );
         let _: Element<'_, ()> = list_view(
@@ -5078,6 +5159,7 @@ mod tests {
             |_| tok.muted,
             None,
             RowFace::FLUSH,
+            |_| (),
             role("list", Role::List),
         );
         let mut striped: Element<'_, ()> = list_view(
@@ -5099,6 +5181,7 @@ mod tests {
             },
             None,
             RowFace::FLUSH,
+            |_| (),
             role("list", Role::List),
         );
         draw_once(&mut striped);
@@ -5115,6 +5198,7 @@ mod tests {
             |_| tok.muted,
             None,
             RowFace::FLUSH,
+            |_| (),
             role("list-sep", Role::List),
         );
         let lines = ["boot".into(), "ready".into()];
@@ -5162,6 +5246,7 @@ mod tests {
             rows: vec![vec!["1".into(), "x".into()], vec!["2".into(), "y".into()]],
             sort_col: None,
             sort_asc: true,
+            checks: Vec::new(),
         };
         let widths = crate::collection::ColumnLayout::new(vec![80.0, 80.0]);
         let _: Element<'_, ()> = data_table(
@@ -5177,6 +5262,7 @@ mod tests {
             |_| (),
             |_| (),
             |_| (),
+            |_| (),
             tok,
             role("table", Role::Table),
         );
@@ -5185,6 +5271,7 @@ mod tests {
             rows: (0..50).map(|i| vec![i.to_string()]).collect(),
             sort_col: None,
             sort_asc: true,
+            checks: Vec::new(),
         };
         let one = crate::collection::ColumnLayout::new(vec![96.0]);
         let _: Element<'_, ()> = data_table(
@@ -5202,6 +5289,7 @@ mod tests {
             20.0,
             2,
             |_, _| (),
+            |_| (),
             |_| (),
             |_| (),
             |_| (),
@@ -5539,6 +5627,7 @@ mod tests {
             |_| tok.muted,
             None,
             RowFace::FLUSH,
+            |_| (),
             role("list", Role::List),
         );
         draw_once(&mut lv);
@@ -5556,6 +5645,7 @@ mod tests {
             |_| tok.muted,
             None,
             RowFace::FLUSH,
+            |_| (),
             role("list-empty", Role::List),
         );
         draw_once(&mut empty_lv);
@@ -5584,6 +5674,7 @@ mod tests {
             },
             None,
             RowFace::FLUSH,
+            |_| (),
             role("list-color", Role::List),
         );
         draw_once(&mut color_lv);
@@ -5600,6 +5691,7 @@ mod tests {
             |_| tok.muted,
             None,
             RowFace::FLUSH,
+            |_| (),
             role("list", Role::List).with_disabled(true),
         );
         draw_once(&mut dead_lv);
@@ -5608,6 +5700,7 @@ mod tests {
             rows: vec![vec!["1".into()]],
             sort_col: None,
             sort_asc: true,
+            checks: Vec::new(),
         };
         let widths = crate::collection::ColumnLayout::new(vec![80.0]);
         let mut dt = data_table(
@@ -5620,6 +5713,7 @@ mod tests {
             24.0,
             2,
             |_, _| (),
+            |_| (),
             |_| (),
             |_| (),
             |_| (),
@@ -5637,6 +5731,7 @@ mod tests {
             24.0,
             2,
             |_, _| (),
+            |_| (),
             |_| (),
             |_| (),
             |_| (),
@@ -6167,6 +6262,7 @@ mod tests {
             |_| tok.muted,
             Some(Id::from("list-scroll")),
             RowFace::FLUSH,
+            |_| window,
             A11y::new("list", Role::List),
         );
         let _ = drive(&mut list_el);
@@ -6177,6 +6273,7 @@ mod tests {
                 .collect(),
             sort_col: None,
             sort_asc: true,
+            checks: Vec::new(),
         };
         let tw = crate::collection::ColumnLayout::new(vec![80.0, 80.0]);
         let mut table_el: Element<'_, VisibleWindow> = data_table(
@@ -6191,6 +6288,7 @@ mod tests {
             |_, _| window,
             |_| window,
             |w| w,
+            |_| window,
             |_| window,
             tok,
             A11y::new("table", Role::Table),
@@ -6255,6 +6353,7 @@ mod tests {
             |_| tok.muted,
             Some(Id::from("list-rail")),
             RowFace::FLUSH,
+            |_| window,
             A11y::new("list", Role::List),
         );
         let mut tree = Tree::new(el.as_widget());
@@ -6362,6 +6461,7 @@ mod tests {
             |_| tok.muted,
             None,
             RowFace::FLUSH,
+            |_| window,
             A11y::new("list", Role::List),
         );
         let mut tree = Tree::new(el.as_widget());
@@ -6414,6 +6514,7 @@ mod tests {
             |_| tok.muted,
             None,
             RowFace::FLUSH,
+            |_| window,
             A11y::new("sep-list", Role::List),
         );
         let mut sep_tree = Tree::new(sep_el.as_widget());
@@ -6465,6 +6566,7 @@ mod tests {
             |_| tok.muted,
             None,
             RowFace::FLUSH,
+            |_| 0.0,
             A11y::new("var-list", Role::List),
         );
         let mut tree = Tree::new(el.as_widget());
@@ -6503,6 +6605,7 @@ mod tests {
             RowFace::Card {
                 meter: Some(|i| if i == 0 { 0.8 } else { 0.2 }),
             },
+            |_| (),
             A11y::new("card-list", Role::List),
         );
         let mut tree_c = Tree::new(cards.as_widget());
@@ -6543,6 +6646,7 @@ mod tests {
             RowFace::Card {
                 meter: None::<fn(usize) -> f32>,
             },
+            |_| (),
             A11y::new("card-bare", Role::List).with_disabled(true),
         );
         draw_once(&mut no_meter);
@@ -6572,6 +6676,7 @@ mod tests {
             rows: vec![vec!["1".into(), "2".into(), "3".into()]],
             sort_col: None,
             sort_asc: true,
+            checks: Vec::new(),
         };
         let mut cols = crate::collection::ColumnLayout::new(vec![80.0, 80.0, 80.0]).with_frozen(1);
         cols.set_h_scroll(0.0);
@@ -6587,6 +6692,7 @@ mod tests {
                 24.0,
                 0,
                 |_, _| (),
+                |_| (),
                 |_| (),
                 |_| (),
                 |_| (),
@@ -6638,6 +6744,7 @@ mod tests {
             |_| 0.0,
             |_| 0.0,
             |x| x,
+            |_| 0.0,
             tok,
             A11y::new("pin-h", Role::Table),
         );
@@ -6690,6 +6797,7 @@ mod tests {
             rows: vec![vec!["1".into(), "2".into()], vec!["3".into(), "4".into()]],
             sort_col: None,
             sort_asc: true,
+            checks: Vec::new(),
         };
         let cols = crate::collection::ColumnLayout::new(vec![80.0, 80.0]);
         let window = VisibleWindow::new(80.0);
@@ -6706,6 +6814,7 @@ mod tests {
             |_| (),
             |_| (),
             |_| (),
+            |_| (),
             tok,
             A11y::new("zebra", Role::Table).with_disabled(true),
         );
@@ -6715,6 +6824,7 @@ mod tests {
             rows: vec![],
             sort_col: None,
             sort_asc: true,
+            checks: Vec::new(),
         };
         let one = crate::collection::ColumnLayout::new(vec![80.0]);
         let mut headers_only: Element<'_, ()> = data_table(
@@ -6727,6 +6837,7 @@ mod tests {
             24.0,
             0,
             |_, _| (),
+            |_| (),
             |_| (),
             |_| (),
             |_| (),
@@ -6940,6 +7051,7 @@ mod tests {
             rows: (0..n).map(|i| vec![format!("r{i}")]).collect(),
             sort_col: None,
             sort_asc: true,
+            checks: Vec::new(),
         };
         let widths = crate::collection::ColumnLayout::new(vec![80.0]);
         let window = crate::collection::visible_window(scroll, viewport, row_h, n, overscan, None);
@@ -6955,6 +7067,7 @@ mod tests {
             |_, _| window,
             |_| window,
             |w| w,
+            |_| window,
             |_| window,
             tok,
             A11y::new("table", Role::Table),

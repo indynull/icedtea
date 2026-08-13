@@ -4,7 +4,8 @@
 
 `markdown_view` drag-selects across blocks via `select::markdown_select`
 and `MarkdownSpan` (layout stays structured). Navigation rail is
-`pattern::nav_rail`.
+`pattern::nav_rail`. Lists take leading/trailing `RowSlot`s. Tables paint a checkbox column from
+`TableSource::row_checked`.
 
 Desktop Material controls: segmented button, icon button, range slider,
 indeterminate checkbox (`CheckState`), field supporting/error text,
