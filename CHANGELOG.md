@@ -2,54 +2,46 @@
 
 ## Unreleased
 
-Chrome icons use solid black fills so iced's svg recolor tints them on
-macOS Metal as well as Linux and Windows (stroke/`currentColor` paths
-often rasterized empty on Metal).
-
-`value_field` takes `label_width` so multi-row stacks share a gutter;
-pass `layout::FORM_LABEL` (140px, same as `layout::form`).
-
-`themed_slider` steps continuous ranges (~100 positions) so a `0..=1`
-drag is not stuck on the endpoints. `progress` fills its host and uses
-an 8px girth; `progress_ring` track mixes text into surface. Lists and
-tables paint through `ClipLayer` (scissor) so virtual panes do not bleed.
-`split_button` takes overflow rows and opens them from a chevron menu.
-`collection::page_range` / `page_count` page application-owned sets.
-`list_detail` pads the list rail and detail inset. Gallery list page:
-search, Unread/Flagged buckets, and pagination over a 1000-row seed;
-list and list-detail keep separate selection and scroll windows.
-
-`pattern::modal_card` takes tokens and paints a black dim wash over the
-scene. `virtual_column` clamps each mounted row to its height so open
-faces grow. `selectable` paints on a transparent field (value rows no
-longer sit in a dark editor slab).
-
-## 0.4.0 — 2026-08-12
+## 0.4.0 — 2026-08-13
 
 `pattern::workspace` calls `pane` with each leaf id. `list_view`
 takes `RowHeights` so rows can be `visible_range_var` heights, and
 `RowFace::Card` for a wrapped title on a surface. `widget::virtual_column`
 virtualizes app-built rows (expand cards) with known heights;
 `collection::expand_card_heights` builds the closed/open slice (same
-rail and overscan as list). `data_table` keeps `ColumnLayout.frozen`
-leading columns in view; `on_h_scroll` moves the rest.
+rail and overscan as list). Open faces clamp to their row height.
+`data_table` keeps `ColumnLayout.frozen` leading columns in view;
+`on_h_scroll` moves the rest. Lists and tables paint through
+`ClipLayer` (scissor) so virtual panes do not bleed.
+`collection::page_range` / `page_count` page application-owned sets.
+`list_detail` pads the list rail and detail inset.
 `command_palette_view` paints a parameter field when
 `CommandPalette::ask` is set. `window::place_pinned` clamps an
 overlay onto a chosen display. `daemon!` starts `iced::daemon` with
 the same `Prepared` settings; `Prepared::open` maps a window and
 `Prepared::open_desktop` maps a decorated pop-out. `expander` title
-and body share the 12px card inset.
+and body share the 12px card inset. `pattern::modal_card` takes
+tokens and paints a black dim wash over the scene.
 
-`selectable` is body text the user can drag-select and copy.
-`field::Selectables` binds those buffers by id (`get` is `Option`,
-unbound `perform` is a no-op; `ensure` / `retain` / `unbind` for lazy
-open cards); `value_field` is the labeled row. `highlighted_code` and
+`selectable` is body text the user can drag-select and copy; it paints
+on a transparent field. `field::Selectables` binds those buffers by id
+(`get` is `Option`, unbound `perform` is a no-op; `ensure` / `retain` /
+`unbind` for lazy open cards). `value_field` is the labeled row with a
+fixed label gutter (`label_width`; pass `layout::FORM_LABEL` for the
+same 140px column as `layout::form`). `highlighted_code` and
 `code_block` use the same select-and-copy contract. `markdown_view`
 keeps structured layout with paint-side select within each block;
 full document copy posts `MarkdownDoc.source`. Contract: `select`
 module. `key::WhileInput::Chrome` / `KeyContext::chrome_over_input`
 match Escape, Enter, and F1–F24 while a field is focused (modifier
 chords already did). Gallery demos public select constructors only.
+
+`themed_slider` steps continuous ranges (~100 positions) so a `0..=1`
+drag is not stuck on the endpoints. `progress` fills its host and uses
+an 8px girth; `progress_ring` track mixes text into surface.
+`split_button` takes overflow rows and opens them from a chevron menu.
+Chrome icons use solid black fills so iced's svg recolor tints them on
+macOS Metal as well as Linux and Windows.
 
 `light` and `dark` are a neutral desktop pair. Persist defaults
 `follow_os` on. When follow-OS is on, `OsChrome` /
@@ -67,6 +59,8 @@ first frame.
 
 The spinner is eight dots around a circle. `chip` takes optional
 press and dismiss. `status_bar` takes an optional tone and caption.
+Gallery list demos search, Unread/Flagged buckets, and pagination over
+a large seed with selection isolated from list-detail.
 
 ## 0.3.0 — 2026-08-11
 
