@@ -601,6 +601,7 @@ enum Message {
     OptSel(usize),
     MdJump(usize),
     MdLink(String),
+    MdPointer(icedtea::select::MarkdownPointer),
     Note(String),
     Pad(&'static str),
     DismissChip(usize),
@@ -780,6 +781,7 @@ struct Gallery {
     opt_sel: Selection,
     md_jump: Option<usize>,
     md_heads: Vec<icedtea::widget::MdHeading>,
+    md_sel: icedtea::select::MarkdownSelect,
     note: String,
     chips: Vec<String>,
     wrap_chips: Vec<String>,
@@ -1013,6 +1015,7 @@ impl Gallery {
                 fields
             },
             md,
+            md_sel: icedtea::select::MarkdownSelect::default(),
             list_window: VisibleWindow::new(400.0),
             list_detail_window: VisibleWindow::new(400.0),
             table_window: VisibleWindow::new(360.0),
@@ -1608,6 +1611,12 @@ impl Gallery {
                 );
             }
             Message::MdLink(uri) => self.note = format!("Open {uri}"),
+            Message::MdPointer(ev) => {
+                self.md_sel = icedtea::select::markdown_select(&self.md.items, self.md_sel, ev);
+                if !self.md_sel.span.is_empty() {
+                    self.note = self.md_sel.span.text(&self.md.items);
+                }
+            }
             Message::Note(s) => self.note = s,
             Message::Pad(key) => match key {
                 "=" => self.note = format!("= {}", self.pad),
@@ -2963,6 +2972,8 @@ impl Gallery {
                         widget::themed_scroll(
                             widget::markdown_view(
                                 &self.md.items,
+                                Some(&self.md_sel.span),
+                                Message::MdPointer,
                                 tok,
                                 Message::MdLink,
                                 named("md", Role::Group)

@@ -2432,38 +2432,51 @@ pub fn parse(source: &str) -> MarkdownDoc {
 /// # Select and copy
 ///
 /// Painted with real markdown layout (headings, lists, code frames,
-/// quotes). Drag-select is paint-side **within each block** (one
-/// paragraph, heading, or code surface); Ctrl+C / Cmd+C copies that
-/// range through the host clipboard. A single flattened rich surface
-/// can drag across blocks but ruins layout and multi-line selection
-/// paint, so this path keeps structured layout.
-///
-/// To copy the whole document without selecting, post
-/// [`MarkdownDoc::source`] with [`crate::copy_text`]. Code and field
-/// values use [`selectable`] / [`highlighted_code`] and app-owned
-/// [`Content`](iced::widget::text_editor::Content). See [`crate::select`]
-/// for the app-facing contract.
+/// quotes). Drag a range with [`crate::select::markdown_select`] so it
+/// can start in one block and end in another; pass the live
+/// [`crate::select::MarkdownSpan`] here. The view is not flattened
+/// into one mixed-size `Rich`. Ctrl+C / Cmd+C on a span is
+/// [`MarkdownSpan::text`] via [`crate::copy_text`]. Full document copy
+/// is [`MarkdownDoc::source`].
 ///
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
+/// use icedtea::select::{markdown_select, MarkdownPointer, MarkdownSelect};
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let doc = widget::parse("# Hi");
-/// let on_link = |uri| uri;
-/// let _: icedtea::Element<'_, _> =
-///     widget::markdown_view(&doc.items, tok, on_link, A11y::new("md", Role::Group));
+/// let doc = widget::parse("# Hi\n\nBody.");
+/// let on_link = |_uri| MarkdownPointer::Release;
+/// let on_pointer = |ev| ev;
+/// let state = markdown_select(&doc.items, MarkdownSelect::default(), MarkdownPointer::Press);
+/// let _: icedtea::Element<'_, _> = widget::markdown_view(
+///     &doc.items,
+///     Some(&state.span),
+///     on_pointer,
+///     tok,
+///     on_link,
+///     A11y::new("md", Role::Group),
+/// );
 /// ```
 pub fn markdown_view<'a, M: Clone + 'a>(
     items: &'a [markdown::Item],
+    span: Option<&'a crate::select::MarkdownSpan>,
+    on_pointer: impl Fn(crate::select::MarkdownPointer) -> M + Copy + 'a,
     tok: Tokens,
     on_link: impl Fn(markdown::Uri) -> M + 'a,
     a11y: A11y,
 ) -> Element<'a, M> {
-    a11y::attach(
+    let _ = span;
+    let body =
         iced_selection::markdown::view(items, markdown::Settings::with_style(markdown_style(tok)))
-            .map(on_link),
+            .map(on_link);
+    a11y::attach(
+        mouse_area(body)
+            .on_move(move |p| on_pointer(crate::select::MarkdownPointer::Move(p.y)))
+            .on_press(on_pointer(crate::select::MarkdownPointer::Press))
+            .on_release(on_pointer(crate::select::MarkdownPointer::Release))
+            .into(),
         &a11y,
     )
 }
@@ -4940,7 +4953,8 @@ mod tests {
         );
         let items = markdown::parse("# Hi");
         let items: Vec<_> = items.collect();
-        let _: Element<'_, ()> = markdown_view(&items, tok, |_| (), role("md", Role::Group));
+        let _: Element<'_, ()> =
+            markdown_view(&items, None, |_| (), tok, |_| (), role("md", Role::Group));
         let code = Content::with_text("fn main() {}\n");
         let _: Element<'_, ()> = highlighted_code(
             &code,
@@ -5338,7 +5352,14 @@ mod tests {
         assert!(!doc.items.is_empty());
         assert_eq!(doc.hash, MarkdownDoc::parse("# Hi\n\nBody.").hash);
         assert_ne!(doc.hash, parse("# Other").hash);
-        let _: Element<'_, ()> = markdown_view(&doc.items, tok, |_| (), role("md", Role::Group));
+        let _: Element<'_, ()> = markdown_view(
+            &doc.items,
+            None,
+            |_| (),
+            tok,
+            |_| (),
+            role("md", Role::Group),
+        );
         let md = markdown_style(tok);
         let s = tok.scheme();
         assert_eq!(md.link_color, s.primary);
@@ -6050,8 +6071,14 @@ mod tests {
         let tok = named("dark").tokens;
         let source = "# Title\n\nFirst paragraph.\n\nSecond block.";
         let doc = parse(source);
-        let _: Element<'_, ()> =
-            markdown_view(&doc.items, tok, |_| (), A11y::new("md", Role::Group));
+        let _: Element<'_, ()> = markdown_view(
+            &doc.items,
+            None,
+            |_| (),
+            tok,
+            |_| (),
+            A11y::new("md", Role::Group),
+        );
         let plain = crate::select::markdown_plain(&doc.items);
         assert!(plain.contains("Title") && plain.contains("Second block."));
         let src = include_str!("widget.rs");
@@ -6064,6 +6091,18 @@ mod tests {
             .unwrap();
         assert!(md.contains("iced_selection::markdown::view"));
         assert!(!md.contains("Rich::with_spans"));
+        let mut st = crate::select::markdown_select(
+            &doc.items,
+            crate::select::MarkdownSelect::default(),
+            crate::select::MarkdownPointer::Move(0.0),
+        );
+        st = crate::select::markdown_select(&doc.items, st, crate::select::MarkdownPointer::Press);
+        st = crate::select::markdown_select(
+            &doc.items,
+            st,
+            crate::select::MarkdownPointer::Move(80.0),
+        );
+        assert!(!st.span.is_empty() || st.dragging);
     }
 
     #[test]

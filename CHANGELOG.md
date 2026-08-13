@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+`markdown_view` drag-selects across blocks via `select::markdown_select`
+and `MarkdownSpan` (layout stays structured).
+
 Desktop Material controls: segmented button, icon button, range slider,
 indeterminate checkbox (`CheckState`), field supporting/error text,
 filter chip set, sectioned and cascade menus, side sheet. Search gains

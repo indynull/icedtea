@@ -11,15 +11,15 @@
 //! | --- | --- | --- | --- | --- |
 //! | Body / path | [`crate::widget::selectable`], [`crate::widget::value_field`] | App `text_editor::Content` / [`crate::field::Selectables`] | `Content::selection()` → [`crate::copy_text`] | whole buffer via `text()` / `Selectables::copy` |
 //! | Code | [`crate::widget::highlighted_code`], [`crate::widget::code_block`] | App `Content` | same | same |
-//! | Markdown | [`crate::widget::markdown_view`] | Structured paint (per block) | Ctrl/Cmd+C on a selected block | [`crate::copy_text`] on [`crate::widget::MarkdownDoc::source`] |
+//! | Markdown | [`crate::widget::markdown_view`] | Structured paint (per block) | [`MarkdownSpan`] across blocks → [`crate::copy_text`] | [`crate::copy_text`] on [`crate::widget::MarkdownDoc::source`] |
 //!
 //! Chrome (menus, buttons, status meta) is not drag-selectable.
 //!
 //! Editor surfaces use [`select_only`] so the buffer cannot be mutated
-//! by typing. Markdown keeps real block layout; selection is paint-side
-//! within each block. Flattening every block into one rich surface
-//! breaks layout and multi-line selection paint, so it is not the
-//! shipped path.
+//! by typing. Markdown keeps real block layout. Drag uses
+//! [`markdown_select`] so a range can start in one block and end in
+//! another. Flattening every block into one rich surface breaks layout
+//! and multi-line selection paint, so it is not the shipped path.
 
 use iced::advanced::text::Span;
 use iced::widget::markdown::{self, Bullet, HeadingLevel, Item, Settings, Text};
@@ -188,6 +188,201 @@ fn push_styled(
             s.font = Some(Font::MONOSPACE);
         }
         out.push(s);
+    }
+}
+
+/// Byte caret inside one top-level markdown item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct MarkdownPos {
+    pub item: usize,
+    pub offset: usize,
+}
+
+/// Ordered range across markdown blocks (start ≤ end in document order).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct MarkdownSpan {
+    pub start: MarkdownPos,
+    pub end: MarkdownPos,
+}
+
+impl MarkdownSpan {
+    /// Span from a press caret to the current caret.
+    pub fn from_drag(press: MarkdownPos, now: MarkdownPos) -> Self {
+        if (now.item, now.offset) < (press.item, press.offset) {
+            Self {
+                start: now,
+                end: press,
+            }
+        } else {
+            Self {
+                start: press,
+                end: now,
+            }
+        }
+    }
+
+    pub fn is_empty(self) -> bool {
+        self.start == self.end
+    }
+
+    /// Plain text of this range in document order (blocks joined by blank lines).
+    pub fn text(self, items: &[Item]) -> String {
+        if items.is_empty() {
+            return String::new();
+        }
+        let last = items.len().saturating_sub(1);
+        let start_i = self.start.item.min(last);
+        let end_i = self.end.item.min(last);
+        let mut out = String::new();
+        for (i, item) in items.iter().enumerate().take(end_i + 1).skip(start_i) {
+            let plain = markdown_item_plain(item);
+            let n = plain.len();
+            let a = if i == start_i {
+                floor_char_boundary(&plain, self.start.offset.min(n))
+            } else {
+                0
+            };
+            let b = if i == end_i {
+                ceil_char_boundary(&plain, self.end.offset.min(n).max(a))
+            } else {
+                n
+            };
+            if i > start_i {
+                out.push_str("\n\n");
+            }
+            out.push_str(&plain[a..b]);
+        }
+        out
+    }
+
+    pub fn covers(self, item: usize) -> bool {
+        item >= self.start.item && item <= self.end.item && !self.is_empty()
+    }
+}
+
+/// Pointer event for [`markdown_select`].
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum MarkdownPointer {
+    Press,
+    Move(f32),
+    Release,
+}
+
+/// Live drag state for [`crate::widget::markdown_view`].
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct MarkdownSelect {
+    pub span: MarkdownSpan,
+    pub dragging: bool,
+    pub anchor: MarkdownPos,
+    pub hover_y: f32,
+}
+
+/// Apply a pointer event to a document span. Layout stays structured.
+pub fn markdown_select(
+    items: &[Item],
+    mut state: MarkdownSelect,
+    ev: MarkdownPointer,
+) -> MarkdownSelect {
+    match ev {
+        MarkdownPointer::Press => {
+            let pos = markdown_pos_at(items, state.hover_y);
+            state.dragging = true;
+            state.anchor = pos;
+            state.span = MarkdownSpan::from_drag(pos, pos);
+        }
+        MarkdownPointer::Move(y) => {
+            state.hover_y = y;
+            if state.dragging {
+                state.span = MarkdownSpan::from_drag(state.anchor, markdown_pos_at(items, y));
+            }
+        }
+        MarkdownPointer::Release => {
+            state.dragging = false;
+        }
+    }
+    state
+}
+
+/// Map a Y offset in the markdown column to a caret.
+pub fn markdown_pos_at(items: &[Item], y: f32) -> MarkdownPos {
+    if items.is_empty() {
+        return MarkdownPos::default();
+    }
+    let y = y.max(0.0);
+    let mut acc = 0.0;
+    let mut pos = MarkdownPos::default();
+    for (i, item) in items.iter().enumerate() {
+        let h = markdown_item_extent(item).max(1.0);
+        let frac = ((y - acc) / h).clamp(0.0, 1.0);
+        let plain = markdown_item_plain(item);
+        let raw = (plain.len() as f32 * frac).round() as usize;
+        pos = MarkdownPos {
+            item: i,
+            offset: floor_char_boundary(&plain, raw.min(plain.len())),
+        };
+        if y < acc + h {
+            break;
+        }
+        acc += h;
+    }
+    pos
+}
+
+pub(crate) fn markdown_item_plain(item: &Item) -> String {
+    let settings = Settings::with_style(markdown_measure_style());
+    let mut spans = Vec::new();
+    flatten_spans(std::slice::from_ref(item), &settings, &mut spans, 0);
+    spans.iter().map(|s| s.text.as_ref()).collect()
+}
+
+pub(crate) fn markdown_text_len(text: &Text) -> usize {
+    text.spans(markdown_measure_style())
+        .iter()
+        .map(|s| s.text.len())
+        .sum()
+}
+
+/// Estimated block height (same map [`crate::widget::MarkdownDoc::item_offset`] uses).
+pub fn markdown_item_extent(item: &Item) -> f32 {
+    const TEXT: f32 = 16.0;
+    const SPACING: f32 = 16.0 * 0.875;
+    const COL: f32 = 64.0;
+    match item {
+        Item::Heading(level, text) => {
+            let size = match level {
+                HeadingLevel::H1 => TEXT * 2.0,
+                HeadingLevel::H2 => TEXT * 1.75,
+                HeadingLevel::H3 => TEXT * 1.5,
+                HeadingLevel::H4 => TEXT * 1.25,
+                HeadingLevel::H5 | HeadingLevel::H6 => TEXT,
+            };
+            let lines = ((markdown_text_len(text) as f32) / COL).ceil().max(1.0);
+            size * 1.3 * lines + TEXT * 0.5 + SPACING
+        }
+        Item::Paragraph(text) => {
+            let lines = ((markdown_text_len(text) as f32) / COL).ceil().max(1.0);
+            lines * TEXT * 1.4 + SPACING
+        }
+        Item::CodeBlock { code, lines, .. } => {
+            let n = lines.len().max(code.lines().count()).max(1) as f32;
+            n * TEXT * 0.75 * 1.5 + 24.0 + SPACING
+        }
+        Item::List { bullets, .. } => {
+            bullets
+                .iter()
+                .map(|b| {
+                    let kids = match b {
+                        Bullet::Point { items } | Bullet::Task { items, .. } => items,
+                    };
+                    TEXT + kids.iter().map(markdown_item_extent).sum::<f32>()
+                })
+                .sum::<f32>()
+                + SPACING
+        }
+        Item::Image { .. } => 160.0 + SPACING,
+        Item::Quote(items) => items.iter().map(markdown_item_extent).sum::<f32>() + 16.0 + SPACING,
+        Item::Rule => 24.0 + SPACING,
+        Item::Table { rows, .. } => (1 + rows.len()) as f32 * TEXT * 1.8 + SPACING,
     }
 }
 
@@ -361,5 +556,38 @@ fn b() {}
         let plain = markdown_plain(&code);
         assert!(plain.contains("line1") && plain.contains("line2"));
         assert!(plain.contains('\n'));
+    }
+
+    #[test]
+    fn markdown_select_spans_heading_paragraph_and_list() {
+        let items: Vec<_> = markdown::parse("# Title\n\nA paragraph.\n\n- alpha\n- beta").collect();
+        assert!(items.len() >= 3);
+        let mut st = MarkdownSelect::default();
+        st = markdown_select(&items, st, MarkdownPointer::Move(0.0));
+        st = markdown_select(&items, st, MarkdownPointer::Press);
+        let end_y = items.iter().map(markdown_item_extent).sum::<f32>();
+        st = markdown_select(&items, st, MarkdownPointer::Move(end_y));
+        st = markdown_select(&items, st, MarkdownPointer::Release);
+        assert!(!st.dragging);
+        assert!(st.span.start.item < st.span.end.item);
+        let copied = st.span.text(&items);
+        assert!(copied.contains("Title"), "{copied}");
+        assert!(copied.contains("paragraph"), "{copied}");
+        assert!(copied.contains("alpha") || copied.contains('•'), "{copied}");
+        let mut back = MarkdownSelect::default();
+        back = markdown_select(&items, back, MarkdownPointer::Move(end_y));
+        back = markdown_select(&items, back, MarkdownPointer::Press);
+        back = markdown_select(&items, back, MarkdownPointer::Move(0.0));
+        let rev = back.span.text(&items);
+        assert!(rev.contains("Title") && rev.contains("paragraph"));
+        assert_eq!(
+            markdown_select(&[], MarkdownSelect::default(), MarkdownPointer::Press)
+                .span
+                .text(&[]),
+            ""
+        );
+        assert!(MarkdownSpan::default().is_empty());
+        assert!(!st.span.covers(99));
+        assert!(st.span.covers(st.span.start.item));
     }
 }

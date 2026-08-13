@@ -17,12 +17,12 @@ surfaces.
 | Surface | Who owns the text | Range copy | Full document |
 | --- | --- | --- | --- |
 | [`selectable`](#selectable), code | App `text_editor::Content` via `select_only` | `Content::selection()` → `copy_text` | whole buffer |
-| [`markdown`](#markdown) | Paint-side document (layout stays real) | Ctrl/Cmd+C within a block | `copy_text` on `MarkdownDoc::source` |
+| [`markdown`](#markdown) | Paint-side document (layout stays real) | `MarkdownSpan` across blocks → `copy_text` | `copy_text` on `MarkdownDoc::source` |
 
 Labeled values use the same editor path under [Fields](fields.md#value-field)
 and `field::Selectables`. Chrome (menus, buttons, status meta) is not
-drag-selectable. Continuous select across markdown headings and
-paragraphs is not shipped yet.
+drag-selectable. Drag across headings, paragraphs, and lists uses
+`select::markdown_select` and `MarkdownSpan::text`.
 
 ### Label
 
