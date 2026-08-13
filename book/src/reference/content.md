@@ -35,17 +35,6 @@ Constructor: [`widget::label`](https://docs.rs/icedtea/latest/icedtea/widget/fn.
 
 Platform sans. Empty string is an empty node; still pass `A11y`.
 
-### Rich cell
-
-**`rich-cell`** — A table or list cell: plain, emphasis, code, or link.
-
-Constructor: [`widget::rich_cell`](https://docs.rs/icedtea/latest/icedtea/widget/fn.rich_cell.html)
-
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea)
-
-Not a markup parser. `RichCell::Link` takes an optional message.
-`MarkdownDoc` stays documents.
 
 ### Icon
 

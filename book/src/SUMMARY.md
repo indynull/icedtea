@@ -4,6 +4,7 @@
 - [Install](install.md)
 - [First window](first-window.md)
 - [Architecture](architecture.md)
+- [Material Design 3](m3-foundations.md)
 - [Actions](actions.md)
 - [Layout](layout.md)
 - [Theming](theming.md)

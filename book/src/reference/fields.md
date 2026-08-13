@@ -126,16 +126,6 @@ Constructor: [`widget::number_input`](https://docs.rs/icedtea/latest/icedtea/wid
 The application owns the number. Step messages bump it. Disabled
 freezes the value.
 
-### Masked field
-
-**`mask`** — Fill digit slots on a template (`0000-0000`).
-
-Constructor: [`widget::masked_input`](https://docs.rs/icedtea/latest/icedtea/widget/fn.masked_input.html)
-
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea)
-
-Non-digit template characters stay put. Empty slots are blanks.
 
 ### Date
 
@@ -161,14 +151,3 @@ Constructor: [`widget::time_picker`](https://docs.rs/icedtea/latest/icedtea/widg
 (12-hour or 24-hour, optional seconds). `TimeField` is the unit that
 steps. Disabled freezes the fields.
 
-### Color
-
-**`color`** — A swatch that opens a color pick.
-
-Constructor: [`widget::color_swatch`](https://docs.rs/icedtea/latest/icedtea/widget/fn.color_swatch.html)
-
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea)
-
-The application owns the `Color`. The message is the new color.
-Disabled keeps the swatch and drops the pick.

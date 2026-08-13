@@ -2,65 +2,78 @@
 
 ## Unreleased
 
-## 0.4.0 — 2026-08-13
+Material Design 3 foundations live under `m3`: color `Scheme` roles
+(light and dark baselines), type scale, shape, elevation, density on a
+4dp grid, and `ControlState`. `Tokens` seed from those schemes;
+`Tokens::scheme()` exposes the role map. Light and dark colorways use
+the M3 baselines; hover, pressed, and selection layers use M3 state
+mixes. The guide has an M3 foundations chapter.
 
-`pattern::workspace` calls `pane` with each leaf id. `list_view`
-takes `RowHeights` so rows can be `visible_range_var` heights, and
-`RowFace::Card` for a wrapped title on a surface. `widget::virtual_column`
-virtualizes app-built rows (expand cards) with known heights;
-`collection::expand_card_heights` builds the closed/open slice (same
-rail and overscan as list). Open faces clamp to their row height.
-`data_table` keeps `ColumnLayout.frozen` leading columns in view;
-`on_h_scroll` moves the rest. Lists and tables paint through
-`ClipLayer` (scissor) so virtual panes do not bleed.
-`collection::page_range` / `page_count` page application-owned sets.
-`list_detail` pads the list rail and detail inset.
-`command_palette_view` paints a parameter field when
-`CommandPalette::ask` is set. `window::place_pinned` clamps an
-overlay onto a chosen display. `daemon!` starts `iced::daemon` with
-the same `Prepared` settings; `Prepared::open` maps a window and
-`Prepared::open_desktop` maps a decorated pop-out. `expander` title
-and body share the 12px card inset. `pattern::modal_card` takes
-tokens and paints a black dim wash over the scene.
+Catalog surfaces without an M3 counterpart are gone from the public
+catalog and gallery: mask, color, sparkline, display, rich-cell,
+document-tabs, pad, callout, group-box, skeleton, teaching-tip, and
+jobs. Apps that used those constructors need replacements or own
+widgets.
 
-`selectable` is body text the user can drag-select and copy; it paints
-on a transparent field. `field::Selectables` binds those buffers by id
-(`get` is `Option`, unbound `perform` is a no-op; `ensure` / `retain` /
-`unbind` for lazy open cards). `value_field` is the labeled row with a
-fixed label gutter (`label_width`; pass `layout::FORM_LABEL` for the
-same 140px column as `layout::form`). `highlighted_code` and
-`code_block` use the same select-and-copy contract. `markdown_view`
-keeps structured layout with paint-side select within each block;
-full document copy posts `MarkdownDoc.source`. Contract: `select`
-module. `key::WhileInput::Chrome` / `KeyContext::chrome_over_input`
-match Escape, Enter, and F1–F24 while a field is focused (modifier
-chords already did). Gallery demos public select constructors only.
+## 0.4.0 — 2026-08-12
+
+Workspace panes, virtual collections, and multi-window chrome.
+
+`pattern::workspace` calls `pane` with each leaf id. `list_view` takes
+`RowHeights` (`visible_range_var` heights) and `RowFace::Card` for a
+wrapped title on a surface. `widget::virtual_column` virtualizes
+app-built rows with known heights; `collection::expand_card_heights`
+builds the closed/open slice (same rail and overscan as list). Open
+faces clamp to their row height. `data_table` keeps
+`ColumnLayout.frozen` leading columns in view; `on_h_scroll` moves the
+rest. Lists and tables paint through `ClipLayer` so virtual panes do
+not bleed. `collection::page_range` / `page_count` page
+application-owned sets. `list_detail` pads the list rail and detail
+inset. `command_palette_view` paints a parameter field when
+`CommandPalette::ask` is set. `window::place_pinned` clamps an overlay
+onto a chosen display. `daemon!` starts `iced::daemon` with the same
+`Prepared` settings; `Prepared::open` and `Prepared::open_desktop` map
+windows. `expander` title and body share the 12px card inset.
+`pattern::modal_card` takes tokens and paints a black dim wash over
+the scene.
+
+Select-and-copy for body content.
+
+`selectable` is body text the user can drag-select and copy on a
+transparent field. `field::Selectables` binds buffers by id (`get` is
+`Option`; unbound `perform` is a no-op; `ensure` / `retain` / `unbind`
+for lazy open cards). `value_field` is the labeled row with a fixed
+label gutter (`label_width`; pass `layout::FORM_LABEL` for the same
+140px column as `layout::form`). `highlighted_code` and `code_block`
+share the contract. `markdown_view` keeps structured layout with
+paint-side select per block; full document copy posts
+`MarkdownDoc.source`. Contract: `select` module.
+`key::WhileInput::Chrome` / `KeyContext::chrome_over_input` match
+Escape, Enter, and F1–F24 while a field is focused (modifier chords
+already did).
+
+Controls, theme, and host faces.
 
 `themed_slider` steps continuous ranges (~100 positions) so a `0..=1`
-drag is not stuck on the endpoints. `progress` fills its host and uses
-an 8px girth; `progress_ring` track mixes text into surface.
-`split_button` takes overflow rows and opens them from a chevron menu.
-Chrome icons use solid black fills so iced's svg recolor tints them on
-macOS Metal as well as Linux and Windows.
-
-`light` and `dark` are a neutral desktop pair. Persist defaults
-`follow_os` on. When follow-OS is on, `OsChrome` /
+drag is not stuck on the endpoints. `progress` fills its host at 8px
+girth; `progress_ring` track mixes text into surface. `split_button`
+takes overflow rows from a chevron menu. Chrome icons use solid black
+fills so iced's svg recolor tints them on macOS Metal as well as
+Linux and Windows. `light` and `dark` are a neutral desktop pair.
+Persist defaults `follow_os` on. When follow-OS is on, `OsChrome` /
 `os_chrome` / `listen_os_chrome` / `apply_os_chrome` layer optional
 desktop colors onto the active colorway: accent as `primary` on every
 host; `canvas`, `surface`, `panel`, `text`, `muted`, and `border` on
 macOS and Windows; Linux (settings portal) supplies accent only.
 Unset fields and follow-OS off leave the colorway unchanged. Success,
-warning, and danger stay on the colorway.
-
-`run!` and `daemon!` call `typo::install_platform_faces` so SansSerif
-and Monospace bind to installed faces (UI needs normal and bold weight
-700). Apps that start iced without those macros call it before the
-first frame.
-
-The spinner is eight dots around a circle. `chip` takes optional
-press and dismiss. `status_bar` takes an optional tone and caption.
-Gallery list demos search, Unread/Flagged buckets, and pagination over
-a large seed with selection isolated from list-detail.
+warning, and danger stay on the colorway. `run!` and `daemon!` call
+`typo::install_platform_faces` so SansSerif and Monospace bind to
+installed faces (UI needs normal and bold weight 700). Apps that
+start iced without those macros call it before the first frame. The
+spinner is eight dots around a circle. `chip` takes optional press
+and dismiss. `status_bar` takes an optional tone and caption. Gallery
+list demos search, Unread/Flagged buckets, and pagination over a
+large seed with selection isolated from list-detail.
 
 ## 0.3.0 — 2026-08-11
 

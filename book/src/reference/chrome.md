@@ -112,28 +112,7 @@ Constructor: [`layout::wrap`](https://docs.rs/icedtea/latest/icedtea/layout/fn.w
 Pass child width, gap, and available width. Empty children yield an
 empty column.
 
-### Pad
 
-**`pad`** — Equal-fill tiles.
-
-Constructor: [`layout::pad`](https://docs.rs/icedtea/latest/icedtea/layout/fn.pad.html)
-
-[source](https://github.com/indynull/icedtea/blob/master/src/layout/recipes.rs) ·
-[icedtea](https://crates.io/crates/icedtea)
-
-Pair with `themed_button_sized` for a key pad. `columns` is the row
-length.
-
-### Callout
-
-**`callout`** — An inline info bar.
-
-Constructor: [`widget::info_bar`](https://docs.rs/icedtea/latest/icedtea/widget/fn.info_bar.html)
-
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea)
-
-Tone comes from `Variant`. Empty body is title only.
 
 ### Banner
 
@@ -146,38 +125,6 @@ Constructor: [`widget::banner`](https://docs.rs/icedtea/latest/icedtea/widget/fn
 
 Use for “offline” or “update available”. Optional button message.
 
-### Group box
-
-**`group-box`** — A titled panel around children.
-
-Constructor: [`widget::group_box`](https://docs.rs/icedtea/latest/icedtea/widget/fn.group_box.html)
-
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea)
-
-Same constructor as card. Prefer this name for form sections.
-
-### Skeleton
-
-**`skeleton`** — A placeholder block while content loads.
-
-Constructor: [`widget::placeholder_skeleton`](https://docs.rs/icedtea/latest/icedtea/widget/fn.placeholder_skeleton.html)
-
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea)
-
-Size the box. No message.
-
-### Teaching tip
-
-**`teaching-tip`** — A one-shot hint next to a control.
-
-Constructor: [`widget::teaching_tip`](https://docs.rs/icedtea/latest/icedtea/widget/fn.teaching_tip.html)
-
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea)
-
-The application owns dismissed state. Empty body hides the tip.
 
 ### Command bar
 
@@ -250,16 +197,6 @@ Constructor: [`pattern::status_bar`](https://docs.rs/icedtea/latest/icedtea/patt
 Left is status copy (`meta`, or `info_bar` when a tone is set). Right
 is `table.footer_hints()`, or an optional caption string.
 
-### Jobs
-
-**`jobs`** — Progress rows for background work.
-
-Constructor: [`pattern::job_strip`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.job_strip.html)
-
-[source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
-[icedtea](https://crates.io/crates/icedtea)
-
-The application owns job titles and fractions. Empty strip hides.
 
 ### Scrollbar
 

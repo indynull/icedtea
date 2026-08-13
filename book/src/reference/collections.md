@@ -90,17 +90,6 @@ Constructor: [`widget::tree_view`](https://docs.rs/icedtea/latest/icedtea/widget
 The application owns expand state. Leaf rows have no twisty. Empty
 tree is an empty column.
 
-### Document tabs
-
-**`document-tabs`** — Closable document titles; dirty titles get a bullet.
-
-Constructor: [`pattern::document_tabs`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.document_tabs.html)
-
-[source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
-[icedtea](https://crates.io/crates/icedtea)
-
-Close confirm is the application's. `DocumentTabs` holds titles and
-dirty flags.
 
 ### Tabs
 

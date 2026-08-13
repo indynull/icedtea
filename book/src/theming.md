@@ -1,5 +1,8 @@
 # Theming
 
+Colorways seed **Material Design 3** schemes (`m3::Scheme`). See [Material Design 3 foundations](./m3-foundations.md).
+
+
 Styling is Rust: semantic tokens plus mixing rules.
 
 Tokens: `canvas`, `surface`, `panel`, `text`, `muted`, `primary`,

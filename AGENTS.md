@@ -48,9 +48,11 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   language.
 - One `Action` feeds menus, toolbars, shortcuts, context menus, footer
   hints, and the command palette.
-- Semantic tokens + `theme::mix` for washes. Named colorways
-  (`theme::named`, `theme::builtin_names`) plus high-contrast. Apps may
-  register more that implement the same tokens.
+- **Material Design 3** foundations in `m3` (color roles, type scale,
+  shape, elevation, density, control states). `theme::Tokens` seeds from
+  `m3::Scheme` (baseline light/dark). Named colorways plus high-contrast
+  remain; apps may register more that implement the same roles. See
+  `m3::mapping` for catalog inventory. `theme::mix` builds washes.
 - User-facing text uses `typo::UI` (`Font::DEFAULT`, platform sans).
   Code uses `typo::MONO` (`Font::MONOSPACE`). Never bundle a font
   file. Apps that want a named family load it on the iced application
@@ -116,8 +118,9 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   state. Never demo a usable control with `Nop` or a hardcoded value.
   When a page looks broken, read the widget (offset, stick, viewport)
   before blaming seed data.
-- 4px spacing grid (default density 8px). Design-system numbers live in
-  `density`, `typo`, `chrome`, and tokens — not one-off magic in widgets.
+- 4 dp M3 spacing grid (default density 8 dp, 48 dp touch). Design-system
+  numbers live in `m3` / `density`, `typo`, `chrome`, and tokens — not
+  one-off magic in widgets.
 - Never leave a process-global `OnceLock` or env mutation that freezes
   the first workspace, locale, or theme for the process lifetime.
 - Experiments live in `icedtea` or `icedtea-gallery`. Never add a

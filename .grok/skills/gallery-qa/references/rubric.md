@@ -1,3 +1,10 @@
+## Material Design 3
+
+- Spacing on a **4 dp grid**; default density 8 dp gap, 48 dp touch targets.
+- Controls show M3 states: enabled, disabled, hovered, focused, pressed, selected/error where defined.
+- Surfaces use token roles only (no one-off hex).
+- Type hierarchy: label < body < title (M3 type scale).
+
 # Gallery QA rubric
 
 Score every shot (and every live page) **ok / ugly / broken**. Prefer

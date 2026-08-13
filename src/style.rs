@@ -1,4 +1,4 @@
-//! iced style closures painted from [`crate::theme::Tokens`].
+//! iced style closures painted from M3 [`crate::theme::Tokens`] roles.
 
 use iced::border::Border;
 use iced::overlay::menu as overlay_menu;
@@ -84,11 +84,13 @@ pub fn hairline(tok: Tokens) -> container::Style {
     }
 }
 
-pub fn dim_backdrop(_tok: Tokens) -> container::Style {
-    // Black wash so the sheet sits above the scene on light and dark colorways.
-    // Canvas-tinted alpha was nearly invisible on dark themes.
+pub fn dim_backdrop(tok: Tokens) -> container::Style {
+    // M3 scrim at ~32% over the scene.
+    let scrim = tok.scheme().scrim;
     container::Style {
-        background: Some(Background::Color(Color::from_rgba(0.0, 0.0, 0.0, 0.55))),
+        background: Some(Background::Color(Color::from_rgba(
+            scrim.r, scrim.g, scrim.b, 0.32,
+        ))),
         snap: false,
         ..container::Style::default()
     }

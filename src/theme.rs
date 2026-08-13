@@ -8,8 +8,10 @@
 //! ```
 //! let dark = icedtea::theme::named("dark");
 //! assert_eq!(dark.name, "dark");
-//! let mixed = icedtea::theme::mix(dark.tokens.primary, dark.tokens.canvas, 0.28);
-//! assert_eq!(mixed, dark.tokens.selection);
+//! assert_eq!(
+//!     dark.tokens.selection,
+//!     icedtea::m3::scheme_dark().secondary_container
+//! );
 //! let pure = icedtea::theme::apply_os_chrome(
 //!     dark.tokens,
 //!     false,
@@ -27,10 +29,26 @@ use serde_json::Value;
 
 /// Semantic colors used by every styled widget.
 ///
+/// Fields map to Material Design 3 roles (see [`crate::m3::Scheme`]):
+/// - `canvas` → surface
+/// - `surface` → surface_container
+/// - `panel` → surface_container_high
+/// - `text` → on_surface
+/// - `muted` → on_surface_variant
+/// - `primary` → primary
+/// - `accent` → secondary
+/// - `danger` → error
+/// - `border` → outline
+/// - `selection` → secondary_container
+/// - `selection_text` → on_secondary_container
+///
+/// Prefer reading via [`Tokens::scheme`] for the full M3 role set.
+///
 /// ```
 /// let dark = icedtea::theme::named("dark");
 /// assert_eq!(dark.name, "dark");
 /// assert!(dark.tokens.canvas.r < 0.2);
+/// assert_eq!(dark.tokens.primary, icedtea::m3::scheme_dark().primary);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Tokens {
@@ -47,6 +65,75 @@ pub struct Tokens {
     pub border: Color,
     pub selection: Color,
     pub selection_text: Color,
+}
+
+impl From<crate::m3::Scheme> for Tokens {
+    fn from(s: crate::m3::Scheme) -> Self {
+        Self {
+            canvas: s.surface,
+            surface: s.surface_container,
+            panel: s.surface_container_high,
+            text: s.on_surface,
+            muted: s.on_surface_variant,
+            primary: s.primary,
+            accent: s.secondary,
+            success: s.success,
+            warning: s.warning,
+            danger: s.error,
+            border: s.outline,
+            selection: s.secondary_container,
+            selection_text: s.on_secondary_container,
+        }
+    }
+}
+
+impl Tokens {
+    /// Reconstruct the full M3 scheme for this token face.
+    pub fn scheme(self) -> crate::m3::Scheme {
+        let base = if self.canvas_is_dark() {
+            crate::m3::scheme_dark()
+        } else {
+            crate::m3::scheme_light()
+        };
+        crate::m3::Scheme {
+            primary: self.primary,
+            on_primary: base.on_primary,
+            primary_container: mix(self.primary, self.canvas, 0.25),
+            on_primary_container: self.text,
+            secondary: self.accent,
+            on_secondary: base.on_secondary,
+            secondary_container: self.selection,
+            on_secondary_container: self.selection_text,
+            tertiary: base.tertiary,
+            on_tertiary: base.on_tertiary,
+            tertiary_container: base.tertiary_container,
+            on_tertiary_container: base.on_tertiary_container,
+            error: self.danger,
+            on_error: base.on_error,
+            error_container: mix(self.danger, self.canvas, 0.20),
+            on_error_container: self.text,
+            surface: self.canvas,
+            on_surface: self.text,
+            on_surface_variant: self.muted,
+            surface_variant: mix(self.text, self.canvas, 0.12),
+            surface_container_lowest: self.canvas,
+            surface_container_low: mix(self.surface, self.canvas, 0.5),
+            surface_container: self.surface,
+            surface_container_high: self.panel,
+            surface_container_highest: mix(self.text, self.panel, 0.08),
+            outline: self.border,
+            outline_variant: mix(self.border, self.canvas, 0.5),
+            inverse_surface: self.text,
+            inverse_on_surface: self.canvas,
+            inverse_primary: self.primary,
+            scrim: Color::from_rgb(0.0, 0.0, 0.0),
+            shadow: Color::from_rgb(0.0, 0.0, 0.0),
+            success: self.success,
+            on_success: base.on_success,
+            warning: self.warning,
+            on_warning: base.on_warning,
+        }
+    }
 }
 
 /// A named theme: catalog key plus tokens.
@@ -79,12 +166,12 @@ pub fn mix(fg: Color, bg: Color, amount: f32) -> Color {
 
 /// Hover wash over canvas.
 pub fn hover_fill(tok: Tokens) -> Color {
-    mix(tok.text, tok.canvas, 0.08)
+    crate::m3::color::state_hover(tok.scheme())
 }
 
-/// Pressed wash over canvas.
+/// Pressed wash over surface.
 pub fn pressed_fill(tok: Tokens) -> Color {
-    mix(tok.text, tok.canvas, 0.14)
+    crate::m3::color::state_pressed(tok.scheme())
 }
 
 /// Chip / quiet fill.
@@ -94,7 +181,8 @@ pub fn chip_fill(tok: Tokens) -> Color {
 
 /// Primary wash used for selected rows.
 pub fn selection_fill(tok: Tokens) -> Color {
-    mix(tok.primary, tok.canvas, 0.28)
+    // Prefer explicit selection (M3 secondary_container when seeded from Scheme).
+    tok.selection
 }
 
 /// Mix `color` toward white.
@@ -277,6 +365,20 @@ fn catalog() -> &'static BTreeMap<&'static str, NamedTheme> {
 
 fn builtin(name: &str) -> Option<NamedTheme> {
     let key = alias(name.trim());
+    if key.eq_ignore_ascii_case("light") {
+        return Some(NamedTheme {
+            name: "light",
+            tokens: crate::m3::scheme_light().into(),
+            dark: false,
+        });
+    }
+    if key.eq_ignore_ascii_case("dark") {
+        return Some(NamedTheme {
+            name: "dark",
+            tokens: crate::m3::scheme_dark().into(),
+            dark: true,
+        });
+    }
     catalog().get(key).copied()
 }
 
@@ -768,7 +870,11 @@ pub fn apply_os_chrome(tokens: Tokens, follow_os: bool, chrome: OsChrome) -> Tok
         dirty = true;
     }
     if dirty {
-        tokens.selection = selection_fill(tokens);
+        // Rebuild selection wash from primary on canvas (M3 secondary container tone).
+        tokens.selection = mix(tokens.primary, tokens.canvas, 0.28);
+        if chrome.text.is_some() {
+            tokens.selection_text = tokens.text;
+        }
     }
     tokens
 }
@@ -798,7 +904,7 @@ mod tests {
         assert!(pressed_fill(t).r >= h.r);
         assert!(chip_fill(t).a == 1.0);
         let sel = selection_fill(t);
-        assert_eq!(sel, mix(t.primary, t.canvas, 0.28));
+        assert_eq!(sel, t.selection);
     }
 
     #[test]
@@ -814,8 +920,14 @@ mod tests {
         }
         assert_eq!(named("").name, "dark");
         assert_eq!(named("  nord  ").name, "nord");
-        assert_eq!(named("dark").tokens.canvas, rgb(0x20, 0x20, 0x20));
-        assert_eq!(named("light").tokens.canvas, rgb(0xF3, 0xF3, 0xF3));
+        assert_eq!(
+            named("dark").tokens.canvas,
+            crate::m3::scheme_dark().surface
+        );
+        assert_eq!(
+            named("light").tokens.canvas,
+            crate::m3::scheme_light().surface
+        );
         assert!(named("light").tokens.canvas.r > named("dark").tokens.canvas.r);
         assert_eq!(named("high-contrast").tokens.border, rgb(0xFF, 0xFF, 0xFF));
         assert_ne!(named("gruvbox").tokens.canvas, named("nord").tokens.canvas);
@@ -926,11 +1038,12 @@ mod tests {
     #[test]
     fn light_selection_keeps_dark_ink() {
         let t = named("light").tokens;
-        assert_eq!(t.selection_text, t.text);
-        assert!(t.selection.r < 1.0);
+        // M3 on-secondary-container is dark ink on a light container.
+        assert!(relative_luma(t.selection_text) < 0.5);
+        assert!(relative_luma(t.selection) > 0.7);
         let sun = named("solarized-light").tokens;
-        assert_eq!(sun.selection_text, sun.text);
-        assert!((relative_luma(sun.selection) - relative_luma(sun.text)).abs() > 0.15);
+        assert!(relative_luma(sun.text) < 0.5);
+        assert!((relative_luma(sun.selection) - relative_luma(sun.text)).abs() > 0.05);
     }
 
     #[test]

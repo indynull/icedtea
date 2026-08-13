@@ -76,14 +76,15 @@
 //! assert_eq!(handle(KeyContext::default(), &table, &ev), Some(save));
 //! ```
 //!
-//! # Tokens
+//! # Tokens (Material Design 3)
 //!
-//! [`theme::named`] picks a colorway. [`theme::mix`] builds washes:
+//! [`theme::named`] picks a colorway seeded from M3 schemes
+//! ([`m3::scheme_light`] / [`m3::scheme_dark`]). [`theme::mix`] builds washes:
 //!
 //! ```
 //! use icedtea::theme;
 //! let tok = theme::named("dark").tokens;
-//! let wash = theme::mix(tok.primary, tok.canvas, 0.28);
+//! let wash = theme::selection_fill(tok);
 //! assert_eq!(wash, tok.selection);
 //! ```
 //!
@@ -194,6 +195,7 @@ pub mod i18n;
 pub mod icon;
 pub mod key;
 pub mod layout;
+pub mod m3;
 mod menubar;
 pub mod nav;
 pub mod palette;
@@ -300,9 +302,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn dark_selection_uses_mix_rule() {
+    fn dark_selection_is_scheme_secondary_container() {
         let t = theme::named("dark").tokens;
-        assert_eq!(theme::mix(t.primary, t.canvas, 0.28), t.selection);
+        assert_eq!(theme::selection_fill(t), t.selection);
+        assert_eq!(t.selection, crate::m3::scheme_dark().secondary_container);
     }
 
     #[test]
