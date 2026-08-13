@@ -717,7 +717,7 @@ impl TableModel {
             self.sort_asc = true;
         }
         let asc = self.sort_asc;
-        self.rows.sort_by(|a, b| {
+        let cmp = |a: &Vec<String>, b: &Vec<String>| {
             let av = a.get(col).map(String::as_str).unwrap_or("");
             let bv = b.get(col).map(String::as_str).unwrap_or("");
             if asc {
@@ -725,7 +725,18 @@ impl TableModel {
             } else {
                 bv.cmp(av)
             }
-        });
+        };
+        if self.checks.len() == self.rows.len() {
+            let mut pairs: Vec<(Vec<String>, bool)> =
+                self.rows.drain(..).zip(self.checks.drain(..)).collect();
+            pairs.sort_by(|(a, _), (b, _)| cmp(a, b));
+            for (row, on) in pairs {
+                self.rows.push(row);
+                self.checks.push(on);
+            }
+        } else {
+            self.rows.sort_by(cmp);
+        }
     }
 
     pub fn cell(&self, row: usize, col: usize) -> &str {
@@ -1123,6 +1134,17 @@ mod tests {
         assert_eq!(table.cell(0, 0), "a");
         table.sort(0);
         assert_eq!(table.cell(0, 0), "b");
+        let mut checked = TableModel {
+            headers: vec!["n".into()],
+            rows: vec![vec!["b".into()], vec!["a".into()]],
+            sort_col: None,
+            sort_asc: true,
+            checks: vec![true, false],
+        };
+        checked.sort(0);
+        assert_eq!(checked.cell(0, 0), "a");
+        assert_eq!(checked.row_checked(0), Some(false));
+        assert_eq!(checked.row_checked(1), Some(true));
         assert_eq!(table.cell(9, 9), "");
         assert_eq!(TableSource::row_count(&table), 2);
         assert_eq!(TableSource::column_count(&table), 1);

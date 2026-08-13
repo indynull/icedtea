@@ -3,7 +3,8 @@
 ## Unreleased
 
 `markdown_view` drag-selects across blocks via `select::markdown_select`
-and `MarkdownSpan` (layout stays structured). Navigation rail is
+and `MarkdownSpan` (layout stays structured; covered blocks paint the
+span wash). Navigation rail is
 `pattern::nav_rail`. Lists take leading/trailing `RowSlot`s. Sliders take
 `SliderMarks`. Tabs take badges and overflow width. Progress takes a
 buffer fill and labeled remaining. Tables paint a checkbox column from

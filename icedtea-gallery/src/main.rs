@@ -1280,7 +1280,13 @@ impl Gallery {
 
     fn copy_value(&self) -> String {
         match self.page {
-            "markdown" => self.md.source.clone(),
+            "markdown" => {
+                if self.md_sel.span.is_empty() {
+                    self.md.source.clone()
+                } else {
+                    self.md_sel.span.text(&self.md.items)
+                }
+            }
             "list" => self
                 .list_sel
                 .primary()
@@ -4944,6 +4950,35 @@ mod tests {
         assert!(g.note.starts_with("Jump to "));
         let _ = g.update(super::Message::MdLink("https://example.com".into()));
         assert!(g.note.contains("example.com"));
+    }
+
+    #[test]
+    fn markdown_copy_posts_the_dragged_span() {
+        let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
+        g.page = "markdown";
+        assert_eq!(g.copy_value(), g.md.source);
+        let end_y =
+            g.md.items
+                .iter()
+                .map(icedtea::select::markdown_item_extent)
+                .sum::<f32>();
+        let _ = g.update(super::Message::MdPointer(
+            icedtea::select::MarkdownPointer::Move(0.0),
+        ));
+        let _ = g.update(super::Message::MdPointer(
+            icedtea::select::MarkdownPointer::Press,
+        ));
+        let _ = g.update(super::Message::MdPointer(
+            icedtea::select::MarkdownPointer::Move(end_y),
+        ));
+        let _ = g.update(super::Message::MdPointer(
+            icedtea::select::MarkdownPointer::Release,
+        ));
+        let copied = g.copy_value();
+        assert!(!g.md_sel.span.is_empty());
+        assert_eq!(copied, g.md_sel.span.text(&g.md.items));
+        assert_ne!(copied, g.md.source);
+        assert!(copied.contains("Markdown") || copied.contains("Heading"));
     }
 
     #[test]

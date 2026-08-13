@@ -2480,13 +2480,30 @@ pub fn markdown_view<'a, M: Clone + 'a>(
     span: Option<&'a crate::select::MarkdownSpan>,
     on_pointer: impl Fn(crate::select::MarkdownPointer) -> M + Copy + 'a,
     tok: Tokens,
-    on_link: impl Fn(markdown::Uri) -> M + 'a,
+    on_link: impl Fn(markdown::Uri) -> M + Copy + 'a,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let _ = span;
-    let body =
-        iced_selection::markdown::view(items, markdown::Settings::with_style(markdown_style(tok)))
-            .map(on_link);
+    let settings = markdown::Settings::with_style(markdown_style(tok));
+    let body: Element<'a, M> = match span.copied().filter(|s| !s.is_empty()) {
+        None => iced_selection::markdown::view(items, settings).map(on_link),
+        Some(span) => {
+            let mut col = Column::new().spacing(settings.spacing).width(Length::Fill);
+            for (i, item) in items.iter().enumerate() {
+                let block = iced_selection::markdown::view(std::slice::from_ref(item), settings)
+                    .map(on_link);
+                let block: Element<'a, M> = if span.covers(i) {
+                    container(block)
+                        .width(Length::Fill)
+                        .style(move |_| style::list_row(tok, true))
+                        .into()
+                } else {
+                    block
+                };
+                col = col.push(block);
+            }
+            col.into()
+        }
+    };
     a11y::attach(
         mouse_area(body)
             .on_move(move |p| on_pointer(crate::select::MarkdownPointer::Move(p.y)))
@@ -6271,6 +6288,8 @@ mod tests {
             .unwrap();
         assert!(md.contains("iced_selection::markdown::view"));
         assert!(!md.contains("Rich::with_spans"));
+        assert!(!md.contains("let _ = span"));
+        assert!(md.contains("covers"));
         let mut st = crate::select::markdown_select(
             &doc.items,
             crate::select::MarkdownSelect::default(),
@@ -6298,6 +6317,19 @@ mod tests {
         draw_once(&mut painted);
         assert!(st.span.text(&doc.items).contains("Title"));
         assert!(st.span.text(&doc.items).contains("First"));
+        let head = crate::select::MarkdownSpan {
+            start: crate::select::MarkdownPos { item: 0, offset: 0 },
+            end: crate::select::MarkdownPos { item: 0, offset: 5 },
+        };
+        let mut part: Element<'_, ()> = markdown_view(
+            &doc.items,
+            Some(&head),
+            |_| (),
+            tok,
+            |_| (),
+            A11y::new("md-head", Role::Group),
+        );
+        draw_once(&mut part);
     }
 
     #[test]
@@ -7262,6 +7294,16 @@ mod tests {
                 }),
                 layout,
                 mouse::Cursor::Available(Point::new(80.0, 8.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+            range_el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(Point::new(200.0, 48.0)),
                 &renderer,
                 &mut clipboard,
                 &mut shell,
