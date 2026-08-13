@@ -430,6 +430,18 @@ DEFAULT_INTERACT: list[dict[str, str]] = [
         "script": "sheet true\n",
         "expect": "side sheet open over dim scene",
     },
+    {
+        "match": "markdown:",
+        "name": "markdown-span",
+        "script": "md-move 0\nmd-press\nmd-move 800\nmd-release\n",
+        "expect": "selection wash on heading through later blocks",
+    },
+    {
+        "match": "table:",
+        "name": "table-sort",
+        "script": "sort 0\n",
+        "expect": "Name column sorted; checks moved with their rows",
+    },
 ]
 
 

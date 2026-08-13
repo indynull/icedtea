@@ -511,6 +511,16 @@ fn parse_inject_line(line: &str) -> Option<Message> {
         "tree" => Some(Message::Tree(parts.next()?.parse().ok()?)),
         "tree-sel" | "tree_sel" => Some(Message::TreeSelect(parts.next()?.parse().ok()?)),
         "swatch" => Some(Message::Swatch),
+        "md-move" | "md_move" => Some(Message::MdPointer(icedtea::select::MarkdownPointer::Move(
+            parts.next()?.parse().ok()?,
+        ))),
+        "md-press" | "md_press" => {
+            Some(Message::MdPointer(icedtea::select::MarkdownPointer::Press))
+        }
+        "md-release" | "md_release" => Some(Message::MdPointer(
+            icedtea::select::MarkdownPointer::Release,
+        )),
+        "sort" => Some(Message::Sort(parts.next()?.parse().ok()?)),
         _ => None,
     }
 }
@@ -1633,7 +1643,8 @@ impl Gallery {
             Message::MdPointer(ev) => {
                 self.md_sel = icedtea::select::markdown_select(&self.md.items, self.md_sel, ev);
                 if !self.md_sel.span.is_empty() {
-                    self.note = self.md_sel.span.text(&self.md.items);
+                    let n = self.md_sel.span.text(&self.md.items).chars().count();
+                    self.note = format!("Selected {n} characters");
                 }
             }
             Message::ListCheck(i) => {
@@ -4979,6 +4990,8 @@ mod tests {
         assert_eq!(copied, g.md_sel.span.text(&g.md.items));
         assert_ne!(copied, g.md.source);
         assert!(copied.contains("Markdown") || copied.contains("Heading"));
+        assert!(g.note.starts_with("Selected "));
+        assert!(!g.note.contains('\n'));
     }
 
     #[test]
@@ -5002,6 +5015,16 @@ mod tests {
         assert!(matches!(
             super::parse_inject_line("face card"),
             Some(super::Message::ListFace(true))
+        ));
+        assert!(matches!(
+            super::parse_inject_line("md-press"),
+            Some(super::Message::MdPointer(
+                icedtea::select::MarkdownPointer::Press
+            ))
+        ));
+        assert!(matches!(
+            super::parse_inject_line("sort 0"),
+            Some(super::Message::Sort(0))
         ));
         assert!(super::parse_inject_line("# comment").is_none());
         assert!(super::parse_inject_line("unknown x").is_none());
