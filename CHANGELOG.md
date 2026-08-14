@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.6.3 — 2026-08-14
+
+### Controls
+
+- Selected and assist chips paint `primary` / `on_primary` so their ink
+  differs from the idle outline.
+
 ## 0.6.2 — 2026-08-14
 
 ### Controls
