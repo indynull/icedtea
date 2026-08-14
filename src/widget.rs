@@ -3137,10 +3137,11 @@ pub fn chip_face(
     let s = tok.scheme();
     let r = crate::m3::shape::Component::Chip.radius();
     match variant {
-        // Selected / assist filled
+        // Selected filter / assist filled. Primary solid so ink is
+        // on_primary, not the same on_surface as the idle outline.
         Variant::Primary | Variant::Chip => (
-            s.secondary_container,
-            s.on_secondary_container,
+            s.primary,
+            s.on_primary,
             iced::border::Border {
                 color: Color::TRANSPARENT,
                 width: 0.0,
