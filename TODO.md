@@ -20,6 +20,9 @@ Non-goals:
 - A stylesheet, markup language, or second renderer.
 - Threading views as a mail-specific widget (compose from list + detail).
 - Offline indicators as a domain widget (status/toasts cover the chrome).
-- FAB, extended FAB, bottom navigation, pull-to-refresh.
+- FAB, extended FAB, FAB menu, bottom navigation, pull-to-refresh.
 - Carousel and marketing hero sheets.
 - Snackbar as a second path next to `toast`.
+- Bottom sheets (mobile).
+- Loading indicator as M3 Expressive shape-morph.
+- Floating toolbar as a pill / expressive float.

@@ -599,6 +599,71 @@ pub fn segmented_button<'a, M: Clone + 'a>(
     a11y::attach(r.into(), &a11y)
 }
 
+/// Related actions in one strip (M3 button group). Not exclusive.
+///
+/// Each label sends its index. Empty labels paint an empty row.
+/// Disabled drops every press.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let on_press = |i| i;
+/// let _: icedtea::Element<'_, usize> = widget::button_group(
+///     &["Cut".into(), "Copy".into(), "Paste".into()],
+///     on_press,
+///     tok,
+///     A11y::new("edit", Role::Group),
+/// );
+/// ```
+pub fn button_group<'a, M: Clone + 'a>(
+    labels: &[String],
+    on_press: impl Fn(usize) -> M + Copy + 'a,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let mut r = Row::new().spacing(0).align_y(Alignment::Center);
+    for (i, label) in labels.iter().enumerate() {
+        if i > 0 {
+            r = r.push(
+                container(Space::new().width(1).height(control_height())).style(move |_| {
+                    style::fill(tok.scheme().outline_variant, tok.scheme().on_surface)
+                }),
+            );
+        }
+        let face = themed_button_sized(
+            label.clone(),
+            if a11y.disabled {
+                None
+            } else {
+                Some(on_press(i))
+            },
+            tok,
+            Variant::Quiet,
+            Length::Shrink,
+            Length::Fixed(control_height()),
+            A11y::button(label.clone()).with_disabled(a11y.disabled),
+        );
+        r = r.push(face);
+    }
+    a11y::attach(
+        container(r)
+            .style(move |_| {
+                let s = tok.scheme();
+                let mut st = style::fill(Color::TRANSPARENT, s.on_surface);
+                st.border = iced::border::Border {
+                    color: s.outline_variant,
+                    width: 1.0,
+                    radius: crate::m3::shape::Component::Button.radius(),
+                };
+                st
+            })
+            .into(),
+        &a11y,
+    )
+}
+
 /// Icon-only press control (toolbar density).
 ///
 /// Same variant wash as labeled buttons. Disabled drops the press.
@@ -1916,6 +1981,80 @@ pub fn search_input_clear<'a, M: Clone + 'a>(
     a11y::attach(r.into(), &a11y)
 }
 
+/// Docked search results under a search field (M3 search view, desktop).
+///
+/// Hits are application-filtered. Empty `hits` shows `empty`. Disabled
+/// drops pick and clear.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let on_input = |s| s;
+/// let on_pick = |i| format!("{i}");
+/// let _: icedtea::Element<'_, String> = widget::search_view(
+///     "in",
+///     ["Inbox", "Sent"],
+///     on_input,
+///     on_pick,
+///     Some(String::new()),
+///     "No matches",
+///     tok,
+///     A11y::new("find", Role::Group),
+/// );
+/// ```
+#[allow(clippy::too_many_arguments)]
+pub fn search_view<'a, M: Clone + 'a>(
+    query: &str,
+    hits: impl IntoIterator<Item = impl Into<String>>,
+    on_input: impl Fn(String) -> M + 'a,
+    on_pick: impl Fn(usize) -> M + Copy + 'a,
+    on_clear: Option<M>,
+    empty: &'a str,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let hits: Vec<String> = hits.into_iter().map(Into::into).collect();
+    let field = search_input_clear(
+        query,
+        on_input,
+        if a11y.disabled { None } else { on_clear },
+        tok,
+        A11y::new(a11y.name.clone(), Role::TextBox).with_disabled(a11y.disabled),
+    );
+    let body: Element<'a, M> = if hits.is_empty() {
+        meta(empty, tok, A11y::new(empty, Role::Status))
+    } else {
+        let mut col = Column::new().spacing(0).width(Length::Fill);
+        for (i, hit) in hits.iter().enumerate() {
+            let hit_a11y = A11y::button(hit.clone()).with_disabled(a11y.disabled);
+            let mut b = button(
+                text(hit_a11y.apply_name(hit.clone()))
+                    .size(typo::BODY)
+                    .width(Length::Fill)
+                    .align_x(Alignment::Start),
+            )
+            .padding(pad())
+            .width(Length::Fill)
+            .style(style::button_style(tok, Variant::Ghost));
+            if let Some(m) = hit_a11y.apply_message(if a11y.disabled {
+                None
+            } else {
+                Some(on_pick(i))
+            }) {
+                b = b.on_press(m);
+            }
+            col = col.push(a11y::attach(b.into(), &hit_a11y));
+        }
+        col.into()
+    };
+    a11y::attach(
+        column![field, body].spacing(4).width(Length::Fill).into(),
+        &a11y,
+    )
+}
+
 /// Pick one string from a list.
 ///
 /// Placeholder shows when nothing is selected. Disabled keeps the
@@ -2563,6 +2702,53 @@ pub fn tooltip_wrap<'a, M: 'a>(
             container(meta(tip.clone(), tok, A11y::new(tip, Role::Tooltip)))
                 .padding(6)
                 .style(tip_style(tok)),
+            tooltip::Position::FollowCursor,
+        )
+        .into(),
+        &a11y,
+    )
+}
+
+/// Hover title plus supporting copy on a child (M3 rich tooltip).
+///
+/// Empty title and body is a no-op wrap. The child keeps its own `A11y`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = widget::tooltip_rich(
+///     widget::label("Hover", tok, A11y::new("Hover", Role::Header)),
+///     "Save",
+///     "Write the buffer to disk.",
+///     tok,
+///     A11y::new("Save tip", Role::Tooltip),
+/// );
+/// ```
+pub fn tooltip_rich<'a, M: 'a>(
+    child: Element<'a, M>,
+    title: impl Into<String>,
+    body: impl Into<String>,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let title = title.into();
+    let body = body.into();
+    if title.is_empty() && body.is_empty() {
+        return child;
+    }
+    let mut col = Column::new().spacing(2);
+    if !title.is_empty() {
+        col = col.push(label(title.clone(), tok, A11y::new(title, Role::Header)));
+    }
+    if !body.is_empty() {
+        col = col.push(meta(body.clone(), tok, A11y::new(body, Role::Status)));
+    }
+    a11y::attach(
+        tooltip(
+            child,
+            container(col).padding(8).style(tip_style(tok)),
             tooltip::Position::FollowCursor,
         )
         .into(),
@@ -5067,6 +5253,74 @@ mod tests {
             role("vf-off", Role::Group).with_disabled(true),
         );
         let _: Element<'_, ()> = search_input("q", |_| (), tok, role("q", Role::TextBox));
+        let mut sv: Element<'_, ()> = search_view(
+            "in",
+            ["Inbox", "Sent"],
+            |_| (),
+            |_| (),
+            Some(()),
+            "No matches",
+            tok,
+            role("find", Role::Group),
+        );
+        draw_once(&mut sv);
+        let mut empty_sv: Element<'_, ()> = search_view(
+            "zz",
+            Vec::<String>::new(),
+            |_| (),
+            |_| (),
+            None,
+            "No matches",
+            tok,
+            role("find-empty", Role::Group).with_disabled(true),
+        );
+        draw_once(&mut empty_sv);
+        let mut disabled_hits: Element<'_, ()> = search_view(
+            "in",
+            ["Inbox", "Sent"],
+            |_| (),
+            |_| (),
+            Some(()),
+            "No matches",
+            tok,
+            role("find-off", Role::Group).with_disabled(true),
+        );
+        draw_once(&mut disabled_hits);
+        let mut group: Element<'_, usize> = button_group(
+            &["Cut".into(), "Copy".into()],
+            |i| i,
+            tok,
+            role("edit", Role::Group),
+        );
+        draw_once(&mut group);
+        let mut group_off: Element<'_, usize> = button_group(
+            &["Cut".into()],
+            |i| i,
+            tok,
+            role("edit-off", Role::Group).with_disabled(true),
+        );
+        draw_once(&mut group_off);
+        let _: Element<'_, usize> = button_group(
+            &[],
+            |i| i,
+            tok,
+            role("edit-empty", Role::Group).with_disabled(true),
+        );
+        let mut tip: Element<'_, ()> = tooltip_rich(
+            label("Save", tok, role("Save", Role::Header)),
+            "Save",
+            "Write the buffer.",
+            tok,
+            role("tip", Role::Tooltip),
+        );
+        draw_once(&mut tip);
+        let _: Element<'_, ()> = tooltip_rich(
+            label("x", tok, role("x", Role::Header)),
+            "",
+            "",
+            tok,
+            role("tip-empty", Role::Tooltip),
+        );
         let hints = ["save".into(), "open".into()];
         let _: Element<'_, ()> = suggest_field(
             "Command",

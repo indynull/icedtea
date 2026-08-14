@@ -113,6 +113,18 @@ Constructor: [`widget::segmented_button`](https://docs.rs/icedtea/latest/icedtea
 
 The application owns the selected index. Press emits the new index. Disabled freezes every segment.
 
+### Button group
+
+**`button-group`** — Related actions in one strip.
+
+Constructor: [`widget::button_group`](https://docs.rs/icedtea/latest/icedtea/widget/fn.button_group.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea)
+
+Each label sends its index. Not exclusive (see segmented button).
+Empty labels paint an empty row. Disabled drops every press.
+
 ### Icon button
 
 **`icon-button`** — Icon-only press control for dense toolbars.

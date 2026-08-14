@@ -708,6 +708,7 @@ pub fn navigation_view<'a, M: Clone + 'a>(
 ///     ["Inbox", "Sent"],
 ///     0,
 ///     on_pick,
+///     true,
 ///     tok,
 ///     A11y::new("rail", Role::List),
 /// );
@@ -716,6 +717,7 @@ pub fn nav_rail<'a, M: Clone + 'a>(
     items: impl IntoIterator<Item = impl Into<String>>,
     selected: usize,
     on_select: impl Fn(usize) -> M + Copy + 'a,
+    expanded: bool,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
@@ -723,8 +725,17 @@ pub fn nav_rail<'a, M: Clone + 'a>(
     let mut col = Column::new().spacing(4).width(Length::Fill);
     for (i, title) in items.iter().enumerate() {
         let on = i == selected;
+        let face_title = if expanded {
+            title.clone()
+        } else {
+            title
+                .chars()
+                .next()
+                .map(|c| c.to_string())
+                .unwrap_or_default()
+        };
         let face = container(crate::widget::themed_button(
-            title.clone(),
+            face_title,
             if a11y.disabled {
                 None
             } else {
@@ -742,7 +753,7 @@ pub fn nav_rail<'a, M: Clone + 'a>(
     }
     crate::a11y::attach(
         container(col)
-            .width(72)
+            .width(if expanded { 220 } else { 72 })
             .padding(8)
             .style(move |_| style::panel(tok))
             .into(),
@@ -1676,24 +1687,38 @@ mod tests {
             ["Inbox", "Sent"],
             0,
             |i| i,
+            true,
             tok,
             A11y::new("rail", Role::List),
         );
         draw_once(&mut rail);
-        let _: Element<'_, usize> = nav_rail(
+        let mut compact: Element<'_, usize> = nav_rail(
+            ["Inbox", "Sent"],
+            0,
+            |i| i,
+            false,
+            tok,
+            A11y::new("rail-compact", Role::List),
+        );
+        draw_once(&mut compact);
+        let mut off: Element<'_, usize> = nav_rail(
             ["Inbox"],
             1,
             |i| i,
+            true,
             tok,
             A11y::new("rail-off", Role::List).with_disabled(true),
         );
-        let _: Element<'_, usize> = nav_rail(
+        draw_once(&mut off);
+        let mut empty: Element<'_, usize> = nav_rail(
             Vec::<String>::new(),
             0,
             |i| i,
+            false,
             tok,
             A11y::new("rail-empty", Role::List).with_disabled(true),
         );
+        draw_once(&mut empty);
     }
 
     #[test]

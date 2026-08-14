@@ -89,6 +89,18 @@ Constructor: [`widget::search_input`](https://docs.rs/icedtea/latest/icedtea/wid
 
 Use for palette and list filters. Empty query means “show all”.
 
+### Search view
+
+**`search-view`** — Docked results under a search field.
+
+Constructor: [`widget::search_view`](https://docs.rs/icedtea/latest/icedtea/widget/fn.search_view.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea)
+
+The application owns the query and the hit list. Empty hits show
+`empty`. Disabled drops pick and clear.
+
 ### Suggest
 
 **`suggest`** — A text field with a pick list of completions.

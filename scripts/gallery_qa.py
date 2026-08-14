@@ -380,8 +380,20 @@ DEFAULT_INTERACT: list[dict[str, str]] = [
     {
         "match": "controls:",
         "name": "controls-toggles",
-        "script": "check true\nswitch true\nsounds true\nradio 1\nslide 0.75\nsegment 1\nrange 15 90\n",
-        "expect": "Accept and Sounds on; Option B; slider 75%; Week segment; range 15-90",
+        "script": "check true\nswitch true\nsounds true\nradio 1\nslide 0.75\nsegment 1\nrange 15 90\ngroup 1\n",
+        "expect": "Button group visible; Accept and Sounds on; Option B; status Group 1",
+    },
+    {
+        "match": "fields:",
+        "name": "search-view-filter",
+        "script": "query in\n",
+        "expect": "search view hits filter to Inbox",
+    },
+    {
+        "match": "navigation stack",
+        "name": "nav-rail-select",
+        "script": "rail 1\n",
+        "expect": "Sent rail row selected",
     },
     {
         "match": "list:",

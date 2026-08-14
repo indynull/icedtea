@@ -32,6 +32,11 @@ pub const MAP: &[MapRow] = &[
         fate: Fate::Map,
     },
     MapRow {
+        id: "button-group",
+        m3: "Button groups",
+        fate: Fate::Map,
+    },
+    MapRow {
         id: "icon-button",
         m3: "Icon button",
         fate: Fate::Map,
@@ -113,6 +118,11 @@ pub const MAP: &[MapRow] = &[
         fate: Fate::Map,
     },
     MapRow {
+        id: "search-view",
+        m3: "Search (view)",
+        fate: Fate::Map,
+    },
+    MapRow {
         id: "suggest",
         m3: "Menus (suggest)",
         fate: Fate::Map,
@@ -167,6 +177,11 @@ pub const MAP: &[MapRow] = &[
     MapRow {
         id: "tooltip",
         m3: "Tooltip",
+        fate: Fate::Map,
+    },
+    MapRow {
+        id: "rich-tooltip",
+        m3: "Tooltip (rich)",
         fate: Fate::Map,
     },
     MapRow {

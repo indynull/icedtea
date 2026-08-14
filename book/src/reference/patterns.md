@@ -87,7 +87,8 @@ Constructor: [`pattern::nav_rail`](https://docs.rs/icedtea/latest/icedtea/patter
 [icedtea](https://crates.io/crates/icedtea)
 
 Selected row uses the rail wash. Press emits the destination index.
-Empty items paint an empty column.
+`expanded` is the wide labeled rail; compact shows the first letter
+in a 72 px column. Empty items paint an empty column.
 
 ### Navigation view
 

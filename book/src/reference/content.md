@@ -60,6 +60,17 @@ Constructor: [`widget::tooltip_wrap`](https://docs.rs/icedtea/latest/icedtea/wid
 
 Empty tip text is a no-op wrap. The child keeps its own `A11y`.
 
+### Rich tooltip
+
+**`rich-tooltip`** — Hover title plus supporting copy.
+
+Constructor: [`widget::tooltip_rich`](https://docs.rs/icedtea/latest/icedtea/widget/fn.tooltip_rich.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea)
+
+Empty title and body is a no-op wrap. The child keeps its own `A11y`.
+
 ### Hyperlink
 
 **`link`** — A text link that sends a message.

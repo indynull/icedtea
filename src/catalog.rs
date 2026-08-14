@@ -28,8 +28,9 @@ pub struct Entry {
 /// group cannot be swapped. One row per public surface.
 #[rustfmt::skip]
 pub const ENTRIES: &[Entry] = &[
-    // Inject targets first (checkbox/radio/switch/slider). New desktop
-    // Material controls next so idle shots still show them above the fold.
+    // Button group first so the new strip sits above the fold. Inject
+    // targets (checkbox/radio/switch/slider) follow while still visible.
+    Entry { id: "button-group", title: "Button group", group: "Controls", page: "controls" },
     Entry { id: "checkbox", title: "Checkbox", group: "Controls", page: "controls" },
     Entry { id: "radio", title: "Radio", group: "Controls", page: "controls" },
     Entry { id: "switch", title: "Switch", group: "Controls", page: "controls" },
@@ -41,6 +42,8 @@ pub const ENTRIES: &[Entry] = &[
     Entry { id: "button", title: "Button", group: "Controls", page: "controls" },
     Entry { id: "split-button", title: "Split button", group: "Controls", page: "controls" },
     Entry { id: "toggle-button", title: "Toggle button", group: "Controls", page: "controls" },
+    // Search view first so docked hits are above the fold on Fields.
+    Entry { id: "search-view", title: "Search view", group: "Fields", page: "fields" },
     Entry { id: "text-input", title: "Text input", group: "Fields", page: "fields" },
     Entry { id: "field-support", title: "Field support", group: "Fields", page: "fields" },
     Entry { id: "password", title: "Password", group: "Fields", page: "fields" },
@@ -59,6 +62,7 @@ pub const ENTRIES: &[Entry] = &[
     Entry { id: "label", title: "Label", group: "Content", page: "type" },
     Entry { id: "icon", title: "Icon", group: "Content", page: "type" },
     Entry { id: "tooltip", title: "Tooltip", group: "Content", page: "type" },
+    Entry { id: "rich-tooltip", title: "Rich tooltip", group: "Content", page: "type" },
     Entry { id: "link", title: "Hyperlink", group: "Content", page: "type" },
     Entry { id: "markdown", title: "Markdown", group: "Content", page: "markdown" },
     Entry { id: "code", title: "Code", group: "Content", page: "code" },
@@ -270,6 +274,7 @@ mod tests {
         let ctors = [
             ("button", "themed_button"),
             ("segmented-button", "segmented_button"),
+            ("button-group", "button_group"),
             ("icon-button", "icon_button"),
             ("split-button", "split_button"),
             ("toggle-button", "toggle_button"),
@@ -286,6 +291,7 @@ mod tests {
             ("value-field", "value_field"),
             ("textarea", "textarea"),
             ("search", "search_input"),
+            ("search-view", "search_view"),
             ("suggest", "suggest_field"),
             ("select", "themed_pick_list"),
             ("number", "number_input"),
@@ -297,6 +303,7 @@ mod tests {
             ("label", "label"),
             ("icon", "icon_svg"),
             ("tooltip", "tooltip_wrap"),
+            ("rich-tooltip", "tooltip_rich"),
             ("link", "hyperlink"),
             ("markdown", "markdown_view"),
             ("code", "highlighted_code"),
@@ -471,6 +478,7 @@ mod tests {
         let map = [
             ("button", "themed_button", widget),
             ("segmented-button", "segmented_button", widget),
+            ("button-group", "button_group", widget),
             ("icon-button", "icon_button", widget),
             ("split-button", "split_button", widget),
             ("toggle-button", "toggle_button", widget),
@@ -487,6 +495,7 @@ mod tests {
             ("value-field", "value_field", widget),
             ("textarea", "textarea", widget),
             ("search", "search_input", widget),
+            ("search-view", "search_view", widget),
             ("suggest", "suggest_field", widget),
             ("select", "themed_pick_list", widget),
             ("number", "number_input", widget),
@@ -498,6 +507,7 @@ mod tests {
             ("label", "label", widget),
             ("icon", "icon_svg", widget),
             ("tooltip", "tooltip_wrap", widget),
+            ("rich-tooltip", "tooltip_rich", widget),
             ("link", "hyperlink", widget),
             ("markdown", "markdown_view", widget),
             ("code", "highlighted_code", widget),

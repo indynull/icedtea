@@ -521,6 +521,10 @@ fn parse_inject_line(line: &str) -> Option<Message> {
             icedtea::select::MarkdownPointer::Release,
         )),
         "sort" => Some(Message::Sort(parts.next()?.parse().ok()?)),
+        "group" => Some(Message::GroupPress(parts.next()?.parse().ok()?)),
+        "query" => Some(Message::Query(parts.next()?.to_string())),
+        "pick" => Some(Message::SearchPick(parts.next()?.parse().ok()?)),
+        "rail" => Some(Message::Rail(parts.next()?.parse().ok()?)),
         _ => None,
     }
 }
@@ -584,6 +588,7 @@ enum Message {
     Select(&'static str),
     Theme(String),
     Query(String),
+    Name(String),
     Toggle(bool),
     Number(String),
     Pick(String),
@@ -620,6 +625,8 @@ enum Message {
     ListCheck(usize),
     TableCheck(usize),
     Rail(usize),
+    SearchPick(usize),
+    GroupPress(usize),
     Note(String),
     Pad(&'static str),
     DismissChip(usize),
@@ -736,6 +743,7 @@ struct Gallery {
     tokens: Tokens,
     catalog: Catalog,
     query: String,
+    name: String,
     secret: String,
     secret_revealed: bool,
     checked: bool,
@@ -901,6 +909,7 @@ impl Gallery {
             tokens,
             catalog: Catalog::builtin(),
             query: String::new(),
+            name: String::new(),
             secret: "hunter2".into(),
             secret_revealed: false,
             checked: true,
@@ -1443,6 +1452,7 @@ impl Gallery {
                         .unwrap_or_else(|| theme::named(&name).tokens);
                 }
             }
+            Message::Name(s) => self.name = s,
             Message::Query(q) => {
                 self.query = q;
                 let needle = self.query.to_ascii_lowercase();
@@ -1671,6 +1681,8 @@ impl Gallery {
                 self.rail = i;
                 self.note = format!("Rail {i}");
             }
+            Message::SearchPick(i) => self.note = format!("Hit {i}"),
+            Message::GroupPress(i) => self.note = format!("Group {i}"),
             Message::Note(s) => self.note = s,
             Message::Pad(key) => match key {
                 "=" => self.note = format!("= {}", self.pad),
@@ -1739,7 +1751,7 @@ impl Gallery {
                 self.sel.select_single(r);
             }
             Message::Submit => {
-                self.dialog_note = format!("submit: {}", self.query);
+                self.dialog_note = format!("submit: {}", self.name);
             }
             Message::Tick => {
                 self.tick = self.tick.saturating_add(1);
@@ -2630,6 +2642,12 @@ impl Gallery {
                 tok,
                 named("segment", Role::Group),
             ),
+            "button-group" => widget::button_group(
+                &["Cut".into(), "Copy".into(), "Paste".into()],
+                Message::GroupPress,
+                tok,
+                named("edit", Role::Group),
+            ),
             "icon-button" => row![
                 widget::icon_button(
                     icedtea::icon::Icon::Search,
@@ -2687,8 +2705,8 @@ impl Gallery {
             "text-input" => column![
                 widget::themed_text_input(
                     "Name",
-                    &self.query,
-                    Message::Query,
+                    &self.name,
+                    Message::Name,
                     Some(Message::Submit),
                     tok,
                     named("Name", Role::TextBox),
@@ -2798,6 +2816,24 @@ impl Gallery {
                 tok,
                 named("search", Role::TextBox),
             ),
+            "search-view" => {
+                let q = self.query.to_ascii_lowercase();
+                let hits: Vec<String> = ["Inbox", "Sent", "Drafts", "Archive"]
+                    .into_iter()
+                    .filter(|t| q.is_empty() || t.to_ascii_lowercase().contains(&q))
+                    .map(String::from)
+                    .collect();
+                widget::search_view(
+                    &self.query,
+                    hits,
+                    Message::Query,
+                    Message::SearchPick,
+                    Some(Message::SearchClear),
+                    "No matches",
+                    tok,
+                    named("find", Role::Group),
+                )
+            }
             "field-support" => column![
                 widget::meta(
                     "Supporting copy and error ink under a field.",
@@ -3356,6 +3392,13 @@ impl Gallery {
                 "Tip",
                 tok,
                 named("Tip", Role::Tooltip),
+            ),
+            "rich-tooltip" => widget::tooltip_rich(
+                widget::label("Save", tok, named("Save", Role::Header)),
+                "Save",
+                "Write the buffer to disk.",
+                tok,
+                named("Save tip", Role::Tooltip),
             ),
             "link" => widget::hyperlink(
                 "docs",
@@ -4321,6 +4364,7 @@ impl Gallery {
                 ["Inbox", "Sent", "Drafts"],
                 self.rail,
                 Message::Rail,
+                true,
                 tok,
                 named("rail", Role::List),
             ),
@@ -4365,6 +4409,7 @@ impl Gallery {
                             ["Mail", "Files", "Settings"],
                             self.rail,
                             Message::Rail,
+                            false,
                             tok,
                             named("rail", Role::List),
                         ),
@@ -4722,6 +4767,7 @@ fn handled_ids() -> &'static [&'static str] {
     &[
         "button",
         "segmented-button",
+        "button-group",
         "icon-button",
         "split-button",
         "toggle-button",
@@ -4741,6 +4787,7 @@ fn handled_ids() -> &'static [&'static str] {
         "value-field",
         "textarea",
         "search",
+        "search-view",
         "suggest",
         "select",
         "date",
@@ -4751,6 +4798,7 @@ fn handled_ids() -> &'static [&'static str] {
         "icon",
         "image",
         "tooltip",
+        "rich-tooltip",
         "link",
         "selectable",
         "list",
@@ -5026,11 +5074,36 @@ mod tests {
             super::parse_inject_line("sort 0"),
             Some(super::Message::Sort(0))
         ));
+        assert!(matches!(
+            super::parse_inject_line("group 1"),
+            Some(super::Message::GroupPress(1))
+        ));
+        assert!(matches!(
+            super::parse_inject_line("query in"),
+            Some(super::Message::Query(q)) if q == "in"
+        ));
+        assert!(matches!(
+            super::parse_inject_line("pick 0"),
+            Some(super::Message::SearchPick(0))
+        ));
+        assert!(matches!(
+            super::parse_inject_line("rail 1"),
+            Some(super::Message::Rail(1))
+        ));
         assert!(super::parse_inject_line("# comment").is_none());
         assert!(super::parse_inject_line("unknown x").is_none());
 
         let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
-        for line in ["check true", "switch true", "list 2", "expand true"] {
+        for line in [
+            "check true",
+            "switch true",
+            "list 2",
+            "expand true",
+            "group 1",
+            "query in",
+            "pick 0",
+            "rail 1",
+        ] {
             if let Some(msg) = super::parse_inject_line(line) {
                 let _ = g.update(msg);
             }
@@ -5039,6 +5112,9 @@ mod tests {
         assert!(g.on);
         assert_eq!(g.list_sel.primary(), Some(2));
         assert!(g.expander_open);
+        assert_eq!(g.query, "in");
+        assert_eq!(g.rail, 1);
+        assert_eq!(g.note, "Rail 1");
     }
 
     #[test]

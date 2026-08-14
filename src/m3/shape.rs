@@ -116,6 +116,7 @@ mod tests {
         }
         assert!(Shape::Small.dp() < Shape::Large.dp());
         assert_eq!(Corner::None.radius_px(), 0.0);
+        assert_eq!(Corner::None.radius().top_left, 0.0);
         assert_eq!(Corner::Tight.radius_px(), 4.0);
         assert_eq!(Corner::Soft.radius_px(), 12.0);
         assert_eq!(Corner::Pill.shape(), Shape::Full);
