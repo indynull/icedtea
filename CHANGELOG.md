@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+### Theme
+
+- `m3::DurationStep` and `m3::Ease` are the Material motion tokens.
+  `Tokens::with_reduced_motion` collapses every duration to 0 ms.
+- `Tokens::fade` scales every scheme role's alpha.
+
+### Chrome
+
+- `motion::overlay` slides a child from a 0–1 progress. Build the child
+  with `Tokens::fade` so fills and ink fade with the slide.
+- `motion::expand` clips a child between a peek height and its open
+  height.
+- Toast enter and the last slice of TTL fade through `motion::overlay`.
+- Side sheet enter starts toward the docked edge.
+- A reduced-motion toast uses `DurationStep::duration` (0 ms) and
+  appears at rest immediately.
+
+### Patterns
+
+- `modal_card` and `side_sheet` take overlay `progress` (fade plus a
+  short slide).
+- `command_palette_view` takes overlay `progress`.
+
+### Collections
+
+- `expander` and `accordion_view` take height `progress`.
+
 ## 0.7.0 — 2026-08-14
 
 ### Content

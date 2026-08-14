@@ -121,8 +121,9 @@ Constructor: [`widget::accordion_view`](https://docs.rs/icedtea/latest/icedtea/w
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-The application owns which row is open. Closed rows are headers
-only. The chevron sits on the trailing edge.
+The application owns which row is open and a 0–1 `progress` for
+height. Closed rows are headers only. The chevron sits on the
+trailing edge.
 
 ### Expander
 
@@ -133,11 +134,11 @@ Constructor: [`widget::expander`](https://docs.rs/icedtea/latest/icedtea/widget/
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-The application owns `open`. Closed shows a `Peek` of the child
-(pixels, or whole body lines with room for the last descent) and
-fades the cut. Open paints the full child. Title starts; the
-chevron sits on the trailing edge. Accordion is many headers;
-this is one card.
+The application owns `open` and `progress` (0 peek, 1 full). Closed
+shows a `Peek` of the child (pixels, or whole body lines with room
+for the last descent) and fades the cut. Title starts; the chevron
+sits on the trailing edge. Accordion is many headers; this is one
+card.
 
 ### Pagination
 

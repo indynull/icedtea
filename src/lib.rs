@@ -167,7 +167,7 @@
 //! | --- | --- |
 //! | [`app`] / [`run!`] | Boot the window |
 //! | [`action`] / [`key`] / [`shortcut`] | Commands and chords |
-//! | [`theme`] / [`variant`] / [`typo`] | Color, variant, type |
+//! | [`theme`] / [`variant`] / [`typo`] / [`motion`] | Color, variant, type, motion |
 //! | [`widget`] / [`collection`] | Controls, lists, tables |
 //! | [`select`] | Select-and-copy contract for content text |
 //! | [`layout`] / [`pattern`] / [`window`] | Recipes and chrome |
@@ -202,6 +202,7 @@ pub mod key;
 pub mod layout;
 pub mod m3;
 mod menubar;
+pub mod motion;
 pub mod nav;
 pub mod palette;
 pub mod pattern;

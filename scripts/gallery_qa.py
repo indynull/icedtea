@@ -537,6 +537,12 @@ DEFAULT_INTERACT: list[dict[str, str]] = [
         "expect": "side sheet open over dim scene",
     },
     {
+        "match": "motion",
+        "name": "motion-toggle",
+        "script": "dialog false\nexpand true\n",
+        "expect": "overlay closed; expand body open",
+    },
+    {
         "match": "markdown:",
         "name": "markdown-span",
         "script": "md-move 0\nmd-press\nmd-move 800\nmd-release\n",

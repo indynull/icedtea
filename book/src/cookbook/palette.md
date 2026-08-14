@@ -56,6 +56,7 @@ impl App {
             self.palette.prompt.as_ref(),
             Message::Prompt,
             None,
+            1.0,
             tok,
         )
     }

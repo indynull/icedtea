@@ -122,6 +122,8 @@ pub const ENTRIES: &[Entry] = &[
     Entry { id: "status-page", title: "Status page", group: "Patterns", page: "status-page" },
     Entry { id: "palette", title: "Command palette", group: "Patterns", page: "palette" },
     Entry { id: "main-window", title: "Main window", group: "Patterns", page: "main-window" },
+    Entry { id: "motion", title: "Motion", group: "Chrome", page: "motion" },
+    Entry { id: "expand-motion", title: "Expand motion", group: "Chrome", page: "motion" },
 ];
 
 pub fn get(id: &str) -> Option<&'static Entry> {
@@ -164,6 +166,7 @@ pub fn page_title(page: &str) -> &'static str {
         "chrome-rows" => "Chrome rows",
         "feedback" => "Feedback",
         "workspace" => "Workspace",
+        "motion" => "Motion",
         id => get(id).map(|e| e.title).unwrap_or("Page"),
     }
 }
@@ -364,6 +367,8 @@ mod tests {
             ("status-page", "status_page"),
             ("palette", "command_palette_view"),
             ("main-window", "main_window"),
+            ("motion", "overlay"),
+            ("expand-motion", "expand"),
         ];
         assert_eq!(ctors.len(), ENTRIES.len());
         for (group, rel) in group_file {
@@ -608,6 +613,7 @@ mod tests {
         let theme = include_str!("theme.rs");
         let key = include_str!("key.rs");
         let layout = include_str!("layout/recipes.rs");
+        let motion = include_str!("motion.rs");
         let map = [
             ("button", "themed_button", widget),
             ("segmented-button", "segmented_button", widget),
@@ -694,6 +700,8 @@ mod tests {
             ("status-page", "status_page", pattern),
             ("palette", "command_palette_view", pattern),
             ("main-window", "main_window", pattern),
+            ("motion", "overlay", motion),
+            ("expand-motion", "expand", motion),
         ];
         assert_eq!(map.len(), ENTRIES.len());
         for e in ENTRIES {

@@ -16,6 +16,8 @@ pub struct Toast {
     pub kind: ToastKind,
     pub text: String,
     pub ttl_ms: u64,
+    /// Milliseconds since push. Used for enter fade.
+    pub age_ms: u64,
 }
 
 /// FIFO toasts.
@@ -46,6 +48,7 @@ impl ToastQueue {
             kind,
             text: text.into(),
             ttl_ms,
+            age_ms: 0,
         });
         id
     }
@@ -72,6 +75,7 @@ impl ToastQueue {
 
     pub fn tick(&mut self, elapsed_ms: u64) {
         for t in &mut self.items {
+            t.age_ms = t.age_ms.saturating_add(elapsed_ms);
             t.ttl_ms = t.ttl_ms.saturating_sub(elapsed_ms);
         }
         self.items.retain(|t| t.ttl_ms > 0);

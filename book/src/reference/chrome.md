@@ -228,7 +228,8 @@ Constructor: [`widget::toast_view`](https://docs.rs/icedtea/latest/icedtea/widge
 [iced](https://crates.io/crates/iced)
 
 The application owns the `Toast` queue and dismiss. Empty queue
-paints nothing.
+paints nothing. Enter and the last slice of TTL fade through
+`motion::overlay`.
 
 ### Busy overlay
 
@@ -241,6 +242,33 @@ Constructor: [`widget::busy_overlay`](https://docs.rs/icedtea/latest/icedtea/wid
 
 When `busy` is false the child is unmodified. Advance spinner
 `phase` while true.
+
+### Motion
+
+**`motion`** — Fade and slide a child for overlay enter/exit.
+
+Constructor: [`motion::overlay`](https://docs.rs/icedtea/latest/icedtea/motion/fn.overlay.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/motion.rs) ·
+[icedtea](https://crates.io/crates/icedtea)
+
+`progress` is 0 (gone) to 1 (rest). The application owns
+`iced::Animation` and passes `interpolate(0.0, 1.0, now)`.
+Reduced-motion tokens snap to 0 or 1. Duration and easing live in
+`m3::motion`.
+
+### Expand motion
+
+**`expand-motion`** — Clip a child between a peek height and its open
+height.
+
+Constructor: [`motion::expand`](https://docs.rs/icedtea/latest/icedtea/motion/fn.expand.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/motion.rs) ·
+[icedtea](https://crates.io/crates/icedtea)
+
+Expander and accordion paint through this. `progress` 0 is the peek;
+1 is the laid-out height.
 
 ### Filter chips
 

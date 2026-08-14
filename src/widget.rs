@@ -3583,7 +3583,7 @@ pub fn breadcrumb<'a, M: Clone + 'a>(
 /// use icedtea::toast::{Toast, ToastKind};
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let t = Toast { id: 1, kind: ToastKind::Success, text: "Saved".into(), ttl_ms: 0 };
+/// let t = Toast { id: 1, kind: ToastKind::Success, text: "Saved".into(), ttl_ms: 0, age_ms: 0 };
 /// let _: icedtea::Element<'_, ()> =
 ///     widget::toast_view(&t, (), tok, A11y::new("Saved", Role::Status));
 /// ```
@@ -3595,26 +3595,28 @@ pub fn toast_view<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let kind = toast.kind;
     let text_s = toast.text.clone();
-    a11y::attach(
-        container(
-            row![
-                label(text_s.clone(), tok, A11y::new(text_s, Role::Status),),
-                Space::new().width(Length::Fill),
-                dismiss_button(
-                    dismiss,
-                    tok,
-                    A11y::button("dismiss").with_disabled(a11y.disabled),
-                ),
-            ]
-            .spacing(8)
-            .align_y(Alignment::Center),
-        )
-        .width(Length::Fill)
-        .padding([8, 12])
-        .style(toast_style(tok, kind))
-        .into(),
-        &a11y,
+    let fade_ms =
+        crate::motion::duration(crate::m3::motion::TOAST, tok.reduced_motion).as_millis() as u64;
+    let progress = crate::motion::toast_progress(toast.age_ms, toast.ttl_ms, fade_ms);
+    let t = crate::motion::visual(progress, tok.reduced_motion);
+    let paint = tok.fade(t);
+    let face = container(
+        row![
+            label(text_s.clone(), paint, A11y::new(text_s, Role::Status),),
+            Space::new().width(Length::Fill),
+            dismiss_button(
+                dismiss,
+                paint,
+                A11y::button("dismiss").with_disabled(a11y.disabled),
+            ),
+        ]
+        .spacing(8)
+        .align_y(Alignment::Center),
     )
+    .width(Length::Fill)
+    .padding([8, 12])
+    .style(move |theme| style::fade_face(toast_style(tok, kind)(theme), t));
+    crate::motion::overlay(face.into(), t, crate::motion::Slide::Down, tok, a11y)
 }
 
 fn tip_style(tok: Tokens) -> impl Fn(&iced::Theme) -> iced::widget::container::Style {
@@ -4853,6 +4855,7 @@ fn disclosure_header<'a, M: Clone + 'a>(
 ///     &titles,
 ///     vec![widget::label("New", tok, A11y::new("New", Role::Status))],
 ///     &Accordion { open: Some(0) },
+///     1.0,
 ///     on_toggle,
 ///     tok,
 ///     A11y::new("acc", Role::Group),
@@ -4862,6 +4865,7 @@ pub fn accordion_view<'a, M: Clone + 'a>(
     titles: &[String],
     bodies: Vec<Element<'a, M>>,
     state: &Accordion,
+    progress: f32,
     on_toggle: impl Fn(usize) -> M + Copy + 'a,
     tok: Tokens,
     a11y: A11y,
@@ -4879,13 +4883,23 @@ pub fn accordion_view<'a, M: Clone + 'a>(
                 .with_disabled(a11y.disabled),
             pad(tok),
         ));
-        if open {
-            col = col.push(
-                container(body)
-                    .width(Length::Fill)
-                    .padding(12)
-                    .style(move |_| style::panel(tok)),
-            );
+        let t = if open {
+            crate::motion::visual(progress, tok.reduced_motion)
+        } else {
+            0.0
+        };
+        if t > 0.0 {
+            let pane = container(body)
+                .width(Length::Fill)
+                .padding(12)
+                .style(move |_| style::panel(tok));
+            col = col.push(crate::motion::expand(
+                pane.into(),
+                t,
+                0.0,
+                tok,
+                A11y::new(title.clone(), Role::Group),
+            ));
         }
     }
     a11y::attach(col.into(), &a11y)
@@ -4958,10 +4972,9 @@ fn peek_clip<'a, M: 'a>(child: Element<'a, M>, h: f32, tok: Tokens) -> Element<'
 
 /// A card that clips its child until opened.
 ///
-/// The application owns `open`. The header toggles. Closed shows a
-/// [`Peek`] of the child (pixels or whole body lines) and fades the
-/// cut. Open paints the full child. Title and body share the card
-/// inset. The chevron sits on the trailing edge.
+/// The application owns `open` and `progress` (0 peek, 1 full). The
+/// header toggles. Closed shows a [`Peek`] of the child. Title and
+/// body share the card inset. The chevron sits on the trailing edge.
 ///
 ///
 /// ```
@@ -4975,16 +4988,19 @@ fn peek_clip<'a, M: 'a>(child: Element<'a, M>, h: f32, tok: Tokens) -> Element<'
 ///     body,
 ///     Peek::Lines(2),
 ///     false,
+///     0.0,
 ///     |open| open,
 ///     tok,
 ///     A11y::new("Notes", Role::Group),
 /// );
 /// ```
+#[allow(clippy::too_many_arguments)]
 pub fn expander<'a, M: Clone + 'a>(
     title: impl Into<String>,
     child: Element<'a, M>,
     collapsed: impl Into<Peek>,
     open: bool,
+    progress: f32,
     on_toggle: impl Fn(bool) -> M + 'a,
     tok: Tokens,
     a11y: A11y,
@@ -5005,11 +5021,14 @@ pub fn expander<'a, M: Clone + 'a>(
             left: 0.0,
         },
     );
-    let h = collapsed.into().height();
-    let body: Element<'a, M> = if open {
+    let peek_h = collapsed.into().height();
+    let t = crate::motion::visual(progress, tok.reduced_motion);
+    let body: Element<'a, M> = if t >= 1.0 {
         child
+    } else if t <= 0.0 {
+        peek_clip(child, peek_h, tok)
     } else {
-        peek_clip(child, h, tok)
+        crate::motion::expand(child, t, peek_h, tok, A11y::new(title.clone(), Role::Group))
     };
     a11y::attach(
         container(column![header, body].spacing(8))
@@ -6058,6 +6077,7 @@ mod tests {
             kind: ToastKind::Info,
             text: "t".into(),
             ttl_ms: 10,
+            age_ms: 10,
         };
         let _: Element<'_, ()> = toast_view(&toast, (), tok, role("t", Role::Status));
         let list = VecList {
@@ -6276,6 +6296,7 @@ mod tests {
             &["A".into()],
             vec![label("b", tok, role("b", Role::Header))],
             &acc,
+            1.0,
             |_| (),
             tok,
             role("acc", Role::Group),
@@ -6286,6 +6307,7 @@ mod tests {
             note,
             48.0,
             false,
+            0.0,
             |open| open,
             tok,
             role("exp", Role::Group),
@@ -6296,6 +6318,7 @@ mod tests {
             note,
             48.0,
             true,
+            1.0,
             |open| open,
             tok,
             role("exp", Role::Group).with_disabled(true),
@@ -6948,6 +6971,7 @@ mod tests {
             &["A".into()],
             vec![label("b", tok, role("b", Role::Header))],
             &acc,
+            1.0,
             |_| (),
             tok,
             role("acc", Role::Group),
@@ -7161,13 +7185,25 @@ mod tests {
             kind: ToastKind::Info,
             text: "t".into(),
             ttl_ms: 10,
+            age_ms: 10,
         };
         let mut tvw = toast_view(&toast, (), tok, role("t", Role::Status));
         draw_once(&mut tvw);
+        let reduced = tok.with_reduced_motion(true);
+        let fresh = Toast {
+            id: 2,
+            kind: ToastKind::Success,
+            text: "ok".into(),
+            ttl_ms: 4000,
+            age_ms: 0,
+        };
+        let mut instant = toast_view(&fresh, (), reduced, role("ok", Role::Status));
+        draw_once(&mut instant);
         let mut closed = accordion_view(
             &["A".into()],
             vec![label("b", tok, role("b", Role::Header))],
             &Accordion { open: None },
+            0.0,
             |_| (),
             tok,
             role("acc", Role::Group),
@@ -7178,6 +7214,7 @@ mod tests {
             label("more", tok, role("more", Role::Status)),
             48.0,
             false,
+            0.0,
             |_| (),
             tok,
             role("exp", Role::Group),
@@ -7188,6 +7225,7 @@ mod tests {
             label("more", tok, role("more", Role::Status)),
             48.0,
             true,
+            1.0,
             |_| (),
             tok,
             role("exp", Role::Group),
@@ -7198,6 +7236,7 @@ mod tests {
             label("more", tok, role("more", Role::Status)),
             48.0,
             false,
+            0.0,
             |_| (),
             tok,
             role("exp", Role::Group).with_disabled(true),
@@ -8796,6 +8835,7 @@ mod tests {
             tall(),
             48.0,
             false,
+            0.0,
             |open| open,
             tok,
             A11y::new("exp", Role::Group),
@@ -8805,6 +8845,7 @@ mod tests {
             tall(),
             48.0,
             true,
+            1.0,
             |open| open,
             tok,
             A11y::new("exp", Role::Group),
@@ -8840,6 +8881,7 @@ mod tests {
             label("body-line", tok, A11y::new("body-line", Role::Status)),
             Peek::Lines(2),
             true,
+            1.0,
             |open| open,
             tok,
             A11y::new("exp", Role::Group),
@@ -8884,6 +8926,7 @@ mod tests {
             ),
             Peek::Lines(2),
             false,
+            0.0,
             |open| open,
             named("dark").tokens,
             A11y::new("exp", Role::Group),
@@ -8978,6 +9021,7 @@ mod tests {
             &titles,
             vec![body()],
             &Accordion { open: None },
+            0.0,
             |_| (),
             tok,
             A11y::new("acc", Role::Group),
@@ -8986,6 +9030,7 @@ mod tests {
             &titles,
             vec![body()],
             &Accordion { open: Some(0) },
+            1.0,
             |_| (),
             tok,
             A11y::new("acc", Role::Group),

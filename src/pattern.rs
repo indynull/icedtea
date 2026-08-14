@@ -325,6 +325,7 @@ pub fn status_bar<'a, M: Clone + 'a>(
 ///     None,
 ///     |_s| (),
 ///     None,
+///     1.0,
 ///     tok,
 /// );
 /// ```
@@ -338,14 +339,17 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
     prompt: Option<&crate::palette::Prompt>,
     on_prompt: impl Fn(String) -> M + 'a,
     on_done: Option<M>,
+    progress: f32,
     tok: Tokens,
 ) -> Element<'a, M> {
+    let t = crate::motion::visual(progress, tok.reduced_motion);
+    let paint = tok.fade(t);
     let mut list = Column::new().spacing(2);
     for (i, a) in results.iter().enumerate() {
         list = list.push(themed_button(
             a.title.clone(),
             a.enabled.then(|| on_pick(i)),
-            tok,
+            paint,
             if i == selected {
                 Variant::Primary
             } else {
@@ -362,7 +366,7 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
         column![
             meta(
                 p.label.clone(),
-                tok,
+                paint,
                 A11y::new(p.label.clone(), Role::Status)
             ),
             themed_text_input(
@@ -371,7 +375,7 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
                 on_prompt,
                 on_done,
                 FieldOpts::NONE,
-                tok,
+                paint,
                 A11y::new("palette-arg", Role::TextBox),
                 Some(iced::widget::Id::new("palette-arg")),
             ),
@@ -385,7 +389,7 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
             on_query,
             None,
             FieldOpts::NONE,
-            tok,
+            paint,
             A11y::new("palette-query", Role::TextBox),
             Some(iced::widget::Id::new("palette-query")),
         )
@@ -393,7 +397,7 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
     let hits: Element<'a, M> = if n > 12 {
         container(themed_scroll(
             list.into(),
-            tok,
+            paint,
             A11y::new("palette-list", Role::List),
             false,
             None,
@@ -404,12 +408,18 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
     } else {
         list.into()
     };
-    container(column![field, hits].spacing(8))
+    let panel = container(column![field, hits].spacing(8))
         .padding(12)
         .width(480)
         .max_height(360.0)
-        .style(move |_| style::raised_card(tok))
-        .into()
+        .style(move |_| style::fade_face(style::raised_card(tok), t));
+    crate::motion::overlay(
+        panel.into(),
+        t,
+        crate::motion::Slide::Down,
+        tok,
+        A11y::new("palette", Role::Menu),
+    )
 }
 
 /// Centered empty or error state.
@@ -928,6 +938,9 @@ pub fn main_window<'a, M: Clone + 'a>(
 
 /// In-window modal: scene, dim wash, then the centered sheet.
 ///
+/// `progress` is 0 (gone) to 1 (rest). Pass `1.0` for a static open
+/// card. The application owns [`iced::Animation`] and interpolates.
+///
 /// ```
 /// use icedtea::a11y::A11y;
 /// use icedtea::pattern;
@@ -937,24 +950,34 @@ pub fn main_window<'a, M: Clone + 'a>(
 /// let _: icedtea::Element<'_, ()> = pattern::modal_card(
 ///     widget::label(" ", tok, A11y::new("dim", icedtea::a11y::Role::Status)),
 ///     pattern::dialog_sheet("Save", "Overwrite?", ("Save".into(), ()), None, None::<(String, ())>, None, tok),
+///     1.0,
 ///     tok,
 /// );
 /// ```
 pub fn modal_card<'a, M: 'a>(
     backdrop: Element<'a, M>,
     card: Element<'a, M>,
+    progress: f32,
     tok: Tokens,
 ) -> Element<'a, M> {
+    let t = crate::motion::visual(progress, tok.reduced_motion);
+    let sheet = crate::motion::overlay(
+        card,
+        t,
+        crate::motion::Slide::Up,
+        tok,
+        A11y::new("modal-card", Role::Dialog),
+    );
     Stack::new()
         .push(backdrop)
         .push(
             container(Space::new().width(Length::Fill).height(Length::Fill))
                 .width(Length::Fill)
                 .height(Length::Fill)
-                .style(move |_| style::dim_backdrop(tok)),
+                .style(move |_| style::dim_backdrop_at(tok, t)),
         )
         .push(
-            container(card)
+            container(sheet)
                 .width(Length::Fill)
                 .height(Length::Fill)
                 .center_x(Length::Fill)
@@ -1231,7 +1254,7 @@ pub fn cascade_menu<'a, M: Clone + 'a>(
 /// Docked supporting pane (M3 side sheet) over a dimmed scene.
 ///
 /// `end` true docks trailing edge (LTR right). Body is application
-/// content; dismiss is optional.
+/// content; dismiss is optional. `progress` is 0 (gone) to 1 (rest).
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -1247,9 +1270,11 @@ pub fn cascade_menu<'a, M: Clone + 'a>(
 ///     Some(()),
 ///     true,
 ///     320.0,
+///     1.0,
 ///     tok,
 /// );
 /// ```
+#[allow(clippy::too_many_arguments)]
 pub fn side_sheet<'a, M: Clone + 'a>(
     backdrop: Element<'a, M>,
     title: impl Into<String>,
@@ -1257,22 +1282,25 @@ pub fn side_sheet<'a, M: Clone + 'a>(
     on_dismiss: Option<M>,
     end: bool,
     width: f32,
+    progress: f32,
     tok: Tokens,
 ) -> Element<'a, M> {
     let title = title.into();
+    let t = crate::motion::visual(progress, tok.reduced_motion);
+    let paint = tok.fade(t);
     let mut head = Row::new()
         .spacing(8)
         .align_y(Alignment::Center)
         .push(label(
             title.clone(),
-            tok,
+            paint,
             A11y::new(title.clone(), Role::Header),
         ))
         .push(Space::new().width(Length::Fill));
     if let Some(m) = on_dismiss {
         head = head.push(dismiss_button(
             m,
-            tok,
+            paint,
             A11y::button(format!("close {title}")),
         ));
     }
@@ -1285,7 +1313,19 @@ pub fn side_sheet<'a, M: Clone + 'a>(
     .padding(16)
     .width(Length::Fixed(width.max(200.0)))
     .height(Length::Fill)
-    .style(move |_| style::dialog_sheet_face(tok));
+    .style(move |_| style::fade_face(style::dialog_sheet_face(tok), t));
+    let slide = if end {
+        crate::motion::Slide::End
+    } else {
+        crate::motion::Slide::Start
+    };
+    let sheet = crate::motion::overlay(
+        sheet.into(),
+        t,
+        slide,
+        tok,
+        A11y::new(title.clone(), Role::Group),
+    );
     let docked = if end {
         container(
             row![Space::new().width(Length::Fill), sheet]
@@ -1309,7 +1349,7 @@ pub fn side_sheet<'a, M: Clone + 'a>(
             container(Space::new().width(Length::Fill).height(Length::Fill))
                 .width(Length::Fill)
                 .height(Length::Fill)
-                .style(move |_| style::dim_backdrop(tok)),
+                .style(move |_| style::dim_backdrop_at(tok, t)),
         )
         .push(docked)
         .width(Length::Fill)
@@ -1901,11 +1941,12 @@ mod tests {
         );
         let body = label("x", tok, A11y::new("x", Role::Status));
         let scene = label("s", tok, A11y::new("s", Role::Status));
-        let mut sheet: Element<'_, ()> = side_sheet(scene, "I", body, Some(()), true, 240.0, tok);
+        let mut sheet: Element<'_, ()> =
+            side_sheet(scene, "I", body, Some(()), true, 240.0, 1.0, tok);
         draw_once(&mut sheet);
         let body = label("x", tok, A11y::new("x", Role::Status));
         let scene = label("s", tok, A11y::new("s", Role::Status));
-        let _: Element<'_, ()> = side_sheet(scene, "L", body, None, false, 100.0, tok);
+        let _: Element<'_, ()> = side_sheet(scene, "L", body, None, false, 100.0, 1.0, tok);
         assert!(MenuSection::<()>::untitled([]).title.is_none());
         assert!(MenuSection::<()>::new("", []).title.is_none());
         assert_eq!(MenuSection::<()>::new("T", []).title.as_deref(), Some("T"));
@@ -2105,10 +2146,20 @@ mod tests {
         assert_eq!(loc.direction, Direction::Rtl);
         let res: Vec<&Action<()>> = table.iter().collect();
         let _: Element<'_, ()> =
-            command_palette_view("", &res, 0, |_| (), |_| (), None, |_| (), None, tok);
+            command_palette_view("", &res, 0, |_| (), |_| (), None, |_| (), None, 1.0, tok);
         let dead_res: Vec<&Action<()>> = disabled.iter().collect();
-        let _: Element<'_, ()> =
-            command_palette_view("q", &dead_res, 0, |_| (), |_| (), None, |_| (), None, tok);
+        let _: Element<'_, ()> = command_palette_view(
+            "q",
+            &dead_res,
+            0,
+            |_| (),
+            |_| (),
+            None,
+            |_| (),
+            None,
+            1.0,
+            tok,
+        );
         // Long hit lists scroll inside a fixed height (n > 12).
         let mut many = ActionTable::new();
         for i in 0..20 {
@@ -2132,7 +2183,7 @@ mod tests {
         let tabs = Tabs::new(["A"]);
         let _: Element<'_, ()> = tab_view(&tabs, lab("b"), |_| (), |_| (), tok);
         let _: Element<'_, ()> = main_window(lab("m"), lab("t"), lab("c"), lab("s"), tok);
-        let _: Element<'_, ()> = modal_card(lab("b"), lab("c"), tok);
+        let _: Element<'_, ()> = modal_card(lab("b"), lab("c"), 1.0, tok);
         let _: Element<'_, ()> = context_menu(
             table.iter().cloned(),
             iced::Point::ORIGIN,
@@ -2171,10 +2222,21 @@ mod tests {
         paint(&mut tb);
         let mut sb = status_bar("ready", None, None, &table, tok, ltr);
         paint(&mut sb);
-        let mut pal = command_palette_view("", &res, 0, |_| (), |_| (), None, |_| (), None, tok);
+        let mut pal =
+            command_palette_view("", &res, 0, |_| (), |_| (), None, |_| (), None, 1.0, tok);
         paint(&mut pal);
-        let mut many_pal =
-            command_palette_view("c", &many_res, 0, |_| (), |_| (), None, |_| (), None, tok);
+        let mut many_pal = command_palette_view(
+            "c",
+            &many_res,
+            0,
+            |_| (),
+            |_| (),
+            None,
+            |_| (),
+            None,
+            1.0,
+            tok,
+        );
         paint(&mut many_pal);
         let ask = crate::palette::Prompt {
             action: "go.line".into(),
@@ -2190,6 +2252,7 @@ mod tests {
             Some(&ask),
             |_| (),
             Some(()),
+            1.0,
             tok,
         );
         paint(&mut asked);
@@ -2245,7 +2308,7 @@ mod tests {
         paint(&mut nv);
         let mut tv = tab_view(&tabs, lab("b"), |_| (), |_| (), tok);
         paint(&mut tv);
-        let mut mc = modal_card(lab("b"), lab("c"), tok);
+        let mut mc = modal_card(lab("b"), lab("c"), 1.0, tok);
         paint(&mut mc);
         let mut cb = command_bar(table.iter(), tok, ltr);
         paint(&mut cb);

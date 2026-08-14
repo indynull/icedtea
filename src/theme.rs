@@ -71,6 +71,8 @@ pub struct Tokens {
     pub selection_text: Color,
     /// Compact / default / comfortable pad and control height.
     pub density: crate::m3::Density,
+    /// When true, motion durations are 0 ms and progress snaps.
+    pub reduced_motion: bool,
     /// Exact M3 scheme. [`Self::scheme`] returns this without mixing.
     full: crate::m3::Scheme,
 }
@@ -92,6 +94,7 @@ impl From<crate::m3::Scheme> for Tokens {
             selection: s.secondary_container,
             selection_text: s.on_secondary_container,
             density: crate::m3::Density::default(),
+            reduced_motion: false,
             full: s,
         }
     }
@@ -111,6 +114,23 @@ impl Tokens {
     pub fn with_density(mut self, density: crate::m3::Density) -> Self {
         self.density = density;
         self
+    }
+
+    /// Same tokens with reduced motion on or off.
+    pub fn with_reduced_motion(mut self, on: bool) -> Self {
+        self.reduced_motion = on;
+        self
+    }
+
+    /// Multiply every scheme role's alpha by `amount` (0..=1).
+    ///
+    /// Overlay chrome builds its child with `tok.fade(progress)` so
+    /// fills, ink, and icons fade with the slide.
+    pub fn fade(self, amount: f32) -> Self {
+        let mut out = Self::from(self.full.fade(amount));
+        out.density = self.density;
+        out.reduced_motion = self.reduced_motion;
+        out
     }
 
     /// Rebuild `full` after short fields change (OS chrome, catalog).
@@ -290,6 +310,7 @@ fn tokens(
         selection: mix(primary, canvas, 0.28),
         selection_text: text,
         density: crate::m3::Density::default(),
+        reduced_motion: false,
         full: crate::m3::scheme_dark(), // replaced by sync
     }
     .sync_full_from_aliases()
@@ -338,6 +359,7 @@ fn high_contrast() -> NamedTheme {
             selection: rgb(0x00, 0x00, 0xAA),
             selection_text: rgb(0xFF, 0xFF, 0xFF),
             density: crate::m3::Density::default(),
+            reduced_motion: false,
             full: crate::m3::scheme_dark(),
         }
         .sync_full_from_aliases(),
@@ -977,6 +999,24 @@ mod tests {
         assert!(chip_fill(t).a == 1.0);
         let sel = selection_fill(t);
         assert_eq!(sel, t.selection);
+    }
+
+    #[test]
+    fn fade_scales_surface_and_ink() {
+        let tok = named("dark")
+            .tokens
+            .with_reduced_motion(true)
+            .with_density(crate::m3::Density::named(crate::m3::DensityName::Compact));
+        let mid = tok.fade(0.5);
+        assert!(mid.reduced_motion);
+        assert_eq!(
+            mid.density,
+            crate::m3::Density::named(crate::m3::DensityName::Compact)
+        );
+        assert!((mid.scheme().surface.a - 0.5).abs() < 1e-5);
+        assert!((mid.text.a - 0.5).abs() < 1e-5);
+        assert!((mid.primary.a - 0.5).abs() < 1e-5);
+        assert_eq!(tok.fade(1.0).text.a, tok.text.a);
     }
 
     #[test]

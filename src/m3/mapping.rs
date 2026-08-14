@@ -452,6 +452,16 @@ pub const MAP: &[MapRow] = &[
         m3: "App bars (desktop)",
         fate: Fate::Desktop,
     },
+    MapRow {
+        id: "motion",
+        m3: "Motion",
+        fate: Fate::Map,
+    },
+    MapRow {
+        id: "expand-motion",
+        m3: "Motion (expand)",
+        fate: Fate::Map,
+    },
     // Removed from public catalog (no dual path)
     MapRow {
         id: "sparkline",

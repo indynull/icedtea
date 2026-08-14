@@ -121,11 +121,33 @@ pub fn hairline(tok: Tokens) -> container::Style {
 }
 
 pub fn dim_backdrop(tok: Tokens) -> container::Style {
-    // M3 scrim at ~32% over the scene.
+    dim_backdrop_at(tok, 1.0)
+}
+
+/// Multiply a container face alpha by `progress` (0..=1).
+pub fn fade_face(mut face: container::Style, progress: f32) -> container::Style {
+    let t = progress.clamp(0.0, 1.0);
+    if let Some(Background::Color(c)) = &mut face.background {
+        c.a *= t;
+    }
+    if let Some(c) = &mut face.text_color {
+        c.a *= t;
+    }
+    face.border.color.a *= t;
+    face.shadow.color.a *= t;
+    face
+}
+
+/// Scrim whose opacity follows overlay progress (0 = clear, 1 = rest).
+pub fn dim_backdrop_at(tok: Tokens, progress: f32) -> container::Style {
+    let t = progress.clamp(0.0, 1.0);
     let scrim = tok.scheme().scrim;
     container::Style {
         background: Some(Background::Color(Color::from_rgba(
-            scrim.r, scrim.g, scrim.b, 0.32,
+            scrim.r,
+            scrim.g,
+            scrim.b,
+            0.32 * t,
         ))),
         snap: false,
         ..container::Style::default()
@@ -927,6 +949,12 @@ mod tests {
         let _ = hairline(tok);
         let _ = dim_backdrop(tok);
         let _ = dialog_sheet_face(tok);
+        let faded = fade_face(dialog_sheet_face(tok), 0.5);
+        if let Some(Background::Color(c)) = faded.background {
+            assert!((c.a - 0.5).abs() < 1e-5);
+        } else {
+            panic!("fade_face keeps a color fill");
+        }
         let _ = app_bar(tok);
         let _ = nav_rail(tok, true);
         let _ = nav_rail(tok, false);

@@ -52,6 +52,14 @@ Every public catalog id is listed in `m3::mapping::MAP` with fate
 tokens), or **Delete** (removed; no dual path). Guide and gallery only
 host Map and Desktop rows.
 
+## Motion
+
+`m3::DurationStep` and `m3::Ease` are the M3 duration and easing
+tokens. Desktop chrome uses the short and medium steps (50–250 ms).
+`Tokens::with_reduced_motion(true)` collapses every duration to 0 ms.
+Constructors take a 0–1 progress; the application owns
+`iced::Animation`. See [`motion::overlay`](https://docs.rs/icedtea/latest/icedtea/motion/fn.overlay.html).
+
 ## Control states
 
 `m3::ControlState`: enabled, disabled, hovered, focused, pressed,

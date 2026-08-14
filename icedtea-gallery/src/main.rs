@@ -282,6 +282,7 @@ fn page_job(page: &str) -> &'static str {
         "status-page" => "Empty or error pane. Use when a list has no rows, or a host is down.",
         "palette" => "Fuzzy find over the action table. Type to filter; pick a row.",
         "main-window" => "Menu, toolbar, center, and status docked as one window.",
+        "motion" => "Open and close. Reduce motion snaps to the target.",
         _ => "",
     }
 }
@@ -311,6 +312,8 @@ fn widget_job(id: &str) -> Option<&'static str> {
         "navigation" => "Wide: sidebar beside content. Narrow: a stack with Back.",
         "main-window" => "The four regions are arguments. This page is that compose.",
         "dialogs" => "Primary and optional cancel. Native file pickers go through native_dialog.",
+        "motion" => "Fade and a short slide. The application owns iced::Animation.",
+        "expand-motion" => "Height from peek to open. Expander and accordion use this.",
         _ => return None,
     })
 }
@@ -509,6 +512,8 @@ fn parse_inject_line(line: &str) -> Option<Message> {
         }
         "expand" => Some(Message::Expand(parts.next()? == "true")),
         "acc" => Some(Message::Acc(parts.next()?.parse().ok()?)),
+        "dialog" => Some(Message::DialogOpen(parts.next()? == "true")),
+        "reduce-motion" | "reduce_motion" => Some(Message::ReduceMotion(parts.next()? == "true")),
         "page" => Some(Message::Page(parts.next()?.parse().ok()?)),
         "tab" => Some(Message::Tab(parts.next()?.parse().ok()?)),
         "grid" => Some(Message::Grid(parts.next()?.parse().ok()?)),
@@ -664,6 +669,9 @@ enum Message {
     ConfirmSave,
     ConfirmCancel,
     ConfirmDiscard,
+    DialogOpen(bool),
+    ReduceMotion(bool),
+    Motion,
     PaletteQuery(String),
     PalettePick(usize),
     PalettePrompt(String),
@@ -839,6 +847,14 @@ struct Gallery {
     dialog_note: String,
     palette: CommandPalette,
     palette_focus: bool,
+    reduced_motion: bool,
+    dialog_open: bool,
+    dialog_anim: icedtea::iced::Animation<bool>,
+    sheet_anim: icedtea::iced::Animation<bool>,
+    palette_anim: icedtea::iced::Animation<bool>,
+    expand_anim: icedtea::iced::Animation<bool>,
+    acc_anim: icedtea::iced::Animation<bool>,
+    acc_closing: bool,
     window_width: f32,
     window_height: f32,
     pointer: icedtea::iced::Point,
@@ -1124,6 +1140,14 @@ impl Gallery {
             dialog_note: String::new(),
             palette,
             palette_focus: true,
+            reduced_motion: false,
+            dialog_open: true,
+            dialog_anim: icedtea::motion::overlay_animation(true, false),
+            sheet_anim: icedtea::motion::overlay_animation(false, false),
+            palette_anim: icedtea::motion::overlay_animation(true, false),
+            expand_anim: icedtea::motion::expand_animation(false, false),
+            acc_anim: icedtea::motion::expand_animation(true, false),
+            acc_closing: false,
             window_width: 900.0,
             window_height: 640.0,
             pointer: icedtea::iced::Point::ORIGIN,
@@ -1187,7 +1211,23 @@ impl Gallery {
             .get(&name)
             .map(|t| t.tokens)
             .unwrap_or_else(|| theme::named(&name).tokens);
-        self.tokens = theme::apply_os_chrome(tokens, self.follow_os, self.os_chrome);
+        self.tokens = theme::apply_os_chrome(tokens, self.follow_os, self.os_chrome)
+            .with_reduced_motion(self.reduced_motion);
+    }
+
+    fn anim_progress(anim: &icedtea::iced::Animation<bool>) -> f32 {
+        anim.interpolate(0.0, 1.0, icedtea::iced::time::Instant::now())
+    }
+
+    fn motion_live(&self) -> bool {
+        let now = icedtea::iced::time::Instant::now();
+        self.dialog_anim.is_animating(now)
+            || self.sheet_anim.is_animating(now)
+            || self.palette_anim.is_animating(now)
+            || self.expand_anim.is_animating(now)
+            || self.acc_anim.is_animating(now)
+            || self.acc_closing
+            || self.toasts.iter().next().is_some()
     }
 
     fn clamp_nav(&mut self) {
@@ -1447,7 +1487,8 @@ impl Gallery {
                             .themes
                             .get(&name)
                             .map(|t| t.tokens)
-                            .unwrap_or_else(|| theme::named(&name).tokens);
+                            .unwrap_or_else(|| theme::named(&name).tokens)
+                            .with_reduced_motion(self.reduced_motion);
                     }
                 } else {
                     self.follow_os = false;
@@ -1456,7 +1497,8 @@ impl Gallery {
                         .themes
                         .get(&name)
                         .map(|t| t.tokens)
-                        .unwrap_or_else(|| theme::named(&name).tokens);
+                        .unwrap_or_else(|| theme::named(&name).tokens)
+                        .with_reduced_motion(self.reduced_motion);
                 }
             }
             Message::Name(s) => self.name = s,
@@ -1491,7 +1533,34 @@ impl Gallery {
             }
             Message::Segment(i) => self.segment = i,
             Message::CascadeOpen(i) => self.cascade_open = i,
-            Message::SideSheet(on) => self.side_sheet = on,
+            Message::SideSheet(on) => {
+                self.side_sheet = on;
+                self.sheet_anim
+                    .go_mut(on, icedtea::iced::time::Instant::now());
+            }
+            Message::DialogOpen(on) => {
+                self.dialog_open = on;
+                self.dialog_anim
+                    .go_mut(on, icedtea::iced::time::Instant::now());
+            }
+            Message::ReduceMotion(on) => {
+                self.reduced_motion = on;
+                self.tokens = self.tokens.with_reduced_motion(on);
+                self.dialog_anim = icedtea::motion::overlay_animation(self.dialog_open, on);
+                self.sheet_anim = icedtea::motion::overlay_animation(self.side_sheet, on);
+                self.palette_anim = icedtea::motion::overlay_animation(true, on);
+                self.expand_anim = icedtea::motion::expand_animation(self.expander_open, on);
+                self.acc_anim =
+                    icedtea::motion::expand_animation(self.accordion.open.is_some(), on);
+            }
+            Message::Motion => {
+                self.toasts.tick(16);
+                let now = icedtea::iced::time::Instant::now();
+                if self.acc_closing && !self.acc_anim.is_animating(now) {
+                    self.accordion.open = None;
+                    self.acc_closing = false;
+                }
+            }
             Message::SearchClear => self.query = String::new(),
             Message::Editor(action) => {
                 self.editor.perform(action);
@@ -1593,8 +1662,22 @@ impl Gallery {
                     self.toasts.push_info("Terminal moved beside Explorer");
                 }
             }
-            Message::Acc(i) => self.accordion.toggle(i),
-            Message::Expand(open) => self.expander_open = open,
+            Message::Acc(i) => {
+                let now = icedtea::iced::time::Instant::now();
+                if self.accordion.open == Some(i) {
+                    self.acc_closing = true;
+                    self.acc_anim.go_mut(false, now);
+                } else {
+                    self.accordion.open = Some(i);
+                    self.acc_closing = false;
+                    self.acc_anim.go_mut(true, now);
+                }
+            }
+            Message::Expand(open) => {
+                self.expander_open = open;
+                self.expand_anim
+                    .go_mut(open, icedtea::iced::time::Instant::now());
+            }
             Message::Page(i) => {
                 self.list_page = i;
                 self.list_window.scroll = 0.0;
@@ -1906,12 +1989,15 @@ impl Gallery {
             }
             Message::ConfirmSave => {
                 self.dialog_note = "Saved notes.txt".into();
+                return self.update(Message::DialogOpen(false));
             }
             Message::ConfirmCancel => {
                 self.dialog_note = "Save cancelled".into();
+                return self.update(Message::DialogOpen(false));
             }
             Message::ConfirmDiscard => {
                 self.dialog_note = "Discarded notes.txt".into();
+                return self.update(Message::DialogOpen(false));
             }
             Message::PaletteQuery(q) => {
                 self.palette.set_query(&self.actions, q);
@@ -2159,6 +2245,12 @@ impl Gallery {
             subs.push(
                 icedtea::iced::time::every(std::time::Duration::from_millis(50))
                     .map(|_| Message::Spin),
+            );
+        }
+        if self.motion_live() {
+            subs.push(
+                icedtea::iced::time::every(std::time::Duration::from_millis(16))
+                    .map(|_| Message::Motion),
             );
         }
         if tour_cmd_path().is_some() {
@@ -3820,6 +3912,7 @@ impl Gallery {
                     ),
                 ],
                 &self.accordion,
+                Self::anim_progress(&self.acc_anim),
                 Message::Acc,
                 tok,
                 named("accordion", Role::Group),
@@ -3859,6 +3952,7 @@ impl Gallery {
                     body,
                     widget::Peek::Lines(2),
                     self.expander_open,
+                    Self::anim_progress(&self.expand_anim),
                     Message::Expand,
                     tok,
                     named("expander", Role::Group),
@@ -4326,6 +4420,44 @@ impl Gallery {
             .spacing(12)
             .into(),
             "dialogs" => {
+                let mut actions = row![
+                    widget::themed_button(
+                        "Open…",
+                        Some(Message::FileOpen),
+                        tok,
+                        Variant::Quiet,
+                        Icons::NONE,
+                        btn("Open"),
+                    ),
+                    widget::themed_button(
+                        "Save…",
+                        Some(Message::FileSave),
+                        tok,
+                        Variant::Primary,
+                        Icons::NONE,
+                        btn("Save"),
+                    ),
+                    widget::themed_button(
+                        "Folder…",
+                        Some(Message::Folder),
+                        tok,
+                        Variant::Quiet,
+                        Icons::NONE,
+                        btn("Folder"),
+                    ),
+                ]
+                .spacing(8);
+                let progress = Self::anim_progress(&self.dialog_anim);
+                if !self.dialog_open && progress <= 0.01 {
+                    actions = actions.push(widget::themed_button(
+                        "Open dialog",
+                        Some(Message::DialogOpen(true)),
+                        tok,
+                        Variant::Quiet,
+                        Icons::NONE,
+                        btn("dialog-open"),
+                    ));
+                }
                 let backdrop = container(
                     column![
                         widget::label("notes.txt", tok, named("dlg-doc", Role::Header)),
@@ -4338,33 +4470,7 @@ impl Gallery {
                             tok,
                             named("dlg-result", Role::Status),
                         ),
-                        row![
-                            widget::themed_button(
-                                "Open…",
-                                Some(Message::FileOpen),
-                                tok,
-                                Variant::Quiet,
-                                Icons::NONE,
-                                btn("Open"),
-                            ),
-                            widget::themed_button(
-                                "Save…",
-                                Some(Message::FileSave),
-                                tok,
-                                Variant::Primary,
-                                Icons::NONE,
-                                btn("Save"),
-                            ),
-                            widget::themed_button(
-                                "Folder…",
-                                Some(Message::Folder),
-                                tok,
-                                Variant::Quiet,
-                                Icons::NONE,
-                                btn("Folder"),
-                            ),
-                        ]
-                        .spacing(8),
+                        actions,
                     ]
                     .spacing(8)
                     .padding(16),
@@ -4372,21 +4478,27 @@ impl Gallery {
                 .width(Length::Fill)
                 .height(Length::Fill)
                 .style(move |_| icedtea::style::panel(tok));
-                pattern::modal_card(
-                    backdrop.into(),
-                    container(pattern::dialog_sheet(
-                        "Save",
-                        "Overwrite notes.txt?",
-                        ("Save".into(), Message::ConfirmSave),
-                        Some(("Cancel".into(), Message::ConfirmCancel)),
-                        [("Don't save".into(), Message::ConfirmDiscard)],
-                        Some(icedtea::icon::Icon::Warning),
+                if self.dialog_open || progress > 0.01 {
+                    let t = icedtea::motion::visual(progress, tok.reduced_motion);
+                    pattern::modal_card(
+                        backdrop.into(),
+                        container(pattern::dialog_sheet(
+                            "Save",
+                            "Overwrite notes.txt?",
+                            ("Save".into(), Message::ConfirmSave),
+                            Some(("Cancel".into(), Message::ConfirmCancel)),
+                            [("Don't save".into(), Message::ConfirmDiscard)],
+                            Some(icedtea::icon::Icon::Warning),
+                            tok.fade(t),
+                        ))
+                        .width(Length::Fixed(420.0))
+                        .into(),
+                        progress,
                         tok,
-                    ))
-                    .width(Length::Fixed(420.0))
-                    .into(),
-                    tok,
-                )
+                    )
+                } else {
+                    backdrop.into()
+                }
             }
             "side-sheet" => {
                 let scene = container(
@@ -4416,7 +4528,8 @@ impl Gallery {
                 .width(Length::Fill)
                 .height(Length::Fill)
                 .style(move |_| icedtea::style::panel(tok));
-                if self.side_sheet {
+                let progress = Self::anim_progress(&self.sheet_anim);
+                if self.side_sheet || progress > 0.01 {
                     pattern::side_sheet(
                         scene.into(),
                         "Inspector",
@@ -4429,6 +4542,7 @@ impl Gallery {
                         Some(Message::SideSheet(false)),
                         true,
                         280.0,
+                        progress,
                         tok,
                     )
                 } else {
@@ -4722,6 +4836,7 @@ impl Gallery {
                         self.palette.prompt.as_ref(),
                         Message::PalettePrompt,
                         Some(Message::PaletteApply),
+                        Self::anim_progress(&self.palette_anim),
                         tok,
                     ))
                     .width(Length::Fill)
@@ -4935,6 +5050,97 @@ impl Gallery {
             .spacing(8)
             .height(Length::Fill)
             .into(),
+            "motion" => {
+                let progress = Self::anim_progress(&self.dialog_anim);
+                let t = icedtea::motion::visual(progress, tok.reduced_motion);
+                let paint = tok.fade(t);
+                let card = widget::group_box(
+                    "Sheet",
+                    widget::label(
+                        "Fade and a short slide from progress 0 to 1.",
+                        paint,
+                        named("motion-body", Role::Status),
+                    ),
+                    paint,
+                    CardFace::Elevated,
+                    named("motion-card", Role::Group),
+                );
+                column![
+                    widget::themed_switch(
+                        "Reduce motion",
+                        self.reduced_motion,
+                        Message::ReduceMotion,
+                        tok,
+                        named("reduce-motion", Role::Switch).with_checked(self.reduced_motion),
+                    ),
+                    widget::themed_button(
+                        if self.dialog_open {
+                            "Close overlay"
+                        } else {
+                            "Open overlay"
+                        },
+                        Some(Message::DialogOpen(!self.dialog_open)),
+                        tok,
+                        Variant::Primary,
+                        Icons::NONE,
+                        btn("overlay-toggle"),
+                    ),
+                    icedtea::motion::overlay(
+                        card,
+                        t,
+                        icedtea::motion::Slide::Up,
+                        tok,
+                        named("motion", Role::Group),
+                    ),
+                ]
+                .spacing(12)
+                .into()
+            }
+            "expand-motion" => {
+                let progress = Self::anim_progress(&self.expand_anim);
+                let body = column![
+                    widget::label(
+                        "Closed keeps a two-line peek.",
+                        tok,
+                        named("em-1", Role::Status),
+                    ),
+                    widget::label(
+                        "Open interpolates to the full height.",
+                        tok,
+                        named("em-2", Role::Status),
+                    ),
+                    widget::label(
+                        "Expander and accordion paint through this.",
+                        tok,
+                        named("em-3", Role::Status),
+                    ),
+                ]
+                .spacing(8)
+                .into();
+                column![
+                    widget::themed_button(
+                        if self.expander_open {
+                            "Collapse"
+                        } else {
+                            "Expand"
+                        },
+                        Some(Message::Expand(!self.expander_open)),
+                        tok,
+                        Variant::Primary,
+                        Icons::NONE,
+                        btn("expand-toggle"),
+                    ),
+                    icedtea::motion::expand(
+                        body,
+                        progress,
+                        widget::Peek::Lines(2).height(),
+                        tok,
+                        named("expand-motion", Role::Group),
+                    ),
+                ]
+                .spacing(12)
+                .into()
+            }
             "main-window" => pattern::main_window(
                 pattern::menu_bar(&self.actions, tok, self.direction, &self.catalog),
                 pattern::toolbar(self.actions.iter(), tok, self.direction),
@@ -5047,6 +5253,8 @@ fn handled_ids() -> &'static [&'static str] {
         "status-page",
         "palette",
         "main-window",
+        "motion",
+        "expand-motion",
     ]
 }
 
@@ -5288,6 +5496,14 @@ mod tests {
             super::parse_inject_line("rail 1"),
             Some(super::Message::Rail(1))
         ));
+        assert!(matches!(
+            super::parse_inject_line("dialog false"),
+            Some(super::Message::DialogOpen(false))
+        ));
+        assert!(matches!(
+            super::parse_inject_line("reduce-motion true"),
+            Some(super::Message::ReduceMotion(true))
+        ));
         assert!(super::parse_inject_line("# comment").is_none());
         assert!(super::parse_inject_line("unknown x").is_none());
 
@@ -5347,6 +5563,19 @@ mod tests {
         assert!(!g.expander_open);
         let _ = g.update(super::Message::Expand(true));
         assert!(g.expander_open);
+        let _ = g.update(super::Message::DialogOpen(false));
+        assert!(!g.dialog_open);
+        let _ = g.update(super::Message::ReduceMotion(true));
+        assert!(g.reduced_motion);
+        assert!(g.tokens.reduced_motion);
+        g.page = "motion";
+        let _ = g.view();
+        g.page = "dialogs";
+        let _ = g.view();
+        g.page = "sections";
+        let _ = g.view();
+        g.page = "palette";
+        let _ = g.view();
         let _ = g.update(super::Message::Swatch);
         assert!(g.swatch);
         let _ = g.view();

@@ -19,7 +19,8 @@ Constructor: [`pattern::dialog_sheet`](https://docs.rs/icedtea/latest/icedtea/pa
 
 Primary and optional cancel, plus extra actions and an optional header
 icon. Native file dialogs go through
-`icedtea::native_dialog`. In-window modals sit on `pattern::modal_card`.
+`icedtea::native_dialog`. In-window modals sit on `pattern::modal_card`
+with a 0–1 `progress` for enter/exit.
 
 ### List/detail
 
@@ -163,7 +164,8 @@ Constructor: [`pattern::command_palette_view`](https://docs.rs/icedtea/latest/ic
 [icedtea](https://crates.io/crates/icedtea)
 
 `CommandPalette` owns the query and hits. Empty query can show
-recent and favorites. See [Overlay windows](../overlay-windows.md).
+recent and favorites. `progress` fades and slides the panel.
+See [Overlay windows](../overlay-windows.md).
 
 ### Main window
 
@@ -188,3 +190,4 @@ Constructor: [`pattern::side_sheet`](https://docs.rs/icedtea/latest/icedtea/patt
 [iced](https://crates.io/crates/iced)
 
 `end` docks the trailing edge. Optional dismiss closes the sheet.
+`progress` fades the scrim and slides the pane.

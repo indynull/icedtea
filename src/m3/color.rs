@@ -182,9 +182,56 @@ pub fn relative_luma(c: Color) -> f32 {
     0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
 }
 
+fn mul_a(c: Color, t: f32) -> Color {
+    Color { a: c.a * t, ..c }
+}
+
 impl Scheme {
     pub fn is_dark(self) -> bool {
         relative_luma(self.surface) < 0.5
+    }
+
+    /// Multiply every role's alpha by `amount` (0..=1).
+    pub fn fade(self, amount: f32) -> Self {
+        let t = amount.clamp(0.0, 1.0);
+        Self {
+            primary: mul_a(self.primary, t),
+            on_primary: mul_a(self.on_primary, t),
+            primary_container: mul_a(self.primary_container, t),
+            on_primary_container: mul_a(self.on_primary_container, t),
+            secondary: mul_a(self.secondary, t),
+            on_secondary: mul_a(self.on_secondary, t),
+            secondary_container: mul_a(self.secondary_container, t),
+            on_secondary_container: mul_a(self.on_secondary_container, t),
+            tertiary: mul_a(self.tertiary, t),
+            on_tertiary: mul_a(self.on_tertiary, t),
+            tertiary_container: mul_a(self.tertiary_container, t),
+            on_tertiary_container: mul_a(self.on_tertiary_container, t),
+            error: mul_a(self.error, t),
+            on_error: mul_a(self.on_error, t),
+            error_container: mul_a(self.error_container, t),
+            on_error_container: mul_a(self.on_error_container, t),
+            surface: mul_a(self.surface, t),
+            on_surface: mul_a(self.on_surface, t),
+            on_surface_variant: mul_a(self.on_surface_variant, t),
+            surface_variant: mul_a(self.surface_variant, t),
+            surface_container_lowest: mul_a(self.surface_container_lowest, t),
+            surface_container_low: mul_a(self.surface_container_low, t),
+            surface_container: mul_a(self.surface_container, t),
+            surface_container_high: mul_a(self.surface_container_high, t),
+            surface_container_highest: mul_a(self.surface_container_highest, t),
+            outline: mul_a(self.outline, t),
+            outline_variant: mul_a(self.outline_variant, t),
+            inverse_surface: mul_a(self.inverse_surface, t),
+            inverse_on_surface: mul_a(self.inverse_on_surface, t),
+            inverse_primary: mul_a(self.inverse_primary, t),
+            scrim: mul_a(self.scrim, t),
+            shadow: mul_a(self.shadow, t),
+            success: mul_a(self.success, t),
+            on_success: mul_a(self.on_success, t),
+            warning: mul_a(self.warning, t),
+            on_warning: mul_a(self.on_warning, t),
+        }
     }
 }
 
@@ -200,6 +247,18 @@ mod tests {
         assert_ne!(l.primary, d.primary);
         assert!(!l.is_dark());
         assert!(d.is_dark());
+    }
+
+    #[test]
+    fn fade_scales_every_role_alpha() {
+        let s = scheme_light();
+        let mid = s.fade(0.5);
+        assert!((mid.surface.a - 0.5).abs() < 1e-5);
+        assert!((mid.on_surface.a - 0.5).abs() < 1e-5);
+        assert!((mid.primary.a - 0.5).abs() < 1e-5);
+        assert!((mid.primary_container.a - 0.5).abs() < 1e-5);
+        assert_eq!(s.fade(1.0).surface.a, s.surface.a);
+        assert_eq!(s.fade(0.0).error.a, 0.0);
     }
 
     #[test]
