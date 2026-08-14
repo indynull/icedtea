@@ -2,13 +2,15 @@
 
 ## Unreleased
 
+## 0.7.0 — 2026-08-14
+
 ### Content
 
 - `markdown_view` sizes body and headings from `typo` (H1 is the page
   title step).
-- `highlighted_code` and `code_block` use `typo::CODE`; `selectable`
-  uses `CODE` for mono and `BODY` for UI. Fields set `BODY` on the
-  iced input instead of inheriting iced's default size.
+- `highlighted_code` and `code_block` use `typo::CODE`.
+- `selectable` uses `typo::CODE` for mono and `typo::BODY` for UI.
+- Text fields and `textarea` set `typo::BODY` on the iced input.
 
 ### Patterns
 

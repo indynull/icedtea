@@ -4680,7 +4680,7 @@ impl Gallery {
             ),
             "about" => container(pattern::about_page(
                 "icedtea",
-                "0.6.3",
+                env!("CARGO_PKG_VERSION"),
                 "MIT",
                 "Widgets and chrome for iced 0.14 desktop applications.",
                 tok,
