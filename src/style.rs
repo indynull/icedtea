@@ -320,7 +320,7 @@ fn button_face(
             )
         }
         Variant::Elevated => {
-            let (bg, fg) = face(s.surface_container_low, s.primary, surface, state);
+            let (bg, fg) = face(s.surface_container_high, s.primary, surface, state);
             (bg, fg, pill, crate::m3::Elevation::Level1.shadow())
         }
     }

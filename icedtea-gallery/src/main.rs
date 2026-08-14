@@ -2644,21 +2644,30 @@ impl Gallery {
             ]
             .spacing(8)
             .into(),
-            "slider" => column![
-                widget::themed_slider(
-                    0.0..=1.0,
-                    self.value,
-                    Message::Slide,
-                    widget::SliderMarks {
-                        ticks: 5,
-                        min: "0",
-                        max: "1",
-                        thumb: "now",
-                        ..widget::SliderMarks::NONE
-                    },
-                    tok,
-                    named("value", Role::Slider).with_value(self.value.to_string()),
-                ),
+            "slider" => row![
+                column![
+                    widget::themed_slider(
+                        0.0..=1.0,
+                        self.value,
+                        Message::Slide,
+                        widget::SliderMarks {
+                            ticks: 5,
+                            min: "0",
+                            max: "1",
+                            thumb: "now",
+                            ..widget::SliderMarks::NONE
+                        },
+                        tok,
+                        named("value", Role::Slider).with_value(self.value.to_string()),
+                    ),
+                    widget::meta(
+                        widget::progress_label(self.value, None),
+                        tok,
+                        named("slider-value", Role::Status),
+                    ),
+                ]
+                .spacing(8)
+                .width(Length::Fill),
                 widget::themed_slider(
                     0.0..=1.0,
                     self.value,
@@ -2671,13 +2680,8 @@ impl Gallery {
                     tok,
                     named("vert", Role::Slider).with_value(self.value.to_string()),
                 ),
-                widget::meta(
-                    widget::progress_label(self.value, None),
-                    tok,
-                    named("slider-value", Role::Status),
-                ),
             ]
-            .spacing(8)
+            .spacing(16)
             .into(),
             "range-slider" => widget::range_slider(
                 0.0..=100.0,

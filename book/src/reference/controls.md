@@ -20,7 +20,9 @@ Constructor: [`widget::themed_button`](https://docs.rs/icedtea/latest/icedtea/wi
 
 `title` is the face. `msg` is `None` when there is nothing to send.
 `A11y::button(name).with_disabled(true)` drops the press handler.
-`Variant` picks the token wash (`Primary`, `Quiet`, `Ghost`).
+`Variant` picks the token wash (`Primary` filled, `Quiet` tonal,
+`Outlined`, `Elevated`, `Ghost` text). `Icons` is leading and trailing
+chrome.
 
 ### Split button
 
@@ -98,8 +100,8 @@ Constructor: [`widget::themed_slider`](https://docs.rs/icedtea/latest/icedtea/wi
 [iced](https://crates.io/crates/iced)
 
 Pass min, max, and the current value. `SliderMarks` paints ticks and
-end labels. The message is the new value while the thumb moves.
-Disabled ignores drag.
+end labels, a `vertical` rail, and an optional thumb value label. The
+message is the new value while the thumb moves. Disabled ignores drag.
 
 ### Segmented button
 

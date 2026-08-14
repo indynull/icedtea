@@ -52,9 +52,13 @@ use crate::typo;
 use crate::variant::Variant;
 
 /// Shared padding for controls. Vertical and horizontal follow token density.
+///
+/// Vertical is `pad - 4` so Compact / Default / Comfortable stay distinct
+/// on the 4 dp grid (8→4, 12→8, 16→12). `(pad * 2 / 3)` snapped Compact
+/// and Default to the same 8 px.
 fn pad(tok: Tokens) -> Padding {
     let p = tok.density.pad;
-    let v = crate::density::Density::snap((p * 2 / 3).max(4));
+    let v = crate::density::Density::snap(p.saturating_sub(4).max(4));
     let h = crate::density::Density::snap(p + 4);
     Padding::from([v as f32, h as f32])
 }
@@ -1131,6 +1135,7 @@ pub fn themed_slider<'a, M: Clone + 'a>(
         if marks.vertical {
             iced::widget::vertical_slider(range, value, msg)
                 .step(step)
+                .style(style::slider_style(tok))
                 .height(Length::Fill)
                 .into()
         } else {
@@ -6742,6 +6747,67 @@ mod tests {
             btn("Wide"),
         );
         draw_once(&mut comfy_btn);
+    }
+
+    #[test]
+    fn named_densities_produce_distinct_control_heights() {
+        let base = named("dark").tokens;
+        let height = |name| control_height(base.with_density(crate::density::Density::named(name)));
+        let compact = height(crate::density::DensityName::Compact);
+        let default = height(crate::density::DensityName::Default);
+        let comfortable = height(crate::density::DensityName::Comfortable);
+        assert!(
+            compact < default,
+            "compact {compact} must be shorter than default {default}"
+        );
+        assert!(
+            default < comfortable,
+            "default {default} must be shorter than comfortable {comfortable}"
+        );
+        let max = iced::Size::new(400.0, 80.0);
+        let mut compact_btn = themed_button(
+            "Save",
+            Some(()),
+            base.with_density(crate::density::Density::named(
+                crate::density::DensityName::Compact,
+            )),
+            Variant::Primary,
+            Icons::NONE,
+            A11y::button("Save"),
+        );
+        let mut default_btn = themed_button(
+            "Save",
+            Some(()),
+            base,
+            Variant::Primary,
+            Icons::NONE,
+            A11y::button("Save"),
+        );
+        let mut comfortable_btn = themed_button(
+            "Save",
+            Some(()),
+            base.with_density(crate::density::Density::named(
+                crate::density::DensityName::Comfortable,
+            )),
+            Variant::Primary,
+            Icons::NONE,
+            A11y::button("Save"),
+        );
+        let hc = layout_size(&mut compact_btn, max).height;
+        let hd = layout_size(&mut default_btn, max).height;
+        let hh = layout_size(&mut comfortable_btn, max).height;
+        assert!(hc < hd, "compact button {hc} < default {hd}");
+        assert!(hd < hh, "default button {hd} < comfortable {hh}");
+        let slider_fn = include_str!("widget.rs")
+            .split("pub fn themed_slider")
+            .nth(1)
+            .unwrap();
+        assert_eq!(
+            slider_fn
+                .matches(".style(style::slider_style(tok))")
+                .count(),
+            2
+        );
     }
 
     #[test]

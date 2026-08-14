@@ -28,19 +28,20 @@ pub struct Entry {
 /// group cannot be swapped. One row per public surface.
 #[rustfmt::skip]
 pub const ENTRIES: &[Entry] = &[
-    // Button group first so the new strip sits above the fold. Inject
-    // targets (checkbox/radio/switch/slider) follow while still visible.
+    // Button faces, toggle-icon, and slider sit first so idle QA shows
+    // Outlined / Elevated, icon-plus-label, toggle-icon, and the vertical
+    // slider above the fold.
+    Entry { id: "button", title: "Button", group: "Controls", page: "controls" },
+    Entry { id: "toggle-icon-button", title: "Toggle icon button", group: "Controls", page: "controls" },
+    Entry { id: "slider", title: "Slider", group: "Controls", page: "controls" },
     Entry { id: "button-group", title: "Button group", group: "Controls", page: "controls" },
     Entry { id: "checkbox", title: "Checkbox", group: "Controls", page: "controls" },
     Entry { id: "radio", title: "Radio", group: "Controls", page: "controls" },
     Entry { id: "switch", title: "Switch", group: "Controls", page: "controls" },
-    Entry { id: "slider", title: "Slider", group: "Controls", page: "controls" },
     Entry { id: "range-slider", title: "Range slider", group: "Controls", page: "controls" },
     Entry { id: "segmented-button", title: "Segmented button", group: "Controls", page: "controls" },
     Entry { id: "icon-button", title: "Icon button", group: "Controls", page: "controls" },
-    Entry { id: "toggle-icon-button", title: "Toggle icon button", group: "Controls", page: "controls" },
     Entry { id: "checkbox-indeterminate", title: "Indeterminate checkbox", group: "Controls", page: "controls" },
-    Entry { id: "button", title: "Button", group: "Controls", page: "controls" },
     Entry { id: "split-button", title: "Split button", group: "Controls", page: "controls" },
     Entry { id: "toggle-button", title: "Toggle button", group: "Controls", page: "controls" },
     // Search view first so docked hits are above the fold on Fields.

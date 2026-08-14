@@ -2,10 +2,14 @@
 
 ## Unreleased
 
+## 0.6.0 — 2026-08-13
+
 ### Controls
 
+- `widget::search_view` docks application-filtered hits under a search field.
+- `widget::button_group` is a strip of related actions (not exclusive).
 - `Variant::Outlined` and `Variant::Elevated` complete the five Material button faces (filled / tonal / text already map to Primary / Quiet / Ghost).
-- `Tokens::with_density` threads compact / default / comfortable pad and control height.
+- `Tokens::with_density` threads compact / default / comfortable pad and three distinct control heights.
 - Labeled buttons, split, and toggle take `Icons` for leading and trailing chrome.
 - `Cell` carries an optional icon on segmented button and button group.
 - `icon_button` takes `ControlSize`. `icon_button_toggle` is the pressed icon face.
@@ -17,32 +21,22 @@
 ### Readout
 
 - `progress` takes `indeterminate` for a linear busy bar.
-- `SliderMarks` adds `vertical` and a thumb value label.
-
-### Content and chrome
-
-- `chip` takes `ChipKind` (assist / filter / input / suggestion) and `Icons`.
-- `badge` takes `BadgeSize` and an optional host to overlap.
-- `group_box` takes `CardFace` (elevated / filled / outlined).
-- Tooltips take `TooltipAnchor`. Rich tips take an optional action.
-- `dialog_sheet` takes extra actions and an optional header icon.
-- `tab_bar` takes a secondary underbar; `Tabs::with_icon` paints icon-plus-text.
-- `RailDest` gives the navigation rail real icons and badges.
-
-## 0.6.0 — 2026-08-13
-
-### Controls
-
-- `widget::search_view` docks application-filtered hits under a search field.
-- `widget::button_group` is a strip of related actions (not exclusive).
+- `SliderMarks` adds `vertical` and a thumb value label. The vertical rail uses the same themed handle as the horizontal slider.
 
 ### Content
 
 - `widget::tooltip_rich` is a hover title plus supporting copy.
+- `chip` takes `ChipKind` (assist / filter / input / suggestion) and `Icons`.
+- `badge` takes `BadgeSize` and an optional host to overlap.
+- `group_box` takes `CardFace` (elevated / filled / outlined).
+- Tooltips take `TooltipAnchor`. Rich tips take an optional action.
 
 ### Navigation
 
 - `pattern::nav_rail` takes `expanded` so the compact letter face and the labeled 220px face share one constructor.
+- `dialog_sheet` takes extra actions and an optional header icon.
+- `tab_bar` takes a secondary underbar; `Tabs::with_icon` paints icon-plus-text.
+- `RailDest` gives the navigation rail real icons and badges.
 
 ## 0.5.0 — 2026-08-13
 
