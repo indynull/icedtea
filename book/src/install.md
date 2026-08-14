@@ -9,7 +9,7 @@ Toolchain: Rust 1.89 or newer.
 ```toml
 [dependencies]
 iced = "0.14"
-icedtea = "0.4"
+icedtea = "0.5"
 ```
 
 [Crate docs](https://docs.rs/icedtea) ·

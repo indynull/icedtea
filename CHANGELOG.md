@@ -2,37 +2,36 @@
 
 ## Unreleased
 
-`markdown_view` drag-selects across blocks via `select::markdown_select`
-and `MarkdownSpan` (layout stays structured; covered blocks paint the
-span wash). Navigation rail is
-`pattern::nav_rail`. Lists take leading/trailing `RowSlot`s. Sliders take
-`SliderMarks`. Tabs take badges and overflow width. Progress takes a
-buffer fill and labeled remaining. Tables paint a checkbox column from
-`TableSource::row_checked`.
+## 0.5.0 — 2026-08-13
+
+Material Design 3 foundations and the desktop catalog.
+
+`m3` holds color `Scheme` roles, type scale, shape, elevation, density,
+and `ControlState`. Light and dark keep the M3 baselines. Catalog
+constructors paint through `Tokens::scheme()`. Desktop chrome is shape
+None (0 dp). Community colorways recompute solid-fill `on_*` roles
+(including `on_primary`) from text/canvas contrast. Inventory is
+`m3::mapping`. Surfaces without an M3 counterpart are gone
+(`sparkline`, `display_reading`, `rich_cell`, `masked_input`,
+`color_swatch`, `teaching_tip`, `placeholder_skeleton`,
+`document_tabs`, `job_strip`, and related types).
 
 Desktop Material controls: segmented button, icon button, range slider,
 indeterminate checkbox (`CheckState`), field supporting/error text,
 filter chip set, sectioned and cascade menus, side sheet. Search gains
 an optional clear control (`search_input_clear`). Filter chips use
 outline idle and filled selected. Segmented and split buttons share
-the labeled button height (body line box plus pad), not the 48dp
-touch floor.
+the labeled button height (body line box plus pad). Tabs use a 3dp
+primary underbar. Table selection is secondary container, separate
+from zebra stripes.
 
-Desktop chrome is M3 shape None (0 dp). Tabs use a 3dp primary underbar.
-Table selection is secondary container, separate from zebra stripes.
-
-Catalog constructors paint through `Tokens::scheme()`. Community
-colorways recompute solid-fill `on_*` roles (including `on_primary`)
-from text/canvas contrast so switch thumbs and filled ink stay on the
-colorway.
-
-Material Design 3 foundations live under `m3`: color `Scheme` roles,
-type scale, shape, elevation, density, and `ControlState`. Light and
-dark keep the M3 baselines. Catalog inventory is `m3::mapping`.
-Deleted surfaces without an M3 counterpart are gone (`sparkline`,
-`display_reading`, `rich_cell`, `masked_input`, `color_swatch`,
-`teaching_tip`, `placeholder_skeleton`, `document_tabs`, `job_strip`,
-and related types).
+`markdown_view` drag-selects across blocks via `select::markdown_select`
+and `MarkdownSpan` (layout stays structured; covered blocks paint the
+span wash). Navigation rail is `pattern::nav_rail`. Lists take
+leading/trailing `RowSlot`s. Sliders take `SliderMarks`. Tabs take
+badges and overflow width. Progress takes a buffer fill and labeled
+remaining. Tables paint a checkbox column from
+`TableSource::row_checked`; sort permutes checks with the rows.
 
 ## 0.4.0 — 2026-08-12
 
