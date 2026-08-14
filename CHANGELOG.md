@@ -2,10 +2,12 @@
 
 ## Unreleased
 
+## 0.6.0 — 2026-08-14
+
 ### Theme
 
-- `light` and `dark` are the neutral desktop pair again. Follow-OS
-  layers host chrome on that pair; a named colorway is a choice.
+- `light` and `dark` are the desktop pair. Follow-OS layers host chrome
+  on that pair; a named colorway is a choice.
 
 ### Guide
 
@@ -15,8 +17,6 @@
   as sections with indented pages.
 - First-window and each visual reference group show a captured still
   of the shipped constructors.
-
-## 0.6.0 — 2026-08-13
 
 ### Controls
 
