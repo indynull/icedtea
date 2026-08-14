@@ -11,9 +11,11 @@ defaults:
   run:
     shell: bash
 
+# Tag after master is green. This job publishes; it does not re-run the check.
 jobs:
   crates-io:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       id-token: write
       contents: read
@@ -22,20 +24,19 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.89
-          components: rustfmt, clippy, llvm-tools-preview
       - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@v2
         with:
-          tool: just,cargo-llvm-cov
+          key: publish
       - name: Linux graphics libraries
-        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev lld
+      - name: Faster linker
+        run: echo "RUSTFLAGS=-C link-arg=-fuse-ld=lld" >> "$GITHUB_ENV"
       - name: Tag matches Cargo.toml version
         run: |
           tag="${GITHUB_REF_NAME#v}"
           ver="$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -n1)"
           test -n "$tag"
           test "$tag" = "$ver"
-      - run: just check
       - uses: rust-lang/crates-io-auth-action@v1
         id: auth
       - run: cargo publish -p icedtea --locked

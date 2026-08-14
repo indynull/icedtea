@@ -15,7 +15,8 @@ instead of adding another. Do not put icedtea lessons in a home-level
 rules file.
 
 ```bash
-just check          # format, clippy -D warnings, test, docs, coverage
+just lint           # format check + clippy -D warnings
+just check          # lint, test, docs, coverage
 just clean          # cargo clean (debug, release, coverage trees)
 cargo run -p icedtea-gallery
 just gallery-qa     # visual QA (shots under tmp/gallery-qa/); see .grok/skills/gallery-qa
@@ -32,7 +33,7 @@ just book-stills    # recapture book/src/images/ constructor stills
 | `book/` | Guide (mdBook). Published from `master` to GitHub Pages |
 | `TODO.md` | Remaining work |
 | `assets/icons/` | Chrome SVGs |
-| `.github/workflows/ci.yml` | Linux, macOS, Windows run `just check` |
+| `.github/workflows/ci.yml` | Linux lint, docs, coverage; tests on Linux, macOS, Windows |
 | `.github/workflows/publish.yml` | Tag `vX.Y.Z` publishes `icedtea` to crates.io |
 | `.github/workflows/book.yml` | `mdbook build`; deploys the guide on `master` |
 
@@ -108,9 +109,9 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   document copy is `copy_text` on `MarkdownDoc::source`. Contract:
   `select` module rustdoc. Gallery demos only public constructors.
 - Always recapture handbook stills with `just book-stills` in the same change when the painted constructor or chrome in a published still changes. Never hand-edit those PNGs or generate them.
-- Always drop `target/llvm-cov-target` after a passing coverage run.
-  `just clean` is `cargo clean`. Only `just cov` (and continuous
-  integration) set `CARGO_INCREMENTAL=0`. Targeted `cargo test` /
+- Always drop `target/llvm-cov-target` after a passing local coverage
+  run. `just clean` is `cargo clean`. Only `just cov` and the coverage
+  job set `CARGO_INCREMENTAL=0`. Targeted `cargo test` /
   `cargo check` / `just test` leave incremental on.
 - Never prefix a targeted cargo command with `CARGO_INCREMENTAL=0`.
   That rebuilds iced and the workspace on every turn.
@@ -207,18 +208,17 @@ Rejected alternatives live once under Non-goals below. Do not add a
 
 ## Check and coverage
 
-`just check` is the **public** check (continuous integration and
-feature-complete handoff): `cargo fmt --all -- --check`, clippy
-workspace `-D warnings`, `cargo test --workspace --all-features`,
-`cargo doc` on `icedtea`, `cargo llvm-cov` on `icedtea` with
-`--fail-under-lines 99 --ignore-filename-regex 'src[/\\]host'`.
-Only `just cov` sets `CARGO_INCREMENTAL=0` (llvm-cov uses
-`target/llvm-cov-target`). After a passing `just cov`, delete
-`target/llvm-cov-target` (and `target/llvm-cov`). Continuous
-integration sets `CARGO_INCREMENTAL=0` on the job. Local `just test` /
-`just clippy` / `just doc` keep the debug incremental graph. `just
-clean` is `cargo clean`. Recipes: `just fmt-check`, `just clippy`,
-`just test`, `just doc`, `just cov`.
+`just check` is the **public** local handoff: `just lint` (`cargo fmt
+--all -- --check`, clippy workspace `-D warnings`), `just test`,
+`just doc`, `just cov` (`cargo llvm-cov` on `icedtea` with
+`--fail-under-lines 99 --ignore-filename-regex 'src[/\\]host'`).
+Only `just cov` and the coverage job set `CARGO_INCREMENTAL=0`
+(llvm-cov uses `target/llvm-cov-target`). After a passing local
+`just cov`, delete `target/llvm-cov-target` (and `target/llvm-cov`).
+The coverage job leaves that tree so rust-cache can reuse it. Local
+`just test` / `just clippy` / `just doc` keep the debug incremental
+graph. `just clean` is `cargo clean`. Recipes: `just lint`,
+`just fmt-check`, `just clippy`, `just test`, `just doc`, `just cov`.
 
 **Agent verification (default: targeted, not full `just check`)**
 
@@ -230,7 +230,7 @@ Do not default to full `just check` after every edit. Prefer:
 | Logic in one module | `cargo test -p icedtea --lib <module>::` (or a named test) |
 | Gallery-only | `cargo test -p icedtea-gallery --bin icedtea-gallery <filter>` |
 | Compile only | `cargo check -p icedtea` / `-p icedtea-gallery` |
-| Style on touched files | `cargo fmt --all` then `cargo clippy -p icedtea --all-targets --all-features -- -D warnings` (or workspace if many crates) |
+| Style on touched files | `just lint` (or `cargo fmt --all` then package/workspace clippy `-D warnings`) |
 | Public API / rustdoc examples changed | `cargo test -p icedtea --doc` and/or `just doc` |
 | Coverage-sensitive branch work | `just cov` (or module tests first, cov before handoff) |
 | Feature complete / pre-push / “ready for review” | full `just check` |
@@ -265,15 +265,18 @@ exact command and result you ran.
   record. Do not hand-edit those GIF files. Read the stills, not the
   animation. `ICEDTEA_GALLERY_ISOLATED=0` records on the current display
   and must float a tiled window first.
-- Continuous integration runs `just check` on Linux, macOS, and Windows
-  at Rust 1.89, plus `cargo test --workspace --all-features` on Ubuntu
-  `stable` and `beta`. This environment proves Linux; do not invent
-  green results for the others. Tag `vX.Y.Z` (matching `Cargo.toml`
-  `version`) publishes `icedtea` to crates.io via
-  `.github/workflows/publish.yml`.
-- Lint and format before commit or handoff (`cargo fmt`, `just clippy`
-  or package clippy). Full `just check` at handoff. Do not reformat
-  unrelated files.
+- Continuous integration (`.github/workflows/ci.yml`) runs lint, docs,
+  and coverage on Ubuntu at Rust 1.89, and `cargo test --workspace
+  --all-features` on Linux, macOS, and Windows at 1.89 plus Ubuntu
+  `stable` and `beta`. Coverage is Ubuntu-only. A new push cancels the
+  previous run on the same branch or pull request. Tag `vX.Y.Z`
+  (matching `Cargo.toml` `version`) publishes `icedtea` to crates.io
+  via `.github/workflows/publish.yml` (`cargo publish --locked`).
+  This environment proves Linux; do not invent green results for the
+  others.
+- Lint and format before commit or handoff (`just lint` or package
+  clippy). Full `just check` at handoff. Do not reformat unrelated
+  files.
 
 `icedtea::run!` is a macro because iced 0.14 title/view closures are
 higher-ranked; do not replace it with a generic `run` function unless
