@@ -44,6 +44,11 @@ return iced `Element`s and emit your messages. Each takes `A11y` and
 tokens. The application owns the buffer, the selection, and the rest
 of the state. `update` applies the message.
 
+## Move it
+
+The application owns `iced::Animation` and the clock. Constructors
+paint one frame from a 0–1 progress. See [Motion](motion.md).
+
 ## Arrange with patterns
 
 [`pattern`](https://docs.rs/icedtea/latest/icedtea/pattern/index.html)

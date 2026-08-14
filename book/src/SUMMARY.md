@@ -10,6 +10,7 @@
     - [Actions](actions.md)
     - [Layout](layout.md)
     - [Theming](theming.md)
+    - [Motion](motion.md)
     - [Navigation](navigation.md)
     - [Overlay windows](overlay-windows.md)
     - [Compact tools](compact-tools.md)
