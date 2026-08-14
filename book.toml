@@ -12,4 +12,6 @@ build-dir = "book/book"
 git-repository-url = "https://github.com/indynull/icedtea"
 edit-url-template = "https://github.com/indynull/icedtea/edit/master/book/src/{path}"
 site-url = "/icedtea/"
+no-section-label = true
+additional-css = ["book/sidebar.css"]
 

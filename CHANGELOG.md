@@ -5,6 +5,7 @@
 ### Guide
 
 - The handbook sidebar groups Start, Compose, Cookbook, and Reference.
+  Part labels are quiet section titles; chapters are not numbered.
 
 ## 0.6.0 — 2026-08-13
 
