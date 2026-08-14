@@ -6,6 +6,13 @@
 
 - `markdown_view` sizes body and headings from `typo` (H1 is the page
   title step).
+- `highlighted_code` and `code_block` use `typo::CODE`; `selectable`
+  uses `CODE` for mono and `BODY` for UI. Fields set `BODY` on the
+  iced input instead of inheriting iced's default size.
+
+### Patterns
+
+- Dialog sheet title uses `typo::TITLE`.
 
 ## 0.6.3 — 2026-08-14
 

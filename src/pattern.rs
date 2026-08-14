@@ -1034,10 +1034,13 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
             A11y::new(title.clone(), Role::Image),
         ));
     }
-    head = head.push(label(
-        title.clone(),
-        tok,
-        A11y::new(title.clone(), Role::Header),
+    head = head.push(crate::a11y::attach(
+        text(title.clone())
+            .size(typo::TITLE)
+            .font(typo::UI_BOLD)
+            .color(tok.scheme().on_surface)
+            .into(),
+        &A11y::new(title.clone(), Role::Header),
     ));
     crate::a11y::attach(
         container(
