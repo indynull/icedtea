@@ -1,18 +1,18 @@
-/* Part headings in SUMMARY.md (# Start) are labels, not chapters. */
-.chapter li.part-title {
-    font-size: 0.72em;
+/* Sections are parents; pages sit in a nested list. */
+.chapter > .chapter-item {
+    margin-block-start: 0.85em;
+}
+
+.chapter > .chapter-item > .chapter-link-wrapper {
     font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--sidebar-non-existant);
-    margin: 1.25em 0 0.2em;
-    line-height: 1.3;
 }
 
-.chapter > .chapter-item:first-child .part-title {
-    margin-top: 0.15em;
+.chapter ol.section {
+    padding-inline-start: 1.15em;
+    margin-block-start: 0.2em;
 }
 
-.chapter li.chapter-item {
-    margin-block-start: 0.28em;
+.chapter ol.section > .chapter-item {
+    margin-block-start: 0.15em;
+    font-weight: 400;
 }

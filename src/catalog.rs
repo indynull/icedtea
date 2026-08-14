@@ -706,10 +706,12 @@ mod tests {
     #[test]
     fn cookbook_exists() {
         let summary = include_str!("../book/src/SUMMARY.md");
-        assert!(summary.contains("# Start"));
-        assert!(summary.contains("# Compose"));
-        assert!(summary.contains("# Cookbook"));
-        assert!(summary.contains("# Reference"));
+        assert!(summary.contains("- [Start]()"));
+        assert!(summary.contains("- [Compose]()"));
+        assert!(summary.contains("- [Cookbook]()"));
+        assert!(summary.contains("- [Reference]()"));
+        assert!(summary.contains("    - [Install](install.md)"));
+        assert!(summary.contains("    - [Widgets](widgets.md)"));
         for path in [
             "introduction.md",
             "install.md",
