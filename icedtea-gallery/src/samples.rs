@@ -195,6 +195,30 @@ pub fn sample_handle() -> icedtea::iced::widget::image::Handle {
     icedtea::iced::widget::image::Handle::from_rgba(W, H, px)
 }
 
+/// Wide still for expand demos (320×160 checker).
+pub fn banner_handle() -> icedtea::iced::widget::image::Handle {
+    const W: u32 = 320;
+    const H: u32 = 160;
+    let mut px = vec![0u8; (W * H * 4) as usize];
+    for y in 0..H {
+        for x in 0..W {
+            let on = ((x / 20) + (y / 20)) % 2 == 1;
+            let i = ((y * W + x) * 4) as usize;
+            if on {
+                px[i] = 0x1a;
+                px[i + 1] = 0x73;
+                px[i + 2] = 0xe8;
+            } else {
+                px[i] = 0xf4;
+                px[i + 1] = 0xc4;
+                px[i + 2] = 0x30;
+            }
+            px[i + 3] = 255;
+        }
+    }
+    icedtea::iced::widget::image::Handle::from_rgba(W, H, px)
+}
+
 /// Which markdown item kinds `MARKDOWN` must produce after parse.
 #[cfg(test)]
 fn markdown_kinds(source: &str) -> Vec<&'static str> {

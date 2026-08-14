@@ -54,6 +54,70 @@ fn named(name: &str, role: Role) -> A11y {
     A11y::new(name, role)
 }
 
+/// Tall notes body for expander and expand-motion. Peek is two lines.
+fn expand_notes_body<'a>(tok: Tokens) -> Element<'a, Message> {
+    column![
+        widget::label(
+            "Closed, this card keeps a short face and clips the rest.",
+            tok,
+            named("exp-1", Role::Status),
+        ),
+        widget::label(
+            "The header chevron opens the full notes, the figure, and the leftover copy.",
+            tok,
+            named("exp-2", Role::Status),
+        ),
+        widget::label(
+            "0.8 ships motion tokens, overlay enter, and expand height. Dialogs, \
+             side sheets, and the palette fade and slide from a 0–1 progress. \
+             The application owns iced::Animation and the clock.",
+            tok,
+            named("exp-3", Role::Status),
+        ),
+        widget::label(
+            "Determinate progress eases to the new fraction. The linear busy bar \
+             grows, travels, and shrinks. Reduce motion snaps every duration to 0 ms.",
+            tok,
+            named("exp-4", Role::Status),
+        ),
+        widget::image_slot(
+            widget::ImageSlot::Ready {
+                handle: samples::banner_handle(),
+                fit: icedtea::iced::ContentFit::Cover,
+            },
+            Length::Fill,
+            Length::Fixed(160.0),
+            tok,
+            named("exp-shot", Role::Image),
+        ),
+        widget::meta(
+            "Figure: checker still. The slot keeps this box while the card opens.",
+            tok,
+            named("exp-shot-cap", Role::Status),
+        ),
+        widget::label(
+            "Save still lives on the File action. Theme, density, and high-contrast \
+             stay on the tokens. Open is the application's; this page toggles it.",
+            tok,
+            named("exp-5", Role::Status),
+        ),
+        widget::label(
+            "Accordion is many headers. This is one card. Both paint through \
+             motion::expand so the height interpolates instead of jumping.",
+            tok,
+            named("exp-6", Role::Status),
+        ),
+        widget::label(
+            "When the notes are this long, the peek is still two body lines. \
+             Open has to grow past the figure and the trailing paragraphs.",
+            tok,
+            named("exp-7", Role::Status),
+        ),
+    ]
+    .spacing(8)
+    .into()
+}
+
 fn nav_item<'a>(
     id: &'static str,
     title: &'static str,
@@ -282,7 +346,7 @@ fn page_job(page: &str) -> &'static str {
         "status-page" => "Empty or error pane. Use when a list has no rows, or a host is down.",
         "palette" => "Fuzzy find over the action table. Type to filter; pick a row.",
         "main-window" => "Menu, toolbar, center, and status docked as one window.",
-        "motion" => "Open and close. Reduce motion snaps to the target.",
+        "motion" => "Open and close. Progress eases. Reduce motion snaps.",
         _ => "",
     }
 }
@@ -855,6 +919,7 @@ struct Gallery {
     expand_anim: icedtea::iced::Animation<bool>,
     acc_anim: icedtea::iced::Animation<bool>,
     acc_closing: bool,
+    progress_anim: icedtea::iced::Animation<f32>,
     window_width: f32,
     window_height: f32,
     pointer: icedtea::iced::Point,
@@ -1148,6 +1213,7 @@ impl Gallery {
             expand_anim: icedtea::motion::expand_animation(false, false),
             acc_anim: icedtea::motion::expand_animation(true, false),
             acc_closing: false,
+            progress_anim: icedtea::motion::value_animation(0.4, false),
             window_width: 900.0,
             window_height: 640.0,
             pointer: icedtea::iced::Point::ORIGIN,
@@ -1226,8 +1292,14 @@ impl Gallery {
             || self.palette_anim.is_animating(now)
             || self.expand_anim.is_animating(now)
             || self.acc_anim.is_animating(now)
+            || self.progress_anim.is_animating(now)
             || self.acc_closing
             || self.toasts.iter().next().is_some()
+    }
+
+    fn shown_progress(&self) -> f32 {
+        self.progress_anim
+            .interpolate_with(|v| v, icedtea::iced::time::Instant::now())
     }
 
     fn clamp_nav(&mut self) {
@@ -1526,7 +1598,11 @@ impl Gallery {
             Message::Switch(v) => self.on = v,
             Message::Sounds(v) => self.sounds = v,
             Message::Radio(v) => self.radio = v,
-            Message::Slide(v) => self.value = v,
+            Message::Slide(v) => {
+                self.value = v;
+                self.progress_anim
+                    .go_mut(v.clamp(0.0, 1.0), icedtea::iced::time::Instant::now());
+            }
             Message::RangeSlide(lo, hi) => {
                 self.range_lo = lo;
                 self.range_hi = hi;
@@ -1552,6 +1628,7 @@ impl Gallery {
                 self.expand_anim = icedtea::motion::expand_animation(self.expander_open, on);
                 self.acc_anim =
                     icedtea::motion::expand_animation(self.accordion.open.is_some(), on);
+                self.progress_anim = icedtea::motion::value_animation(self.value, on);
             }
             Message::Motion => {
                 self.toasts.tick(16);
@@ -2241,7 +2318,7 @@ impl Gallery {
             layout::listen_sash().map(nav_sash),
             layout::listen_cursor().map(Message::Cursor),
         ];
-        if matches!(self.page, "feedback" | "readout") {
+        if matches!(self.page, "feedback" | "readout" | "motion") {
             subs.push(
                 icedtea::iced::time::every(std::time::Duration::from_millis(50))
                     .map(|_| Message::Spin),
@@ -2862,18 +2939,46 @@ impl Gallery {
                 named("tri", Role::Checkbox),
             ),
             "progress" => {
-                let copy = widget::progress_label(self.value, Some("1 min"));
+                let shown = self.shown_progress();
+                let copy = widget::progress_label(shown, Some("1 min"));
                 column![
+                    row![
+                        widget::themed_button(
+                            "25%",
+                            Some(Message::Slide(0.25)),
+                            tok,
+                            Variant::Quiet,
+                            Icons::NONE,
+                            btn("p25"),
+                        ),
+                        widget::themed_button(
+                            "60%",
+                            Some(Message::Slide(0.6)),
+                            tok,
+                            Variant::Quiet,
+                            Icons::NONE,
+                            btn("p60"),
+                        ),
+                        widget::themed_button(
+                            "Full",
+                            Some(Message::Slide(1.0)),
+                            tok,
+                            Variant::Primary,
+                            Icons::NONE,
+                            btn("p100"),
+                        ),
+                    ]
+                    .spacing(8),
                     widget::progress(
-                        self.value,
-                        Some((self.value + 0.2).min(1.0)),
+                        shown,
+                        Some((shown + 0.2).min(1.0)),
                         Some(copy.as_str()),
                         false,
                         tok,
-                        named("progress", Role::Progress).with_value(self.value.to_string()),
+                        named("progress", Role::Progress).with_value(shown.to_string()),
                     ),
                     widget::progress(
-                        self.value,
+                        self.spin,
                         None,
                         Some("working"),
                         true,
@@ -2884,12 +2989,15 @@ impl Gallery {
                 .spacing(12)
                 .into()
             }
-            "progress-ring" => widget::progress_ring(
-                self.value,
-                Some(&widget::progress_label(self.value, None)),
-                tok,
-                named("ring", Role::Progress).with_value(self.value.to_string()),
-            ),
+            "progress-ring" => {
+                let shown = self.shown_progress();
+                widget::progress_ring(
+                    shown,
+                    Some(&widget::progress_label(shown, None)),
+                    tok,
+                    named("ring", Role::Progress).with_value(shown.to_string()),
+                )
+            }
             "number" => widget::number_input(
                 self.number.parse().unwrap_or(0.0),
                 Message::Number,
@@ -3917,47 +4025,16 @@ impl Gallery {
                 tok,
                 named("accordion", Role::Group),
             ),
-            "expander" => {
-                let body = column![
-                    widget::label(
-                        "Closed, this card keeps a short face and clips the rest.",
-                        tok,
-                        named("exp-1", Role::Status),
-                    ),
-                    widget::label(
-                        "The header chevron opens the full notes.",
-                        tok,
-                        named("exp-2", Role::Status),
-                    ),
-                    widget::label(
-                        "Save still lives on the File action.",
-                        tok,
-                        named("exp-3", Role::Status),
-                    ),
-                    widget::label(
-                        "Theme, density, and high-contrast stay on the tokens.",
-                        tok,
-                        named("exp-4", Role::Status),
-                    ),
-                    widget::label(
-                        "Open is the application's. This page toggles it.",
-                        tok,
-                        named("exp-5", Role::Status),
-                    ),
-                ]
-                .spacing(8)
-                .into();
-                widget::expander(
-                    "Release notes",
-                    body,
-                    widget::Peek::Lines(2),
-                    self.expander_open,
-                    Self::anim_progress(&self.expand_anim),
-                    Message::Expand,
-                    tok,
-                    named("expander", Role::Group),
-                )
-            }
+            "expander" => widget::expander(
+                "Release notes",
+                expand_notes_body(tok),
+                widget::Peek::Lines(2),
+                self.expander_open,
+                Self::anim_progress(&self.expand_anim),
+                Message::Expand,
+                tok,
+                named("expander", Role::Group),
+            ),
             "pagination" => widget::pagination(
                 self.list_matched,
                 self.list_page,
@@ -5092,31 +5169,71 @@ impl Gallery {
                         tok,
                         named("motion", Role::Group),
                     ),
+                    widget::meta(
+                        "Determinate fill eases. The busy bar travels.",
+                        tok,
+                        named("motion-progress-job", Role::Status),
+                    ),
+                    row![
+                        widget::themed_button(
+                            "25%",
+                            Some(Message::Slide(0.25)),
+                            tok,
+                            Variant::Quiet,
+                            Icons::NONE,
+                            btn("m25"),
+                        ),
+                        widget::themed_button(
+                            "60%",
+                            Some(Message::Slide(0.6)),
+                            tok,
+                            Variant::Quiet,
+                            Icons::NONE,
+                            btn("m60"),
+                        ),
+                        widget::themed_button(
+                            "Full",
+                            Some(Message::Slide(1.0)),
+                            tok,
+                            Variant::Primary,
+                            Icons::NONE,
+                            btn("m100"),
+                        ),
+                    ]
+                    .spacing(8),
+                    {
+                        let shown = self.shown_progress();
+                        let copy = widget::progress_label(shown, None);
+                        widget::progress(
+                            shown,
+                            None,
+                            Some(copy.as_str()),
+                            false,
+                            tok,
+                            named("motion-bar", Role::Progress).with_value(shown.to_string()),
+                        )
+                    },
+                    widget::progress(
+                        self.spin,
+                        None,
+                        Some("working"),
+                        true,
+                        tok,
+                        named("motion-busy", Role::Progress),
+                    ),
+                    widget::progress_ring(
+                        self.shown_progress(),
+                        None,
+                        tok,
+                        named("motion-ring", Role::Progress)
+                            .with_value(self.shown_progress().to_string()),
+                    ),
                 ]
                 .spacing(12)
                 .into()
             }
             "expand-motion" => {
                 let progress = Self::anim_progress(&self.expand_anim);
-                let body = column![
-                    widget::label(
-                        "Closed keeps a two-line peek.",
-                        tok,
-                        named("em-1", Role::Status),
-                    ),
-                    widget::label(
-                        "Open interpolates to the full height.",
-                        tok,
-                        named("em-2", Role::Status),
-                    ),
-                    widget::label(
-                        "Expander and accordion paint through this.",
-                        tok,
-                        named("em-3", Role::Status),
-                    ),
-                ]
-                .spacing(8)
-                .into();
                 column![
                     widget::themed_button(
                         if self.expander_open {
@@ -5131,7 +5248,7 @@ impl Gallery {
                         btn("expand-toggle"),
                     ),
                     icedtea::motion::expand(
-                        body,
+                        expand_notes_body(tok),
                         progress,
                         widget::Peek::Lines(2).height(),
                         tok,
