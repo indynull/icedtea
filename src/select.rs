@@ -25,6 +25,8 @@ use iced::advanced::text::Span;
 use iced::widget::markdown::{self, Bullet, HeadingLevel, Item, Settings, Text};
 use iced::Font;
 
+use crate::typo;
+
 /// Keep selection, click, drag, and scroll. Typing, paste, and delete
 /// become a zero scroll so `Content::perform` does not change the text.
 pub fn select_only(action: iced::widget::text_editor::Action) -> iced::widget::text_editor::Action {
@@ -65,12 +67,31 @@ fn ceil_char_boundary(s: &str, i: usize) -> usize {
     i
 }
 
+/// Paint settings for [`crate::widget::markdown_view`].
+///
+/// Body, code, and headings use [`typo`] steps (H1 is [`typo::PAGE`]).
+pub(crate) fn markdown_paint_settings(style: markdown::Style) -> Settings {
+    let body = typo::BODY as f32;
+    Settings {
+        text_size: body.into(),
+        h1_size: (typo::PAGE as f32).into(),
+        h2_size: (typo::TITLE as f32).into(),
+        h3_size: body.into(),
+        h4_size: body.into(),
+        h5_size: (typo::META as f32).into(),
+        h6_size: (typo::META as f32).into(),
+        code_size: (typo::CODE as f32).into(),
+        spacing: (body * 0.875).into(),
+        style,
+    }
+}
+
 /// Plain text of a painted markdown document in document order.
 ///
 /// Top-level blocks are separated by blank lines. Useful for tests and
 /// for building a linear copy string; the live view selects per block.
 pub fn markdown_plain(items: &[Item]) -> String {
-    let settings = Settings::with_style(markdown_measure_style());
+    let settings = markdown_paint_settings(markdown_measure_style());
     let spans = markdown_document_spans(items, &settings);
     spans.iter().map(|s| s.text.as_ref()).collect()
 }
@@ -329,7 +350,7 @@ pub fn markdown_pos_at(items: &[Item], y: f32) -> MarkdownPos {
 }
 
 pub(crate) fn markdown_item_plain(item: &Item) -> String {
-    let settings = Settings::with_style(markdown_measure_style());
+    let settings = markdown_paint_settings(markdown_measure_style());
     let mut spans = Vec::new();
     flatten_spans(std::slice::from_ref(item), &settings, &mut spans, 0);
     spans.iter().map(|s| s.text.as_ref()).collect()
@@ -344,28 +365,25 @@ pub(crate) fn markdown_text_len(text: &Text) -> usize {
 
 /// Estimated block height (same map [`crate::widget::MarkdownDoc::item_offset`] uses).
 pub fn markdown_item_extent(item: &Item) -> f32 {
-    const TEXT: f32 = 16.0;
-    const SPACING: f32 = 16.0 * 0.875;
+    let settings = markdown_paint_settings(markdown_measure_style());
+    let text = f32::from(settings.text_size);
+    let spacing = f32::from(settings.spacing);
     const COL: f32 = 64.0;
     match item {
-        Item::Heading(level, text) => {
-            let size = match level {
-                HeadingLevel::H1 => TEXT * 2.0,
-                HeadingLevel::H2 => TEXT * 1.75,
-                HeadingLevel::H3 => TEXT * 1.5,
-                HeadingLevel::H4 => TEXT * 1.25,
-                HeadingLevel::H5 | HeadingLevel::H6 => TEXT,
-            };
-            let lines = ((markdown_text_len(text) as f32) / COL).ceil().max(1.0);
-            size * 1.3 * lines + TEXT * 0.5 + SPACING
+        Item::Heading(level, heading) => {
+            let size = f32::from(heading_size(&settings, *level));
+            let lines = ((markdown_text_len(heading) as f32) / COL).ceil().max(1.0);
+            size * 1.3 * lines + text * 0.5 + spacing
         }
-        Item::Paragraph(text) => {
-            let lines = ((markdown_text_len(text) as f32) / COL).ceil().max(1.0);
-            lines * TEXT * 1.4 + SPACING
+        Item::Paragraph(paragraph) => {
+            let lines = ((markdown_text_len(paragraph) as f32) / COL)
+                .ceil()
+                .max(1.0);
+            lines * text * 1.4 + spacing
         }
         Item::CodeBlock { code, lines, .. } => {
             let n = lines.len().max(code.lines().count()).max(1) as f32;
-            n * TEXT * 0.75 * 1.5 + 24.0 + SPACING
+            n * f32::from(settings.code_size) * 1.5 + 24.0 + spacing
         }
         Item::List { bullets, .. } => {
             bullets
@@ -374,15 +392,15 @@ pub fn markdown_item_extent(item: &Item) -> f32 {
                     let kids = match b {
                         Bullet::Point { items } | Bullet::Task { items, .. } => items,
                     };
-                    TEXT + kids.iter().map(markdown_item_extent).sum::<f32>()
+                    text + kids.iter().map(markdown_item_extent).sum::<f32>()
                 })
                 .sum::<f32>()
-                + SPACING
+                + spacing
         }
-        Item::Image { .. } => 160.0 + SPACING,
-        Item::Quote(items) => items.iter().map(markdown_item_extent).sum::<f32>() + 16.0 + SPACING,
-        Item::Rule => 24.0 + SPACING,
-        Item::Table { rows, .. } => (1 + rows.len()) as f32 * TEXT * 1.8 + SPACING,
+        Item::Image { .. } => 160.0 + spacing,
+        Item::Quote(items) => items.iter().map(markdown_item_extent).sum::<f32>() + 16.0 + spacing,
+        Item::Rule => 24.0 + spacing,
+        Item::Table { rows, .. } => (1 + rows.len()) as f32 * text * 1.8 + spacing,
     }
 }
 
@@ -441,6 +459,28 @@ mod tests {
     }
 
     #[test]
+    fn markdown_paint_settings_follow_ui_type_scale() {
+        let s = markdown_paint_settings(markdown_measure_style());
+        assert_eq!(f32::from(s.text_size), crate::typo::BODY as f32);
+        assert_eq!(f32::from(s.h1_size), crate::typo::PAGE as f32);
+        assert_eq!(f32::from(s.h2_size), crate::typo::TITLE as f32);
+        assert_eq!(f32::from(s.h3_size), crate::typo::BODY as f32);
+        assert_eq!(f32::from(s.h4_size), crate::typo::BODY as f32);
+        assert_eq!(f32::from(s.h5_size), crate::typo::META as f32);
+        assert_eq!(f32::from(s.h6_size), crate::typo::META as f32);
+        assert_eq!(f32::from(s.code_size), crate::typo::CODE as f32);
+        assert!(f32::from(s.h1_size) > f32::from(s.text_size));
+        let items: Vec<_> = markdown::parse("# Title\n\nBody.").collect();
+        let h1 = items
+            .iter()
+            .find(|i| matches!(i, Item::Heading(HeadingLevel::H1, _)))
+            .expect("h1");
+        let page = crate::typo::PAGE as f32;
+        let body = crate::typo::BODY as f32;
+        assert!(markdown_item_extent(h1) <= page * 1.3 + body * 0.5 + body * 0.875 + 0.5);
+    }
+
+    #[test]
     fn markdown_plain_preserves_document_order() {
         let items: Vec<_> =
             markdown::parse("# Title\n\nFirst paragraph.\n\nSecond block.").collect();
@@ -461,7 +501,7 @@ mod tests {
     #[test]
     fn markdown_document_spans_join_blocks_for_plain_order() {
         let items: Vec<_> = markdown::parse("# A\n\nB line\n\nC line").collect();
-        let settings = Settings::with_style(markdown_measure_style());
+        let settings = markdown_paint_settings(markdown_measure_style());
         let spans = markdown_document_spans(&items, &settings);
         let joined: String = spans.iter().map(|s| s.text.as_ref()).collect();
         assert!(joined.contains('A'));

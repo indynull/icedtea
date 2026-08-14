@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Content
+
+- `markdown_view` sizes body and headings from `typo` (H1 is the page
+  title step).
+
 ## 0.6.3 — 2026-08-14
 
 ### Controls

@@ -98,7 +98,8 @@ Constructor: [`widget::markdown_view`](https://docs.rs/icedtea/latest/icedtea/wi
 [iced](https://crates.io/crates/iced)
 
 Parse with `MarkdownDoc::parse`, then view the items. Truncate by
-slicing the source before parse. Links and inline code use
+slicing the source before parse. Body is `typo::BODY`; H1 is
+`typo::PAGE` (same step as a window title). Links and inline code use
 `Tokens::scheme()` (`primary`, `on_surface`, `surface_container_high`).
 Real markdown layout (headings, lists, code frames). Drag a range
 across blocks with `select::markdown_select`; covered blocks paint
