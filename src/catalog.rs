@@ -462,6 +462,41 @@ mod tests {
     }
 
     #[test]
+    fn handbook_architecture_composes_a_window() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let page = std::fs::read_to_string(root.join("book/src/architecture.md")).unwrap();
+        let fig = std::fs::read_to_string(root.join("book/src/images/compose.svg")).unwrap();
+        for needle in ["Boot", "Tokens", "ActionTable", "constructor", "pattern"] {
+            assert!(
+                page.contains(needle),
+                "architecture page must name {needle}"
+            );
+        }
+        for needle in ["Boot", "Tokens", "ActionTable", "Constructor", "Pattern"] {
+            assert!(fig.contains(needle), "compose.svg must name {needle}");
+        }
+        for (label, src) in [("page", page.as_str()), ("figure", fig.as_str())] {
+            assert!(
+                !src.contains("Notes"),
+                "{label} must not use hello fixture Notes"
+            );
+            assert!(
+                !src.contains("Ready"),
+                "{label} must not use hello fixture Ready"
+            );
+            let lower = src.to_ascii_lowercase();
+            assert!(
+                !lower.contains("one action feeds"),
+                "{label} must not say one Action feeds chrome"
+            );
+            assert!(
+                !lower.contains("one `action` feeds"),
+                "{label} must not say one Action feeds chrome"
+            );
+        }
+    }
+
+    #[test]
     fn reader_path_omits_maintainer_process() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
         let files = [

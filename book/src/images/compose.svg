@@ -1,66 +1,53 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 520" role="img" aria-labelledby="title desc">
-  <title id="title">Five pieces of an icedtea window</title>
-  <desc id="desc">Boot starts the window. Tokens color it. One Action is Save on the menu, the toolbar, and ctrl+s. Constructors are the controls. Patterns put those controls in a layout. The application owns state and receives messages.</desc>
-  <defs>
-    <filter id="lift" x="-6%" y="-6%" width="112%" height="116%">
-      <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#0a0c10" flood-opacity="0.5"/>
-    </filter>
-  </defs>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img" aria-labelledby="title desc">
+  <title id="title">How a window is composed</title>
+  <desc id="desc">Boot starts the window. Tokens color it. An ActionTable of many Actions feeds the toolbar and shortcuts. A list/detail pattern lays out the list_view and textarea constructors.</desc>
 
-  <rect width="800" height="520" rx="18" fill="#14181C"/>
-
-  <g filter="url(#lift)">
-    <rect x="40" y="28" width="720" height="464" rx="14" fill="#202020" stroke="#3A3A3A"/>
-  </g>
+  <rect width="800" height="500" rx="18" fill="#14181C"/>
 
   <g font-family="ui-sans-serif, system-ui, sans-serif">
-    <!-- Boot -->
-    <rect x="40" y="28" width="720" height="72" rx="14" fill="#2B2B2B"/>
-    <rect x="40" y="72" width="720" height="28" fill="#2B2B2B"/>
-    <text x="64" y="58" fill="#6B9EFF" font-size="13" font-weight="600">Boot</text>
-    <text x="64" y="82" fill="#F2F2F2" font-size="15">Starts the iced window.</text>
-    <text x="736" y="70" text-anchor="end" fill="#A3A3A3" font-size="13">run! and daemon!</text>
+    <text x="40" y="28" fill="#6B9EFF" font-size="13" font-weight="600">Boot</text>
+    <text x="80" y="28" fill="#A3A3A3" font-size="13">run!(Boot::new(…))</text>
+    <text x="400" y="28" fill="#6B9EFF" font-size="13" font-weight="600">Tokens</text>
+    <text x="456" y="28" fill="#A3A3A3" font-size="13">color every constructor</text>
 
-    <!-- Tokens -->
-    <line x1="40" y1="100" x2="760" y2="100" stroke="#3A3A3A"/>
-    <text x="64" y="128" fill="#6B9EFF" font-size="13" font-weight="600">Tokens</text>
-    <text x="64" y="150" fill="#F2F2F2" font-size="15">Color the window. Every widget takes these.</text>
-    <circle cx="616" cy="136" r="8" fill="#202020" stroke="#3A3A3A"/>
-    <circle cx="640" cy="136" r="8" fill="#2B2B2B" stroke="#3A3A3A"/>
-    <circle cx="664" cy="136" r="8" fill="#6B9EFF"/>
-    <circle cx="688" cy="136" r="8" fill="#5EEAD4"/>
-    <circle cx="712" cy="136" r="8" fill="#F2F2F2"/>
+    <rect x="40" y="48" width="420" height="420" rx="8" fill="#202020" stroke="#3A3A3A"/>
 
-    <!-- Action -->
-    <line x1="40" y1="168" x2="760" y2="168" stroke="#3A3A3A"/>
-    <text x="64" y="196" fill="#6B9EFF" font-size="13" font-weight="600">Action</text>
-    <text x="64" y="218" fill="#F2F2F2" font-size="15">Write Save once. It is the menu, the toolbar, and ctrl+s.</text>
-    <rect x="580" y="190" width="52" height="22" rx="5" fill="#6B9EFF"/>
-    <text x="606" y="205" text-anchor="middle" fill="#FFFFFF" font-size="12" font-weight="600">Save</text>
-    <text x="736" y="205" text-anchor="end" fill="#A3A3A3" font-size="12">ctrl+s</text>
+    <!-- toolbar: several actions -->
+    <rect x="40" y="48" width="420" height="44" rx="8" fill="#2B2B2B"/>
+    <rect x="40" y="76" width="420" height="16" fill="#2B2B2B"/>
+    <rect x="56" y="60" width="72" height="22" rx="5" fill="#6B9EFF"/>
+    <text x="92" y="76" text-anchor="middle" fill="#FFFFFF" font-size="11" font-weight="600">file.save</text>
+    <rect x="136" y="60" width="76" height="22" rx="5" fill="#2B2B2B" stroke="#3A3A3A"/>
+    <text x="174" y="76" text-anchor="middle" fill="#F2F2F2" font-size="11">file.open</text>
+    <rect x="220" y="60" width="76" height="22" rx="5" fill="#2B2B2B" stroke="#3A3A3A"/>
+    <text x="258" y="76" text-anchor="middle" fill="#F2F2F2" font-size="11">edit.undo</text>
 
-    <!-- Constructors + Patterns -->
-    <line x1="40" y1="236" x2="760" y2="236" stroke="#3A3A3A"/>
-    <rect x="40" y="236" width="360" height="168" fill="#252525"/>
-    <rect x="398" y="248" width="2" height="144" rx="1" fill="#3A3A3A"/>
+    <!-- list / detail -->
+    <rect x="48" y="104" width="120" height="316" rx="6" fill="#252525" stroke="#3A3A3A"/>
+    <text x="108" y="260" text-anchor="middle" fill="#A3A3A3" font-size="12">list_view</text>
+    <rect x="176" y="104" width="272" height="316" rx="6" fill="#252525" stroke="#3A3A3A"/>
+    <rect x="188" y="120" width="2" height="14" fill="#F2F2F2"/>
+    <text x="312" y="260" text-anchor="middle" fill="#A3A3A3" font-size="12">textarea</text>
 
-    <text x="64" y="268" fill="#6B9EFF" font-size="13" font-weight="600">Patterns</text>
-    <text x="64" y="296" fill="#F2F2F2" font-size="15">Put constructors in a layout.</text>
-    <text x="64" y="318" fill="#A3A3A3" font-size="13">list/detail, dock, main window</text>
-    <rect x="64" y="336" width="88" height="48" rx="6" fill="#2B2B2B" stroke="#3A3A3A"/>
-    <rect x="160" y="336" width="200" height="48" rx="6" fill="#2B2B2B" stroke="#3A3A3A"/>
-    <text x="108" y="365" text-anchor="middle" fill="#A3A3A3" font-size="11">list</text>
-    <text x="260" y="365" text-anchor="middle" fill="#A3A3A3" font-size="11">detail</text>
+    <!-- status: shortcut from the table, no status string -->
+    <rect x="40" y="432" width="420" height="36" rx="8" fill="#2B2B2B"/>
+    <rect x="40" y="432" width="420" height="12" fill="#2B2B2B"/>
+    <text x="440" y="456" text-anchor="end" fill="#A3A3A3" font-size="12">ctrl+s</text>
 
-    <text x="428" y="268" fill="#6B9EFF" font-size="13" font-weight="600">Constructors</text>
-    <text x="428" y="296" fill="#F2F2F2" font-size="15">The controls you call.</text>
-    <text x="428" y="318" fill="#A3A3A3" font-size="13">Each returns an Element and a message.</text>
-    <text x="428" y="352" fill="#A3A3A3" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12">toolbar, list_view, textarea</text>
+    <!-- callouts -->
+    <line x1="460" y1="70" x2="500" y2="70" stroke="#6B9EFF"/>
+    <text x="512" y="60" fill="#6B9EFF" font-size="13" font-weight="600">ActionTable</text>
+    <text x="512" y="78" fill="#F2F2F2" font-size="13">many Action rows</text>
+    <text x="512" y="96" fill="#A3A3A3" font-size="12">Pattern · toolbar</text>
 
-    <!-- App -->
-    <rect x="40" y="404" width="720" height="88" rx="14" fill="#2B2B2B"/>
-    <rect x="40" y="404" width="720" height="20" fill="#2B2B2B"/>
-    <text x="64" y="436" fill="#6B9EFF" font-size="13" font-weight="600">Your application</text>
-    <text x="64" y="462" fill="#F2F2F2" font-size="15">You own the notes, the selection, and the files.</text>
+    <line x1="460" y1="262" x2="500" y2="262" stroke="#6B9EFF"/>
+    <text x="512" y="252" fill="#6B9EFF" font-size="13" font-weight="600">Pattern</text>
+    <text x="512" y="270" fill="#F2F2F2" font-size="13">list_detail</text>
+    <text x="512" y="288" fill="#A3A3A3" font-size="12">Constructors · list_view, textarea</text>
+
+    <line x1="460" y1="450" x2="500" y2="450" stroke="#6B9EFF"/>
+    <text x="512" y="440" fill="#6B9EFF" font-size="13" font-weight="600">Action</text>
+    <text x="512" y="458" fill="#F2F2F2" font-size="13">file.save · ctrl+s</text>
+    <text x="512" y="476" fill="#A3A3A3" font-size="12">Pattern · status_bar</text>
   </g>
 </svg>

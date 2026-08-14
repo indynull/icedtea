@@ -47,8 +47,9 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   Do not own application state or business logic.
 - Layout, styling, and logic are Rust. No stylesheet or markup
   language.
-- One `Action` feeds menus, toolbars, shortcuts, context menus, footer
-  hints, and the command palette.
+- An `ActionTable` of `Action`s feeds menus, toolbars, shortcuts,
+  context menus, footer hints, and the command palette. Each Action is
+  declared once.
 - **Material Design 3** foundations in `m3` (color roles, type scale,
   shape, elevation, density, control states). `Tokens::scheme()` maps
   short fields onto those roles. `light` and `dark` are a neutral
