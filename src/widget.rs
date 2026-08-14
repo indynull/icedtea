@@ -1290,6 +1290,9 @@ pub fn progress_label(value: f32, remaining: Option<&str>) -> String {
 /// A determinate bar from 0 to 1.
 ///
 /// Values outside the range clamp. No message; it is a readout.
+/// Interpolate `value` with [`crate::motion::value_animation`] so the
+/// fill eases when the fraction changes. `indeterminate` paints a
+/// traveling chunk; pass a looping phase (0..=1) as `value`.
 ///
 ///
 /// ```
@@ -1324,13 +1327,14 @@ pub fn progress<'a, M: 'a>(
     };
     let mut parts = Row::new().width(Length::Fill);
     if indeterminate {
-        let lead = (value * 70.0).round() as u16;
-        let mid = 30u16;
-        let tail = 100u16.saturating_sub(lead.saturating_add(mid)).max(1);
+        let (lead, mid, _tail) = crate::motion::progress_run(value, tok.reduced_motion);
+        let l = (lead * 100.0).round() as u16;
+        let m = (mid * 100.0).round() as u16;
+        let t = 100u16.saturating_sub(l.saturating_add(m)).max(1);
         parts = parts
-            .push(seg(lead, s.surface_container_highest, s.on_surface))
-            .push(seg(mid, s.primary, s.on_primary))
-            .push(seg(tail, s.surface_container_highest, s.on_surface));
+            .push(seg(l.max(1), s.surface_container_highest, s.on_surface))
+            .push(seg(m.max(1), s.primary, s.on_primary))
+            .push(seg(t, s.surface_container_highest, s.on_surface));
     } else {
         let buf = buffer.unwrap_or(value).clamp(0.0, 1.0).max(value);
         let v = (value * 100.0).round() as u16;
@@ -1378,6 +1382,7 @@ pub fn ring_should_stroke(start: f32, end: f32) -> bool {
 /// A determinate arc from 0 to 1.
 ///
 /// Same fraction contract as [`progress`], drawn as a ring.
+/// Interpolate `value` with [`crate::motion::value_animation`].
 ///
 ///
 /// ```
@@ -6688,6 +6693,18 @@ mod tests {
             role("p", Role::Progress),
         );
         draw_once(&mut busy);
+        let mut late: Element<'_, ()> =
+            progress(0.98, None, None, true, tok, role("p-late", Role::Progress));
+        draw_once(&mut late);
+        let mut still: Element<'_, ()> = progress(
+            0.2,
+            None,
+            None,
+            true,
+            tok.with_reduced_motion(true),
+            role("p-still", Role::Progress),
+        );
+        draw_once(&mut still);
         let mut card: Element<'_, ()> = group_box(
             "Box",
             label("x", tok, role("x", Role::Status)),

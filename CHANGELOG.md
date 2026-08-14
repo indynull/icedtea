@@ -29,6 +29,13 @@
 
 - `expander` and `accordion_view` take height `progress`.
 
+### Readout
+
+- `motion::value_animation` eases a determinate 0–1 value for
+  `progress` and `progress_ring`.
+- `motion::progress_run` is the linear busy-bar phase (grows, travels,
+  shrinks). Reduced motion holds a static chunk.
+
 ## 0.7.0 — 2026-08-14
 
 ### Content

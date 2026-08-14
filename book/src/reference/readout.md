@@ -18,8 +18,11 @@ Constructor: [`widget::progress`](https://docs.rs/icedtea/latest/icedtea/widget/
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
-Pass the fraction. Optional buffer is a second fill on the same track.
-`indeterminate` paints a linear busy chunk (`value` is the offset).
+Pass the painted fraction. Interpolate it with
+`motion::value_animation` so the fill eases when the target changes.
+Optional buffer is a second fill on the same track.
+`indeterminate` paints a traveling chunk; pass a looping phase
+(0..=1) as `value`. Reduced motion holds that chunk still.
 `progress_label` builds the remaining-time copy. Values outside 0..=1
 clamp. No message; it is a readout.
 
@@ -33,7 +36,8 @@ Constructor: [`widget::progress_ring`](https://docs.rs/icedtea/latest/icedtea/wi
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
-Same fraction contract as the bar, drawn as a ring.
+Same fraction contract as the bar, drawn as a ring. Interpolate
+`value` with `motion::value_animation`.
 
 
 ### Spinner

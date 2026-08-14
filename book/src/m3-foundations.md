@@ -58,7 +58,9 @@ host Map and Desktop rows.
 tokens. Desktop chrome uses the short and medium steps (50–250 ms).
 `Tokens::with_reduced_motion(true)` collapses every duration to 0 ms.
 Constructors take a 0–1 progress; the application owns
-`iced::Animation`. See [`motion::overlay`](https://docs.rs/icedtea/latest/icedtea/motion/fn.overlay.html).
+`iced::Animation`. Overlay chrome uses `motion::overlay`. Determinate
+progress uses `motion::value_animation`; the linear busy bar uses
+`motion::progress_run`. See [`motion::overlay`](https://docs.rs/icedtea/latest/icedtea/motion/fn.overlay.html).
 
 ## Control states
 

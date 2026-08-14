@@ -128,6 +128,8 @@ pub const SHEET: DurationStep = DurationStep::Short4;
 pub const TOAST: DurationStep = DurationStep::Short3;
 /// Expander / accordion height.
 pub const EXPAND: DurationStep = DurationStep::Medium1;
+/// Determinate progress value change.
+pub const PROGRESS: DurationStep = DurationStep::Medium2;
 
 /// Slide distance at progress 0 (desktop dp).
 pub const OVERLAY_SLIDE: f32 = 12.0;
@@ -185,6 +187,7 @@ mod tests {
         assert_eq!(OVERLAY.millis(), 200);
         assert_eq!(TOAST.millis(), 150);
         assert_eq!(EXPAND.millis(), 250);
+        assert_eq!(PROGRESS.millis(), 300);
         for step in DurationStep::ALL {
             assert!(step.millis() > 0);
             assert_eq!(step.duration(true), Duration::ZERO);

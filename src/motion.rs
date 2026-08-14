@@ -113,6 +113,37 @@ pub fn expand_animation(open: bool, reduced: bool) -> iced::Animation<bool> {
         .easing(Ease::EmphasizedDecelerate.lilt())
 }
 
+/// Configure an iced animation for a determinate 0..=1 value.
+pub fn value_animation(start: f32, reduced: bool) -> iced::Animation<f32> {
+    iced::Animation::new(start.clamp(0.0, 1.0))
+        .duration(m3motion::PROGRESS.duration(reduced))
+        .easing(Ease::Standard.lilt())
+}
+
+/// Linear indeterminate run: `(lead, mid, tail)` portions that sum to 1.
+///
+/// `phase` is 0..=1 over one cycle. The chunk grows as it leaves the
+/// start, then shrinks as it exits the end. Reduced motion holds a
+/// static mid-track chunk.
+pub fn progress_run(phase: f32, reduced: bool) -> (f32, f32, f32) {
+    if reduced {
+        return (0.35, 0.30, 0.35);
+    }
+    let p = phase.rem_euclid(1.0);
+    let head = Ease::EmphasizedDecelerate.sample(p);
+    let tail = if p < 0.38 {
+        0.0
+    } else {
+        Ease::StandardAccelerate.sample(((p - 0.38) / 0.62).clamp(0.0, 1.0))
+    };
+    let start = tail.min(0.92);
+    let end = head.max(start + 0.08).min(1.0);
+    let mid = (end - start).clamp(0.08, 1.0);
+    let lead = start;
+    let rest = (1.0 - lead - mid).max(0.0);
+    (lead, mid, rest)
+}
+
 /// Fade and slide a child for overlay enter/exit.
 ///
 /// `progress` is 0 (gone) to 1 (at rest). The application owns
@@ -522,6 +553,26 @@ mod tests {
         let expand_off = expand_animation(false, true);
         assert!(!expand_off.is_animating(iced::time::Instant::now()));
         let _ = expand_live;
+        let snap = value_animation(0.4, true);
+        assert!(!snap.is_animating(iced::time::Instant::now()));
+        assert!((snap.value() - 0.4).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn progress_run_travels_then_snaps_when_reduced() {
+        let (l0, m0, t0) = progress_run(0.0, false);
+        let (l1, m1, t1) = progress_run(0.98, false);
+        let (lm, mm, tm) = progress_run(0.45, false);
+        assert!((l0 + m0 + t0 - 1.0).abs() < 0.02);
+        assert!((l1 + m1 + t1 - 1.0).abs() < 0.02);
+        assert!((lm + mm + tm - 1.0).abs() < 0.02);
+        assert!(m0 >= 0.08 && m1 >= 0.08);
+        assert!(l0 < lm);
+        assert!(l1 > lm);
+        assert!(mm > m0);
+        let (lr, mr, tr) = progress_run(0.1, true);
+        assert_eq!((lr, mr, tr), progress_run(0.9, true));
+        assert!((lr + mr + tr - 1.0).abs() < 0.02);
     }
 
     #[test]
