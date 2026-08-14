@@ -2909,12 +2909,13 @@ pub fn parse(source: &str) -> MarkdownDoc {
 /// # Select and copy
 ///
 /// Painted with real markdown layout (headings, lists, code frames,
-/// quotes). Drag a range with [`crate::select::markdown_select`] so it
-/// can start in one block and end in another; pass the live
-/// [`crate::select::MarkdownSpan`] here. The view is not flattened
-/// into one mixed-size `Rich`. Ctrl+C / Cmd+C on a span is
-/// [`MarkdownSpan::text`] via [`crate::copy_text`]. Full document copy
-/// is [`MarkdownDoc::source`].
+/// quotes). Body is [`crate::typo::BODY`]; H1 is [`crate::typo::PAGE`]
+/// (window title), not iced's 2× blog heading. Drag a range with
+/// [`crate::select::markdown_select`] so it can start in one block and
+/// end in another; pass the live [`crate::select::MarkdownSpan`] here.
+/// The view is not flattened into one mixed-size `Rich`. Ctrl+C /
+/// Cmd+C on a span is [`MarkdownSpan::text`] via [`crate::copy_text`].
+/// Full document copy is [`MarkdownDoc::source`].
 ///
 ///
 /// ```
@@ -2944,7 +2945,7 @@ pub fn markdown_view<'a, M: Clone + 'a>(
     on_link: impl Fn(markdown::Uri) -> M + Copy + 'a,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let settings = markdown::Settings::with_style(markdown_style(tok));
+    let settings = crate::select::markdown_paint_settings(markdown_style(tok));
     let body: Element<'a, M> = match span.copied().filter(|s| !s.is_empty()) {
         None => iced_selection::markdown::view(items, settings).map(on_link),
         Some(span) => {
