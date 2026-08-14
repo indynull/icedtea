@@ -6,6 +6,8 @@ Type, icons, documents, and images.
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
+![Labels, icons, and type](../images/content.png)
+
 ## Select and copy
 
 Readable body, code, and markdown share one contract (module

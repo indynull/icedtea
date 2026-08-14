@@ -6,6 +6,8 @@ Composed chrome.
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
+![A list beside a filling detail pane](../images/patterns.png)
+
 ### Dialogs
 
 **`dialogs`** — A confirm / message / save sheet.

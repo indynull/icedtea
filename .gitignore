@@ -1,6 +1,7 @@
 /target
 /book/book
 /tmp/
+__pycache__/
 .superpowers/
 .ruff_cache/
 **/*.rs.bk

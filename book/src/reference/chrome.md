@@ -6,6 +6,8 @@ Theme, marks, rows, and feedback.
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
+![Menu, toolbar, and status](../images/chrome.png)
+
 ### Theme
 
 **`theme`** — Look up a built-in colorway by name.

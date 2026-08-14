@@ -20,6 +20,7 @@ just clean          # cargo clean (debug, release, coverage trees)
 cargo run -p icedtea-gallery
 just gallery-qa     # visual QA (shots under tmp/gallery-qa/); see .grok/skills/gallery-qa
 just gallery-gif    # recapture assets/gallery.gif when the gallery shell changes
+just book-stills    # recapture book/src/images/ constructor stills
 ```
 
 ## Tree
@@ -103,6 +104,7 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   mixed-size `Rich` — that breaks layout and selection paint. Full
   document copy is `copy_text` on `MarkdownDoc::source`. Contract:
   `select` module rustdoc. Gallery demos only public constructors.
+- Always recapture handbook stills with `just book-stills` in the same change when the painted constructor or chrome in a published still changes. Never hand-edit those PNGs or generate them.
 - Always drop `target/llvm-cov-target` after a passing coverage run.
   `just clean` is `cargo clean`. Only `just cov` (and continuous
   integration) set `CARGO_INCREMENTAL=0`. Targeted `cargo test` /

@@ -6,6 +6,8 @@ Lists, tables, trees, tabs, expanders, and pages.
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
+![A virtualized list with filters and pagination](../images/collections.png)
+
 `VisibleWindow.scroll` is the only list and table offset. The rail and
 the wheel write it. Variable-height rows use `row_offsets` /
 `visible_range_var`. `scroll_id` names the list clip pane.

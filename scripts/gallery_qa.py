@@ -10,7 +10,8 @@ Does not commit. Does not invent screenshots.
 
   just gallery-qa
   just gallery-qa --interact --beats 0,8
-  just gallery-gif   # ship assets/gallery.gif for README/book only
+  just gallery-gif     # ship assets/gallery.gif for README/book only
+  just book-stills     # recapture handbook stills into book/src/images/
 """
 
 from __future__ import annotations
@@ -288,7 +289,7 @@ def find_window_id(display: str, pid: int, timeout_s: float = 20.0) -> str:
             if len(parts) >= 3 and parts[2] == str(pid):
                 return parts[0]
         time.sleep(0.25)
-    raise SystemExit(f"timed out waiting for gallery window (pid={pid})")
+    raise SystemExit(f"timed out waiting for window (pid={pid})")
 
 
 def place_window(display: str, wid: str, x: int, y: int, w: int, h: int) -> None:
@@ -359,6 +360,99 @@ def capture_window(display: str, wid: str, dest: Path) -> dict:
         "geometry": wh.stdout.strip() if wh.returncode == 0 else None,
         "wid": wid,
     }
+
+
+# Caption prefix (before ':') → dest under book/src/images/.
+# One representative idle frame per visual handbook group.
+BOOK_STILLS: dict[str, str] = {
+    "controls": "controls.png",
+    "fields": "fields.png",
+    "readout": "readout.png",
+    "type": "content.png",
+    "list": "collections.png",
+    "chrome": "chrome.png",
+    "list-and-detail": "patterns.png",
+}
+BOOK_HELLO_STILL = "first-window.png"
+PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+
+
+def require_png(path: Path, *, min_bytes: int = 1000) -> None:
+    if not path.is_file():
+        raise SystemExit(f"book still missing: {path}")
+    data = path.read_bytes()
+    if len(data) < min_bytes or not data.startswith(PNG_MAGIC):
+        raise SystemExit(f"book still is not a painted PNG: {path}")
+
+
+def publish_book_still(src: Path, dest: Path) -> None:
+    require_png(src)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(src.read_bytes())
+    print(f"book still {dest}", file=sys.stderr)
+
+
+def hello_binary(root: Path, release: bool) -> Path:
+    kind = "release" if release else "debug"
+    return root / "target" / kind / "examples" / "hello"
+
+
+def build_hello(root: Path, release: bool) -> Path:
+    cmd = ["cargo", "build", "--example", "hello"]
+    if release:
+        cmd.append("--release")
+    print(" ".join(cmd), file=sys.stderr)
+    r = subprocess.run(cmd, cwd=root, check=False)
+    if r.returncode != 0:
+        raise SystemExit(f"cargo build --example hello failed ({r.returncode})")
+    path = hello_binary(root, release)
+    if not path.is_file():
+        raise SystemExit(f"hello example missing after build: {path}")
+    return path
+
+
+def capture_hello(
+    root: Path,
+    display: str,
+    dest: Path,
+    *,
+    release: bool,
+    no_build: bool,
+    width: int = 480,
+    height: int = 640,
+) -> dict:
+    if no_build and hello_binary(root, release).is_file():
+        binary = hello_binary(root, release)
+    else:
+        binary = build_hello(root, release)
+    env = os.environ.copy()
+    env["DISPLAY"] = display
+    env.pop("WAYLAND_DISPLAY", None)
+    print(f"starting {binary}", file=sys.stderr)
+    proc = subprocess.Popen(
+        [str(binary)],
+        cwd=root,
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+    )
+    try:
+        wid = find_window_id(display, proc.pid)
+        place_window(display, wid, 40, 48, width, height)
+        pointer_clear_hover(display)
+        time.sleep(0.5)
+        cap = capture_window(display, wid, dest)
+        require_png(dest)
+        print(f"book still {dest}", file=sys.stderr)
+        return cap
+    finally:
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                proc.kill()
 
 
 def slug(s: str) -> str:
@@ -601,6 +695,11 @@ def main() -> int:
     ap.add_argument("--client-h", type=int, default=900)
     ap.add_argument("--screen-w", type=int, default=1720)
     ap.add_argument("--screen-h", type=int, default=1080)
+    ap.add_argument(
+        "--book",
+        action="store_true",
+        help="Write handbook stills under book/src/images/ from idle constructor frames",
+    )
     args = ap.parse_args()
 
     for cmd in ("wmctrl", "import", "xwininfo", "identify"):
@@ -787,6 +886,9 @@ def main() -> int:
                 else (slug(caption) if caption else f"beat-{beat}")
             )
 
+            if args.book and page not in BOOK_STILLS:
+                continue
+
             time.sleep(settle)
             record_shot(
                 beat=beat,
@@ -860,6 +962,36 @@ def main() -> int:
             json.dumps(meta, indent=2) + "\n", encoding="utf-8"
         )
         write_capture_md(out, meta=meta, steps=steps, timings=timings)
+
+        if args.book:
+            images = root / "book" / "src" / "images"
+            written: set[str] = set()
+            for s in steps:
+                if s.get("kind") != "idle" or s.get("shot") is None:
+                    continue
+                dest_name = BOOK_STILLS.get(s.get("page", ""))
+                if dest_name is None:
+                    continue
+                publish_book_still(out / s["shot"], images / dest_name)
+                written.add(dest_name)
+            missing = sorted(set(BOOK_STILLS.values()) - written)
+            if missing:
+                raise SystemExit(
+                    "book stills missing after tour: " + ", ".join(missing)
+                )
+            if gallery.poll() is None:
+                gallery.terminate()
+                try:
+                    gallery.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    gallery.kill()
+            capture_hello(
+                root,
+                display,
+                images / BOOK_HELLO_STILL,
+                release=args.release,
+                no_build=args.no_build,
+            )
 
         if args.gif is not None:
             gif = args.gif if args.gif.is_absolute() else out / args.gif

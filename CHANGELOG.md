@@ -5,7 +5,9 @@
 ### Guide
 
 - The handbook sidebar nests Start, Compose, Cookbook, and Reference
-  as sections with indented pages. Chapters are not numbered.
+  as sections with indented pages.
+- First-window and each visual reference group show a captured still
+  of the shipped constructors.
 
 ## 0.6.0 — 2026-08-13
 

@@ -243,7 +243,12 @@ mod tests {
             "layout.md",
             "theming.md",
             "architecture.md",
+            "m3-foundations.md",
             "navigation.md",
+            "cookbook/save.md",
+            "cookbook/list-detail.md",
+            "cookbook/table.md",
+            "cookbook/palette.md",
             "overlay-windows.md",
             "compact-tools.md",
             "reference/controls.md",
@@ -400,6 +405,60 @@ mod tests {
                 );
             }
         }
+    }
+
+    fn first_png_src(text: &str) -> Option<&str> {
+        let mut rest = text;
+        while let Some(i) = rest.find("](") {
+            let after = &rest[i + 2..];
+            let end = after.find(')')?;
+            let src = &after[..end];
+            if src.ends_with(".png") {
+                return Some(src);
+            }
+            rest = &after[end + 1..];
+        }
+        None
+    }
+
+    #[test]
+    fn handbook_shows_constructor_stills() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("book/src");
+        let pages = [
+            "first-window.md",
+            "reference/controls.md",
+            "reference/fields.md",
+            "reference/readout.md",
+            "reference/content.md",
+            "reference/collections.md",
+            "reference/chrome.md",
+            "reference/patterns.md",
+        ];
+        for rel in pages {
+            let path = root.join(rel);
+            let text = std::fs::read_to_string(&path).unwrap();
+            let src = first_png_src(&text)
+                .unwrap_or_else(|| panic!("{rel} must show a constructor still"));
+            must(
+                !src.contains("placeholder"),
+                format!("{rel} still must be a capture"),
+            );
+            let dest = path.parent().unwrap().join(src);
+            let bytes = std::fs::read(&dest)
+                .unwrap_or_else(|_| panic!("{rel} still missing at {}", dest.display()));
+            must(bytes.len() >= 1000, format!("{src} is empty"));
+            must(
+                bytes.starts_with(b"\x89PNG\r\n\x1a\n"),
+                format!("{src} must be a PNG capture"),
+            );
+        }
+    }
+
+    #[test]
+    fn handbook_stills_have_a_recapture_command() {
+        let just = include_str!("../justfile");
+        assert!(just.contains("\nbook-stills"));
+        assert!(just.contains("gallery_qa.py --book"));
     }
 
     #[test]
@@ -712,33 +771,6 @@ mod tests {
         assert!(summary.contains("- [Reference]()"));
         assert!(summary.contains("    - [Install](install.md)"));
         assert!(summary.contains("    - [Widgets](widgets.md)"));
-        for path in [
-            "introduction.md",
-            "install.md",
-            "first-window.md",
-            "architecture.md",
-            "m3-foundations.md",
-            "actions.md",
-            "layout.md",
-            "theming.md",
-            "navigation.md",
-            "overlay-windows.md",
-            "compact-tools.md",
-            "cookbook/save.md",
-            "cookbook/list-detail.md",
-            "cookbook/table.md",
-            "cookbook/palette.md",
-            "widgets.md",
-            "reference/controls.md",
-            "reference/fields.md",
-            "reference/readout.md",
-            "reference/content.md",
-            "reference/collections.md",
-            "reference/chrome.md",
-            "reference/patterns.md",
-        ] {
-            assert!(summary.contains(path), "{path}");
-        }
         let pages: [(&str, &[&str]); 4] = [
             (
                 include_str!("../book/src/cookbook/save.md"),

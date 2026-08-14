@@ -51,3 +51,8 @@ gallery-qa *args:
 # ICEDTEA_GALLERY_ISOLATED=0 uses the current display.
 gallery-gif:
     bash scripts/gallery-gif.sh
+
+# Recapture handbook constructor stills into book/src/images/.
+# Same Xephyr path as gallery-qa. Does not invent screenshots.
+book-stills *args:
+    python3 scripts/gallery_qa.py --book {{args}}

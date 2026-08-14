@@ -14,7 +14,8 @@ disabled, checked). The application owns state.
 | Chrome | [Chrome](reference/chrome.md) |
 | Patterns | [Patterns](reference/patterns.md) |
 
-Each entry names the job, the shipped constructor, and links to
+Each group page shows a still of the shipped constructors, then names
+the job, the constructor, and links to
 [rustdoc](https://docs.rs/icedtea),
 [source](https://github.com/indynull/icedtea), and
 [crates.io](https://crates.io/crates/icedtea).

@@ -8,6 +8,8 @@ Buttons, toggles, and a slider. Faces paint from M3 roles and
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
+![Buttons, checks, radios, and sliders](../images/controls.png)
+
 ### Button
 
 **`button`** — Press a labeled control to send a message.

@@ -6,6 +6,8 @@ Text, numbers, dates, and picks.
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
+![Text, numbers, dates, and picks](../images/fields.png)
+
 ### Text input
 
 **`text-input`** — A single-line editor.

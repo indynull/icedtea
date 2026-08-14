@@ -6,6 +6,8 @@ Progress, sparks, and a large reading.
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
+![Progress bars, rings, and a spinner](../images/readout.png)
+
 ### Progress
 
 **`progress`** — A determinate bar from 0 to 1.

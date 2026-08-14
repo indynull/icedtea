@@ -6,6 +6,8 @@
 The program is [`examples/hello.rs`](https://github.com/indynull/icedtea/blob/master/examples/hello.rs)
 in the repository. `cargo run --example hello`.
 
+![Notes: Save on the toolbar and a filling editor](images/first-window.png)
+
 ```rust
 {{#include ../../examples/hello.rs}}
 ```
