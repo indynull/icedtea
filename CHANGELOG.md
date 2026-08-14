@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+### Controls
+
+- `Variant::Outlined` and `Variant::Elevated` complete the five Material button faces (filled / tonal / text already map to Primary / Quiet / Ghost).
+- `Tokens::with_density` threads compact / default / comfortable pad and control height.
+- Labeled buttons, split, and toggle take `Icons` for leading and trailing chrome.
+- `Cell` carries an optional icon on segmented button and button group.
+- `icon_button` takes `ControlSize`. `icon_button_toggle` is the pressed icon face.
+
+### Fields
+
+- `FieldOpts` adds filled vs outlined, prefix/suffix icons, a floating label, and a character count.
+
+### Readout
+
+- `progress` takes `indeterminate` for a linear busy bar.
+- `SliderMarks` adds `vertical` and a thumb value label.
+
+### Content and chrome
+
+- `chip` takes `ChipKind` (assist / filter / input / suggestion) and `Icons`.
+- `badge` takes `BadgeSize` and an optional host to overlap.
+- `group_box` takes `CardFace` (elevated / filled / outlined).
+- Tooltips take `TooltipAnchor`. Rich tips take an optional action.
+- `dialog_sheet` takes extra actions and an optional header icon.
+- `tab_bar` takes a secondary underbar; `Tabs::with_icon` paints icon-plus-text.
+- `RailDest` gives the navigation rail real icons and badges.
+
 ## 0.6.0 — 2026-08-13
 
 ### Controls

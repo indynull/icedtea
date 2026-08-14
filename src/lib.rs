@@ -321,10 +321,7 @@ mod tests {
         let arch = include_str!("../book/src/architecture.md");
         let first = include_str!("../book/src/first-window.md");
         let hello = include_str!("../examples/hello.rs");
-        let tour_msg = "crate-root rustdoc is a tour, not the GitHub README";
-        if tour.contains("include_str!(\"../README.md\")") {
-            panic!("{tour_msg}");
-        }
+        assert!(!tour.contains("include_str!(\"../README.md\")"));
         assert!(tour.contains("Action"));
         assert!(tour.contains("toolbar"));
         assert!(tour.contains("Boot"));
@@ -347,10 +344,7 @@ mod tests {
             let at = src
                 .find("icedtea =")
                 .expect("install story names the crate");
-            let ver_msg = "first icedtea line is the crates.io version";
-            if !src[at..].starts_with("icedtea = \"0.6\"") {
-                panic!("{ver_msg}");
-            }
+            assert!(src[at..].starts_with("icedtea = \"0.6\""));
         }
         assert!(arch.contains("Action"));
         assert!(arch.contains("Tokens"));
@@ -372,10 +366,7 @@ mod tests {
             let action = head.contains("Action");
             let sash = head.contains("listen_sash");
             let handle = head.contains("handle");
-            let recipe_msg = format!("{name} module docs must name the intended recipe");
-            if !(a11y || action || sash || handle) {
-                panic!("{recipe_msg}");
-            }
+            assert!(a11y || action || sash || handle, "{name}");
         }
     }
 
@@ -385,10 +376,7 @@ mod tests {
         assert!(src.contains("$crate::iced::application($new, $update, $view)"));
         assert!(src.contains("$crate::iced::daemon($new, $update, $view)"));
         let daemon_src = src.split("macro_rules! daemon").nth(1).unwrap();
-        let daemon_msg = "daemon leaves window open to Prepared::open";
-        if daemon_src.contains(".window(") {
-            panic!("{daemon_msg}");
-        }
+        assert!(!daemon_src.contains(".window("));
         let prep = bootstrap(&Boot::new("tea", "dev.icedtea.tea"));
         assert!(!prep.title.is_empty());
         assert!(prep.iced_settings.fonts.is_empty());

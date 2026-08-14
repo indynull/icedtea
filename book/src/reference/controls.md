@@ -111,7 +111,7 @@ Constructor: [`widget::segmented_button`](https://docs.rs/icedtea/latest/icedtea
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
-The application owns the selected index. Press emits the new index. Disabled freezes every segment.
+The application owns the selected index. Cells may carry an icon. Press emits the new index. Disabled freezes every segment.
 
 ### Button group
 
@@ -122,8 +122,8 @@ Constructor: [`widget::button_group`](https://docs.rs/icedtea/latest/icedtea/wid
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Each label sends its index. Not exclusive (see segmented button).
-Empty labels paint an empty row. Disabled drops every press.
+Each cell is a label plus optional icon (`Cell`). Press sends the index.
+Empty cells paint an empty row. Disabled drops every press.
 
 ### Icon button
 
@@ -135,7 +135,18 @@ Constructor: [`widget::icon_button`](https://docs.rs/icedtea/latest/icedtea/widg
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
-`Variant` picks the wash. Disabled drops the press.
+`Variant` picks the wash. `ControlSize` is the hit box. Disabled drops the press.
+
+### Toggle icon button
+
+**`toggle-icon-button`** — Icon button that stays pressed while on.
+
+Constructor: [`widget::icon_button_toggle`](https://docs.rs/icedtea/latest/icedtea/widget/fn.icon_button_toggle.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea)
+
+Same wash as toggle button. Disabled keeps the face.
 
 ### Range slider
 

@@ -16,6 +16,8 @@ Constructor: [`widget::themed_text_input`](https://docs.rs/icedtea/latest/icedte
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
+`FieldOpts` picks filled or outlined, prefix/suffix icons, a floating
+label when the value is non-empty, and an optional character count.
 Optional iced `Id` so you can `focus` after show. Disabled greys the
 field and drops edit. Empty value is a valid state.
 

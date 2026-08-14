@@ -63,7 +63,8 @@ Constructor: [`widget::group_box`](https://docs.rs/icedtea/latest/icedtea/widget
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Same constructor as group-box. Empty title is a border only.
+Same constructor as group-box. `CardFace` is elevated, filled, or
+outlined. Empty title is a border only.
 
 ### Rule
 
@@ -86,8 +87,9 @@ Constructor: [`widget::chip`](https://docs.rs/icedtea/latest/icedtea/widget/fn.c
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Optional press and optional dismiss. META type, chip wash, shrink
-width. Disabled keeps the face and drops press.
+`ChipKind` is assist, filter, input, or suggestion. Optional icon,
+press, and dismiss. META type, chip wash, shrink width. Disabled keeps
+the face and drops press.
 
 ### Badge
 
@@ -98,7 +100,8 @@ Constructor: [`widget::badge`](https://docs.rs/icedtea/latest/icedtea/widget/fn.
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Short text. Empty string is an empty pill.
+`BadgeSize` is small or large. Pass a host element to overlap the mark
+on an icon. Empty string is an empty pill.
 
 ### Wrap
 

@@ -58,7 +58,8 @@ Constructor: [`widget::tooltip_wrap`](https://docs.rs/icedtea/latest/icedtea/wid
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
-Empty tip text is a no-op wrap. The child keeps its own `A11y`.
+`TooltipAnchor` picks follow-cursor, top, bottom, or start. Empty tip
+text is a no-op wrap. The child keeps its own `A11y`.
 
 ### Rich tooltip
 
@@ -69,7 +70,8 @@ Constructor: [`widget::tooltip_rich`](https://docs.rs/icedtea/latest/icedtea/wid
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Empty title and body is a no-op wrap. The child keeps its own `A11y`.
+Optional action button and `TooltipAnchor`. Empty title, body, and
+action is a no-op wrap. The child keeps its own `A11y`.
 
 ### Hyperlink
 

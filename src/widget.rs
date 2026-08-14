@@ -7,6 +7,7 @@
 //!
 //! ```
 //! use icedtea::a11y::A11y;
+//! use icedtea::icon::Icons;
 //! use icedtea::theme;
 //! use icedtea::variant::Variant;
 //! use icedtea::widget;
@@ -16,6 +17,7 @@
 //!     Some(()),
 //!     tok,
 //!     Variant::Primary,
+//!     Icons::NONE,
 //!     A11y::button("Save"),
 //! );
 //! ```
@@ -28,7 +30,7 @@ use iced::widget::text_editor::Content;
 use iced::widget::{
     button, checkbox, column, container, mouse_area, pick_list, progress_bar, radio, row, rule,
     scrollable, slider, stack, svg, text, text_editor, text_input, toggler, tooltip, Column, Id,
-    Row, Space,
+    Row, Space, Stack,
 };
 use iced::{Alignment, Background, Color, Element, Length, Padding, Radians};
 
@@ -42,28 +44,44 @@ use crate::collection::{
     RowFace, RowHeights, Selection, Tabs, TreeNode, VisibleWindow,
 };
 use crate::i18n::Direction;
-use crate::icon::Icon;
+use crate::icon::{Icon, Icons};
 use crate::style;
 use crate::theme::Tokens;
 use crate::toast::{Toast, ToastKind};
 use crate::typo;
 use crate::variant::Variant;
 
-/// Shared padding for controls.
-fn pad() -> Padding {
-    // M3 small button: 8dp vertical, 16dp horizontal (4dp grid).
-    Padding::from([8, 16])
+/// Shared padding for controls. Vertical and horizontal follow token density.
+fn pad(tok: Tokens) -> Padding {
+    let p = tok.density.pad;
+    let v = crate::density::Density::snap((p * 2 / 3).max(4));
+    let h = crate::density::Density::snap(p + 4);
+    Padding::from([v as f32, h as f32])
 }
 
 /// Outer height of a standard padded control (body line box + vertical pad).
-fn control_height() -> f32 {
+fn control_height(tok: Tokens) -> f32 {
     // Same face as `themed_button` Shrink. Do not floor to the 48dp touch
     // target: iced `Fixed(48)` + pad paints a 48px face, taller than
     // labeled buttons on the same page.
     let line = f32::from(
         iced::widget::text::LineHeight::default().to_absolute(iced::Pixels(typo::BODY as f32)),
     );
-    line + pad().top + pad().bottom
+    let p = pad(tok);
+    line + p.top + p.bottom
+}
+
+/// Label plus optional leading/trailing icons.
+fn icon_label<'a, M: 'a>(title: String, icons: Icons, tok: Tokens) -> Element<'a, M> {
+    let mut r = Row::new().spacing(8).align_y(Alignment::Center);
+    if let Some(ic) = icons.leading {
+        r = r.push(icon_svg(ic, tok, A11y::new(title.clone(), Role::Image)));
+    }
+    r = r.push(text(title.clone()).size(typo::BODY));
+    if let Some(ic) = icons.trailing {
+        r = r.push(icon_svg(ic, tok, A11y::new(title, Role::Image)));
+    }
+    r.into()
 }
 
 /// Step for a continuous [`themed_slider`] range (~100 positions).
@@ -268,6 +286,7 @@ pub fn hyperlink<'a, M: Clone + 'a>(
 ///     Some(save),
 ///     tok,
 ///     Variant::Primary,
+///     icedtea::icon::Icons::NONE,
 ///     A11y::button("Save"),
 /// );
 /// ```
@@ -276,6 +295,7 @@ pub fn themed_button<'a, M: Clone + 'a>(
     msg: Option<M>,
     tok: Tokens,
     variant: Variant,
+    icons: Icons,
     a11y: A11y,
 ) -> Element<'a, M> {
     themed_button_sized(
@@ -283,6 +303,7 @@ pub fn themed_button<'a, M: Clone + 'a>(
         msg,
         tok,
         variant,
+        icons,
         Length::Shrink,
         Length::Shrink,
         a11y,
@@ -290,26 +311,32 @@ pub fn themed_button<'a, M: Clone + 'a>(
 }
 
 /// Themed button that fills a pad cell.
+#[allow(clippy::too_many_arguments)]
 pub fn themed_button_sized<'a, M: Clone + 'a>(
     title: impl Into<String>,
     msg: Option<M>,
     tok: Tokens,
     variant: Variant,
+    icons: Icons,
     width: Length,
     height: Length,
     a11y: A11y,
 ) -> Element<'a, M> {
     let label = a11y.apply_name(title);
-    let mut b = button(
+    let face: Element<'a, M> = if icons == Icons::NONE {
         text(label)
             .size(typo::BODY)
             .width(Length::Fill)
-            .align_x(Alignment::Center),
-    )
-    .padding(pad())
-    .width(width)
-    .height(height)
-    .style(style::button_style(tok, variant));
+            .align_x(Alignment::Center)
+            .into()
+    } else {
+        icon_label(label, icons, tok)
+    };
+    let mut b = button(face)
+        .padding(pad(tok))
+        .width(width)
+        .height(height)
+        .style(style::button_style(tok, variant));
     if let Some(m) = a11y.apply_message(msg) {
         b = b.on_press(m);
     }
@@ -332,6 +359,7 @@ pub fn themed_button_sized<'a, M: Clone + 'a>(
 ///     0,
 ///     vec![("Save As…".into(), 1), ("Export…".into(), 2)],
 ///     tok,
+///     icedtea::icon::Icons::NONE,
 ///     A11y::button("Save"),
 /// );
 /// ```
@@ -340,12 +368,13 @@ pub fn split_button<'a, M: Clone + 'a>(
     primary: M,
     overflow: impl IntoIterator<Item = (String, M)>,
     tok: Tokens,
+    icons: Icons,
     a11y: A11y,
 ) -> Element<'a, M> {
     let title = a11y.apply_name(title);
     let primary_msg = (!a11y.disabled).then_some(primary);
     let items: Vec<(String, M)> = overflow.into_iter().collect();
-    let h = control_height();
+    let h = control_height(tok);
     a11y::attach(
         row![
             themed_button_sized(
@@ -353,6 +382,7 @@ pub fn split_button<'a, M: Clone + 'a>(
                 primary_msg,
                 tok,
                 Variant::Primary,
+                icons,
                 Length::Shrink,
                 Length::Fixed(h),
                 A11y::button(&title).with_disabled(a11y.disabled),
@@ -378,13 +408,21 @@ pub fn split_button<'a, M: Clone + 'a>(
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let _: icedtea::Element<'_, ()> =
-///     widget::toggle_button("Bold", true, (), tok, A11y::button("Bold").with_checked(true));
+///     widget::toggle_button(
+///         "Bold",
+///         true,
+///         (),
+///         tok,
+///         icedtea::icon::Icons::NONE,
+///         A11y::button("Bold").with_checked(true),
+///     );
 /// ```
 pub fn toggle_button<'a, M: Clone + 'a>(
     title: impl Into<String>,
     pressed: bool,
     msg: M,
     tok: Tokens,
+    icons: Icons,
     a11y: A11y,
 ) -> Element<'a, M> {
     let title = title.into();
@@ -401,6 +439,7 @@ pub fn toggle_button<'a, M: Clone + 'a>(
         } else {
             Variant::Quiet
         },
+        icons,
         a11y,
     )
 }
@@ -451,6 +490,140 @@ pub enum CheckState {
     Checked,
     /// Partial selection (select-all over mixed children).
     Indeterminate,
+}
+
+/// Icon plus optional label for a group or segment cell.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Cell {
+    pub label: String,
+    pub icon: Option<Icon>,
+}
+
+impl Cell {
+    pub fn new(label: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            icon: None,
+        }
+    }
+
+    pub fn with_icon(mut self, icon: Icon) -> Self {
+        self.icon = Some(icon);
+        self
+    }
+}
+
+impl From<String> for Cell {
+    fn from(label: String) -> Self {
+        Self::new(label)
+    }
+}
+
+impl From<&str> for Cell {
+    fn from(label: &str) -> Self {
+        Self::new(label)
+    }
+}
+
+impl From<&String> for Cell {
+    fn from(label: &String) -> Self {
+        Self::new(label.clone())
+    }
+}
+
+/// Filled (default) or outlined text field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum FieldFace {
+    #[default]
+    Filled,
+    Outlined,
+}
+
+/// Card paint: elevated (shadow), filled, or outline only.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CardFace {
+    #[default]
+    Elevated,
+    Filled,
+    Outlined,
+}
+
+/// Badge size. Large is the default chip-like face.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum BadgeSize {
+    Small,
+    #[default]
+    Large,
+}
+
+/// M3 chip family.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ChipKind {
+    #[default]
+    Assist,
+    Filter,
+    Input,
+    Suggestion,
+}
+
+/// Where a tooltip sits relative to its child.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TooltipAnchor {
+    #[default]
+    Follow,
+    Top,
+    Bottom,
+    /// Start edge (left in LTR).
+    Start,
+}
+
+impl TooltipAnchor {
+    pub fn position(self) -> tooltip::Position {
+        match self {
+            Self::Follow => tooltip::Position::FollowCursor,
+            Self::Top => tooltip::Position::Top,
+            Self::Bottom => tooltip::Position::Bottom,
+            Self::Start => tooltip::Position::Left,
+        }
+    }
+}
+
+/// Icon-button hit box.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ControlSize {
+    Compact,
+    #[default]
+    Default,
+    Comfortable,
+}
+
+impl ControlSize {
+    /// Hit-box padding in px.
+    pub fn pad(self) -> u16 {
+        match self {
+            Self::Compact => 4,
+            Self::Default => 8,
+            Self::Comfortable => 12,
+        }
+    }
+}
+
+/// Optional field chrome: face, prefix/suffix icons, floating label, count.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FieldOpts<'a> {
+    pub face: FieldFace,
+    pub icons: Icons,
+    pub label: &'a str,
+    pub max_len: Option<usize>,
+}
+
+impl FieldOpts<'static> {
+    pub const NONE: Self = Self {
+        face: FieldFace::Filled,
+        icons: Icons::NONE,
+        label: "",
+        max_len: None,
+    };
 }
 
 impl CheckState {
@@ -562,7 +735,7 @@ fn indeterminate_box_face(tok: Tokens) -> iced::widget::container::Style {
 /// let tok = theme::named("dark").tokens;
 /// let on_pick = |i| i;
 /// let _: icedtea::Element<'_, usize> = widget::segmented_button(
-///     &["Day".into(), "Week".into(), "Month".into()],
+///     ["Day", "Week", "Month"],
 ///     0,
 ///     on_pick,
 ///     tok,
@@ -570,17 +743,19 @@ fn indeterminate_box_face(tok: Tokens) -> iced::widget::container::Style {
 /// );
 /// ```
 pub fn segmented_button<'a, M: Clone + 'a>(
-    labels: &[String],
+    cells: impl IntoIterator<Item = impl Into<Cell>>,
     selected: usize,
     on_select: impl Fn(usize) -> M + Copy + 'a,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
+    let cells: Vec<Cell> = cells.into_iter().map(Into::into).collect();
     let mut r = Row::new().spacing(0).align_y(Alignment::Center);
-    for (i, label) in labels.iter().enumerate() {
+    for (i, cell) in cells.iter().enumerate() {
         let on = i == selected;
+        let icons = cell.icon.map(Icons::leading).unwrap_or(Icons::NONE);
         let face = themed_button_sized(
-            label.clone(),
+            cell.label.clone(),
             if a11y.disabled {
                 None
             } else {
@@ -588,9 +763,10 @@ pub fn segmented_button<'a, M: Clone + 'a>(
             },
             tok,
             if on { Variant::Primary } else { Variant::Quiet },
+            icons,
             Length::Shrink,
-            Length::Fixed(control_height()),
-            A11y::button(label.clone())
+            Length::Fixed(control_height(tok)),
+            A11y::button(cell.label.clone())
                 .with_checked(on)
                 .with_disabled(a11y.disabled),
         );
@@ -611,29 +787,31 @@ pub fn segmented_button<'a, M: Clone + 'a>(
 /// let tok = theme::named("dark").tokens;
 /// let on_press = |i| i;
 /// let _: icedtea::Element<'_, usize> = widget::button_group(
-///     &["Cut".into(), "Copy".into(), "Paste".into()],
+///     ["Cut", "Copy", "Paste"],
 ///     on_press,
 ///     tok,
 ///     A11y::new("edit", Role::Group),
 /// );
 /// ```
 pub fn button_group<'a, M: Clone + 'a>(
-    labels: &[String],
+    cells: impl IntoIterator<Item = impl Into<Cell>>,
     on_press: impl Fn(usize) -> M + Copy + 'a,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
+    let cells: Vec<Cell> = cells.into_iter().map(Into::into).collect();
     let mut r = Row::new().spacing(0).align_y(Alignment::Center);
-    for (i, label) in labels.iter().enumerate() {
+    for (i, cell) in cells.iter().enumerate() {
         if i > 0 {
             r = r.push(
-                container(Space::new().width(1).height(control_height())).style(move |_| {
+                container(Space::new().width(1).height(control_height(tok))).style(move |_| {
                     style::fill(tok.scheme().outline_variant, tok.scheme().on_surface)
                 }),
             );
         }
+        let icons = cell.icon.map(Icons::leading).unwrap_or(Icons::NONE);
         let face = themed_button_sized(
-            label.clone(),
+            cell.label.clone(),
             if a11y.disabled {
                 None
             } else {
@@ -641,9 +819,10 @@ pub fn button_group<'a, M: Clone + 'a>(
             },
             tok,
             Variant::Quiet,
+            icons,
             Length::Shrink,
-            Length::Fixed(control_height()),
-            A11y::button(label.clone()).with_disabled(a11y.disabled),
+            Length::Fixed(control_height(tok)),
+            A11y::button(cell.label.clone()).with_disabled(a11y.disabled),
         );
         r = r.push(face);
     }
@@ -681,6 +860,7 @@ pub fn button_group<'a, M: Clone + 'a>(
 ///     Some(open),
 ///     tok,
 ///     Variant::Ghost,
+///     widget::ControlSize::Default,
 ///     A11y::button("Search"),
 /// );
 /// ```
@@ -689,6 +869,7 @@ pub fn icon_button<'a, M: Clone + 'a>(
     msg: Option<M>,
     tok: Tokens,
     variant: Variant,
+    size: ControlSize,
     a11y: A11y,
 ) -> Element<'a, M> {
     let mut b = button(icon_svg(
@@ -696,12 +877,60 @@ pub fn icon_button<'a, M: Clone + 'a>(
         tok,
         A11y::new(a11y.name.clone(), Role::Image),
     ))
-    .padding(8)
+    .padding(size.pad())
     .style(style::button_style(tok, variant));
     if let Some(m) = a11y.apply_message(msg) {
         b = b.on_press(m);
     }
     a11y::attach(b.into(), &a11y)
+}
+
+/// Icon button that stays pressed while on.
+///
+/// Same wash as [`toggle_button`]. Disabled keeps the face.
+///
+/// ```
+/// use icedtea::a11y::A11y;
+/// use icedtea::icon::Icon;
+/// use icedtea::theme;
+/// use icedtea::variant::Variant;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> = widget::icon_button_toggle(
+///     Icon::Check,
+///     true,
+///     (),
+///     tok,
+///     Variant::Primary,
+///     widget::ControlSize::Default,
+///     A11y::button("Bold").with_checked(true),
+/// );
+/// ```
+pub fn icon_button_toggle<'a, M: Clone + 'a>(
+    icon: Icon,
+    pressed: bool,
+    msg: M,
+    tok: Tokens,
+    variant: Variant,
+    size: ControlSize,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let a11y = A11y {
+        checked: Some(pressed),
+        ..a11y
+    };
+    icon_button(
+        icon,
+        (!a11y.disabled).then_some(msg),
+        tok,
+        if a11y.apply_checked(pressed) {
+            variant
+        } else {
+            Variant::Ghost
+        },
+        size,
+        a11y,
+    )
 }
 
 /// A sliding on/off control.
@@ -841,6 +1070,8 @@ pub struct SliderMarks<'a> {
     pub ticks: usize,
     pub min: &'a str,
     pub max: &'a str,
+    pub vertical: bool,
+    pub thumb: &'a str,
 }
 
 impl SliderMarks<'static> {
@@ -848,6 +1079,8 @@ impl SliderMarks<'static> {
         ticks: 0,
         min: "",
         max: "",
+        vertical: false,
+        thumb: "",
     };
 }
 
@@ -868,7 +1101,7 @@ impl SliderMarks<'static> {
 ///     0.0..=1.0,
 ///     0.4,
 ///     on_change,
-///     widget::SliderMarks { ticks: 5, min: "0", max: "1" },
+///     widget::SliderMarks { ticks: 5, min: "0", max: "1", vertical: false, thumb: "0.4" },
 ///     tok,
 ///     A11y::new("vol", Role::Slider).with_value("0.4"),
 /// );
@@ -883,23 +1116,46 @@ pub fn themed_slider<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let slider_el: Element<'a, M> = if a11y.disabled {
         let _ = (range, value, msg);
-        container(Space::new().width(Length::Fill).height(4))
-            .width(Length::Fill)
-            .height(18)
-            .center_y(18)
+        let (w, h) = if marks.vertical {
+            (Length::Fixed(18.0), Length::Fill)
+        } else {
+            (Length::Fill, Length::Fixed(18.0))
+        };
+        container(Space::new().width(4).height(4))
+            .width(w)
+            .height(h)
             .style(move |_| disabled_slider_face(tok))
             .into()
     } else {
         let step = slider_step(range.clone());
-        slider(range, value, msg)
-            .step(step)
-            .style(style::slider_style(tok))
-            .width(Length::Fill)
-            .into()
+        if marks.vertical {
+            iced::widget::vertical_slider(range, value, msg)
+                .step(step)
+                .height(Length::Fill)
+                .into()
+        } else {
+            slider(range, value, msg)
+                .step(step)
+                .style(style::slider_style(tok))
+                .width(Length::Fill)
+                .into()
+        }
     };
     let s = tok.scheme();
-    let mut col = Column::new().spacing(2).width(Length::Fill);
-    if marks.ticks > 1 {
+    let mut col = Column::new().spacing(2).width(if marks.vertical {
+        Length::Shrink
+    } else {
+        Length::Fill
+    });
+    if !marks.thumb.is_empty() {
+        col = col.push(
+            text(marks.thumb)
+                .size(typo::META)
+                .color(s.on_surface)
+                .width(Length::Fill),
+        );
+    }
+    if marks.ticks > 1 && !marks.vertical {
         let mut ticks = Row::new().width(Length::Fill);
         for i in 0..marks.ticks {
             if i > 0 {
@@ -912,7 +1168,11 @@ pub fn themed_slider<'a, M: Clone + 'a>(
         }
         col = col.push(ticks);
     }
-    col = col.push(slider_el);
+    if marks.vertical {
+        col = col.push(container(slider_el).height(Length::Fixed(160.0)).width(32));
+    } else {
+        col = col.push(slider_el);
+    }
     if !marks.min.is_empty() || !marks.max.is_empty() {
         col = col.push(
             row![
@@ -1036,6 +1296,7 @@ pub fn progress_label(value: f32, remaining: Option<&str>) -> String {
 ///     0.4,
 ///     Some(0.7),
 ///     Some(copy.as_str()),
+///     false,
 ///     tok,
 ///     A11y::new("p", Role::Progress).with_value("0.4"),
 /// );
@@ -1044,36 +1305,43 @@ pub fn progress<'a, M: 'a>(
     value: f32,
     buffer: Option<f32>,
     copy: Option<&str>,
+    indeterminate: bool,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
     let value = value.clamp(0.0, 1.0);
-    let buf = buffer.unwrap_or(value).clamp(0.0, 1.0).max(value);
-    let v = (value * 100.0).round() as u16;
-    let b = ((buf * 100.0).round() as u16).saturating_sub(v);
-    let rest = 100u16.saturating_sub(v.saturating_add(b)).max(1);
     let s = tok.scheme();
-    let bar: Element<'a, M> = container(
-        row![
-            container(Space::new().height(8))
-                .width(Length::FillPortion(v.max(1)))
-                .style(move |_| style::fill(s.primary, s.on_primary)),
-            container(Space::new().height(8))
-                .width(Length::FillPortion(b.max(1)))
-                .style(move |_| style::fill(s.secondary_container, s.on_secondary_container)),
-            container(Space::new().height(8))
-                .width(Length::FillPortion(rest))
-                .style(move |_| style::fill(s.surface_container_highest, s.on_surface)),
-        ]
-        .width(Length::Fill),
-    )
-    .width(Length::Fill)
-    .height(8)
-    .into();
-    let el = if let Some(c) = copy.filter(|s| !s.is_empty()) {
-        column![bar, meta(c, tok, A11y::new(c, Role::Status))]
+    let seg = |w: u16, fill: iced::Color, ink: iced::Color| {
+        container(Space::new().height(8))
+            .width(Length::FillPortion(w.max(1)))
+            .style(move |_| style::fill(fill, ink))
+    };
+    let mut parts = Row::new().width(Length::Fill);
+    if indeterminate {
+        let lead = (value * 70.0).round() as u16;
+        let mid = 30u16;
+        let tail = 100u16.saturating_sub(lead.saturating_add(mid)).max(1);
+        parts = parts
+            .push(seg(lead, s.surface_container_highest, s.on_surface))
+            .push(seg(mid, s.primary, s.on_primary))
+            .push(seg(tail, s.surface_container_highest, s.on_surface));
+    } else {
+        let buf = buffer.unwrap_or(value).clamp(0.0, 1.0).max(value);
+        let v = (value * 100.0).round() as u16;
+        let b = ((buf * 100.0).round() as u16).saturating_sub(v);
+        let rest = 100u16.saturating_sub(v.saturating_add(b)).max(1);
+        parts = parts
+            .push(seg(v, s.primary, s.on_primary))
+            .push(seg(b, s.secondary_container, s.on_secondary_container))
+            .push(seg(rest, s.surface_container_highest, s.on_surface));
+    };
+    let bar: Element<'a, M> = container(parts).width(Length::Fill).height(8).into();
+    let el = if let Some(c) = copy.filter(|t| !t.is_empty()) {
+        Column::new()
             .spacing(4)
             .width(Length::Fill)
+            .push(bar)
+            .push(meta(c, tok, A11y::new(c, Role::Status)))
             .into()
     } else {
         bar
@@ -1331,7 +1599,7 @@ pub fn number_input<'a, M: Clone + 'a>(
     let shown = format!("{value}");
     let mut i = text_input("0", &shown)
         .style(style::search_style(tok))
-        .padding(pad());
+        .padding(pad(tok));
     if !a11y.disabled {
         i = i.on_input(on_change);
     }
@@ -1362,23 +1630,27 @@ pub fn step_number(value: f64, step: f64, min: f64, max: f64, dir: i32) -> f64 {
 ///     "",
 ///     on_input,
 ///     None,
+///     widget::FieldOpts::NONE,
 ///     tok,
 ///     A11y::new("Name", Role::TextBox),
 ///     None,
 /// );
 /// ```
+#[allow(clippy::too_many_arguments)]
 pub fn themed_text_input<'a, M: Clone + 'a>(
     placeholder: &str,
     value: &str,
     on_input: impl Fn(String) -> M + 'a,
     on_submit: Option<M>,
+    opts: FieldOpts<'a>,
     tok: Tokens,
     a11y: A11y,
     input_id: Option<Id>,
 ) -> Element<'a, M> {
+    let outlined = matches!(opts.face, FieldFace::Outlined);
     let mut i = text_input(placeholder, value)
-        .style(style::search_style(tok))
-        .padding(pad());
+        .style(style::field_style(tok, outlined))
+        .padding(pad(tok));
     if let Some(id) = input_id {
         i = i.id(id);
     }
@@ -1388,7 +1660,37 @@ pub fn themed_text_input<'a, M: Clone + 'a>(
             i = i.on_submit(m);
         }
     }
-    a11y::attach(i.into(), &a11y)
+    let mut field: Element<'a, M> = i.into();
+    if opts.icons != Icons::NONE {
+        let mut r = Row::new().spacing(8).align_y(Alignment::Center);
+        if let Some(ic) = opts.icons.leading {
+            r = r.push(icon_svg(ic, tok, A11y::new("prefix", Role::Image)));
+        }
+        r = r.push(field);
+        if let Some(ic) = opts.icons.trailing {
+            r = r.push(icon_svg(ic, tok, A11y::new("suffix", Role::Image)));
+        }
+        field = r.width(Length::Fill).into();
+    }
+    let mut col = Column::new().spacing(4).width(Length::Fill);
+    if !opts.label.is_empty() && !value.is_empty() {
+        col = col.push(
+            text(opts.label)
+                .size(typo::META)
+                .color(tok.scheme().on_surface_variant),
+        );
+    }
+    col = col.push(field);
+    if let Some(max) = opts.max_len {
+        let n = value.chars().count();
+        col = col.push(
+            text(format!("{n}/{max}"))
+                .size(typo::META)
+                .color(tok.scheme().on_surface_variant)
+                .width(Length::Fill),
+        );
+    }
+    a11y::attach(col.into(), &a11y)
 }
 
 /// Field stack with optional supporting or error text under the control.
@@ -1407,6 +1709,7 @@ pub fn themed_text_input<'a, M: Clone + 'a>(
 ///     "",
 ///     on_input,
 ///     None,
+///     widget::FieldOpts::NONE,
 ///     tok,
 ///     A11y::new("Email", Role::TextBox),
 ///     None,
@@ -1486,6 +1789,7 @@ pub fn suggest_field<'a, M: Clone + 'a>(
         value,
         on_input,
         None,
+        FieldOpts::NONE,
         tok,
         a11y.child(Role::TextBox),
         None,
@@ -1497,6 +1801,7 @@ pub fn suggest_field<'a, M: Clone + 'a>(
             a11y.apply_message(Some(on_pick(i))),
             tok,
             Variant::Ghost,
+            Icons::NONE,
             A11y::new(s.clone(), Role::ListItem).with_disabled(a11y.disabled),
         ));
     }
@@ -1535,7 +1840,7 @@ pub fn password_input<'a, M: Clone + 'a>(
     let mut i = text_input(placeholder, value)
         .secure(masked)
         .style(style::search_style(tok))
-        .padding(pad());
+        .padding(pad(tok));
     if !a11y.disabled {
         i = i.on_input(on_input);
     }
@@ -1596,6 +1901,7 @@ pub fn secret_field<'a, M: Clone + 'a>(
         Some(on_toggle),
         tok,
         Variant::Quiet,
+        Icons::NONE,
         A11y::button(toggle_title).with_disabled(a11y.disabled),
     );
     let copy_btn = themed_button(
@@ -1603,6 +1909,7 @@ pub fn secret_field<'a, M: Clone + 'a>(
         copy.invoke(),
         tok,
         Variant::Quiet,
+        Icons::NONE,
         A11y::button(copy.title.clone()).with_disabled(!copy.enabled || a11y.disabled),
     );
     let kids = crate::i18n::order(dir, [field, toggle, copy_btn]);
@@ -1687,6 +1994,7 @@ pub fn value_field<'a, M: Clone + 'a>(
             copy.invoke(),
             tok,
             Variant::Quiet,
+            Icons::NONE,
             A11y::button(copy.title.clone()).with_disabled(!copy.enabled || a11y.disabled),
         ));
     }
@@ -1960,6 +2268,7 @@ pub fn search_input_clear<'a, M: Clone + 'a>(
             value,
             on_input,
             None,
+            FieldOpts::NONE,
             tok,
             a11y.child(Role::TextBox),
             None,
@@ -1974,6 +2283,7 @@ pub fn search_input_clear<'a, M: Clone + 'a>(
                 if a11y.disabled { None } else { Some(clear) },
                 tok,
                 Variant::Ghost,
+                ControlSize::Default,
                 A11y::button("Clear search").with_disabled(a11y.disabled),
             ));
         }
@@ -2035,7 +2345,7 @@ pub fn search_view<'a, M: Clone + 'a>(
                     .width(Length::Fill)
                     .align_x(Alignment::Start),
             )
-            .padding(pad())
+            .padding(pad(tok))
             .width(Length::Fill)
             .style(style::button_style(tok, Variant::Ghost));
             if let Some(m) = hit_a11y.apply_message(if a11y.disabled {
@@ -2098,7 +2408,7 @@ where
                     .size(typo::BODY)
                     .color(tok.scheme().on_surface_variant),
             )
-            .padding(pad())
+            .padding(pad(tok))
             .style(move |_| style::panel(tok))
             .into(),
             &a11y,
@@ -2107,7 +2417,7 @@ where
     a11y::attach(
         pick_list(options, selected, on_select)
             .style(style::picker_style(tok))
-            .padding(pad())
+            .padding(pad(tok))
             .into(),
         &a11y,
     )
@@ -2178,6 +2488,7 @@ pub fn date_picker<'a, M: Clone + 'a>(
                 a11y.apply_message(Some(on_prev)),
                 tok,
                 Variant::Quiet,
+                Icons::NONE,
                 A11y::button("previous-day").with_disabled(a11y.disabled),
             ),
             label(
@@ -2190,6 +2501,7 @@ pub fn date_picker<'a, M: Clone + 'a>(
                 a11y.apply_message(Some(on_next)),
                 tok,
                 Variant::Quiet,
+                Icons::NONE,
                 A11y::button("next-day").with_disabled(a11y.disabled),
             ),
         ]
@@ -2395,6 +2707,7 @@ pub fn time_picker<'a, M: Clone + 'a>(
         a11y.apply_message(Some(on_field(TimeField::Hour))),
         tok,
         Variant::Quiet,
+        Icons::NONE,
         A11y::button("hour").with_disabled(a11y.disabled),
     ));
     row = row.push(time_colon(tok));
@@ -2403,6 +2716,7 @@ pub fn time_picker<'a, M: Clone + 'a>(
         a11y.apply_message(Some(on_field(TimeField::Minute))),
         tok,
         Variant::Quiet,
+        Icons::NONE,
         A11y::button("minute").with_disabled(a11y.disabled),
     ));
     if clock.seconds {
@@ -2412,6 +2726,7 @@ pub fn time_picker<'a, M: Clone + 'a>(
             a11y.apply_message(Some(on_field(TimeField::Second))),
             tok,
             Variant::Quiet,
+            Icons::NONE,
             A11y::button("second").with_disabled(a11y.disabled),
         ));
     }
@@ -2421,6 +2736,7 @@ pub fn time_picker<'a, M: Clone + 'a>(
             a11y.apply_message(Some(on_field(TimeField::Period))),
             tok,
             Variant::Quiet,
+            Icons::NONE,
             A11y::button("period").with_disabled(a11y.disabled),
         ));
     }
@@ -2545,6 +2861,7 @@ pub fn markdown_outline<'a, M: Clone + 'a>(
                 a11y.apply_message(Some(on_jump(h.index))),
                 tok,
                 if on { Variant::Quiet } else { Variant::Ghost },
+                Icons::NONE,
                 A11y::button(h.title.clone())
                     .with_checked(on)
                     .with_disabled(a11y.disabled),
@@ -2685,6 +3002,7 @@ fn markdown_style(tok: Tokens) -> markdown::Style {
 /// let _: icedtea::Element<'_, ()> = widget::tooltip_wrap(
 ///     widget::label("Hover", tok, A11y::new("Hover", Role::Header)),
 ///     "Tip",
+///     widget::TooltipAnchor::Follow,
 ///     tok,
 ///     A11y::new("Tip", Role::Tooltip),
 /// );
@@ -2692,6 +3010,7 @@ fn markdown_style(tok: Tokens) -> markdown::Style {
 pub fn tooltip_wrap<'a, M: 'a>(
     child: Element<'a, M>,
     tip: impl Into<String>,
+    anchor: TooltipAnchor,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
@@ -2702,7 +3021,7 @@ pub fn tooltip_wrap<'a, M: 'a>(
             container(meta(tip.clone(), tok, A11y::new(tip, Role::Tooltip)))
                 .padding(6)
                 .style(tip_style(tok)),
-            tooltip::Position::FollowCursor,
+            anchor.position(),
         )
         .into(),
         &a11y,
@@ -2722,20 +3041,24 @@ pub fn tooltip_wrap<'a, M: 'a>(
 ///     widget::label("Hover", tok, A11y::new("Hover", Role::Header)),
 ///     "Save",
 ///     "Write the buffer to disk.",
+///     Some(("Learn more".into(), ())),
+///     widget::TooltipAnchor::Follow,
 ///     tok,
 ///     A11y::new("Save tip", Role::Tooltip),
 /// );
 /// ```
-pub fn tooltip_rich<'a, M: 'a>(
+pub fn tooltip_rich<'a, M: Clone + 'a>(
     child: Element<'a, M>,
     title: impl Into<String>,
     body: impl Into<String>,
+    action: Option<(String, M)>,
+    anchor: TooltipAnchor,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
     let title = title.into();
     let body = body.into();
-    if title.is_empty() && body.is_empty() {
+    if title.is_empty() && body.is_empty() && action.is_none() {
         return child;
     }
     let mut col = Column::new().spacing(2);
@@ -2745,11 +3068,21 @@ pub fn tooltip_rich<'a, M: 'a>(
     if !body.is_empty() {
         col = col.push(meta(body.clone(), tok, A11y::new(body, Role::Status)));
     }
+    if let Some((t, m)) = action {
+        col = col.push(themed_button(
+            t.clone(),
+            Some(m),
+            tok,
+            Variant::Ghost,
+            Icons::NONE,
+            A11y::button(t),
+        ));
+    }
     a11y::attach(
         tooltip(
             child,
             container(col).padding(8).style(tip_style(tok)),
-            tooltip::Position::FollowCursor,
+            anchor.position(),
         )
         .into(),
         &a11y,
@@ -2846,6 +3179,15 @@ pub fn chip_face(
                 radius: r,
             },
         ),
+        Variant::Outlined | Variant::Elevated => (
+            Color::TRANSPARENT,
+            s.on_surface,
+            iced::border::Border {
+                color: s.outline,
+                width: 1.0,
+                radius: r,
+            },
+        ),
     }
 }
 
@@ -2868,6 +3210,8 @@ pub fn chip_face(
 ///     None,
 ///     tok,
 ///     Variant::Chip,
+///     widget::ChipKind::Assist,
+///     icedtea::icon::Icons::NONE,
 ///     A11y::button("Add note"),
 /// );
 /// let drop = ();
@@ -2877,22 +3221,34 @@ pub fn chip_face(
 ///     Some(drop),
 ///     tok,
 ///     Variant::Quiet,
+///     widget::ChipKind::Input,
+///     icedtea::icon::Icons::NONE,
 ///     A11y::button("Rust"),
 /// );
 /// ```
+#[allow(clippy::too_many_arguments)]
 pub fn chip<'a, M: Clone + 'a>(
     title: impl Into<String>,
     press: Option<M>,
     dismiss: Option<M>,
     tok: Tokens,
     variant: Variant,
+    kind: ChipKind,
+    icons: Icons,
     a11y: A11y,
 ) -> Element<'a, M> {
     let title = a11y.apply_name(title);
+    let variant = match kind {
+        ChipKind::Assist => Variant::Chip,
+        ChipKind::Filter => variant,
+        ChipKind::Input | ChipKind::Suggestion => Variant::Quiet,
+    };
     let (wash, ink, border) = chip_face(tok, variant);
-    let mut line = row![text(title.clone()).size(typo::META).color(ink)]
-        .spacing(4)
-        .align_y(Alignment::Center);
+    let mut line = Row::new().spacing(4).align_y(Alignment::Center);
+    if let Some(ic) = icons.leading {
+        line = line.push(icon_svg(ic, tok, A11y::new(title.clone(), Role::Image)));
+    }
+    line = line.push(text(title.clone()).size(typo::META).color(ink));
     if let Some(msg) = dismiss {
         line = line.push(dismiss_button(
             msg,
@@ -2951,6 +3307,8 @@ pub fn filter_chips<'a, M: Clone + 'a>(
             None,
             tok,
             if on { Variant::Primary } else { Variant::Quiet },
+            ChipKind::Filter,
+            Icons::NONE,
             A11y::button(label.clone())
                 .with_checked(on)
                 .with_disabled(a11y.disabled),
@@ -2971,12 +3329,21 @@ pub fn filter_chips<'a, M: Clone + 'a>(
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let _: icedtea::Element<'_, ()> =
-///     widget::badge("New", tok, Variant::Primary, A11y::new("New", Role::Status));
+///     widget::badge(
+///         "New",
+///         None,
+///         tok,
+///         Variant::Primary,
+///         widget::BadgeSize::Large,
+///         A11y::new("New", Role::Status),
+///     );
 /// ```
 pub fn badge<'a, M: 'a>(
     title: impl Into<String>,
+    host: Option<Element<'a, M>>,
     tok: Tokens,
     variant: Variant,
+    size: BadgeSize,
     a11y: A11y,
 ) -> Element<'a, M> {
     let title = a11y.apply_name(title);
@@ -2989,13 +3356,27 @@ pub fn badge<'a, M: 'a>(
         _ => s.on_surface_variant,
     };
     let wash = chip_wash(tok, variant);
-    a11y::attach(
-        container(text(title).size(typo::META).color(ink))
-            .padding([4, 8])
-            .style(move |_| style::fill(wash, ink))
-            .into(),
-        &a11y,
-    )
+    let pad = match size {
+        BadgeSize::Small => [2, 5],
+        BadgeSize::Large => [4, 8],
+    };
+    let type_size = match size {
+        BadgeSize::Small => typo::META.saturating_sub(2).max(10),
+        BadgeSize::Large => typo::META,
+    };
+    let mark: Element<'a, M> = container(text(title).size(type_size).color(ink))
+        .padding(pad)
+        .style(move |_| style::fill(wash, ink))
+        .into();
+    let body = if let Some(child) = host {
+        Stack::new()
+            .push(child)
+            .push(container(mark).width(Length::Fill).align_x(Alignment::End))
+            .into()
+    } else {
+        mark
+    };
+    a11y::attach(body, &a11y)
 }
 
 /// A titled panel around children.
@@ -3011,6 +3392,7 @@ pub fn badge<'a, M: 'a>(
 ///     "Document",
 ///     widget::label("notes.txt", tok, A11y::new("notes", Role::Header)),
 ///     tok,
+///     widget::CardFace::Elevated,
 ///     A11y::new("Document", Role::Group),
 /// );
 /// ```
@@ -3018,6 +3400,7 @@ pub fn group_box<'a, M: 'a>(
     title: impl Into<String>,
     child: Element<'a, M>,
     tok: Tokens,
+    face: CardFace,
     a11y: A11y,
 ) -> Element<'a, M> {
     let title = a11y.apply_name(title);
@@ -3031,7 +3414,11 @@ pub fn group_box<'a, M: 'a>(
         )
         .padding(16)
         .width(Length::Fill)
-        .style(move |_| style::raised_card(tok))
+        .style(move |_| match face {
+            CardFace::Elevated => style::raised_card(tok),
+            CardFace::Filled => style::card(tok, false),
+            CardFace::Outlined => style::outlined_card(tok),
+        })
         .into(),
         &a11y,
     )
@@ -3070,6 +3457,7 @@ pub fn banner<'a, M: Clone + 'a>(
             a11y.apply_message(Some(m)),
             tok,
             Variant::Quiet,
+            Icons::NONE,
             A11y::button(t).with_disabled(a11y.disabled),
         ));
     }
@@ -3884,6 +4272,7 @@ pub fn item_grid<'a, M: Clone + 'a>(
                     a11y.apply_message(Some(on_select(i))),
                     tok,
                     if on { Variant::Quiet } else { Variant::Ghost },
+                    Icons::NONE,
                     Length::Fill,
                     Length::Fill,
                     A11y::new(s.clone(), Role::ListItem)
@@ -4016,6 +4405,7 @@ where
                 a11y.apply_message(Some(on_sort(c))),
                 tok,
                 Variant::Ghost,
+                Icons::NONE,
                 A11y::button(title).with_disabled(disabled),
             ))
             .width(col_w(c)),
@@ -4031,6 +4421,7 @@ where
                 a11y.apply_message(Some(on_sort(c))),
                 tok,
                 Variant::Ghost,
+                Icons::NONE,
                 A11y::button(title).with_disabled(disabled),
             ))
             .width(col_w(c)),
@@ -4189,6 +4580,7 @@ pub fn tree_view<'a, M: Clone + 'a>(
                 a11y.apply_message(Some(on_toggle(id))),
                 tok,
                 Variant::Ghost,
+                Icons::NONE,
                 A11y::button(format!("toggle {label_s}"))
                     .with_checked(expanded)
                     .with_disabled(a11y.disabled),
@@ -4233,6 +4625,14 @@ pub fn tree_view<'a, M: Clone + 'a>(
         ),
         &a11y,
     )
+}
+
+/// Map a More-list title back to its tab index.
+pub fn tab_overflow_pick<M: Clone>(
+    titles: Vec<String>,
+    on_select: impl Fn(usize) -> M + Copy,
+) -> impl Fn(String) -> M {
+    move |title: String| on_select(tab_overflow_index(&titles, &title))
 }
 
 /// Map a More-list title back to its tab index.
@@ -4286,6 +4686,7 @@ pub fn tab_visible_count(titles: &[String], max_width: f32) -> usize {
 ///     on_select,
 ///     on_close,
 ///     480.0,
+///     false,
 ///     tok,
 ///     A11y::new("tabs", Role::Tab),
 /// );
@@ -4295,6 +4696,7 @@ pub fn tab_bar<'a, M: Clone + 'a>(
     on_select: impl Fn(usize) -> M + Copy + 'a,
     on_close: impl Fn(usize) -> M + Copy + 'a,
     max_width: f32,
+    secondary: bool,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
@@ -4303,21 +4705,21 @@ pub fn tab_bar<'a, M: Clone + 'a>(
     for (i, title) in tabs.titles.iter().enumerate().take(visible) {
         let active = i == tabs.active;
         let badge = tabs.badges.get(i).filter(|s| !s.is_empty()).cloned();
-        let label_row = if let Some(b) = badge {
-            row![
-                text(title.clone()).size(typo::META),
-                self::badge(
-                    b,
-                    tok,
-                    Variant::Primary,
-                    A11y::new("tab-badge", Role::Status)
-                ),
-            ]
-            .spacing(6)
-            .align_y(Alignment::Center)
-        } else {
-            row![text(title.clone()).size(typo::META)].align_y(Alignment::Center)
-        };
+        let mut label_row = Row::new().spacing(6).align_y(Alignment::Center);
+        if let Some(Some(ic)) = tabs.icons.get(i) {
+            label_row = label_row.push(icon_svg(*ic, tok, A11y::new(title.clone(), Role::Image)));
+        }
+        label_row = label_row.push(text(title.clone()).size(typo::META));
+        if let Some(b) = badge {
+            label_row = label_row.push(self::badge(
+                b,
+                None,
+                tok,
+                Variant::Primary,
+                BadgeSize::Small,
+                A11y::new("tab-badge", Role::Status),
+            ));
+        }
         let mut tab = button(label_row)
             .padding([12, 16])
             .style(style::tab_style(tok, active));
@@ -4325,8 +4727,9 @@ pub fn tab_bar<'a, M: Clone + 'a>(
             tab = tab.on_press(on_select(i));
         }
         // Underbar only under this label: column Shrink → bar Fill of that width.
+        let bar_h = if secondary { 1.0 } else { 3.0 };
         let indicator = if active {
-            container(Space::new().height(3.0))
+            container(Space::new().height(bar_h))
                 .width(Length::Fill)
                 .style(move |_| style::tab_indicator(tok))
         } else {
@@ -4360,7 +4763,7 @@ pub fn tab_bar<'a, M: Clone + 'a>(
         r = r.push(themed_pick_list(
             hidden,
             None,
-            move |title: String| on_select(tab_overflow_index(&all, &title)),
+            tab_overflow_pick(all, on_select),
             tok,
             A11y::new("more-tabs", Role::ComboBox).with_disabled(a11y.disabled),
         ));
@@ -4457,7 +4860,7 @@ pub fn accordion_view<'a, M: Clone + 'a>(
             A11y::button(title.clone())
                 .with_checked(open)
                 .with_disabled(a11y.disabled),
-            pad(),
+            pad(tok),
         ));
         if open {
             col = col.push(
@@ -4634,6 +5037,7 @@ pub fn pagination<'a, M: Clone + 'a>(
                 a11y.apply_message((page > 0).then(|| on_page(page - 1))),
                 tok,
                 Variant::Quiet,
+                Icons::NONE,
                 A11y::button("Prev").with_disabled(a11y.disabled || page == 0),
             ),
             meta(status.clone(), tok, A11y::new(status, Role::Status)),
@@ -4642,6 +5046,7 @@ pub fn pagination<'a, M: Clone + 'a>(
                 a11y.apply_message((page + 1 < pages).then(|| on_page(page + 1))),
                 tok,
                 Variant::Quiet,
+                Icons::NONE,
                 A11y::button("Next").with_disabled(a11y.disabled || page + 1 >= pages),
             ),
         ]
@@ -4796,12 +5201,14 @@ mod tests {
         let snippet = Content::with_text("fn");
         let _: Element<'_, ()> = code_block(&snippet, |_| (), tok, role("fn", Role::Group));
         let _: Element<'_, ()> = hyperlink("l", (), tok, role("l", Role::Link));
-        let _: Element<'_, ()> = themed_button("B", Some(()), tok, Variant::Primary, btn("B"));
+        let _: Element<'_, ()> =
+            themed_button("B", Some(()), tok, Variant::Primary, Icons::NONE, btn("B"));
         let _: Element<'_, ()> = themed_button_sized(
             "7",
             Some(()),
             tok,
             Variant::Quiet,
+            Icons::NONE,
             Length::Fill,
             Length::Fixed(Density::default().tile() as f32),
             btn("7"),
@@ -4814,6 +5221,7 @@ mod tests {
             Some(()),
             tok,
             Variant::Quiet,
+            Icons::NONE,
             Length::Fill,
             Length::Fixed(48.0),
             glyph,
@@ -4823,20 +5231,38 @@ mod tests {
             None,
             tok,
             Variant::Danger,
+            Icons::NONE,
             btn("D").with_disabled(true),
         );
-        let _: Element<'_, i32> = split_button("S", 0, vec![("As…".into(), 1)], tok, btn("S"));
-        let _: Element<'_, i32> = split_button("S", 0, vec![], tok, btn("S").with_disabled(true));
+        let _: Element<'_, i32> =
+            split_button("S", 0, vec![("As…".into(), 1)], tok, Icons::NONE, btn("S"));
+        let _: Element<'_, i32> = split_button(
+            "S",
+            0,
+            vec![],
+            tok,
+            Icons::NONE,
+            btn("S").with_disabled(true),
+        );
         assert!((slider_step(0.0..=1.0) - 0.01).abs() < f32::EPSILON);
         assert!(slider_step(0.0..=1.0) < 1.0);
         assert!((slider_step(10.0..=10.0) - f32::EPSILON).abs() < 1e-12);
-        let _: Element<'_, ()> = toggle_button("T", true, (), tok, btn("T").with_checked(true));
-        let _: Element<'_, ()> = toggle_button("T", false, (), tok, btn("T").with_checked(false));
+        let _: Element<'_, ()> =
+            toggle_button("T", true, (), tok, Icons::NONE, btn("T").with_checked(true));
+        let _: Element<'_, ()> = toggle_button(
+            "T",
+            false,
+            (),
+            tok,
+            Icons::NONE,
+            btn("T").with_checked(false),
+        );
         let _: Element<'_, ()> = toggle_button(
             "T",
             true,
             (),
             tok,
+            Icons::NONE,
             btn("T").with_checked(true).with_disabled(true),
         );
         let _: Element<'_, ()> = themed_checkbox(
@@ -4964,15 +5390,10 @@ mod tests {
             tok,
             role("tri-d", Role::Checkbox).with_disabled(true),
         );
+        let _: Element<'_, ()> =
+            segmented_button(["A", "B"], 1, |_| (), tok, role("seg", Role::Group));
         let _: Element<'_, ()> = segmented_button(
-            &["A".into(), "B".into()],
-            1,
-            |_| (),
-            tok,
-            role("seg", Role::Group),
-        );
-        let _: Element<'_, ()> = segmented_button(
-            &["A".into()],
+            ["A"],
             0,
             |_| (),
             tok,
@@ -4983,6 +5404,7 @@ mod tests {
             Some(()),
             tok,
             Variant::Ghost,
+            ControlSize::Default,
             A11y::button("s"),
         );
         let _: Element<'_, ()> = icon_button(
@@ -4990,9 +5412,19 @@ mod tests {
             None,
             tok,
             Variant::Quiet,
+            ControlSize::Default,
             A11y::button("c").with_disabled(true),
         );
-        let field = themed_text_input("x", "", |_| (), None, tok, role("f", Role::TextBox), None);
+        let field = themed_text_input(
+            "x",
+            "",
+            |_| (),
+            None,
+            FieldOpts::NONE,
+            tok,
+            role("f", Role::TextBox),
+            None,
+        );
         let _: Element<'_, ()> = field_support(
             field,
             Some("help"),
@@ -5000,11 +5432,28 @@ mod tests {
             tok,
             role("fs", Role::Group),
         );
-        let field2 =
-            themed_text_input("y", "v", |_| (), None, tok, role("f2", Role::TextBox), None);
+        let field2 = themed_text_input(
+            "y",
+            "v",
+            |_| (),
+            None,
+            FieldOpts::NONE,
+            tok,
+            role("f2", Role::TextBox),
+            None,
+        );
         let _: Element<'_, ()> =
             field_support(field2, Some("only"), None, tok, role("fs2", Role::Group));
-        let field3 = themed_text_input("z", "", |_| (), None, tok, role("f3", Role::TextBox), None);
+        let field3 = themed_text_input(
+            "z",
+            "",
+            |_| (),
+            None,
+            FieldOpts::NONE,
+            tok,
+            role("f3", Role::TextBox),
+            None,
+        );
         let _: Element<'_, ()> = field_support(field3, None, None, tok, role("fs3", Role::Group));
         let _: Element<'_, ()> = filter_chips(
             &["a".into(), "b".into()],
@@ -5056,6 +5505,7 @@ mod tests {
             0.2,
             None,
             None,
+            false,
             tok,
             role("p", Role::Progress).with_value("0.2"),
         );
@@ -5063,6 +5513,7 @@ mod tests {
             0.5,
             Some(0.8),
             Some("50% · 1 min"),
+            false,
             tok,
             role("pc", Role::Progress).with_value("0.5"),
         );
@@ -5123,9 +5574,17 @@ mod tests {
         assert!(ring_should_stroke(0.0, 1.0));
         assert!(!ring_should_stroke(0.0, 0.0));
         let a11y = A11y::button("Nope").with_disabled(true);
-        let _: Element<'_, ()> = themed_button("Nope", Some(()), tok, Variant::Primary, a11y);
+        let _: Element<'_, ()> =
+            themed_button("Nope", Some(()), tok, Variant::Primary, Icons::NONE, a11y);
         let unnamed = A11y::button("");
-        let _: Element<'_, ()> = themed_button("Shown", Some(()), tok, Variant::Primary, unnamed);
+        let _: Element<'_, ()> = themed_button(
+            "Shown",
+            Some(()),
+            tok,
+            Variant::Primary,
+            Icons::NONE,
+            unnamed,
+        );
         let unnamed_c = A11y::new("", Role::Checkbox);
         let _: Element<'_, ()> = themed_checkbox("box", true, |_| (), tok, unnamed_c);
         let ca = A11y::new("off", Role::Checkbox)
@@ -5143,6 +5602,7 @@ mod tests {
             "v",
             |_| (),
             Some(()),
+            FieldOpts::NONE,
             tok,
             role("v", Role::TextBox),
             Some(Id::new("name")),
@@ -5152,6 +5612,7 @@ mod tests {
             "",
             |_| (),
             None,
+            FieldOpts::NONE,
             tok,
             role("Name", Role::TextBox),
             None,
@@ -5161,6 +5622,7 @@ mod tests {
             "",
             |_| (),
             Some(()),
+            FieldOpts::NONE,
             tok,
             role("Name", Role::TextBox).with_disabled(true),
             None,
@@ -5286,22 +5748,18 @@ mod tests {
             role("find-off", Role::Group).with_disabled(true),
         );
         draw_once(&mut disabled_hits);
-        let mut group: Element<'_, usize> = button_group(
-            &["Cut".into(), "Copy".into()],
-            |i| i,
-            tok,
-            role("edit", Role::Group),
-        );
+        let mut group: Element<'_, usize> =
+            button_group(["Cut", "Copy"], |i| i, tok, role("edit", Role::Group));
         draw_once(&mut group);
         let mut group_off: Element<'_, usize> = button_group(
-            &["Cut".into()],
+            ["Cut"],
             |i| i,
             tok,
             role("edit-off", Role::Group).with_disabled(true),
         );
         draw_once(&mut group_off);
         let _: Element<'_, usize> = button_group(
-            &[],
+            std::iter::empty::<Cell>(),
             |i| i,
             tok,
             role("edit-empty", Role::Group).with_disabled(true),
@@ -5310,6 +5768,8 @@ mod tests {
             label("Save", tok, role("Save", Role::Header)),
             "Save",
             "Write the buffer.",
+            None,
+            TooltipAnchor::Follow,
             tok,
             role("tip", Role::Tooltip),
         );
@@ -5318,6 +5778,8 @@ mod tests {
             label("x", tok, role("x", Role::Header)),
             "",
             "",
+            None,
+            TooltipAnchor::Follow,
             tok,
             role("tip-empty", Role::Tooltip),
         );
@@ -5415,29 +5877,143 @@ mod tests {
         let _: Element<'_, ()> = tooltip_wrap(
             label("x", tok, role("x", Role::Header)),
             "tip",
+            TooltipAnchor::Follow,
             tok,
             role("tip", Role::Tooltip),
         );
         let _: Element<'_, ()> = rule_h(tok, role("rule", Role::Separator));
         let _: Element<'_, ()> = dismiss_button((), tok, btn("dismiss"));
-        let _: Element<'_, ()> = chip("c", None, Some(()), tok, Variant::Quiet, btn("c"));
-        let _: Element<'_, ()> = chip("plain", None, None, tok, Variant::Primary, btn("plain"));
-        let _: Element<'_, ()> = chip("hot", None, Some(()), tok, Variant::Danger, btn("hot"));
-        let _: Element<'_, ()> = chip("g", None, None, tok, Variant::Ghost, btn("g"));
-        let _: Element<'_, ()> = chip("k", Some(()), None, tok, Variant::Chip, btn("k"));
-        let _: Element<'_, ()> = chip("ok", None, None, tok, Variant::Success, btn("ok"));
-        let _: Element<'_, ()> = chip("warn", None, None, tok, Variant::Warning, btn("warn"));
-        let _: Element<'_, ()> = badge("b", tok, Variant::Quiet, role("b", Role::Status));
-        let _: Element<'_, ()> = badge("new", tok, Variant::Primary, role("new", Role::Status));
-        let _: Element<'_, ()> = badge("!", tok, Variant::Danger, role("bang", Role::Status));
-        let _: Element<'_, ()> = badge("g", tok, Variant::Ghost, role("g", Role::Status));
-        let _: Element<'_, ()> = badge("chip", tok, Variant::Chip, role("chip", Role::Status));
-        let _: Element<'_, ()> = badge("ok", tok, Variant::Success, role("ok", Role::Status));
-        let _: Element<'_, ()> = badge("warn", tok, Variant::Warning, role("warn", Role::Status));
+        let _: Element<'_, ()> = chip(
+            "c",
+            None,
+            Some(()),
+            tok,
+            Variant::Quiet,
+            ChipKind::Assist,
+            Icons::NONE,
+            btn("c"),
+        );
+        let _: Element<'_, ()> = chip(
+            "plain",
+            None,
+            None,
+            tok,
+            Variant::Primary,
+            ChipKind::Assist,
+            Icons::NONE,
+            btn("plain"),
+        );
+        let _: Element<'_, ()> = chip(
+            "hot",
+            None,
+            Some(()),
+            tok,
+            Variant::Danger,
+            ChipKind::Assist,
+            Icons::NONE,
+            btn("hot"),
+        );
+        let _: Element<'_, ()> = chip(
+            "g",
+            None,
+            None,
+            tok,
+            Variant::Ghost,
+            ChipKind::Assist,
+            Icons::NONE,
+            btn("g"),
+        );
+        let _: Element<'_, ()> = chip(
+            "k",
+            Some(()),
+            None,
+            tok,
+            Variant::Chip,
+            ChipKind::Assist,
+            Icons::NONE,
+            btn("k"),
+        );
+        let _: Element<'_, ()> = chip(
+            "ok",
+            None,
+            None,
+            tok,
+            Variant::Success,
+            ChipKind::Assist,
+            Icons::NONE,
+            btn("ok"),
+        );
+        let _: Element<'_, ()> = chip(
+            "warn",
+            None,
+            None,
+            tok,
+            Variant::Warning,
+            ChipKind::Assist,
+            Icons::NONE,
+            btn("warn"),
+        );
+        let _: Element<'_, ()> = badge(
+            "b",
+            None,
+            tok,
+            Variant::Quiet,
+            BadgeSize::Large,
+            role("b", Role::Status),
+        );
+        let _: Element<'_, ()> = badge(
+            "new",
+            None,
+            tok,
+            Variant::Primary,
+            BadgeSize::Large,
+            role("new", Role::Status),
+        );
+        let _: Element<'_, ()> = badge(
+            "!",
+            None,
+            tok,
+            Variant::Danger,
+            BadgeSize::Large,
+            role("bang", Role::Status),
+        );
+        let _: Element<'_, ()> = badge(
+            "g",
+            None,
+            tok,
+            Variant::Ghost,
+            BadgeSize::Large,
+            role("g", Role::Status),
+        );
+        let _: Element<'_, ()> = badge(
+            "chip",
+            None,
+            tok,
+            Variant::Chip,
+            BadgeSize::Large,
+            role("chip", Role::Status),
+        );
+        let _: Element<'_, ()> = badge(
+            "ok",
+            None,
+            tok,
+            Variant::Success,
+            BadgeSize::Large,
+            role("ok", Role::Status),
+        );
+        let _: Element<'_, ()> = badge(
+            "warn",
+            None,
+            tok,
+            Variant::Warning,
+            BadgeSize::Large,
+            role("warn", Role::Status),
+        );
         let _: Element<'_, ()> = group_box(
             "g",
             label("x", tok, role("x", Role::Header)),
             tok,
+            CardFace::Elevated,
             role("g", Role::Group),
         );
         let _: Element<'_, ()> = banner("b", Some(("go".into(), ())), tok, role("b", Role::Status));
@@ -5654,14 +6230,22 @@ mod tests {
         );
         let mut tabs = Tabs::new(["A", "B"]);
         tabs.closable = true;
-        let _: Element<'_, ()> =
-            tab_bar(&tabs, |_| (), |_| (), 120.0, tok, role("tabs", Role::Tab));
+        let _: Element<'_, ()> = tab_bar(
+            &tabs,
+            |_| (),
+            |_| (),
+            120.0,
+            false,
+            tok,
+            role("tabs", Role::Tab),
+        );
         let open_tabs = Tabs::new(["A"]);
         let _: Element<'_, ()> = tab_bar(
             &open_tabs,
             |_| (),
             |_| (),
             0.0,
+            false,
             tok,
             role("tabs", Role::Tab),
         );
@@ -5845,10 +6429,24 @@ mod tests {
         let tok = named("dark").tokens;
         let btn = |n: &str| A11y::button(n);
         let max = iced::Size::new(800.0, 400.0);
-        let mut labeled = themed_button("Save", Some(()), tok, Variant::Primary, btn("Save"));
-        let mut split = split_button("Save", 0, vec![("As…".into(), 1)], tok, btn("Save"));
+        let mut labeled = themed_button(
+            "Save",
+            Some(()),
+            tok,
+            Variant::Primary,
+            Icons::NONE,
+            btn("Save"),
+        );
+        let mut split = split_button(
+            "Save",
+            0,
+            vec![("As…".into(), 1)],
+            tok,
+            Icons::NONE,
+            btn("Save"),
+        );
         let mut segmented = segmented_button(
-            &["Day".into(), "Week".into(), "Month".into()],
+            ["Day", "Week", "Month"],
             0,
             |i| i,
             tok,
@@ -5857,14 +6455,293 @@ mod tests {
         let labeled_h = layout_size(&mut labeled, max).height;
         let split_h = layout_size(&mut split, max).height;
         let segmented_h = layout_size(&mut segmented, max).height;
-        assert_eq!(
-            split_h, labeled_h,
-            "split_button height {split_h} != themed_button {labeled_h}"
+        assert_eq!(split_h, labeled_h);
+        assert_eq!(segmented_h, labeled_h);
+    }
+
+    #[test]
+    fn material_knobs_draw_disabled_empty_and_outlined() {
+        let compact = named("dark")
+            .tokens
+            .with_density(crate::density::Density::named(
+                crate::density::DensityName::Compact,
+            ));
+        let tok = named("dark").tokens;
+        let btn = |n: &str| A11y::button(n);
+        let role = |n: &str, r: Role| A11y::new(n, r);
+        let _ = Cell::from(String::from("X"));
+        let _ = Cell::from(&String::from("Y"));
+        let mut filled = themed_button(
+            "Save",
+            Some(()),
+            tok,
+            Variant::Primary,
+            Icons::both(Icon::Check, Icon::Chevron),
+            btn("Save"),
         );
-        assert_eq!(
-            segmented_h, labeled_h,
-            "segmented_button height {segmented_h} != themed_button {labeled_h}"
+        draw_once(&mut filled);
+        let mut outlined = themed_button(
+            "Edit",
+            None::<()>,
+            compact,
+            Variant::Outlined,
+            Icons::NONE,
+            btn("Edit").with_disabled(true),
         );
+        draw_once(&mut outlined);
+        let mut elevated = themed_button(
+            "Open",
+            Some(()),
+            tok,
+            Variant::Elevated,
+            Icons::NONE,
+            btn("Open"),
+        );
+        draw_once(&mut elevated);
+        let mut toggle_ic = icon_button_toggle(
+            Icon::Check,
+            true,
+            (),
+            tok,
+            Variant::Primary,
+            ControlSize::Comfortable,
+            btn("Bold").with_checked(true),
+        );
+        let mut off_ic = icon_button_toggle(
+            Icon::Menu,
+            false,
+            (),
+            compact,
+            Variant::Quiet,
+            ControlSize::Default,
+            btn("Off").with_checked(false).with_disabled(true),
+        );
+        draw_once(&mut off_ic);
+        draw_once(&mut toggle_ic);
+        let mut cells = segmented_button(
+            [Cell::new("Day").with_icon(Icon::Search), Cell::new("Week")],
+            0,
+            |i| i,
+            tok,
+            role("seg", Role::Group),
+        );
+        draw_once(&mut cells);
+        let opts = FieldOpts {
+            face: FieldFace::Outlined,
+            icons: Icons::both(Icon::Search, Icon::Close),
+            label: "Find",
+            max_len: Some(8),
+        };
+        let mut field = themed_text_input(
+            "q",
+            "hi",
+            |_| (),
+            None,
+            opts,
+            tok,
+            role("q", Role::TextBox),
+            None,
+        );
+        draw_once(&mut field);
+        let empty_opts = FieldOpts {
+            face: FieldFace::Filled,
+            icons: Icons::NONE,
+            label: "Name",
+            max_len: Some(4),
+        };
+        let mut empty = themed_text_input(
+            "Name",
+            "",
+            |_| (),
+            None,
+            empty_opts,
+            compact,
+            role("n", Role::TextBox).with_disabled(true),
+            None,
+        );
+        draw_once(&mut empty);
+        let mut vert = themed_slider(
+            0.0..=1.0,
+            0.3,
+            |_| (),
+            SliderMarks {
+                vertical: true,
+                thumb: "30%",
+                ..SliderMarks::NONE
+            },
+            tok,
+            role("v", Role::Slider),
+        );
+        draw_once(&mut vert);
+        let mut vert_off = themed_slider(
+            0.0..=1.0,
+            0.0,
+            |_| (),
+            SliderMarks {
+                vertical: true,
+                ..SliderMarks::NONE
+            },
+            tok,
+            role("vd", Role::Slider).with_disabled(true),
+        );
+        draw_once(&mut vert_off);
+        let mut tip_b: Element<'_, ()> = tooltip_wrap(
+            label("H", tok, role("Hb", Role::Header)),
+            "tip",
+            TooltipAnchor::Bottom,
+            tok,
+            role("tb", Role::Tooltip),
+        );
+        draw_once(&mut tip_b);
+        let mut tip_s: Element<'_, ()> = tooltip_wrap(
+            label("H", tok, role("Hs", Role::Header)),
+            "tip",
+            TooltipAnchor::Start,
+            tok,
+            role("ts", Role::Tooltip),
+        );
+        draw_once(&mut tip_s);
+        let mut filled_card: Element<'_, ()> = group_box(
+            "F",
+            label("x", tok, role("xf", Role::Status)),
+            tok,
+            CardFace::Filled,
+            role("cf", Role::Group),
+        );
+        draw_once(&mut filled_card);
+        let mut suggest = chip(
+            "go",
+            Some(()),
+            None,
+            tok,
+            Variant::Primary,
+            ChipKind::Suggestion,
+            Icons::trailing(Icon::Chevron),
+            btn("go"),
+        );
+        draw_once(&mut suggest);
+        let mut tabs = crate::collection::Tabs::new(["A", "B"]).with_icon(0, Icon::Search);
+        tabs.closable = true;
+        let mut strip = tab_bar(
+            &tabs,
+            |i| i,
+            |_| 0,
+            480.0,
+            true,
+            tok,
+            role("tabs", Role::Tab),
+        );
+        draw_once(&mut strip);
+        tabs.select(1);
+        let _ = tabs.close(0);
+        let mut busy: Element<'_, ()> = progress(
+            0.2,
+            None,
+            Some("wait"),
+            true,
+            tok,
+            role("p", Role::Progress),
+        );
+        draw_once(&mut busy);
+        let mut card: Element<'_, ()> = group_box(
+            "Box",
+            label("x", tok, role("x", Role::Status)),
+            tok,
+            CardFace::Outlined,
+            role("c", Role::Group),
+        );
+        draw_once(&mut card);
+        let mut mark: Element<'_, ()> = badge(
+            "9",
+            Some(icon_svg(Icon::Menu, tok, role("i", Role::Image))),
+            tok,
+            Variant::Primary,
+            BadgeSize::Small,
+            role("b", Role::Status),
+        );
+        draw_once(&mut mark);
+        let mut tip: Element<'_, ()> = tooltip_rich(
+            label("H", tok, role("H", Role::Header)),
+            "Save",
+            "Write.",
+            Some(("More".into(), ())),
+            TooltipAnchor::Top,
+            tok,
+            role("t", Role::Tooltip),
+        );
+        draw_once(&mut tip);
+        let mut input_chip = chip(
+            "tag",
+            None,
+            Some(()),
+            tok,
+            Variant::Quiet,
+            ChipKind::Input,
+            Icons::leading(Icon::Close),
+            btn("tag"),
+        );
+        draw_once(&mut input_chip);
+        let mut filter_out = chip(
+            "f",
+            Some(()),
+            None,
+            tok,
+            Variant::Outlined,
+            ChipKind::Filter,
+            Icons::NONE,
+            btn("f"),
+        );
+        draw_once(&mut filter_out);
+        let mut filter_el = chip(
+            "e",
+            Some(()),
+            None,
+            tok,
+            Variant::Elevated,
+            ChipKind::Filter,
+            Icons::NONE,
+            btn("e"),
+        );
+        draw_once(&mut filter_el);
+        let mut ic_def = icon_button(
+            Icon::Search,
+            Some(()),
+            tok,
+            Variant::Ghost,
+            ControlSize::Default,
+            btn("s"),
+        );
+        draw_once(&mut ic_def);
+        assert!(compact.density.pad < tok.density.pad);
+        assert_eq!(ControlSize::Compact.pad(), 4);
+        assert_eq!(ControlSize::Default.pad(), 8);
+        assert_eq!(ControlSize::Comfortable.pad(), 12);
+        assert_eq!(
+            TooltipAnchor::Follow.position(),
+            tooltip::Position::FollowCursor
+        );
+        assert_eq!(TooltipAnchor::Top.position(), tooltip::Position::Top);
+        assert_eq!(TooltipAnchor::Bottom.position(), tooltip::Position::Bottom);
+        assert_eq!(TooltipAnchor::Start.position(), tooltip::Position::Left);
+        assert_eq!(FieldFace::default(), FieldFace::Filled);
+        assert_eq!(CardFace::default(), CardFace::Elevated);
+        assert_eq!(BadgeSize::default(), BadgeSize::Large);
+        assert_eq!(ChipKind::default(), ChipKind::Assist);
+        assert_eq!(TooltipAnchor::default(), TooltipAnchor::Follow);
+        assert_eq!(ControlSize::default(), ControlSize::Default);
+        let comfy = tok.with_density(crate::density::Density::named(
+            crate::density::DensityName::Comfortable,
+        ));
+        assert!(comfy.density.pad > tok.density.pad);
+        let mut comfy_btn = themed_button(
+            "Wide",
+            Some(()),
+            comfy,
+            Variant::Primary,
+            Icons::NONE,
+            btn("Wide"),
+        );
+        draw_once(&mut comfy_btn);
     }
 
     #[test]
@@ -5925,19 +6802,46 @@ mod tests {
                 crate::layout::FILL,
                 role("code", Role::Group),
             ),
-            chip("ok", None, None, tok, Variant::Success, btn("ok")),
-            chip("x", None, Some(()), tok, Variant::Quiet, btn("x")),
+            chip(
+                "ok",
+                None,
+                None,
+                tok,
+                Variant::Success,
+                ChipKind::Assist,
+                Icons::NONE,
+                btn("ok"),
+            ),
+            chip(
+                "x",
+                None,
+                Some(()),
+                tok,
+                Variant::Quiet,
+                ChipKind::Assist,
+                Icons::NONE,
+                btn("x"),
+            ),
             tooltip_wrap(
                 label("n", tok, role("n", Role::Status)),
                 "tip",
+                TooltipAnchor::Follow,
                 tok,
                 role("tt", Role::Tooltip),
             ),
-            badge("ok", tok, Variant::Success, role("ok", Role::Status)),
+            badge(
+                "ok",
+                None,
+                tok,
+                Variant::Success,
+                BadgeSize::Large,
+                role("ok", Role::Status),
+            ),
             group_box(
                 "Box",
                 label("in", tok, role("in", Role::Status)),
                 tok,
+                CardFace::Elevated,
                 role("box", Role::Group),
             ),
             banner("Hi", None, tok, role("ban", Role::Status)),
@@ -6502,7 +7406,11 @@ mod tests {
             |_| (),
             None,
             tok,
-            |_| label("x", tok, A11y::new("x", Role::ListItem)),
+            {
+                let paint = |_: usize| label("x", tok, A11y::new("x", Role::ListItem));
+                let _ = paint(0);
+                paint
+            },
             A11y::new("vc0", Role::List),
         );
         draw_once(&mut empty);
@@ -6668,6 +7576,7 @@ mod tests {
                 ticks: 3,
                 min: "lo",
                 max: "hi",
+                ..SliderMarks::NONE
             },
             tok,
             A11y::new("ticked", Role::Slider),
@@ -6684,20 +7593,42 @@ mod tests {
             0.3,
             Some(0.6),
             Some("30% · 4s"),
+            false,
             tok,
             A11y::new("buf", Role::Progress),
         );
         draw_once(&mut buf);
-        let mut zero: Element<'_, ()> =
-            progress(0.0, Some(0.0), None, tok, A11y::new("zero", Role::Progress));
+        let mut zero: Element<'_, ()> = progress(
+            0.0,
+            Some(0.0),
+            None,
+            false,
+            tok,
+            A11y::new("zero", Role::Progress),
+        );
         draw_once(&mut zero);
         let tabs = Tabs::new(["A", "B", "C", "D", "E"]).with_badge(0, "2");
-        let mut ov: Element<'_, usize> =
-            tab_bar(&tabs, |i| i, |_| 0, 80.0, tok, A11y::new("ov", Role::Tab));
+        let mut ov: Element<'_, usize> = tab_bar(
+            &tabs,
+            |i| i,
+            |_| 0,
+            80.0,
+            false,
+            tok,
+            A11y::new("ov", Role::Tab),
+        );
         draw_once(&mut ov);
-        let _: Element<'_, usize> =
-            tab_bar(&tabs, |i| i, |_| 0, 0.0, tok, A11y::new("all", Role::Tab));
+        let _: Element<'_, usize> = tab_bar(
+            &tabs,
+            |i| i,
+            |_| 0,
+            0.0,
+            false,
+            tok,
+            A11y::new("all", Role::Tab),
+        );
         assert_eq!(tab_overflow_index(&tabs.titles, "C"), 2);
+        assert_eq!(tab_overflow_pick(tabs.titles.clone(), |i| i)("C".into()), 2);
         assert_eq!(tab_overflow_index(&tabs.titles, "nope"), 0);
         assert_eq!(tab_visible_count(&[], 100.0), 0);
         assert_eq!(tab_visible_count(&tabs.titles, 0.0), 5);
@@ -7638,6 +8569,7 @@ mod tests {
                 ticks: 4,
                 min: "0",
                 max: "1",
+                ..SliderMarks::NONE
             },
             tok,
             A11y::new("vol", Role::Slider).with_disabled(true),

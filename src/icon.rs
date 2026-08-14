@@ -78,6 +78,41 @@ impl Icon {
     }
 }
 
+/// Optional leading and trailing chrome icons on a labeled control.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Icons {
+    pub leading: Option<Icon>,
+    pub trailing: Option<Icon>,
+}
+
+impl Icons {
+    pub const NONE: Self = Self {
+        leading: None,
+        trailing: None,
+    };
+
+    pub fn leading(icon: Icon) -> Self {
+        Self {
+            leading: Some(icon),
+            trailing: None,
+        }
+    }
+
+    pub fn trailing(icon: Icon) -> Self {
+        Self {
+            leading: None,
+            trailing: Some(icon),
+        }
+    }
+
+    pub fn both(leading: Icon, trailing: Icon) -> Self {
+        Self {
+            leading: Some(leading),
+            trailing: Some(trailing),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -86,20 +121,17 @@ mod tests {
     fn every_icon_has_svg_and_roundtrips() {
         for icon in Icon::ALL {
             let s = icon.svg();
-            assert!(s.contains("<svg"), "{}", icon.slug());
-            assert!(
-                s.contains("fill=\"#000\""),
-                "{} must use black fill for iced recolor on all hosts",
-                icon.slug()
-            );
-            assert!(
-                !s.contains("currentColor"),
-                "{} must not rely on currentColor (blank on macOS Metal)",
-                icon.slug()
-            );
+            assert!(s.contains("<svg"));
+            assert!(s.contains("fill=\"#000\""));
+            assert!(!s.contains("currentColor"));
             assert_eq!(Icon::from_slug(icon.slug()), Some(icon));
             assert_eq!(icon.bytes(), s.as_bytes());
         }
         assert!(Icon::from_slug("nope").is_none());
+        assert_eq!(Icons::trailing(Icon::Close).trailing, Some(Icon::Close));
+        assert_eq!(
+            Icons::both(Icon::Search, Icon::Menu).leading,
+            Some(Icon::Search)
+        );
     }
 }

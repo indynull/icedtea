@@ -15,7 +15,8 @@ Constructor: [`pattern::dialog_sheet`](https://docs.rs/icedtea/latest/icedtea/pa
 [source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Primary and optional cancel messages. Native file dialogs go through
+Primary and optional cancel, plus extra actions and an optional header
+icon. Native file dialogs go through
 `icedtea::native_dialog`. In-window modals sit on `pattern::modal_card`.
 
 ### List/detail
@@ -87,8 +88,9 @@ Constructor: [`pattern::nav_rail`](https://docs.rs/icedtea/latest/icedtea/patter
 [icedtea](https://crates.io/crates/icedtea)
 
 Selected row uses the rail wash. Press emits the destination index.
-`expanded` is the wide labeled rail; compact shows the first letter
-in a 72 px column. Empty items paint an empty column.
+`RailDest` carries an optional icon and badge. `expanded` is the wide
+labeled rail; compact shows the icon or the first letter in a 72 px
+column. Empty items paint an empty column.
 
 ### Navigation view
 

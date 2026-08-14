@@ -8,12 +8,10 @@ use iced::keyboard::{key::Named, Key, Modifiers};
 
 /// Command on macOS, Control on Linux and Windows.
 pub fn primary() -> Modifiers {
-    let logo = Modifiers::LOGO;
-    let ctrl = Modifiers::CTRL;
     if cfg!(target_os = "macos") {
-        logo
+        Modifiers::LOGO
     } else {
-        ctrl
+        Modifiers::CTRL
     }
 }
 

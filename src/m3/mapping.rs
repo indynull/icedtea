@@ -42,6 +42,11 @@ pub const MAP: &[MapRow] = &[
         fate: Fate::Map,
     },
     MapRow {
+        id: "toggle-icon-button",
+        m3: "Icon button (toggle)",
+        fate: Fate::Map,
+    },
+    MapRow {
         id: "split-button",
         m3: "Button (split)",
         fate: Fate::Map,

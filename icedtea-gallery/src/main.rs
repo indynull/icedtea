@@ -20,15 +20,19 @@ use icedtea::key::KeyContext;
 use icedtea::layout;
 use icedtea::layout::{Axis, PointerDrive, SashDrag, SashEvent, SplitState};
 
+use icedtea::icon::Icons;
 use icedtea::nav::NavStack;
 use icedtea::palette::CommandPalette;
-use icedtea::pattern::{self, PrefGroup};
+use icedtea::pattern::{self, PrefGroup, RailDest};
 use icedtea::shortcut::Shortcut;
 use icedtea::theme::{self, Appearance, OsChrome, ThemeCatalog, Tokens};
 use icedtea::toast::{ToastKind, ToastQueue};
 use icedtea::variant::Variant;
 use icedtea::widget;
-use icedtea::widget::{DateValue, MarkdownDoc, TimeClock, TimeField, TimeValue};
+use icedtea::widget::{
+    BadgeSize, CardFace, Cell, ChipKind, ControlSize, DateValue, MarkdownDoc, TimeClock, TimeField,
+    TimeValue,
+};
 use icedtea::{Boot, Element, Task};
 use samples::CodeLang;
 
@@ -659,6 +663,7 @@ enum Message {
     Folder,
     ConfirmSave,
     ConfirmCancel,
+    ConfirmDiscard,
     PaletteQuery(String),
     PalettePick(usize),
     PalettePrompt(String),
@@ -862,7 +867,9 @@ impl Gallery {
         let tokens = theme::named("dark").tokens;
         let mut tabs = Tabs::new(["Notes", "Guide", "Changelog", "Archive", "Drafts"])
             .with_badge(0, "2")
-            .with_badge(1, "9");
+            .with_badge(1, "9")
+            .with_icon(0, icedtea::icon::Icon::Search)
+            .with_icon(1, icedtea::icon::Icon::Menu);
         tabs.closable = true;
         let mut actions = ActionTable::new();
         actions.insert(
@@ -1903,6 +1910,9 @@ impl Gallery {
             Message::ConfirmCancel => {
                 self.dialog_note = "Save cancelled".into();
             }
+            Message::ConfirmDiscard => {
+                self.dialog_note = "Discarded notes.txt".into();
+            }
             Message::PaletteQuery(q) => {
                 self.palette.set_query(&self.actions, q);
                 self.palette_focus = true;
@@ -2427,6 +2437,7 @@ impl Gallery {
                         Some(Message::Note(format!("{v:?}"))),
                         tok,
                         v,
+                        Icons::NONE,
                         btn(&format!("{v:?}")),
                     ));
                 }
@@ -2438,10 +2449,32 @@ impl Gallery {
                         None,
                         tok,
                         v,
+                        Icons::NONE,
                         btn(&format!("{v:?}")).with_disabled(true),
                     ));
                 }
                 col = col.push(row_off);
+                col = col.push(
+                    row![
+                        widget::themed_button(
+                            "Open",
+                            Some(Message::Note("Open".into())),
+                            tok,
+                            Variant::Primary,
+                            Icons::leading(icedtea::icon::Icon::Search),
+                            btn("Open"),
+                        ),
+                        widget::themed_button(
+                            "More",
+                            Some(Message::Note("More".into())),
+                            tok,
+                            Variant::Outlined,
+                            Icons::trailing(icedtea::icon::Icon::Chevron),
+                            btn("More"),
+                        ),
+                    ]
+                    .spacing(8),
+                );
                 col.into()
             }
             "split-button" => column![
@@ -2459,6 +2492,7 @@ impl Gallery {
                             ("Export…".into(), Message::Note("Export…".into())),
                         ],
                         tok,
+                        Icons::leading(icedtea::icon::Icon::Check),
                         btn("Save"),
                     ),
                     widget::split_button(
@@ -2469,6 +2503,7 @@ impl Gallery {
                             ("Export…".into(), Message::Note("Export…".into())),
                         ],
                         tok,
+                        Icons::NONE,
                         btn("Save off").with_disabled(true),
                     ),
                 ]
@@ -2488,6 +2523,7 @@ impl Gallery {
                         self.checked,
                         Message::Check(!self.checked),
                         tok,
+                        Icons::NONE,
                         btn("Bold").with_checked(self.checked),
                     ),
                     widget::toggle_button(
@@ -2495,6 +2531,7 @@ impl Gallery {
                         false,
                         Message::Toggle(!self.checked),
                         tok,
+                        Icons::NONE,
                         btn("Italic").with_checked(false),
                     ),
                     widget::toggle_button(
@@ -2502,6 +2539,7 @@ impl Gallery {
                         true,
                         Message::Nop,
                         tok,
+                        Icons::NONE,
                         btn("Strike").with_checked(true).with_disabled(true),
                     ),
                 ]
@@ -2615,9 +2653,23 @@ impl Gallery {
                         ticks: 5,
                         min: "0",
                         max: "1",
+                        thumb: "now",
+                        ..widget::SliderMarks::NONE
                     },
                     tok,
                     named("value", Role::Slider).with_value(self.value.to_string()),
+                ),
+                widget::themed_slider(
+                    0.0..=1.0,
+                    self.value,
+                    Message::Slide,
+                    widget::SliderMarks {
+                        vertical: true,
+                        thumb: "vol",
+                        ..widget::SliderMarks::NONE
+                    },
+                    tok,
+                    named("vert", Role::Slider).with_value(self.value.to_string()),
                 ),
                 widget::meta(
                     widget::progress_label(self.value, None),
@@ -2636,14 +2688,22 @@ impl Gallery {
                 named("range", Role::Slider),
             ),
             "segmented-button" => widget::segmented_button(
-                &["Day".into(), "Week".into(), "Month".into()],
+                [
+                    Cell::new("Day").with_icon(icedtea::icon::Icon::Search),
+                    Cell::from("Week"),
+                    Cell::from("Month"),
+                ],
                 self.segment,
                 Message::Segment,
                 tok,
                 named("segment", Role::Group),
             ),
             "button-group" => widget::button_group(
-                &["Cut".into(), "Copy".into(), "Paste".into()],
+                [
+                    Cell::new("Cut").with_icon(icedtea::icon::Icon::Close),
+                    Cell::from("Copy"),
+                    Cell::from("Paste"),
+                ],
                 Message::GroupPress,
                 tok,
                 named("edit", Role::Group),
@@ -2654,6 +2714,7 @@ impl Gallery {
                     Some(Message::Note("search".into())),
                     tok,
                     Variant::Ghost,
+                    widget::ControlSize::Default,
                     btn("Search"),
                 ),
                 widget::icon_button(
@@ -2661,6 +2722,7 @@ impl Gallery {
                     Some(Message::Note("menu".into())),
                     tok,
                     Variant::Quiet,
+                    widget::ControlSize::Default,
                     btn("Menu"),
                 ),
                 widget::icon_button(
@@ -2668,7 +2730,30 @@ impl Gallery {
                     None,
                     tok,
                     Variant::Ghost,
+                    widget::ControlSize::Default,
                     btn("Close").with_disabled(true),
+                ),
+            ]
+            .spacing(8)
+            .into(),
+            "toggle-icon-button" => row![
+                widget::icon_button_toggle(
+                    icedtea::icon::Icon::Check,
+                    self.checked,
+                    Message::Check(!self.checked),
+                    tok,
+                    Variant::Primary,
+                    ControlSize::Default,
+                    btn("Bold").with_checked(self.checked),
+                ),
+                widget::icon_button_toggle(
+                    icedtea::icon::Icon::Menu,
+                    false,
+                    Message::Nop,
+                    tok,
+                    Variant::Quiet,
+                    ControlSize::Compact,
+                    btn("Menu").with_checked(false).with_disabled(true),
                 ),
             ]
             .spacing(8)
@@ -2682,13 +2767,26 @@ impl Gallery {
             ),
             "progress" => {
                 let copy = widget::progress_label(self.value, Some("1 min"));
-                widget::progress(
-                    self.value,
-                    Some((self.value + 0.2).min(1.0)),
-                    Some(copy.as_str()),
-                    tok,
-                    named("progress", Role::Progress).with_value(self.value.to_string()),
-                )
+                column![
+                    widget::progress(
+                        self.value,
+                        Some((self.value + 0.2).min(1.0)),
+                        Some(copy.as_str()),
+                        false,
+                        tok,
+                        named("progress", Role::Progress).with_value(self.value.to_string()),
+                    ),
+                    widget::progress(
+                        self.value,
+                        None,
+                        Some("working"),
+                        true,
+                        tok,
+                        named("busy-bar", Role::Progress),
+                    ),
+                ]
+                .spacing(12)
+                .into()
             }
             "progress-ring" => widget::progress_ring(
                 self.value,
@@ -2708,6 +2806,12 @@ impl Gallery {
                     &self.name,
                     Message::Name,
                     Some(Message::Submit),
+                    widget::FieldOpts {
+                        face: widget::FieldFace::Outlined,
+                        icons: Icons::leading(icedtea::icon::Icon::Search),
+                        label: "Name",
+                        max_len: Some(24),
+                    },
                     tok,
                     named("Name", Role::TextBox),
                     Some(icedtea::iced::widget::Id::new("gallery-name")),
@@ -2717,6 +2821,7 @@ impl Gallery {
                     Some(Message::FocusName),
                     tok,
                     Variant::Quiet,
+                    Icons::NONE,
                     btn("Focus field"),
                 ),
                 widget::meta(
@@ -2846,6 +2951,7 @@ impl Gallery {
                         &self.number,
                         Message::Number,
                         None,
+                        widget::FieldOpts::NONE,
                         tok,
                         named("email", Role::TextBox),
                         None,
@@ -3147,6 +3253,7 @@ impl Gallery {
                                     } else {
                                         Variant::Quiet
                                     },
+                                    Icons::NONE,
                                     btn(&name),
                                 ),
                                 widget::meta(
@@ -3191,7 +3298,7 @@ impl Gallery {
                                 Variant::Primary
                             } else {
                                 Variant::Quiet
-                            },
+                            }, Icons::NONE,
                             btn("gallery-brand"),
                         ),
                         widget::themed_pick_list(
@@ -3216,7 +3323,7 @@ impl Gallery {
                                 Variant::Primary
                             } else {
                                 Variant::Quiet
-                            },
+                            }, Icons::NONE,
                             btn("Light"),
                         ),
                         widget::themed_button(
@@ -3227,7 +3334,7 @@ impl Gallery {
                                 Variant::Primary
                             } else {
                                 Variant::Quiet
-                            },
+                            }, Icons::NONE,
                             btn("Dark"),
                         ),
                     ]
@@ -3390,6 +3497,7 @@ impl Gallery {
             "tooltip" => widget::tooltip_wrap(
                 widget::label("Hover", tok, named("Hover", Role::Header)),
                 "Tip",
+                widget::TooltipAnchor::Follow,
                 tok,
                 named("Tip", Role::Tooltip),
             ),
@@ -3397,6 +3505,8 @@ impl Gallery {
                 widget::label("Save", tok, named("Save", Role::Header)),
                 "Save",
                 "Write the buffer to disk.",
+                Some(("Learn more".into(), Message::Note("Learn more".into()))),
+                widget::TooltipAnchor::Bottom,
                 tok,
                 named("Save tip", Role::Tooltip),
             ),
@@ -3669,6 +3779,7 @@ impl Gallery {
                     Message::PinTab,
                     |_| Message::Nop,
                     self.window_width.max(320.0),
+                    true,
                     tok,
                     named("tabs-pinned", Role::Tab),
                 ),
@@ -3678,6 +3789,7 @@ impl Gallery {
                     Message::Tab,
                     Message::CloseTab,
                     220.0,
+                    false,
                     tok,
                     named("tabs", Role::Tab),
                 ),
@@ -3769,8 +3881,10 @@ impl Gallery {
                             widget::label("notes.txt", tok, named("card-title", Role::Header)),
                             widget::badge(
                                 "saved",
+                                None,
                                 tok,
                                 Variant::Primary,
+                                BadgeSize::Large,
                                 named("card-saved", Role::Status),
                             ),
                         ]
@@ -3789,6 +3903,8 @@ impl Gallery {
                                 None,
                                 tok,
                                 Variant::Quiet,
+                                ChipKind::Assist,
+                                Icons::NONE,
                                 btn("markdown"),
                             ));
                             if self.card_tag {
@@ -3798,6 +3914,8 @@ impl Gallery {
                                     Some(Message::DismissCardTag),
                                     tok,
                                     Variant::Quiet,
+                                    ChipKind::Assist,
+                                    Icons::NONE,
                                     btn("local"),
                                 ));
                             }
@@ -3808,18 +3926,21 @@ impl Gallery {
                             Some(Message::FileOpen),
                             tok,
                             Variant::Quiet,
+                            Icons::NONE,
                             btn("Open"),
                         ),
                     ]
                     .spacing(8)
                     .into(),
                     tok,
+                    CardFace::Elevated,
                     named("Card", Role::Group),
                 ),
                 icedtea::widget::group_box(
                     "Empty card",
                     widget::meta("No items", tok, named("empty-card", Role::Status)),
                     tok,
+                    CardFace::Filled,
                     named("empty-card-box", Role::Group),
                 ),
             ]
@@ -3840,7 +3961,29 @@ impl Gallery {
                         None,
                         tok,
                         Variant::Chip,
+                        ChipKind::Assist,
+                        Icons::leading(icedtea::icon::Icon::Search),
                         btn("Add note"),
+                    ));
+                    chips = chips.push(widget::chip(
+                        "Suggest",
+                        Some(Message::Note("Suggest".into())),
+                        None,
+                        tok,
+                        Variant::Quiet,
+                        ChipKind::Suggestion,
+                        Icons::NONE,
+                        btn("Suggest"),
+                    ));
+                    chips = chips.push(widget::chip(
+                        "Input",
+                        None,
+                        Some(Message::Note("input-chip".into())),
+                        tok,
+                        Variant::Quiet,
+                        ChipKind::Input,
+                        Icons::leading(icedtea::icon::Icon::Menu),
+                        btn("Input"),
                     ));
                     for (i, name) in self.chips.iter().enumerate() {
                         let v = if name == "iced" {
@@ -3861,13 +4004,17 @@ impl Gallery {
                             dismiss,
                             tok,
                             v,
+                            ChipKind::Assist,
+                            Icons::NONE,
                             btn(name),
                         ));
                     }
                     chips = chips.push(widget::badge(
                         self.chips.len().to_string(),
+                        None,
                         tok,
                         Variant::Quiet,
+                        BadgeSize::Large,
                         named("chip-count", Role::Status),
                     ));
                     chips
@@ -3882,7 +4029,30 @@ impl Gallery {
                 tok,
                 named("filters", Role::Group),
             ),
-            "badge" => widget::badge("New", tok, Variant::Primary, named("New", Role::Status)),
+            "badge" => row![
+                widget::badge(
+                    "New",
+                    None,
+                    tok,
+                    Variant::Primary,
+                    BadgeSize::Large,
+                    named("New", Role::Status),
+                ),
+                widget::badge(
+                    "3",
+                    Some(widget::icon_svg(
+                        icedtea::icon::Icon::Menu,
+                        tok,
+                        named("host", Role::Image),
+                    )),
+                    tok,
+                    Variant::Danger,
+                    BadgeSize::Small,
+                    named("count", Role::Status),
+                ),
+            ]
+            .spacing(16)
+            .into(),
             "wrap" => {
                 let chips: Vec<Element<'_, Message>> = self
                     .wrap_chips
@@ -3895,6 +4065,8 @@ impl Gallery {
                             Some(Message::DismissWrap(i)),
                             tok,
                             Variant::Quiet,
+                            ChipKind::Assist,
+                            Icons::NONE,
                             btn(t),
                         )
                     })
@@ -3909,6 +4081,7 @@ impl Gallery {
                         Some(Message::Pad(title)),
                         tok,
                         v,
+                        Icons::NONE,
                         Length::Fill,
                         h,
                         btn(title),
@@ -4036,6 +4209,7 @@ impl Gallery {
                             &self.query,
                             Message::Query,
                             None,
+                            widget::FieldOpts::NONE,
                             tok,
                             named("Name", Role::TextBox),
                             None,
@@ -4051,6 +4225,7 @@ impl Gallery {
                     .spacing(8)
                     .into(),
                     tok,
+                    CardFace::Elevated,
                     named("Group", Role::Group),
                 ),
                 widget::group_box(
@@ -4061,6 +4236,7 @@ impl Gallery {
                         named("group-off", Role::Status),
                     ),
                     tok,
+                    widget::CardFace::Outlined,
                     named("group-off-box", Role::Group),
                 ),
             ]
@@ -4096,6 +4272,7 @@ impl Gallery {
                     Some(Message::Toast),
                     tok,
                     Variant::Primary,
+                    Icons::NONE,
                     btn("Toast")
                 ),
                 {
@@ -4131,6 +4308,7 @@ impl Gallery {
                             named("busy-body", Role::Status),
                         ),
                         tok,
+                        widget::CardFace::Elevated,
                         named("busy-card", Role::Group),
                     ),
                     self.on,
@@ -4162,6 +4340,7 @@ impl Gallery {
                                 Some(Message::FileOpen),
                                 tok,
                                 Variant::Quiet,
+                                Icons::NONE,
                                 btn("Open"),
                             ),
                             widget::themed_button(
@@ -4169,6 +4348,7 @@ impl Gallery {
                                 Some(Message::FileSave),
                                 tok,
                                 Variant::Primary,
+                                Icons::NONE,
                                 btn("Save"),
                             ),
                             widget::themed_button(
@@ -4176,6 +4356,7 @@ impl Gallery {
                                 Some(Message::Folder),
                                 tok,
                                 Variant::Quiet,
+                                Icons::NONE,
                                 btn("Folder"),
                             ),
                         ]
@@ -4194,6 +4375,8 @@ impl Gallery {
                         "Overwrite notes.txt?",
                         ("Save".into(), Message::ConfirmSave),
                         Some(("Cancel".into(), Message::ConfirmCancel)),
+                        [("Don't save".into(), Message::ConfirmDiscard)],
+                        Some(icedtea::icon::Icon::Warning),
                         tok,
                     ))
                     .width(Length::Fixed(420.0))
@@ -4219,6 +4402,7 @@ impl Gallery {
                             Some(Message::SideSheet(!self.side_sheet)),
                             tok,
                             Variant::Primary,
+                            Icons::NONE,
                             btn("sheet-toggle"),
                         ),
                     ]
@@ -4361,7 +4545,13 @@ impl Gallery {
                 tok,
             ),
             "nav-rail" => pattern::nav_rail(
-                ["Inbox", "Sent", "Drafts"],
+                [
+                    RailDest::new("Inbox")
+                        .with_icon(icedtea::icon::Icon::Menu)
+                        .with_badge("3"),
+                    RailDest::new("Sent").with_icon(icedtea::icon::Icon::Chevron),
+                    RailDest::new("Drafts").with_icon(icedtea::icon::Icon::Search),
+                ],
                 self.rail,
                 Message::Rail,
                 true,
@@ -4380,6 +4570,7 @@ impl Gallery {
                         } else {
                             Variant::Quiet
                         },
+                        Icons::NONE,
                         Length::Fill,
                         Length::Shrink,
                         btn(title),
@@ -4647,7 +4838,7 @@ impl Gallery {
                                 "Move terminal beside explorer",
                                 Some(Message::WsMove),
                                 tok,
-                                Variant::Quiet,
+                                Variant::Quiet, Icons::NONE,
                                 btn("Move terminal beside explorer"),
                             ),
                         ]
@@ -4700,6 +4891,7 @@ impl Gallery {
                     Some(Message::DrawerToggle),
                     tok,
                     Variant::Quiet,
+                    Icons::NONE,
                     btn("drawer-toggle"),
                 ),
                 pattern::drawer(
@@ -4729,6 +4921,7 @@ impl Gallery {
                     &self.cheat_q,
                     Message::Cheat,
                     None,
+                    widget::FieldOpts::NONE,
                     tok,
                     named("cheat-q", Role::TextBox),
                     None,
@@ -4769,6 +4962,7 @@ fn handled_ids() -> &'static [&'static str] {
         "segmented-button",
         "button-group",
         "icon-button",
+        "toggle-icon-button",
         "split-button",
         "toggle-button",
         "checkbox",

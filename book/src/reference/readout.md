@@ -17,6 +17,7 @@ Constructor: [`widget::progress`](https://docs.rs/icedtea/latest/icedtea/widget/
 [iced](https://crates.io/crates/iced)
 
 Pass the fraction. Optional buffer is a second fill on the same track.
+`indeterminate` paints a linear busy chunk (`value` is the offset).
 `progress_label` builds the remaining-time copy. Values outside 0..=1
 clamp. No message; it is a readout.
 

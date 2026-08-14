@@ -889,6 +889,7 @@ pub fn page_count(len: usize, per_page: usize) -> usize {
 pub struct Tabs {
     pub titles: Vec<String>,
     pub badges: Vec<String>,
+    pub icons: Vec<Option<crate::icon::Icon>>,
     pub active: usize,
     pub closable: bool,
 }
@@ -896,10 +897,12 @@ pub struct Tabs {
 impl Tabs {
     pub fn new(titles: impl IntoIterator<Item = impl Into<String>>) -> Self {
         let titles: Vec<String> = titles.into_iter().map(Into::into).collect();
-        let badges = vec![String::new(); titles.len()];
+        let n = titles.len();
+        let badges = vec![String::new(); n];
         Self {
             titles,
             badges,
+            icons: vec![None; n],
             active: 0,
             closable: false,
         }
@@ -908,6 +911,13 @@ impl Tabs {
     pub fn with_badge(mut self, index: usize, badge: impl Into<String>) -> Self {
         if let Some(slot) = self.badges.get_mut(index) {
             *slot = badge.into();
+        }
+        self
+    }
+
+    pub fn with_icon(mut self, index: usize, icon: crate::icon::Icon) -> Self {
+        if let Some(slot) = self.icons.get_mut(index) {
+            *slot = Some(icon);
         }
         self
     }
@@ -925,6 +935,9 @@ impl Tabs {
         let removed = self.titles.remove(i);
         if i < self.badges.len() {
             self.badges.remove(i);
+        }
+        if i < self.icons.len() {
+            self.icons.remove(i);
         }
         if self.active >= self.titles.len() {
             self.active = self.titles.len().saturating_sub(1);

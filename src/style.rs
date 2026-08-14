@@ -54,6 +54,22 @@ pub fn card(tok: Tokens, focus: bool) -> container::Style {
     }
 }
 
+/// Outline-only card (transparent fill).
+pub fn outlined_card(tok: Tokens) -> container::Style {
+    let s = tok.scheme();
+    container::Style {
+        background: Some(Background::Color(Color::TRANSPARENT)),
+        text_color: Some(s.on_surface),
+        border: Border {
+            color: s.outline,
+            width: 1.0,
+            radius: component_radius(Component::Card),
+        },
+        shadow: Shadow::default(),
+        snap: false,
+    }
+}
+
 /// M3 elevated card (level 2 surface + shadow).
 pub fn raised_card(tok: Tokens) -> container::Style {
     let s = tok.scheme();
@@ -277,6 +293,36 @@ fn button_face(
             let (bg, fg) = face(s.warning, s.on_warning, surface, state);
             (bg, fg, pill, Shadow::default())
         }
+        Variant::Outlined => {
+            let (bg, fg) = match state {
+                ControlState::Disabled => {
+                    (Color::TRANSPARENT, layer_on(surface, s.on_surface, 0.38))
+                }
+                ControlState::Hovered | ControlState::Focused => {
+                    (layer_on(surface, s.primary, 0.08), s.primary)
+                }
+                ControlState::Pressed => (layer_on(surface, s.primary, 0.12), s.primary),
+                _ => (Color::TRANSPARENT, s.primary),
+            };
+            (
+                bg,
+                fg,
+                Border {
+                    color: if matches!(state, ControlState::Disabled) {
+                        s.outline.scale_alpha(0.38)
+                    } else {
+                        s.outline
+                    },
+                    width: 1.0,
+                    radius: pill.radius,
+                },
+                Shadow::default(),
+            )
+        }
+        Variant::Elevated => {
+            let (bg, fg) = face(s.surface_container_low, s.primary, surface, state);
+            (bg, fg, pill, crate::m3::Elevation::Level1.shadow())
+        }
     }
 }
 
@@ -380,6 +426,45 @@ pub fn nav_rail(tok: Tokens, selected: bool) -> container::Style {
         fill(s.secondary_container, s.on_secondary_container)
     } else {
         fill(Color::TRANSPARENT, s.on_surface_variant)
+    }
+}
+
+/// M3 filled or outlined text field.
+pub fn field_style(
+    tok: Tokens,
+    outlined: bool,
+) -> impl Fn(&iced::Theme, text_input::Status) -> text_input::Style {
+    move |_theme, status| {
+        let s = tok.scheme();
+        let (border_color, width) = match status {
+            text_input::Status::Focused { .. } => (s.primary, 2.0),
+            text_input::Status::Hovered => (s.on_surface, 1.0),
+            text_input::Status::Disabled => (s.on_surface.scale_alpha(0.12), 1.0),
+            text_input::Status::Active => (s.outline, 1.0),
+        };
+        let bg = if outlined {
+            Color::TRANSPARENT
+        } else {
+            match status {
+                text_input::Status::Disabled => layer_on(s.surface, s.on_surface, 0.04),
+                _ => s.surface_container_highest,
+            }
+        };
+        text_input::Style {
+            background: Background::Color(bg),
+            border: Border {
+                color: border_color,
+                width,
+                radius: component_radius(Component::Field),
+            },
+            icon: s.on_surface_variant,
+            placeholder: s.on_surface_variant,
+            value: match status {
+                text_input::Status::Disabled => layer_on(s.surface, s.on_surface, 0.38),
+                _ => s.on_surface,
+            },
+            selection: s.secondary_container,
+        }
     }
 }
 
@@ -835,6 +920,7 @@ mod tests {
         let _ = card(tok, true);
         let _ = card(tok, false);
         let _ = raised_card(tok);
+        let _ = outlined_card(tok);
         let _ = shell(tok);
         let _ = panel(tok);
         let _ = footer(tok);
@@ -871,6 +957,14 @@ mod tests {
         let _ = tab(&theme, button::Status::Active);
         let _ = tab2(&theme, button::Status::Hovered);
         let _ = tab2(&theme, button::Status::Active);
+        let outlined = field_style(tok, true);
+        let _ = outlined(&theme, text_input::Status::Active);
+        let _ = outlined(&theme, text_input::Status::Hovered);
+        let _ = outlined(&theme, text_input::Status::Focused { is_hovered: true });
+        let _ = outlined(&theme, text_input::Status::Disabled);
+        let filled = field_style(tok, false);
+        let _ = filled(&theme, text_input::Status::Disabled);
+        let _ = filled(&theme, text_input::Status::Active);
         let s = search_style(tok);
         let _ = s(&theme, text_input::Status::Active);
         let _ = s(&theme, text_input::Status::Hovered);

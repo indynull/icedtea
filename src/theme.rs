@@ -65,6 +65,8 @@ pub struct Tokens {
     pub border: Color,
     pub selection: Color,
     pub selection_text: Color,
+    /// Compact / default / comfortable pad and control height.
+    pub density: crate::m3::Density,
     /// Exact M3 scheme. [`Self::scheme`] returns this without mixing.
     full: crate::m3::Scheme,
 }
@@ -85,6 +87,7 @@ impl From<crate::m3::Scheme> for Tokens {
             border: s.outline,
             selection: s.secondary_container,
             selection_text: s.on_secondary_container,
+            density: crate::m3::Density::default(),
             full: s,
         }
     }
@@ -99,6 +102,12 @@ impl Tokens {
     /// primary surface roles.
     pub fn scheme(self) -> crate::m3::Scheme {
         self.full
+    }
+
+    /// Same tokens with a different density (pad and control height).
+    pub fn with_density(mut self, density: crate::m3::Density) -> Self {
+        self.density = density;
+        self
     }
 
     /// Rebuild `full` after short fields change (OS chrome, catalog).
@@ -277,6 +286,7 @@ fn tokens(
         border,
         selection: mix(primary, canvas, 0.28),
         selection_text: text,
+        density: crate::m3::Density::default(),
         full: crate::m3::scheme_dark(), // replaced by sync
     }
     .sync_full_from_aliases()
@@ -324,6 +334,7 @@ fn high_contrast() -> NamedTheme {
             border: rgb(0xFF, 0xFF, 0xFF),
             selection: rgb(0x00, 0x00, 0xAA),
             selection_text: rgb(0xFF, 0xFF, 0xFF),
+            density: crate::m3::Density::default(),
             full: crate::m3::scheme_dark(),
         }
         .sync_full_from_aliases(),

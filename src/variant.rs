@@ -15,10 +15,14 @@ pub enum Variant {
     Chip,
     Success,
     Warning,
+    /// M3 outlined: transparent fill, outline ink.
+    Outlined,
+    /// M3 elevated: surface fill plus a level-1 shadow.
+    Elevated,
 }
 
 impl Variant {
-    pub const ALL: [Variant; 7] = [
+    pub const ALL: [Variant; 9] = [
         Variant::Primary,
         Variant::Quiet,
         Variant::Danger,
@@ -26,6 +30,8 @@ impl Variant {
         Variant::Chip,
         Variant::Success,
         Variant::Warning,
+        Variant::Outlined,
+        Variant::Elevated,
     ];
 }
 
@@ -40,6 +46,6 @@ mod tests {
         for v in Variant::ALL {
             assert!(seen.insert(v));
         }
-        assert_eq!(seen.len(), 7);
+        assert_eq!(seen.len(), 9);
     }
 }

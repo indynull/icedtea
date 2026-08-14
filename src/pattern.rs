@@ -24,7 +24,7 @@ use crate::a11y::{A11y, Role};
 use crate::action::{Action, ActionTable};
 use crate::collection::Tabs;
 use crate::i18n::{order, Catalog, Direction};
-use crate::icon::Icon;
+use crate::icon::{Icon, Icons};
 use crate::layout;
 use crate::nav::NavStack;
 use crate::style;
@@ -33,7 +33,7 @@ use crate::typo;
 use crate::variant::Variant;
 use crate::widget::{
     dismiss_button, group_box, label, meta, tab_bar, themed_button, themed_scroll,
-    themed_text_input,
+    themed_text_input, CardFace, FieldOpts,
 };
 
 /// Group actions by the id prefix before `.` (`file.save` → `file`).
@@ -166,6 +166,7 @@ pub fn toolbar<'a, M: Clone + 'a>(
             a.invoke(),
             tok,
             Variant::Quiet,
+            Icons::NONE,
             A11y::button(a.title.clone()).with_disabled(!a.enabled),
         ));
     }
@@ -350,6 +351,7 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
             } else {
                 Variant::Ghost
             },
+            Icons::NONE,
             A11y::new(a.title.clone(), Role::MenuItem)
                 .with_checked(i == selected)
                 .with_disabled(!a.enabled),
@@ -368,6 +370,7 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
                 &p.value,
                 on_prompt,
                 on_done,
+                FieldOpts::NONE,
                 tok,
                 A11y::new("palette-arg", Role::TextBox),
                 Some(iced::widget::Id::new("palette-arg")),
@@ -381,6 +384,7 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
             query,
             on_query,
             None,
+            FieldOpts::NONE,
             tok,
             A11y::new("palette-query", Role::TextBox),
             Some(iced::widget::Id::new("palette-query")),
@@ -444,6 +448,7 @@ pub fn status_page<'a, M: Clone + 'a>(
             Some(m),
             tok,
             Variant::Primary,
+            Icons::NONE,
             A11y::button(t),
         ));
     }
@@ -487,6 +492,7 @@ pub fn about_page<'a, M: Clone + 'a>(
         .spacing(6.0)
         .into(),
         tok,
+        CardFace::Elevated,
         A11y::new(cat.t("about"), Role::Dialog),
     )
 }
@@ -560,6 +566,7 @@ pub fn preferences_page<'a, M: Clone + 'a>(
             g.title.clone(),
             lines.into(),
             tok,
+            CardFace::Elevated,
             A11y::new(g.title.clone(), Role::Group),
         ));
     }
@@ -569,6 +576,7 @@ pub fn preferences_page<'a, M: Clone + 'a>(
             query,
             on_query,
             None,
+            FieldOpts::NONE,
             tok,
             A11y::new(cat.t("search"), Role::TextBox),
             None,
@@ -684,6 +692,7 @@ pub fn navigation_view<'a, M: Clone + 'a>(
                 Some(on_back),
                 tok,
                 Variant::Quiet,
+                Icons::NONE,
                 A11y::button(cat.t("back")),
             )
         } else {
@@ -693,10 +702,50 @@ pub fn navigation_view<'a, M: Clone + 'a>(
     }
 }
 
+/// A navigation rail destination (title plus optional icon and badge).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RailDest {
+    pub title: String,
+    pub icon: Option<Icon>,
+    pub badge: Option<String>,
+}
+
+impl RailDest {
+    pub fn new(title: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            icon: None,
+            badge: None,
+        }
+    }
+
+    pub fn with_icon(mut self, icon: Icon) -> Self {
+        self.icon = Some(icon);
+        self
+    }
+
+    pub fn with_badge(mut self, badge: impl Into<String>) -> Self {
+        self.badge = Some(badge.into());
+        self
+    }
+}
+
+impl From<&str> for RailDest {
+    fn from(title: &str) -> Self {
+        Self::new(title)
+    }
+}
+
+impl From<String> for RailDest {
+    fn from(title: String) -> Self {
+        Self::new(title)
+    }
+}
+
 /// Compact destination rail beside content (desktop map of M3 navigation rail).
 ///
 /// Selected row uses `style::nav_rail`. Press emits the destination index.
-/// Empty `items` is an empty column.
+/// Empty `items` is an empty column. `expanded` is the labeled 220 px face.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -714,27 +763,28 @@ pub fn navigation_view<'a, M: Clone + 'a>(
 /// );
 /// ```
 pub fn nav_rail<'a, M: Clone + 'a>(
-    items: impl IntoIterator<Item = impl Into<String>>,
+    items: impl IntoIterator<Item = impl Into<RailDest>>,
     selected: usize,
     on_select: impl Fn(usize) -> M + Copy + 'a,
     expanded: bool,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let items: Vec<String> = items.into_iter().map(Into::into).collect();
+    let items: Vec<RailDest> = items.into_iter().map(Into::into).collect();
     let mut col = Column::new().spacing(4).width(Length::Fill);
-    for (i, title) in items.iter().enumerate() {
+    for (i, dest) in items.iter().enumerate() {
         let on = i == selected;
         let face_title = if expanded {
-            title.clone()
+            dest.title.clone()
         } else {
-            title
+            dest.title
                 .chars()
                 .next()
                 .map(|c| c.to_string())
                 .unwrap_or_default()
         };
-        let face = container(crate::widget::themed_button(
+        let icons = dest.icon.map(Icons::leading).unwrap_or(Icons::NONE);
+        let mut face: Element<'a, M> = crate::widget::themed_button(
             face_title,
             if a11y.disabled {
                 None
@@ -743,12 +793,24 @@ pub fn nav_rail<'a, M: Clone + 'a>(
             },
             tok,
             if on { Variant::Quiet } else { Variant::Ghost },
-            A11y::button(title.clone())
+            icons,
+            A11y::button(dest.title.clone())
                 .with_checked(on)
                 .with_disabled(a11y.disabled),
-        ))
-        .width(Length::Fill)
-        .style(move |_| style::nav_rail(tok, on));
+        );
+        if let Some(b) = dest.badge.as_ref().filter(|s| !s.is_empty()) {
+            face = crate::widget::badge(
+                b.clone(),
+                Some(face),
+                tok,
+                Variant::Primary,
+                crate::widget::BadgeSize::Small,
+                A11y::new(b.clone(), Role::Status),
+            );
+        }
+        let face = container(face)
+            .width(Length::Fill)
+            .style(move |_| style::nav_rail(tok, on));
         col = col.push(face);
     }
     crate::a11y::attach(
@@ -803,6 +865,7 @@ pub fn tab_view<'a, M: Clone + 'a>(
             on_select,
             on_close,
             0.0,
+            false,
             tok,
             A11y::new("tabs", Role::Tab)
         ),
@@ -873,7 +936,7 @@ pub fn main_window<'a, M: Clone + 'a>(
 /// let tok = theme::named("dark").tokens;
 /// let _: icedtea::Element<'_, ()> = pattern::modal_card(
 ///     widget::label(" ", tok, A11y::new("dim", icedtea::a11y::Role::Status)),
-///     pattern::dialog_sheet("Save", "Overwrite?", ("Save".into(), ()), None, tok),
+///     pattern::dialog_sheet("Save", "Overwrite?", ("Save".into(), ()), None, None::<(String, ())>, None, tok),
 ///     tok,
 /// );
 /// ```
@@ -914,6 +977,8 @@ pub fn modal_card<'a, M: 'a>(
 ///     "Overwrite notes.txt?",
 ///     ("Save".into(), ()),
 ///     Some(("Cancel".into(), ())),
+///     None::<(String, ())>,
+///     None,
 ///     tok,
 /// );
 /// ```
@@ -922,18 +987,31 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
     body: impl Into<String>,
     accept: (String, M),
     cancel: Option<(String, M)>,
+    extra: impl IntoIterator<Item = (String, M)>,
+    icon: Option<Icon>,
     tok: Tokens,
 ) -> Element<'a, M> {
     let title = title.into();
     let body = body.into();
-    // M3 dialog: cancel (text) then confirm (filled), trailing edge.
+    // M3 dialog: extra, cancel (text) then confirm (filled), trailing edge.
     let mut actions = Row::new().spacing(8);
+    for (t, m) in extra {
+        actions = actions.push(themed_button(
+            t.clone(),
+            Some(m),
+            tok,
+            Variant::Quiet,
+            Icons::NONE,
+            A11y::button(t),
+        ));
+    }
     if let Some((t, m)) = cancel {
         actions = actions.push(themed_button(
             t.clone(),
             Some(m),
             tok,
             Variant::Ghost,
+            Icons::NONE,
             A11y::button(t),
         ));
     }
@@ -942,15 +1020,29 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
         Some(accept.1),
         tok,
         Variant::Primary,
+        Icons::NONE,
         A11y::button(accept.0),
     ));
     let actions = container(actions)
         .width(Length::Fill)
         .align_x(Alignment::End);
+    let mut head = Row::new().spacing(8).align_y(Alignment::Center);
+    if let Some(ic) = icon {
+        head = head.push(crate::widget::icon_svg(
+            ic,
+            tok,
+            A11y::new(title.clone(), Role::Image),
+        ));
+    }
+    head = head.push(label(
+        title.clone(),
+        tok,
+        A11y::new(title.clone(), Role::Header),
+    ));
     crate::a11y::attach(
         container(
             column![
-                label(title.clone(), tok, A11y::new(title.clone(), Role::Header)),
+                head,
                 label(body.clone(), tok, A11y::new(body, Role::Status)),
                 actions,
             ]
@@ -1042,6 +1134,7 @@ pub fn sectioned_menu<'a, M: Clone + 'a>(
                 a.invoke(),
                 tok,
                 Variant::Ghost,
+                Icons::NONE,
                 A11y::new(a.title.clone(), Role::MenuItem).with_disabled(!a.enabled),
             ));
         }
@@ -1110,6 +1203,7 @@ pub fn cascade_menu<'a, M: Clone + 'a>(
             } else {
                 Variant::Ghost
             },
+            Icons::NONE,
             A11y::new(title, Role::MenuItem).with_disabled(!act.enabled),
         ));
     }
@@ -1285,6 +1379,7 @@ pub fn context_menu<'a, M: Clone + 'a>(
             a.invoke(),
             tok,
             Variant::Ghost,
+            Icons::NONE,
             A11y::new(a.title.clone(), Role::MenuItem).with_disabled(!a.enabled),
         ));
     }
@@ -1465,6 +1560,7 @@ where
                 p.title.clone(),
                 body,
                 tok,
+                CardFace::Elevated,
                 A11y::new(p.id.clone(), Role::Group),
             )
         }
@@ -1548,13 +1644,20 @@ pub fn tool_panel<'a, M: Clone + 'a>(
             a11y.apply_message(on_dock),
             tok,
             Variant::Ghost,
+            Icons::NONE,
             A11y::button("Dock").with_disabled(a11y.disabled),
         ),
     ]
     .spacing(8)
     .padding([4, 8]);
     crate::a11y::attach(
-        group_box(title, column![head, body].into(), tok, a11y.clone()),
+        group_box(
+            title,
+            column![head, body].into(),
+            tok,
+            CardFace::Elevated,
+            a11y.clone(),
+        ),
         &a11y,
     )
 }
@@ -1719,6 +1822,29 @@ mod tests {
             A11y::new("rail-empty", Role::List).with_disabled(true),
         );
         draw_once(&mut empty);
+        let _ = RailDest::from(String::from("Other"));
+        let dest = RailDest::new(String::from("Mail"))
+            .with_icon(Icon::Menu)
+            .with_badge("2");
+        let mut badged: Element<'_, usize> = nav_rail(
+            [dest],
+            0,
+            |i| i,
+            true,
+            tok,
+            A11y::new("rail-badge", Role::List),
+        );
+        draw_once(&mut badged);
+        let mut dlg: Element<'_, ()> = dialog_sheet(
+            "Save",
+            "Overwrite?",
+            ("Save".into(), ()),
+            Some(("Cancel".into(), ())),
+            [("Keep".into(), ())],
+            Some(Icon::Warning),
+            tok,
+        );
+        draw_once(&mut dlg);
     }
 
     #[test]
@@ -1913,9 +2039,19 @@ mod tests {
             "Overwrite notes.txt?",
             ("Save".into(), ()),
             Some(("Cancel".into(), ())),
+            None::<(String, ())>,
+            None,
             tok,
         );
-        let _: Element<'_, ()> = dialog_sheet("Note", "Hello", ("OK".into(), ()), None, tok);
+        let _: Element<'_, ()> = dialog_sheet(
+            "Note",
+            "Hello",
+            ("OK".into(), ()),
+            None,
+            None::<(String, ())>,
+            None,
+            tok,
+        );
         let acts: Vec<_> = table.iter().collect();
         let src = include_str!("pattern.rs");
         let palette_src = src
@@ -2110,13 +2246,23 @@ mod tests {
         paint(&mut mc);
         let mut cb = command_bar(table.iter(), tok, ltr);
         paint(&mut cb);
-        let mut dlg = dialog_sheet("Note", "Hello", ("OK".into(), ()), None, tok);
+        let mut dlg = dialog_sheet(
+            "Note",
+            "Hello",
+            ("OK".into(), ()),
+            None,
+            None::<(String, ())>,
+            None,
+            tok,
+        );
         paint(&mut dlg);
         let mut dlg2 = dialog_sheet(
             "Save",
             "Overwrite?",
             ("Save".into(), ()),
             Some(("Cancel".into(), ())),
+            None::<(String, ())>,
+            None,
             tok,
         );
         paint(&mut dlg2);
