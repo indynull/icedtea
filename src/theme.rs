@@ -991,6 +991,8 @@ mod tests {
             assert_eq!(t.name, *name);
         }
         assert_eq!(named("").name, "dark");
+        assert_eq!(named("Dark").name, "dark");
+        assert_eq!(named("LIGHT").name, "light");
         assert_eq!(named("  nord  ").name, "nord");
         assert_eq!(named("dark").tokens.canvas, rgb(0x20, 0x20, 0x20));
         assert_eq!(named("light").tokens.canvas, rgb(0xF3, 0xF3, 0xF3));

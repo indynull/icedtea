@@ -587,6 +587,11 @@ mod tests {
         let f1 = press(Key::Named(Named::F1), Modifiers::empty());
         assert_eq!(handle(chrome, &table, &f1), Some(4));
         assert_eq!(handle(focused, &table, &f1), None);
+        table.insert(
+            Action::new("help.f24", "Palette", 5u8).with_shortcut(Shortcut::parse("f24").unwrap()),
+        );
+        let f24 = press(Key::Named(Named::F24), Modifiers::empty());
+        assert_eq!(handle(chrome, &table, &f24), Some(5));
     }
 
     #[test]

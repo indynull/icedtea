@@ -5482,6 +5482,11 @@ mod tests {
         assert_ne!(on_ink, off_ink);
         assert_ne!(on_border.color, off_border.color);
         assert!(on_border.width < off_border.width || off_border.width >= 1.0);
+        for v in Variant::ALL {
+            let (bg, ink, border) = chip_face(tok, v);
+            assert_ne!(bg, ink);
+            let _ = border.width;
+        }
         let _: Element<'_, ()> =
             search_input_clear("q", |_| (), Some(()), tok, role("sc", Role::TextBox));
         let _: Element<'_, ()> =
@@ -6757,13 +6762,13 @@ mod tests {
         let compact = height(crate::density::DensityName::Compact);
         let default = height(crate::density::DensityName::Default);
         let comfortable = height(crate::density::DensityName::Comfortable);
-        assert!(
+        must(
             compact < default,
-            "compact {compact} must be shorter than default {default}"
+            format!("compact {compact} must be shorter than default {default}"),
         );
-        assert!(
+        must(
             default < comfortable,
-            "default {default} must be shorter than comfortable {comfortable}"
+            format!("default {default} must be shorter than comfortable {comfortable}"),
         );
         let max = iced::Size::new(400.0, 80.0);
         let mut compact_btn = themed_button(

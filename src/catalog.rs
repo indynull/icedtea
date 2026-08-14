@@ -422,6 +422,18 @@ mod tests {
     }
 
     #[test]
+    fn first_png_src_reads_markdown_images() {
+        assert_eq!(first_png_src("![a](images/x.png)"), Some("images/x.png"));
+        assert_eq!(first_png_src("![a](gallery.gif)"), None);
+        assert_eq!(first_png_src("no image"), None);
+        assert_eq!(first_png_src("](unterminated"), None);
+        assert_eq!(
+            first_png_src("[link](page.md)\n![s](../images/x.png)"),
+            Some("../images/x.png")
+        );
+    }
+
+    #[test]
     fn handbook_shows_constructor_stills() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("book/src");
         let pages = [
@@ -467,52 +479,55 @@ mod tests {
         let page = std::fs::read_to_string(root.join("book/src/architecture.md")).unwrap();
         let fig = std::fs::read_to_string(root.join("book/src/images/compose.svg")).unwrap();
         for needle in ["Boot", "Tokens", "ActionTable", "constructor", "pattern"] {
-            assert!(
+            must(
                 page.contains(needle),
-                "architecture page must name {needle}"
+                format!("architecture page must name {needle}"),
             );
         }
         for needle in ["Boot", "Tokens", "ActionTable", "Constructor", "Pattern"] {
-            assert!(fig.contains(needle), "compose.svg must name {needle}");
+            must(
+                fig.contains(needle),
+                format!("compose.svg must name {needle}"),
+            );
         }
         let pattern_src = include_str!("pattern.rs");
         let recipes = include_str!("layout/recipes.rs");
-        assert!(
+        must(
             !pattern_src.contains("pub fn dock<"),
-            "dock is not a pattern constructor"
+            "dock is not a pattern constructor",
         );
-        assert!(recipes.contains("pub fn dock<"), "dock lives in layout");
-        assert!(
+        must(recipes.contains("pub fn dock<"), "dock lives in layout");
+        must(
             page.contains("layout::"),
-            "architecture must send readers to layout for box recipes"
+            "architecture must send readers to layout for box recipes",
         );
         for recipe in ["dock", "split_view", "clamp", "form"] {
-            assert!(
+            must(
                 page.contains(recipe),
-                "architecture must name layout::{recipe}"
+                format!("architecture must name layout::{recipe}"),
             );
         }
-        assert!(
+        must(
             !page.contains("are the same module"),
-            "layout recipes must not be filed under pattern"
+            "layout recipes must not be filed under pattern",
         );
         for (label, src) in [("page", page.as_str()), ("figure", fig.as_str())] {
-            assert!(
+            must(
                 !src.contains("Notes"),
-                "{label} must not use hello fixture Notes"
+                format!("{label} must not use hello fixture Notes"),
             );
-            assert!(
+            must(
                 !src.contains("Ready"),
-                "{label} must not use hello fixture Ready"
+                format!("{label} must not use hello fixture Ready"),
             );
             let lower = src.to_ascii_lowercase();
-            assert!(
+            must(
                 !lower.contains("one action feeds"),
-                "{label} must not say one Action feeds chrome"
+                format!("{label} must not say one Action feeds chrome"),
             );
-            assert!(
+            must(
                 !lower.contains("one `action` feeds"),
-                "{label} must not say one Action feeds chrome"
+                format!("{label} must not say one Action feeds chrome"),
             );
         }
     }
