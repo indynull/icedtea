@@ -706,7 +706,37 @@ mod tests {
     #[test]
     fn cookbook_exists() {
         let summary = include_str!("../book/src/SUMMARY.md");
+        assert!(summary.contains("# Start"));
+        assert!(summary.contains("# Compose"));
         assert!(summary.contains("# Cookbook"));
+        assert!(summary.contains("# Reference"));
+        for path in [
+            "introduction.md",
+            "install.md",
+            "first-window.md",
+            "architecture.md",
+            "m3-foundations.md",
+            "actions.md",
+            "layout.md",
+            "theming.md",
+            "navigation.md",
+            "overlay-windows.md",
+            "compact-tools.md",
+            "cookbook/save.md",
+            "cookbook/list-detail.md",
+            "cookbook/table.md",
+            "cookbook/palette.md",
+            "widgets.md",
+            "reference/controls.md",
+            "reference/fields.md",
+            "reference/readout.md",
+            "reference/content.md",
+            "reference/collections.md",
+            "reference/chrome.md",
+            "reference/patterns.md",
+        ] {
+            assert!(summary.contains(path), "{path}");
+        }
         let pages: [(&str, &[&str]); 4] = [
             (
                 include_str!("../book/src/cookbook/save.md"),

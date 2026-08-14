@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Guide
+
+- The handbook sidebar groups Start, Compose, Cookbook, and Reference.
+
 ## 0.6.0 — 2026-08-13
 
 ### Controls

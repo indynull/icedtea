@@ -13,8 +13,10 @@ messages. Color, layout, and chrome are Rust values.
 
 [First window](first-window.md) is the shortest path: one `Action`, a
 toolbar, and a notes editor. [Install](install.md) has the crate line
-and host libraries. The [cookbook](cookbook/save.md) walks four jobs.
-The [reference](widgets.md) lists every public constructor.
+and host libraries. The sidebar groups those under Start, then Compose
+(architecture through compact tools), the [cookbook](cookbook/save.md)
+for four jobs, and the [reference](widgets.md) for every public
+constructor.
 
 - [Crate docs](https://docs.rs/icedtea)
 - [crates.io](https://crates.io/crates/icedtea)

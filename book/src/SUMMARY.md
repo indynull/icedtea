@@ -1,8 +1,13 @@
 # Summary
 
+# Start
+
 - [icedtea](introduction.md)
 - [Install](install.md)
 - [First window](first-window.md)
+
+# Compose
+
 - [Architecture](architecture.md)
 - [Material Design 3](m3-foundations.md)
 - [Actions](actions.md)
