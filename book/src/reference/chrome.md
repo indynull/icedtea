@@ -17,8 +17,9 @@ Constructor: [`theme::named`](https://docs.rs/icedtea/latest/icedtea/theme/fn.na
 [source](https://github.com/indynull/icedtea/blob/master/src/theme.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Unknown names resolve to `dark`. Register more on `ThemeCatalog`.
-See [Theming](../theming.md).
+Unknown names resolve to `dark`, the desktop pair with `light`.
+Persist defaults follow-OS on that pair. Register more on
+`ThemeCatalog`. See [Theming](../theming.md).
 
 ### Colors
 

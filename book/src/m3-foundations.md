@@ -5,7 +5,8 @@ icedtea maps its design system to
 
 ## Color roles
 
-`theme::Tokens` is seeded from `m3::Scheme` (baseline light/dark).
+`Tokens::scheme()` maps short token fields onto `m3::Scheme` roles.
+`light` and `dark` are the desktop pair, not the M3 baseline palettes.
 Field mapping:
 
 | Tokens field | M3 role |

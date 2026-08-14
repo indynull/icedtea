@@ -1,16 +1,16 @@
 //! Semantic color tokens, mixing rules, and the named community catalog.
 //!
-//! `named` picks a colorway. `mix` builds washes. With `follow_os`,
+//! `named` picks a colorway. `mix` builds washes. `light` and `dark` are
+//! a neutral desktop pair. With `follow_os` (persist default),
 //! [`apply_os_chrome`] layers optional desktop colors ([`OsChrome`])
-//! onto that colorway; leave fields unset or pass [`OsChrome::empty`]
-//! to keep the palette as authored.
+//! onto that pair; a named colorway is a choice on top of that.
 //!
 //! ```
 //! let dark = icedtea::theme::named("dark");
 //! assert_eq!(dark.name, "dark");
 //! assert_eq!(
 //!     dark.tokens.selection,
-//!     icedtea::m3::scheme_dark().secondary_container
+//!     dark.tokens.scheme().secondary_container
 //! );
 //! let pure = icedtea::theme::apply_os_chrome(
 //!     dark.tokens,
@@ -42,13 +42,17 @@ use serde_json::Value;
 /// - `selection` → secondary_container
 /// - `selection_text` → on_secondary_container
 ///
-/// Prefer reading via [`Tokens::scheme`] for the full M3 role set.
+/// Prefer reading via [`Tokens::scheme`] for the full role set.
+/// `light` / `dark` are the desktop pair, not the M3 baseline palettes.
 ///
 /// ```
 /// let dark = icedtea::theme::named("dark");
 /// assert_eq!(dark.name, "dark");
 /// assert!(dark.tokens.canvas.r < 0.2);
-/// assert_eq!(dark.tokens.primary, icedtea::m3::scheme_dark().primary);
+/// assert_eq!(
+///     dark.tokens.primary,
+///     icedtea::iced::Color::from_rgb8(0x6B, 0x9E, 0xFF)
+/// );
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Tokens {
@@ -94,12 +98,11 @@ impl From<crate::m3::Scheme> for Tokens {
 }
 
 impl Tokens {
-    /// Full M3 scheme for this token face.
+    /// Full M3 role set for this token face.
     ///
-    /// Round-trips exactly when tokens were built from [`crate::m3::Scheme`]
-    /// (`light` / `dark` baselines). Community colorways keep container
-    /// roles from the light/dark baseline while short fields override
-    /// primary surface roles.
+    /// Round-trips exactly when tokens were built from [`crate::m3::Scheme`].
+    /// Named colorways (including the `light` / `dark` desktop pair) keep
+    /// container roles derived from the short fields.
     pub fn scheme(self) -> crate::m3::Scheme {
         self.full
     }
@@ -401,21 +404,10 @@ fn catalog() -> &'static BTreeMap<&'static str, NamedTheme> {
 
 fn builtin(name: &str) -> Option<NamedTheme> {
     let key = alias(name.trim());
-    if key.eq_ignore_ascii_case("light") {
-        return Some(NamedTheme {
-            name: "light",
-            tokens: crate::m3::scheme_light().into(),
-            dark: false,
-        });
+    if let Some(t) = catalog().get(key) {
+        return Some(*t);
     }
-    if key.eq_ignore_ascii_case("dark") {
-        return Some(NamedTheme {
-            name: "dark",
-            tokens: crate::m3::scheme_dark().into(),
-            dark: true,
-        });
-    }
-    catalog().get(key).copied()
+    catalog().get(key.to_ascii_lowercase().as_str()).copied()
 }
 
 /// Built-in catalog keys, `dark` / `light` / `high-contrast` first.
@@ -518,6 +510,7 @@ pub fn code_highlight(name: &str) -> iced::highlighter::Theme {
 }
 
 /// Look up a built-in colorway by name. Unknown names resolve to `dark`.
+/// `light` and `dark` are the desktop pair; other names are a choice.
 ///
 ///
 /// ```
@@ -763,12 +756,10 @@ pub fn resolve_pref(
 
 /// Optional desktop chrome colors layered onto a named colorway.
 ///
-/// **Default / opt-out:** leave every field `None` (or call
-/// [`OsChrome::empty`]) and set `follow_os` to `false` when applying —
-/// the colorway is used as authored.
-///
-/// **Opt-in:** when `follow_os` is true, [`apply_os_chrome`] overwrites
-/// only fields that are `Some`. Hosts fill what they can:
+/// Persist defaults `follow_os` on. When true, [`apply_os_chrome`]
+/// overwrites only fields that are `Some`. Hosts fill what they can.
+/// Leave every field `None` (or call [`OsChrome::empty`]) and set
+/// `follow_os` to `false` to keep a chosen colorway as authored.
 ///
 /// | Field | Typical host source |
 /// | --- | --- |
@@ -924,24 +915,21 @@ mod tests {
 
     #[test]
     fn scheme_roundtrip_preserves_baseline_roles() {
-        for (name, baseline) in [
-            ("light", crate::m3::scheme_light()),
-            ("dark", crate::m3::scheme_dark()),
-        ] {
-            let tok = named(name).tokens;
-            let s = tok.scheme();
-            assert_eq!(s, baseline, "{name} scheme() is exact M3 baseline");
-            assert_eq!(s.primary_container, baseline.primary_container);
-            assert_eq!(s.on_primary, baseline.on_primary);
-            assert_eq!(s.on_primary_container, baseline.on_primary_container);
-            assert_eq!(
-                s.surface_container_highest,
-                baseline.surface_container_highest
-            );
-            // From Scheme preserves full set.
-            let again: Tokens = baseline.into();
-            assert_eq!(again.scheme(), baseline);
+        for baseline in [crate::m3::scheme_light(), crate::m3::scheme_dark()] {
+            let tok: Tokens = baseline.into();
+            assert_eq!(tok.scheme(), baseline);
+            assert_eq!(tok.primary, baseline.primary);
+            assert_eq!(tok.canvas, baseline.surface);
         }
+        let dark = named("dark").tokens;
+        assert_eq!(dark.primary, rgb(0x6B, 0x9E, 0xFF));
+        assert_eq!(dark.canvas, rgb(0x20, 0x20, 0x20));
+        assert_eq!(dark.scheme().secondary_container, dark.selection);
+        let light = named("light").tokens;
+        assert_eq!(light.primary, rgb(0x25, 0x63, 0xEB));
+        assert_eq!(light.canvas, rgb(0xF3, 0xF3, 0xF3));
+        assert_ne!(dark.primary, crate::m3::scheme_dark().primary);
+        assert_ne!(light.primary, crate::m3::scheme_light().primary);
     }
 
     #[test]
@@ -1004,14 +992,8 @@ mod tests {
         }
         assert_eq!(named("").name, "dark");
         assert_eq!(named("  nord  ").name, "nord");
-        assert_eq!(
-            named("dark").tokens.canvas,
-            crate::m3::scheme_dark().surface
-        );
-        assert_eq!(
-            named("light").tokens.canvas,
-            crate::m3::scheme_light().surface
-        );
+        assert_eq!(named("dark").tokens.canvas, rgb(0x20, 0x20, 0x20));
+        assert_eq!(named("light").tokens.canvas, rgb(0xF3, 0xF3, 0xF3));
         assert!(named("light").tokens.canvas.r > named("dark").tokens.canvas.r);
         assert_eq!(named("high-contrast").tokens.border, rgb(0xFF, 0xFF, 0xFF));
         assert_ne!(named("gruvbox").tokens.canvas, named("nord").tokens.canvas);
@@ -1122,7 +1104,6 @@ mod tests {
     #[test]
     fn light_selection_keeps_dark_ink() {
         let t = named("light").tokens;
-        // M3 on-secondary-container is dark ink on a light container.
         assert!(relative_luma(t.selection_text) < 0.5);
         assert!(relative_luma(t.selection) > 0.7);
         let sun = named("solarized-light").tokens;

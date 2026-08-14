@@ -76,14 +76,14 @@
 //! assert_eq!(handle(KeyContext::default(), &table, &ev), Some(save));
 //! ```
 //!
-//! # Tokens (Material Design 3)
+//! # Tokens
 //!
-//! [`theme::named`] picks a colorway seeded from M3 schemes
-//! ([`m3::scheme_light`] / [`m3::scheme_dark`]). Control paint paths
-//! read roles through [`Tokens::scheme`](theme::Tokens::scheme). Short
-//! fields (`primary`, `text`, …) are aliases of those roles.
-//! Desktop chrome is M3 shape None (0 dp, rectangular).
-//! [`theme::mix`] builds washes:
+//! [`theme::named`] picks a colorway. `light` and `dark` are a neutral
+//! desktop pair; follow-OS layers host chrome on that pair. Other
+//! catalog names are a choice. Control paint paths read roles through
+//! [`Tokens::scheme`](theme::Tokens::scheme). Short fields (`primary`,
+//! `text`, …) are aliases of those roles. Desktop chrome is M3 shape
+//! None (0 dp, rectangular). [`theme::mix`] builds washes:
 //!
 //! ```
 //! use icedtea::theme;
@@ -310,7 +310,7 @@ mod tests {
     fn dark_selection_is_scheme_secondary_container() {
         let t = theme::named("dark").tokens;
         assert_eq!(theme::selection_fill(t), t.selection);
-        assert_eq!(t.selection, crate::m3::scheme_dark().secondary_container);
+        assert_eq!(t.selection, t.scheme().secondary_container);
     }
 
     #[test]

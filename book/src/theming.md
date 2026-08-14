@@ -1,16 +1,12 @@
 # Theming
 
-Colorways seed **Material Design 3** schemes (`m3::Scheme`). See [Material Design 3 foundations](./m3-foundations.md).
+Styling is Rust: semantic tokens plus mixing rules. Short token fields
+map onto Material Design 3 roles (`Tokens::scheme()` for the full
+set). See [Material Design 3 foundations](./m3-foundations.md).
 
-
-Styling is Rust: semantic tokens plus mixing rules.
-
-Short token fields map onto M3 roles (`Tokens::scheme()` for the full
-scheme). Aliases: `canvas`/`surface`/`panel`/`text`/`muted`/`primary`/
-`accent`/`danger`/`border`/`selection`. Baseline light/dark keep exact
-M3 containers; community colorways sync containers from aliases and
-recompute solid-fill `on_*` roles (`on_primary` and the rest) for
-contrast on those fills.
+Aliases: `canvas`/`surface`/`panel`/`text`/`muted`/`primary`/
+`accent`/`danger`/`border`/`selection`. Colorways sync containers from
+those aliases and recompute solid-fill `on_*` roles for contrast.
 Washes use scheme state layers (`hover_fill` / `pressed_fill`). Desktop
 control corners are M3 shape **None** (see [foundations](./m3-foundations.md)).
 Constructors take `Tokens`.
@@ -22,10 +18,11 @@ Dracula, Everforest, Kanagawa, Ayu, GitHub, and others).
 and `theme::code_highlight` pick UI tokens and the iced highlighter
 face together. Register more on `ThemeCatalog`. `Boot.theme` is a
 concrete name and defaults to `dark`. `light` and `dark` are a
-neutral desktop pair (not a community skin). `markdown_view` paints
-inline code and links from `Tokens::scheme()` (`on_surface`,
-`surface_container_high`, `primary`). Truncation is slicing the source
-before `MarkdownDoc::parse`.
+neutral desktop pair. Persist defaults `follow_os` on, so host chrome
+layers onto that pair; pick another catalog name to choose a colorway.
+`markdown_view` paints inline code and links from `Tokens::scheme()`
+(`on_surface`, `surface_container_high`, `primary`). Truncation is
+slicing the source before `MarkdownDoc::parse`.
 
 ```rust
 let mut cat = icedtea::theme::ThemeCatalog::new();
@@ -47,11 +44,13 @@ OS. Persist stores `theme` plus optional `family` and `follow_os`
 
 ## Follow-OS chrome
 
-**Default:** a named colorway only. Set `follow_os` to false, or pass
-[`OsChrome::empty`](https://docs.rs/icedtea/latest/icedtea/theme/struct.OsChrome.html),
-and no desktop colors are applied.
+Persist defaults `follow_os` on. The desktop pair (`light` / `dark`)
+follows OS appearance; host colors layer on top. A named colorway is a
+choice: set `theme` to that name, and set `follow_os` to false to keep
+the palette as authored (or pass
+[`OsChrome::empty`](https://docs.rs/icedtea/latest/icedtea/theme/struct.OsChrome.html)).
 
-**Opt-in:** with `follow_os` true:
+With `follow_os` true:
 
 1. Resolve the family light/dark member from OS appearance (as above).
 2. Read host chrome via [`theme::os_chrome`](https://docs.rs/icedtea/latest/icedtea/theme/fn.os_chrome.html)
@@ -61,7 +60,7 @@ and no desktop colors are applied.
 3. Apply with
    [`theme::apply_os_chrome`](https://docs.rs/icedtea/latest/icedtea/theme/fn.apply_os_chrome.html).
    Each `Some` field overwrites the matching token; the rest of the
-   colorway stays. Selection is rebuilt from primary + canvas.
+   pair (or chosen colorway) stays. Selection is rebuilt from primary + canvas.
 
 What the host fills (missing fields stay on the colorway):
 

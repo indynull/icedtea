@@ -50,12 +50,14 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
 - One `Action` feeds menus, toolbars, shortcuts, context menus, footer
   hints, and the command palette.
 - **Material Design 3** foundations in `m3` (color roles, type scale,
-  shape, elevation, density, control states). `theme::Tokens` seeds from
-  `m3::Scheme` (baseline light/dark); `Tokens::scheme()` returns the
-  stored scheme. Desktop chrome uses `m3::Component` → shape **None**
-  (0 dp, rectangular). Named colorways plus high-contrast remain; apps
-  may register more that implement the same roles. See `m3::mapping`
-  for catalog inventory. `theme::mix` builds washes.
+  shape, elevation, density, control states). `Tokens::scheme()` maps
+  short fields onto those roles. `light` and `dark` are a neutral
+  desktop pair; persist defaults `follow_os` on so host chrome layers
+  onto that pair. A named colorway is a choice. Desktop chrome uses
+  `m3::Component` → shape **None** (0 dp, rectangular). High-contrast
+  and community colorways remain; apps may register more that implement
+  the same roles. See `m3::mapping` for catalog inventory.
+  `theme::mix` builds washes.
 - User-facing text uses `typo::UI` (`Font::DEFAULT`, platform sans).
   Code uses `typo::MONO` (`Font::MONOSPACE`). Never bundle a font
   file. Apps that want a named family load it on the iced application

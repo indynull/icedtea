@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Theme
+
+- `light` and `dark` are the neutral desktop pair again. Follow-OS
+  layers host chrome on that pair; a named colorway is a choice.
+
 ### Guide
 
 - The handbook sidebar nests Start, Compose, Cookbook, and Reference
