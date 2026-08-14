@@ -553,7 +553,14 @@ for i in $(seq 0 $((pages - 1))); do
     exit 1
   fi
   apply_host_chrome "$wid"
-  if [[ -f "${ackfile}.face" ]] && [[ "$(tr -d '[:space:]' <"${ackfile}.face")" == "light" ]]; then
+  hold_file="${ackfile}.hold"
+  hold_beat=""
+  if [[ -f "$hold_file" ]]; then
+    hold_beat="$(tr -d '[:space:]' <"$hold_file")"
+  fi
+  if [[ "$hold_beat" =~ ^[1-9][0-9]*$ ]]; then
+    sleep "$(awk "BEGIN { print $hold_beat / 1000 }")"
+  elif [[ -f "${ackfile}.face" ]] && [[ "$(tr -d '[:space:]' <"${ackfile}.face")" == "light" ]]; then
     sleep 1.0
   else
     sleep 0.35

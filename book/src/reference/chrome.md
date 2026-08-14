@@ -254,8 +254,10 @@ Constructor: [`motion::overlay`](https://docs.rs/icedtea/latest/icedtea/motion/f
 
 `progress` is 0 (gone) to 1 (rest). The application owns
 `iced::Animation` and passes `interpolate(0.0, 1.0, now)`.
+`Slide::None` is fade only: build the child with `Tokens::fade`.
 Reduced-motion tokens snap to 0 or 1. Duration and easing live in
-`m3::motion`.
+`m3::motion`. `bounce_out`, `pulse`, and `shake` are curves you
+sample like `Ease`; see [Motion](../motion.md).
 
 ### Expand motion
 

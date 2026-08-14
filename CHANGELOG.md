@@ -2,15 +2,10 @@
 
 ## Unreleased
 
-### Guide
-
-- Motion walks the 0–1 progress path, mixing jobs, and writing a
-  custom number with `Ease::sample`.
-
 ### Theme
 
 - `m3::DurationStep` and `m3::Ease` are the Material motion tokens.
-  `Tokens::with_reduced_motion` collapses every duration to 0 ms.
+- `Tokens::with_reduced_motion` collapses every duration to 0 ms.
 - `Tokens::fade` scales every scheme role's alpha.
 
 ### Chrome
@@ -19,6 +14,9 @@
   with `Tokens::fade` so fills and ink fade with the slide.
 - `motion::expand` clips a child between a peek height and its open
   height.
+- `motion::bounce_out` is an ease-out bounce curve.
+- `motion::pulse` is a 0–1–0 attention curve.
+- `motion::shake` is a decaying wiggle that starts and ends at rest.
 - Toast enter and the last slice of TTL fade through `motion::overlay`.
 - Side sheet enter starts toward the docked edge.
 - A reduced-motion toast uses `DurationStep::duration` (0 ms) and
@@ -26,8 +24,8 @@
 
 ### Patterns
 
-- `modal_card` and `side_sheet` take overlay `progress` (fade plus a
-  short slide).
+- `modal_card` takes overlay `progress`.
+- `side_sheet` takes overlay `progress`.
 - `command_palette_view` takes overlay `progress`.
 - `drawer` takes pane `progress` (width 0–220 dp).
 - `context_menu` takes overlay `progress`.
@@ -35,7 +33,8 @@
 
 ### Collections
 
-- `expander` and `accordion_view` take height `progress`.
+- `expander` takes height `progress`.
+- `accordion_view` takes height `progress`.
 - `tree_view` takes `animating` (`Option<(id, progress)>`) so a branch
   can grow and shrink.
 
@@ -52,6 +51,11 @@
 
 - Wheel over `themed_slider`, `range_slider`, `number_input`, and
   `themed_pick_list` steps the value.
+
+### Guide
+
+- Motion is the 0–1 progress path: overlay, expand, and sampled
+  curves (`Ease`, `bounce_out`, `pulse`, `shake`).
 
 ## 0.7.0 — 2026-08-14
 

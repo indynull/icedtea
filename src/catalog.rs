@@ -123,7 +123,7 @@ pub const ENTRIES: &[Entry] = &[
     Entry { id: "palette", title: "Command palette", group: "Patterns", page: "palette" },
     Entry { id: "main-window", title: "Main window", group: "Patterns", page: "main-window" },
     Entry { id: "motion", title: "Motion", group: "Chrome", page: "motion" },
-    Entry { id: "expand-motion", title: "Expand motion", group: "Chrome", page: "motion" },
+    Entry { id: "expand-motion", title: "Expand motion", group: "Chrome", page: "expand-motion" },
 ];
 
 pub fn get(id: &str) -> Option<&'static Entry> {
@@ -167,6 +167,7 @@ pub fn page_title(page: &str) -> &'static str {
         "feedback" => "Feedback",
         "workspace" => "Workspace",
         "motion" => "Motion",
+        "expand-motion" => "Expand motion",
         id => get(id).map(|e| e.title).unwrap_or("Page"),
     }
 }

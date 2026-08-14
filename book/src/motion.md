@@ -29,7 +29,9 @@ let sheet = motion::overlay(body, t, Slide::End, tok, a11y);
 
 [`motion::overlay`](https://docs.rs/icedtea/latest/icedtea/motion/fn.overlay.html)
 slides. Build the child with [`Tokens::fade`](https://docs.rs/icedtea/latest/icedtea/theme/struct.Tokens.html#method.fade)
-so fills and ink fade with the slide.
+so fills and ink fade with the slide. `Slide::None` is fade only:
+same constructor, no translate.
+
 [`motion::expand`](https://docs.rs/icedtea/latest/icedtea/motion/fn.expand.html)
 clips height between a peek and the open size.
 [`motion::value_animation`](https://docs.rs/icedtea/latest/icedtea/motion/fn.value_animation.html)
@@ -49,16 +51,34 @@ progress value can run together. `view` samples each one and passes
 the numbers in. The subscription fires while any of them reports
 `is_animating` (or while toasts still have TTL).
 
-## Write a number yourself
+## Bounce, pulse, and shake
 
-`Ease::sample(t)` is the cubic at `t` in 0..=1. `duration(step, reduced)`
-is the length. A custom job is: store `from`, `to`, and the start
-instant; in `view` compute `t` from elapsed time; sample the ease;
-lerp `from` toward `to`; pass the result into `overlay`, `expand`,
-`fade`, or your own paint. That is the same path the helpers use.
+[`bounce_out`](https://docs.rs/icedtea/latest/icedtea/motion/fn.bounce_out.html),
+[`pulse`](https://docs.rs/icedtea/latest/icedtea/motion/fn.pulse.html),
+and [`shake`](https://docs.rs/icedtea/latest/icedtea/motion/fn.shake.html)
+are curves, like [`Ease::sample`](https://docs.rs/icedtea/latest/icedtea/m3/enum.Ease.html#method.sample).
+Store `from`, `to`, and the start instant. In `view`, turn elapsed
+time into `u` in 0..=1, sample the curve, lerp, and pass that into
+`overlay`, `expand`, or `Tokens::fade`.
+
+```
+use icedtea::m3::DurationStep;
+use icedtea::motion::{self, Slide};
+
+let dur = motion::duration(DurationStep::Long2, tok.reduced_motion);
+let u = (elapsed.as_secs_f32() / dur.as_secs_f32()).clamp(0.0, 1.0);
+let t = from + (to - from) * motion::bounce_out(u);
+let paint = tok.fade(t);
+let card = motion::overlay(body, t, Slide::Up, tok, a11y);
+```
+
+Expand and contract are [`motion::expand`](https://docs.rs/icedtea/latest/icedtea/motion/fn.expand.html):
+height from a peek to the open size. Pulse loops `t` (hold 1 when
+reduced motion is on). Shake is a decaying wiggle that starts and
+ends at 0; multiply by pixels and shift padding.
 
 Named steps cover overlay, sheet, toast, expand, and progress. Pick
-one of those, or pick a `DurationStep` and an `Ease` and drive the
+one of those, or pick a `DurationStep` and a curve and drive the
 constructor yourself.
 
 See [Material Design 3](m3-foundations.md) for the token names.

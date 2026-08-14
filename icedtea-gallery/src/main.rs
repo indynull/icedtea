@@ -404,7 +404,8 @@ fn page_job(page: &str) -> &'static str {
         "status-page" => "Empty or error pane. Use when a list has no rows, or a host is down.",
         "palette" => "Fuzzy find over the action table. Type to filter; pick a row.",
         "main-window" => "Menu, toolbar, center, and status docked as one window.",
-        "motion" => "Open and close. Progress eases. Reduce motion snaps.",
+        "motion" => "Open and close. Fade, bounce, pulse, and shake. Reduce motion snaps.",
+        "expand-motion" => "Height from a peek to the open size. Reduce motion snaps.",
         _ => "",
     }
 }
@@ -501,16 +502,65 @@ fn list_row_heights(list: &VecList, card: bool) -> Vec<f32> {
 }
 
 /// One README beat. The walk is every `catalog::ENTRIES` page, plus
-/// one Light flip on the Theme page.
+/// one Light flip on the Theme page, plus motion clicks after Motion.
+#[derive(Clone, Copy)]
 struct TourBeat {
     page: &'static str,
     theme: &'static str,
     appearance: Appearance,
     caption: &'static str,
+    /// Inject lines run when the beat is applied (tour clicks).
+    act: &'static str,
+    /// Gallery GIF settle before the grab. 0 keeps the script default.
+    hold_ms: u32,
 }
 
 fn tour_len() -> usize {
-    catalog::pages().len() + 1
+    catalog::pages().len() + 1 + extra_beat_count()
+}
+
+fn extras_after(page: &str) -> &'static [TourBeat] {
+    match page {
+        "motion" => &[
+            TourBeat {
+                page: "motion",
+                theme: "dark",
+                appearance: Appearance::Dark,
+                caption: "Motion: overlay close",
+                act: "dialog false\n",
+                hold_ms: 120,
+            },
+            TourBeat {
+                page: "motion",
+                theme: "dark",
+                appearance: Appearance::Dark,
+                caption: "Motion: bounce in",
+                act: "bounce-in\n",
+                hold_ms: 180,
+            },
+            TourBeat {
+                page: "motion",
+                theme: "dark",
+                appearance: Appearance::Dark,
+                caption: "Motion: pulse and shake",
+                act: "pulse true\nshake\n",
+                hold_ms: 160,
+            },
+        ],
+        "expand-motion" => &[TourBeat {
+            page: "expand-motion",
+            theme: "dark",
+            appearance: Appearance::Dark,
+            caption: "Expand motion: open",
+            act: "expand true\n",
+            hold_ms: 140,
+        }],
+        _ => &[],
+    }
+}
+
+fn extra_beat_count() -> usize {
+    extras_after("motion").len() + extras_after("expand-motion").len()
 }
 
 fn theme_page_index() -> usize {
@@ -520,28 +570,48 @@ fn theme_page_index() -> usize {
         .expect("theme is a gallery page")
 }
 
-fn tour_beat(index: usize) -> TourBeat {
-    let pages = catalog::pages();
-    let light_at = theme_page_index() + 1;
-    if index == light_at {
-        return TourBeat {
-            page: "theme",
-            theme: "light",
-            appearance: Appearance::Light,
-            caption: "Light: paper canvas and window chrome",
-        };
-    }
-    let page = if index < light_at {
-        pages[index]
-    } else {
-        pages[index - 1]
-    };
+fn base_page_beat(page: &'static str) -> TourBeat {
     TourBeat {
         page,
         theme: "dark",
         appearance: Appearance::Dark,
         caption: tour_caption_for(page),
+        act: "",
+        hold_ms: 0,
     }
+}
+
+fn tour_beat(index: usize) -> TourBeat {
+    let pages = catalog::pages();
+    let light_at = theme_page_index() + 1;
+    let mut n = 0usize;
+    let seq = pages.len() + 1;
+    for i in 0..seq {
+        let beat = if i == light_at {
+            TourBeat {
+                page: "theme",
+                theme: "light",
+                appearance: Appearance::Light,
+                caption: "Light: paper canvas and window chrome",
+                act: "",
+                hold_ms: 0,
+            }
+        } else {
+            let page = if i < light_at { pages[i] } else { pages[i - 1] };
+            base_page_beat(page)
+        };
+        if n == index {
+            return beat;
+        }
+        n += 1;
+        for extra in extras_after(beat.page) {
+            if n == index {
+                return *extra;
+            }
+            n += 1;
+        }
+    }
+    base_page_beat("motion")
 }
 
 fn tour_caption_for(page: &str) -> &'static str {
@@ -577,6 +647,8 @@ fn tour_caption_for(page: &str) -> &'static str {
         "status-page" => "Status page: empty or error",
         "palette" => "Command palette: filter actions",
         "main-window" => "Main window: menu, tools, status",
+        "motion" => "Motion: fade and slide",
+        "expand-motion" => "Expand motion: peek to open",
         _ => catalog::page_title(page),
     }
 }
@@ -635,6 +707,11 @@ fn parse_inject_line(line: &str) -> Option<Message> {
         "expand" => Some(Message::Expand(parts.next()? == "true")),
         "acc" => Some(Message::Acc(parts.next()?.parse().ok()?)),
         "dialog" => Some(Message::DialogOpen(parts.next()? == "true")),
+        "fade" => Some(Message::FadeOpen(parts.next()? == "true")),
+        "bounce" => Some(Message::BouncePlay),
+        "bounce-in" | "bounce_in" => Some(Message::BounceIn),
+        "pulse" => Some(Message::Pulse(parts.next()? == "true")),
+        "shake" => Some(Message::ShakePlay),
         "reduce-motion" | "reduce_motion" => Some(Message::ReduceMotion(parts.next()? == "true")),
         "page" => Some(Message::Page(parts.next()?.parse().ok()?)),
         "tab" => Some(Message::Tab(parts.next()?.parse().ok()?)),
@@ -673,13 +750,17 @@ fn read_tour_cmd() -> Option<usize> {
 
 fn write_tour_ack(beat: usize) {
     if let Some(path) = tour_ack_path() {
+        let beat_meta = tour_beat(beat);
         let _ = std::fs::write(&path, beat.to_string());
         let mut face = path.clone();
         face.set_extension("face");
-        let _ = std::fs::write(face, tour_beat(beat).theme);
-        let mut caption = path;
+        let _ = std::fs::write(face, beat_meta.theme);
+        let mut caption = path.clone();
         caption.set_extension("caption");
-        let _ = std::fs::write(caption, tour_beat(beat).caption);
+        let _ = std::fs::write(caption, beat_meta.caption);
+        let mut hold = path;
+        hold.set_extension("hold");
+        let _ = std::fs::write(hold, beat_meta.hold_ms.to_string());
     }
 }
 
@@ -792,6 +873,11 @@ enum Message {
     ConfirmCancel,
     ConfirmDiscard,
     DialogOpen(bool),
+    FadeOpen(bool),
+    BouncePlay,
+    BounceIn,
+    Pulse(bool),
+    ShakePlay,
     ReduceMotion(bool),
     Motion,
     OpenDocs(&'static str),
@@ -986,6 +1072,13 @@ struct Gallery {
     progress_from: f32,
     progress_to: f32,
     progress_start: Option<icedtea::iced::time::Instant>,
+    fade_open: bool,
+    fade_anim: icedtea::iced::Animation<bool>,
+    bounce_from: f32,
+    bounce_to: f32,
+    bounce_start: Option<icedtea::iced::time::Instant>,
+    pulse_on: bool,
+    shake_start: Option<icedtea::iced::time::Instant>,
     window_width: f32,
     window_height: f32,
     pointer: icedtea::iced::Point,
@@ -1288,6 +1381,13 @@ impl Gallery {
             progress_from: 0.4,
             progress_to: 0.4,
             progress_start: None,
+            fade_open: true,
+            fade_anim: icedtea::motion::overlay_animation(true, false),
+            bounce_from: 1.0,
+            bounce_to: 1.0,
+            bounce_start: None,
+            pulse_on: false,
+            shake_start: None,
             window_width: 900.0,
             window_height: 640.0,
             pointer: icedtea::iced::Point::ORIGIN,
@@ -1375,6 +1475,10 @@ impl Gallery {
                 .as_ref()
                 .is_some_and(|(_, a)| a.is_animating(now))
             || self.progress_moving()
+            || self.bounce_moving()
+            || self.shake_moving()
+            || self.pulse_on
+            || self.fade_anim.is_animating(now)
             || self.acc_closing
             || self.context_closing
             || self.cascade_closing
@@ -1409,6 +1513,74 @@ impl Gallery {
         let t = (elapsed.as_secs_f32() / dur.as_secs_f32()).clamp(0.0, 1.0);
         let e = icedtea::m3::Ease::Standard.sample(t);
         self.progress_from + (self.progress_to - self.progress_from) * e
+    }
+
+    fn clocked(
+        start: Option<icedtea::iced::time::Instant>,
+        from: f32,
+        to: f32,
+        step: icedtea::m3::DurationStep,
+        reduced: bool,
+        curve: fn(f32) -> f32,
+    ) -> f32 {
+        let Some(start) = start else {
+            return to;
+        };
+        let dur = icedtea::motion::duration(step, reduced);
+        if dur.is_zero() {
+            return to;
+        }
+        let elapsed = icedtea::iced::time::Instant::now().saturating_duration_since(start);
+        let u = (elapsed.as_secs_f32() / dur.as_secs_f32()).clamp(0.0, 1.0);
+        from + (to - from) * curve(u)
+    }
+
+    fn bounce_moving(&self) -> bool {
+        (self.shown_bounce() - self.bounce_to).abs() > 0.001
+    }
+
+    fn shown_bounce(&self) -> f32 {
+        Self::clocked(
+            self.bounce_start,
+            self.bounce_from,
+            self.bounce_to,
+            icedtea::m3::DurationStep::Long2,
+            self.reduced_motion,
+            icedtea::motion::bounce_out,
+        )
+    }
+
+    fn go_bounce(&mut self) {
+        let shown = self.shown_bounce();
+        self.bounce_from = shown;
+        self.bounce_to = if shown > 0.5 { 0.0 } else { 1.0 };
+        self.bounce_start = Some(icedtea::iced::time::Instant::now());
+    }
+
+    fn shake_moving(&self) -> bool {
+        let Some(start) = self.shake_start else {
+            return false;
+        };
+        let dur =
+            icedtea::motion::duration(icedtea::m3::DurationStep::Medium2, self.reduced_motion);
+        if dur.is_zero() {
+            return false;
+        }
+        icedtea::iced::time::Instant::now().saturating_duration_since(start) < dur
+    }
+
+    fn shown_shake(&self) -> f32 {
+        let Some(start) = self.shake_start else {
+            return 0.0;
+        };
+        let dur =
+            icedtea::motion::duration(icedtea::m3::DurationStep::Medium2, self.reduced_motion);
+        if dur.is_zero() {
+            return 0.0;
+        }
+        let elapsed = icedtea::iced::time::Instant::now().saturating_duration_since(start);
+        let u = (elapsed.as_secs_f32() / dur.as_secs_f32()).clamp(0.0, 1.0);
+        icedtea::motion::shake(u)
     }
 
     fn go_progress(&mut self, to: f32) {
@@ -1749,6 +1921,22 @@ impl Gallery {
                 self.dialog_anim
                     .go_mut(on, icedtea::iced::time::Instant::now());
             }
+            Message::FadeOpen(on) => {
+                self.fade_open = on;
+                self.fade_anim
+                    .go_mut(on, icedtea::iced::time::Instant::now());
+            }
+            Message::BouncePlay => self.go_bounce(),
+            Message::BounceIn => {
+                self.bounce_from = 0.0;
+                self.bounce_to = 0.0;
+                self.bounce_start = None;
+                self.go_bounce();
+            }
+            Message::Pulse(on) => self.pulse_on = on,
+            Message::ShakePlay => {
+                self.shake_start = Some(icedtea::iced::time::Instant::now());
+            }
             Message::ReduceMotion(on) => {
                 self.reduced_motion = on;
                 self.tokens = self.tokens.with_reduced_motion(on);
@@ -1774,6 +1962,10 @@ impl Gallery {
                 self.progress_from = self.value;
                 self.progress_to = self.value;
                 self.progress_start = None;
+                self.fade_anim = icedtea::motion::overlay_animation(self.fade_open, on);
+                self.bounce_from = self.bounce_to;
+                self.bounce_start = None;
+                self.shake_start = None;
             }
             Message::OpenDocs(id) => open_docs_url(id),
             Message::Motion => {
@@ -2471,6 +2663,33 @@ impl Gallery {
         let _ = self.update(Message::Theme(beat.theme.to_string()));
         let _ = self.update(Message::Follow(false));
         let _ = self.update(Message::Appearance(beat.appearance));
+        if beat.act.is_empty() {
+            match beat.page {
+                "motion" => {
+                    self.dialog_open = true;
+                    self.dialog_anim =
+                        icedtea::motion::overlay_animation(true, self.reduced_motion);
+                    self.fade_open = true;
+                    self.fade_anim = icedtea::motion::overlay_animation(true, self.reduced_motion);
+                    self.bounce_from = 1.0;
+                    self.bounce_to = 1.0;
+                    self.bounce_start = None;
+                    self.pulse_on = false;
+                    self.shake_start = None;
+                }
+                "expand-motion" => {
+                    self.expander_open = false;
+                    self.expand_anim =
+                        icedtea::motion::expand_animation(false, self.reduced_motion);
+                }
+                _ => {}
+            }
+        }
+        for line in beat.act.lines() {
+            if let Some(msg) = parse_inject_line(line) {
+                let _ = self.update(msg);
+            }
+        }
     }
 
     fn reveal_nav(&self) -> Task<Message> {
@@ -5365,67 +5584,142 @@ impl Gallery {
                         tok,
                         named("motion", Role::Group),
                     ),
-                    widget::meta(
-                        "Determinate fill eases. The busy bar travels.",
-                        tok,
-                        named("motion-progress-job", Role::Status),
-                    ),
-                    row![
-                        widget::themed_button(
-                            "25%",
-                            Some(Message::Slide(0.25)),
-                            tok,
-                            Variant::Quiet,
-                            Icons::NONE,
-                            btn("m25"),
-                        ),
-                        widget::themed_button(
-                            "60%",
-                            Some(Message::Slide(0.6)),
-                            tok,
-                            Variant::Quiet,
-                            Icons::NONE,
-                            btn("m60"),
-                        ),
-                        widget::themed_button(
-                            "Full",
-                            Some(Message::Slide(1.0)),
-                            tok,
-                            Variant::Primary,
-                            Icons::NONE,
-                            btn("m100"),
-                        ),
-                    ]
-                    .spacing(8),
                     {
-                        let shown = self.shown_progress();
-                        let copy = widget::progress_label(shown, None);
-                        widget::progress(
-                            shown,
-                            None,
-                            Some(copy.as_str()),
-                            false,
-                            tok,
-                            named("motion-bar", Role::Progress).with_value(shown.to_string()),
-                        )
+                        let fade_t = icedtea::motion::visual(
+                            Self::anim_progress(&self.fade_anim),
+                            tok.reduced_motion,
+                        );
+                        let fade_paint = tok.fade(fade_t);
+                        let bounce_t = self.shown_bounce();
+                        let bounce_paint = tok.fade(bounce_t.max(0.15));
+                        let pulse_t = if self.pulse_on && !tok.reduced_motion {
+                            0.55 + 0.45 * icedtea::motion::pulse(self.spin)
+                        } else {
+                            1.0
+                        };
+                        let pulse_paint = tok.fade(pulse_t);
+                        let dx = self.shown_shake() * 16.0;
+                        let fade_col = column![
+                            widget::themed_button(
+                                if self.fade_open {
+                                    "Fade out"
+                                } else {
+                                    "Fade in"
+                                },
+                                Some(Message::FadeOpen(!self.fade_open)),
+                                tok,
+                                Variant::Quiet,
+                                Icons::NONE,
+                                btn("fade-toggle"),
+                            ),
+                            icedtea::motion::overlay(
+                                widget::group_box(
+                                    "Fade",
+                                    widget::label(
+                                        "Slide::None. Tokens::fade.",
+                                        fade_paint,
+                                        named("fade-body", Role::Status),
+                                    ),
+                                    fade_paint,
+                                    CardFace::Elevated,
+                                    named("fade-card", Role::Group),
+                                ),
+                                fade_t,
+                                icedtea::motion::Slide::None,
+                                tok,
+                                named("fade-only", Role::Group),
+                            ),
+                        ]
+                        .spacing(6);
+                        let bounce_col = column![
+                            widget::themed_button(
+                                if bounce_t > 0.5 {
+                                    "Bounce out"
+                                } else {
+                                    "Bounce in"
+                                },
+                                Some(Message::BouncePlay),
+                                tok,
+                                Variant::Quiet,
+                                Icons::NONE,
+                                btn("bounce-play"),
+                            ),
+                            icedtea::motion::overlay(
+                                widget::group_box(
+                                    "Bounce",
+                                    widget::label(
+                                        "bounce_out hops as it lands.",
+                                        bounce_paint,
+                                        named("bounce-body", Role::Status),
+                                    ),
+                                    bounce_paint,
+                                    CardFace::Elevated,
+                                    named("bounce-card", Role::Group),
+                                ),
+                                bounce_t,
+                                icedtea::motion::Slide::Up,
+                                tok,
+                                named("bounce-motion", Role::Group),
+                            ),
+                        ]
+                        .spacing(6);
+                        let pulse_col = column![
+                            widget::themed_switch(
+                                "Pulse",
+                                self.pulse_on,
+                                Message::Pulse,
+                                tok,
+                                named("pulse-switch", Role::Switch).with_checked(self.pulse_on),
+                            ),
+                            widget::group_box(
+                                "Pulse",
+                                widget::label(
+                                    "Loops opacity. Reduced motion holds rest.",
+                                    pulse_paint,
+                                    named("pulse-body", Role::Status),
+                                ),
+                                pulse_paint,
+                                CardFace::Elevated,
+                                named("pulse-card", Role::Group),
+                            ),
+                        ]
+                        .spacing(6);
+                        let shake_col = column![
+                            widget::themed_button(
+                                "Shake",
+                                Some(Message::ShakePlay),
+                                tok,
+                                Variant::Quiet,
+                                Icons::NONE,
+                                btn("shake-play"),
+                            ),
+                            container(widget::group_box(
+                                "Shake",
+                                widget::label(
+                                    "Decaying wiggle, then rest.",
+                                    tok,
+                                    named("shake-body", Role::Status),
+                                ),
+                                tok,
+                                CardFace::Elevated,
+                                named("shake-card", Role::Group),
+                            ))
+                            .padding(Padding {
+                                top: 0.0,
+                                right: (16.0 - dx).max(0.0),
+                                bottom: 0.0,
+                                left: (16.0 + dx).max(0.0),
+                            }),
+                        ]
+                        .spacing(6);
+                        column![
+                            row![fade_col, bounce_col].spacing(12),
+                            row![pulse_col, shake_col].spacing(12),
+                        ]
+                        .spacing(10)
                     },
-                    widget::progress(
-                        self.spin,
-                        None,
-                        Some("working"),
-                        true,
-                        tok,
-                        named("motion-busy", Role::Progress),
-                    ),
-                    widget::progress_ring(
-                        self.shown_progress(),
-                        None,
-                        tok,
-                        named("motion-ring", Role::Progress)
-                            .with_value(self.shown_progress().to_string()),
-                    ),
                 ]
-                .spacing(12)
+                .spacing(10)
                 .into()
             }
             "expand-motion" => {
@@ -5672,7 +5966,10 @@ mod tests {
     #[test]
     fn tour_visits_catalog_pages() {
         let pages = icedtea::catalog::pages();
-        assert_eq!(super::tour_len(), pages.len() + 1);
+        assert_eq!(
+            super::tour_len(),
+            pages.len() + 1 + super::extra_beat_count()
+        );
         assert!(pages.len() < icedtea::catalog::ENTRIES.len());
         let mut seen = std::collections::HashSet::new();
         for i in 0..super::tour_len() {
@@ -5701,6 +5998,15 @@ mod tests {
         let _ = g.update(super::Message::Tour);
         assert_eq!(g.theme, "dark");
         assert_ne!(g.page, "theme");
+        let bounce = (0..super::tour_len())
+            .map(super::tour_beat)
+            .find(|b| b.caption == "Motion: bounce in")
+            .expect("bounce tour beat");
+        assert!(bounce.act.contains("bounce-in"));
+        g.apply_tour_beat(&bounce);
+        assert_eq!(g.page, "motion");
+        assert!(g.bounce_start.is_some());
+        assert!(g.bounce_to > 0.5);
     }
 
     #[test]
@@ -5814,6 +6120,26 @@ mod tests {
             Some(super::Message::DialogOpen(false))
         ));
         assert!(matches!(
+            super::parse_inject_line("fade false"),
+            Some(super::Message::FadeOpen(false))
+        ));
+        assert!(matches!(
+            super::parse_inject_line("bounce"),
+            Some(super::Message::BouncePlay)
+        ));
+        assert!(matches!(
+            super::parse_inject_line("bounce-in"),
+            Some(super::Message::BounceIn)
+        ));
+        assert!(matches!(
+            super::parse_inject_line("pulse true"),
+            Some(super::Message::Pulse(true))
+        ));
+        assert!(matches!(
+            super::parse_inject_line("shake"),
+            Some(super::Message::ShakePlay)
+        ));
+        assert!(matches!(
             super::parse_inject_line("reduce-motion true"),
             Some(super::Message::ReduceMotion(true))
         ));
@@ -5882,6 +6208,16 @@ mod tests {
         assert!(g.reduced_motion);
         assert!(g.tokens.reduced_motion);
         g.page = "motion";
+        let _ = g.view();
+        assert!(g.fade_open);
+        let _ = g.update(super::Message::FadeOpen(false));
+        assert!(!g.fade_open);
+        let _ = g.update(super::Message::BouncePlay);
+        assert!(g.bounce_start.is_some());
+        let _ = g.update(super::Message::Pulse(true));
+        assert!(g.pulse_on);
+        let _ = g.update(super::Message::ShakePlay);
+        assert!(g.shake_start.is_some());
         let _ = g.view();
         g.page = "dialogs";
         let _ = g.view();

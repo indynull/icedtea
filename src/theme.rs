@@ -125,7 +125,8 @@ impl Tokens {
     /// Multiply every scheme role's alpha by `amount` (0..=1).
     ///
     /// Overlay chrome builds its child with `tok.fade(progress)` so
-    /// fills, ink, and icons fade with the slide.
+    /// fills, ink, and icons fade with the slide. `Slide::None` uses
+    /// the same fade with no translate.
     pub fn fade(self, amount: f32) -> Self {
         let mut out = Self::from(self.full.fade(amount));
         out.density = self.density;

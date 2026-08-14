@@ -2,7 +2,8 @@
 //!
 //! The application owns [`iced::Animation`] and the clock. Pass
 //! `animation.interpolate(0.0, 1.0, now)` as `progress`. Reduced-motion
-//! tokens snap that value to 0 or 1.
+//! tokens snap that value to 0 or 1. [`bounce_out`], [`pulse`], and
+//! [`shake`] are extra curves for the same hook.
 
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
@@ -79,6 +80,48 @@ pub fn height(progress: f32, peek: f32, open: f32) -> f32 {
     peek + (open - peek) * t
 }
 
+/// Ease-out bounce. 0 and 1 are at rest; the approach hops.
+///
+/// Pass the result into [`overlay`] or [`expand`] the same way as
+/// [`Ease::sample`](crate::m3::Ease::sample).
+pub fn bounce_out(t: f32) -> f32 {
+    let t = t.clamp(0.0, 1.0);
+    const N1: f32 = 7.5625;
+    const D1: f32 = 2.75;
+    if t < 1.0 / D1 {
+        N1 * t * t
+    } else if t < 2.0 / D1 {
+        let t = t - 1.5 / D1;
+        N1 * t * t + 0.75
+    } else if t < 2.5 / D1 {
+        let t = t - 2.25 / D1;
+        N1 * t * t + 0.9375
+    } else {
+        let t = t - 2.625 / D1;
+        N1 * t * t + 0.984375
+    }
+}
+
+/// One pulse cycle: 0 at the ends, 1 in the middle.
+///
+/// Loop `t` over 0..=1 (the same phase a spinner uses). Reduced
+/// motion should hold 1.
+pub fn pulse(t: f32) -> f32 {
+    let t = t.clamp(0.0, 1.0);
+    0.5 - 0.5 * (t * std::f32::consts::TAU).cos()
+}
+
+/// Shake displacement in -1..=1. 0 at both ends.
+///
+/// Multiply by a pixel amount and shift padding, or scale a slide.
+pub fn shake(t: f32) -> f32 {
+    let t = t.clamp(0.0, 1.0);
+    if t <= 0.0 || t >= 1.0 {
+        return 0.0;
+    }
+    (t * std::f32::consts::PI * 6.0).sin() * (1.0 - t)
+}
+
 /// Toast enter/exit from age and remaining TTL.
 pub fn toast_progress(age_ms: u64, ttl_ms: u64, fade_ms: u64) -> f32 {
     if fade_ms == 0 {
@@ -149,9 +192,10 @@ pub fn progress_run(phase: f32, reduced: bool) -> (f32, f32, f32) {
 /// `progress` is 0 (gone) to 1 (at rest). The application owns
 /// [`iced::Animation`] and passes `interpolate(0.0, 1.0, now)`.
 /// Build the child with [`Tokens::fade`](`crate::theme::Tokens::fade`)
-/// so fills, ink, and icons fade with the slide. Reduced-motion
-/// tokens snap to 0 or 1. Empty progress still occupies layout so a
-/// closing frame can run.
+/// so fills, ink, and icons fade with the slide. [`Slide::None`]
+/// skips the translate (fade only). Reduced-motion tokens snap to
+/// 0 or 1. Empty progress still occupies layout so a closing frame
+/// can run.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -529,6 +573,16 @@ mod tests {
         assert_eq!(height(0.0, 10.0, 40.0), 10.0);
         assert_eq!(height(1.0, 10.0, 40.0), 40.0);
         assert!((height(0.5, 10.0, 40.0) - 25.0).abs() < f32::EPSILON);
+        assert_eq!(bounce_out(0.0), 0.0);
+        assert!((bounce_out(1.0) - 1.0).abs() < 1e-5);
+        let bmid = bounce_out(0.5);
+        assert!(bmid > 0.7 && bmid < 1.0);
+        assert_eq!(pulse(0.0), 0.0);
+        assert!((pulse(0.5) - 1.0).abs() < 1e-5);
+        assert!((pulse(1.0)).abs() < 1e-5);
+        assert_eq!(shake(0.0), 0.0);
+        assert_eq!(shake(1.0), 0.0);
+        assert!(shake(0.2).abs() > 0.1);
         assert_eq!(toast_progress(0, 4000, 150), 0.0);
         assert_eq!(toast_progress(200, 4000, 150), 1.0);
         assert!(toast_progress(200, 80, 150) < 1.0);
