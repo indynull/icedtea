@@ -12,10 +12,10 @@ defaults:
   run:
     shell: bash
 
-# Official Pages recipe: never cancel an in-flight deploy.
+# Cancel superseded pull-request book builds. Never cancel a master deploy.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: book-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 jobs:
   build:
