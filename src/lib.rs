@@ -82,6 +82,7 @@
 //! ([`m3::scheme_light`] / [`m3::scheme_dark`]). Control paint paths
 //! read roles through [`Tokens::scheme`](theme::Tokens::scheme). Short
 //! fields (`primary`, `text`, …) are aliases of those roles.
+//! Desktop chrome is M3 shape None (0 dp, rectangular).
 //! [`theme::mix`] builds washes:
 //!
 //! ```

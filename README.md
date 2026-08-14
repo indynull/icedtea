@@ -6,7 +6,8 @@
 [![check](https://github.com/indynull/icedtea/actions/workflows/ci.yml/badge.svg)][actions]
 
 Native desktop widgets and chrome for [iced](https://iced.rs/).
-Built on [Material Design 3](https://m3.material.io/get-started) foundations (`m3` module).
+Built on [Material Design 3](https://m3.material.io/get-started)
+foundations (`m3` module). Desktop chrome is rectangular (M3 shape None).
 
 `icedtea::run!` starts a themed window. One `Action` feeds the toolbar,
 menus, and shortcuts. Constructors return iced `Element`s and emit
