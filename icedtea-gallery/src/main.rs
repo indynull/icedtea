@@ -75,24 +75,34 @@ fn open_docs_url(id: &str) {
     let _ = c.spawn();
 }
 
-fn ctor_hover<'a>(
+fn ctor_heading<'a>(
     id: &'static str,
-    child: Element<'a, Message>,
+    title: Element<'a, Message>,
     tok: Tokens,
 ) -> Element<'a, Message> {
     let Some((module, name)) = catalog::constructor(id) else {
-        return child;
+        return title;
     };
     let job = widget_job(id).unwrap_or("See rustdoc for the call.");
-    widget::tooltip_rich(
-        child,
-        format!("{module}::{name}"),
-        format!("src/{module}.rs\n{job}"),
-        Some(("Open rustdoc".into(), Message::OpenDocs(id))),
-        widget::TooltipAnchor::Follow,
+    let tip = widget::tooltip_wrap(
+        title,
+        format!("{module}::{name}  ·  src/{module}.rs\n{job}"),
+        widget::TooltipAnchor::Bottom,
         tok,
         named(&format!("{id}-docs"), Role::Tooltip),
-    )
+    );
+    row![
+        tip,
+        widget::hyperlink(
+            "rustdoc",
+            Message::OpenDocs(id),
+            tok,
+            named(&format!("{id}-rustdoc"), Role::Link),
+        ),
+    ]
+    .spacing(12)
+    .align_y(Alignment::Center)
+    .into()
 }
 
 /// Tall notes body for expander and expand-motion. Peek is two lines.
@@ -2601,7 +2611,7 @@ impl Gallery {
                 .font(icedtea::typo::UI_BOLD)
                 .color(tok.scheme().on_surface);
             if hosted.len() == 1 {
-                ctor_hover(hosted[0].id, t.into(), tok)
+                ctor_heading(hosted[0].id, t.into(), tok)
             } else {
                 t.into()
             }
@@ -2647,7 +2657,7 @@ impl Gallery {
             col = col.height(Length::Fill);
         }
         for e in hosted {
-            col = col.push(ctor_hover(
+            col = col.push(ctor_heading(
                 e.id,
                 text(e.title)
                     .size(icedtea::typo::TITLE)
