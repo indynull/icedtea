@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.6.1 — 2026-08-14
+
 ### Controls
 
 - Selected and assist chips paint `primary` / `on_primary` so their ink
