@@ -48,8 +48,10 @@ of the state. `update` applies the message.
 
 [`pattern`](https://docs.rs/icedtea/latest/icedtea/pattern/index.html)
 lays constructors out: `toolbar` and `status_bar` from the action
-table, `list_detail` beside a filling pane, `dock`, `main_window`.
-Recipes (`split`, `clamp`, `form`) are the same module.
+table, `list_detail` beside a filling pane, `main_window`.
+[`layout`](https://docs.rs/icedtea/latest/icedtea/layout/index.html)
+is the box recipes: `layout::dock`, `layout::split_view`,
+`layout::clamp`, `layout::form`. See [Layout](layout.md).
 
 An open modal consumes keys first. Otherwise a focused field owns
 unmodified typing. Otherwise `key::handle` matches the action table.

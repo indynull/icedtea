@@ -475,6 +475,27 @@ mod tests {
         for needle in ["Boot", "Tokens", "ActionTable", "Constructor", "Pattern"] {
             assert!(fig.contains(needle), "compose.svg must name {needle}");
         }
+        let pattern_src = include_str!("pattern.rs");
+        let recipes = include_str!("layout/recipes.rs");
+        assert!(
+            !pattern_src.contains("pub fn dock<"),
+            "dock is not a pattern constructor"
+        );
+        assert!(recipes.contains("pub fn dock<"), "dock lives in layout");
+        assert!(
+            page.contains("layout::"),
+            "architecture must send readers to layout for box recipes"
+        );
+        for recipe in ["dock", "split_view", "clamp", "form"] {
+            assert!(
+                page.contains(recipe),
+                "architecture must name layout::{recipe}"
+            );
+        }
+        assert!(
+            !page.contains("are the same module"),
+            "layout recipes must not be filed under pattern"
+        );
         for (label, src) in [("page", page.as_str()), ("figure", fig.as_str())] {
             assert!(
                 !src.contains("Notes"),

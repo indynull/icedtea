@@ -10,7 +10,7 @@
 ### Guide
 
 - Architecture walks a multi-action window: Boot, tokens, ActionTable,
-  constructors, and patterns.
+  constructors, patterns, and `layout` recipes.
 - The handbook sidebar nests Start, Compose, Cookbook, and Reference
   as sections with indented pages.
 - First-window and each visual reference group show a captured still
