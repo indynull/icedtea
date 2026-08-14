@@ -104,7 +104,11 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   document copy is `copy_text` on `MarkdownDoc::source`. Contract:
   `select` module rustdoc. Gallery demos only public constructors.
 - Always drop `target/llvm-cov-target` after a passing coverage run.
-  `just clean` is `cargo clean`. Check recipes set `CARGO_INCREMENTAL=0`.
+  `just clean` is `cargo clean`. Only `just cov` (and continuous
+  integration) set `CARGO_INCREMENTAL=0`. Targeted `cargo test` /
+  `cargo check` / `just test` leave incremental on.
+- Never prefix a targeted cargo command with `CARGO_INCREMENTAL=0`.
+  That rebuilds iced and the workspace on every turn.
 - Always keep `TODO.md` current with the shipped library. Sort items
   into Do / Consider / discard in the same change. Never leave Order
   or Do pointing at finished work. Never park or discard a job because
@@ -203,9 +207,12 @@ feature-complete handoff): `cargo fmt --all -- --check`, clippy
 workspace `-D warnings`, `cargo test --workspace --all-features`,
 `cargo doc` on `icedtea`, `cargo llvm-cov` on `icedtea` with
 `--fail-under-lines 99 --ignore-filename-regex 'src[/\\]host'`.
-Check/clippy/test/doc/cov set `CARGO_INCREMENTAL=0`. After a passing
-`just cov`, delete `target/llvm-cov-target` (and `target/llvm-cov`).
-`just clean` is `cargo clean`. Recipes: `just fmt-check`, `just clippy`,
+Only `just cov` sets `CARGO_INCREMENTAL=0` (llvm-cov uses
+`target/llvm-cov-target`). After a passing `just cov`, delete
+`target/llvm-cov-target` (and `target/llvm-cov`). Continuous
+integration sets `CARGO_INCREMENTAL=0` on the job. Local `just test` /
+`just clippy` / `just doc` keep the debug incremental graph. `just
+clean` is `cargo clean`. Recipes: `just fmt-check`, `just clippy`,
 `just test`, `just doc`, `just cov`.
 
 **Agent verification (default: targeted, not full `just check`)**

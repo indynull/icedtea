@@ -11,15 +11,16 @@ fmt-check:
     cargo fmt --all -- --check
 
 clippy:
-    CARGO_INCREMENTAL=0 cargo clippy --workspace --all-targets --all-features -- -D warnings
+    cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 test:
-    CARGO_INCREMENTAL=0 cargo test --workspace --all-features
+    cargo test --workspace --all-features
 
 doc:
-    CARGO_INCREMENTAL=0 cargo doc --package icedtea --no-deps --document-private-items
+    cargo doc --package icedtea --no-deps --document-private-items
 
-# Drop target/llvm-cov-target after a passing report.
+# Isolated coverage tree. Incremental off only here so rustc flags do not
+# poison target/debug. Delete the tree after a passing report.
 cov:
     CARGO_INCREMENTAL=0 cargo llvm-cov --package icedtea --all-features --fail-under-lines 99 --ignore-filename-regex 'src[/\\]host'
     rm -rf target/llvm-cov-target target/llvm-cov
