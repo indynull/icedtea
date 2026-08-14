@@ -93,7 +93,8 @@ Constructor: [`widget::tree_view`](https://docs.rs/icedtea/latest/icedtea/widget
 [icedtea](https://crates.io/crates/icedtea)
 
 The application owns expand state. Leaf rows have no twisty. Empty
-tree is an empty column.
+tree is an empty column. `animating` is the branch that is opening or
+closing and its 0–1 height progress.
 
 
 ### Tabs

@@ -38,8 +38,9 @@ and [`progress_ring`](https://docs.rs/icedtea/latest/icedtea/widget/fn.progress_
 [`motion::progress_run`](https://docs.rs/icedtea/latest/icedtea/motion/fn.progress_run.html)
 is the linear busy-bar phase.
 
-`modal_card`, `side_sheet`, `command_palette_view`, `expander`, and
-`accordion_view` take that same 0–1 progress.
+`modal_card`, `side_sheet`, `command_palette_view`, `context_menu`,
+`cascade_menu`, `drawer`, `expander`, `accordion_view`, and `tree_view`
+take that same 0–1 progress (`tree_view` as `animating: Option<(id, progress)>`).
 
 ## Mix several jobs
 

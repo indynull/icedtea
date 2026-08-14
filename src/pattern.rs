@@ -1176,7 +1176,8 @@ pub fn sectioned_menu<'a, M: Clone + 'a>(
 /// Two-level cascade: primary list, optional open submenu panel.
 ///
 /// The application owns which primary row is expanded (`open_sub`).
-/// Sub items share the same message type as top-level actions.
+/// `sub_progress` is 0 (gone) to 1 (rest) for that panel. Sub items
+/// share the same message type as top-level actions.
 ///
 /// ```
 /// use icedtea::action::Action;
@@ -1190,6 +1191,7 @@ pub fn sectioned_menu<'a, M: Clone + 'a>(
 /// let _: icedtea::Element<'_, usize> = pattern::cascade_menu(
 ///     vec![(open, Some(recent))],
 ///     Some(0),
+///     1.0,
 ///     on_open,
 ///     tok,
 ///     A11y::new("File", Role::Menu),
@@ -1198,6 +1200,7 @@ pub fn sectioned_menu<'a, M: Clone + 'a>(
 pub fn cascade_menu<'a, M: Clone + 'a>(
     entries: impl IntoIterator<Item = (Action<M>, Option<Vec<Action<M>>>)>,
     open_sub: Option<usize>,
+    sub_progress: f32,
     on_open_sub: impl Fn(Option<usize>) -> M + Copy + 'a,
     tok: Tokens,
     a11y: A11y,
@@ -1240,10 +1243,19 @@ pub fn cascade_menu<'a, M: Clone + 'a>(
     if let Some(i) = open_sub {
         if let Some((_, Some(kids))) = entries.get(i) {
             if !kids.is_empty() {
-                row = row.push(sectioned_menu(
+                let t = crate::motion::visual(sub_progress, tok.reduced_motion);
+                let paint = tok.fade(t);
+                let sub = sectioned_menu(
                     vec![MenuSection::untitled(kids.clone())],
-                    tok,
+                    paint,
                     A11y::new("submenu", Role::Menu),
+                );
+                row = row.push(crate::motion::overlay(
+                    sub,
+                    t,
+                    crate::motion::Slide::End,
+                    tok,
+                    A11y::new("submenu-motion", Role::Group),
                 ));
             }
         }
@@ -1385,6 +1397,7 @@ pub fn context_origin(origin: Point, size: Size, viewport: Size) -> Point {
 ///
 /// Right-click is the application's (`listen_cursor`). Empty `actions`
 /// still paints a card. `viewport` clamps the card to its real size.
+/// `progress` is 0 (gone) to 1 (rest).
 ///
 ///
 /// ```
@@ -1401,6 +1414,7 @@ pub fn context_origin(origin: Point, size: Size, viewport: Size) -> Point {
 ///     icedtea::iced::Point::new(24.0, 48.0),
 ///     vp,
 ///     (),
+///     1.0,
 ///     tok,
 /// );
 /// ```
@@ -1409,8 +1423,11 @@ pub fn context_menu<'a, M: Clone + 'a>(
     origin: Point,
     viewport: Size,
     on_dismiss: M,
+    progress: f32,
     tok: Tokens,
 ) -> Element<'a, M> {
+    let t = crate::motion::visual(progress, tok.reduced_motion);
+    let paint = tok.fade(t);
     let actions: Vec<Action<M>> = actions.into_iter().collect();
     let n = actions.len();
     let size = context_card_size(n, viewport);
@@ -1420,7 +1437,7 @@ pub fn context_menu<'a, M: Clone + 'a>(
         col = col.push(themed_button(
             a.title.clone(),
             a.invoke(),
-            tok,
+            paint,
             Variant::Ghost,
             Icons::NONE,
             A11y::new(a.title.clone(), Role::MenuItem).with_disabled(!a.enabled),
@@ -1430,7 +1447,7 @@ pub fn context_menu<'a, M: Clone + 'a>(
     let inner = if size.height + 1.0 < 12.0 + (n.max(1) as f32) * 34.0 {
         container(themed_scroll(
             list,
-            tok,
+            paint,
             A11y::new("context-scroll", Role::Group),
             false,
             None,
@@ -1443,7 +1460,7 @@ pub fn context_menu<'a, M: Clone + 'a>(
             .width(Length::Fixed(size.width))
             .height(Length::Fixed(size.height))
     };
-    let card = container(inner).style(move |_| style::raised_card(tok));
+    let card = container(inner).style(move |_| style::fade_face(style::raised_card(tok), t));
     let placed = container(card).padding(Padding {
         top: at.y,
         right: 0.0,
@@ -1454,7 +1471,13 @@ pub fn context_menu<'a, M: Clone + 'a>(
         .push(
             mouse_area(Space::new().width(Length::Fill).height(Length::Fill)).on_press(on_dismiss),
         )
-        .push(placed)
+        .push(crate::motion::overlay(
+            placed.into(),
+            t,
+            crate::motion::Slide::Up,
+            tok,
+            A11y::new("context-motion", Role::Group),
+        ))
         .width(Length::Fill)
         .height(Length::Fill)
         .into()
@@ -1707,7 +1730,8 @@ pub fn tool_panel<'a, M: Clone + 'a>(
 
 /// Compact-width side pane beside `content`.
 ///
-/// `open` is `list_detail` with a fixed pane. Closed paints `content` only.
+/// `open` is the committed pane. `progress` is 0 (gone) to 1 (220 dp).
+/// Closed at 0 paints `content` only.
 ///
 ///
 /// ```
@@ -1720,6 +1744,7 @@ pub fn tool_panel<'a, M: Clone + 'a>(
 ///     true,
 ///     widget::label("nav", tok, A11y::new("nav", Role::Group)),
 ///     widget::label("main", tok, A11y::new("main", Role::Status)),
+///     1.0,
 ///     tok,
 /// );
 /// ```
@@ -1727,12 +1752,14 @@ pub fn drawer<'a, M: 'a>(
     open: bool,
     pane: Element<'a, M>,
     content: Element<'a, M>,
+    progress: f32,
     tok: Tokens,
 ) -> Element<'a, M> {
-    if open {
-        list_detail(pane, content, layout::fixed(220.0), tok)
-    } else {
+    let t = crate::motion::visual(progress, tok.reduced_motion);
+    if !open && t <= 0.0 {
         content
+    } else {
+        list_detail(pane, content, layout::fixed((220.0 * t).max(1.0)), tok)
     }
 }
 
@@ -1904,7 +1931,7 @@ mod tests {
             tok,
             A11y::new("m", Role::Menu),
         );
-        let _: Element<'_, Option<usize>> = cascade_menu(
+        let mut open_sub = cascade_menu(
             vec![
                 (
                     Action::new("file.recent", "Recent", None),
@@ -1918,16 +1945,31 @@ mod tests {
                 (Action::new("file.none", "Empty", None), Some(vec![])),
             ],
             Some(0),
+            1.0,
             |i| i,
             tok,
             A11y::new("c", Role::Menu),
         );
+        draw_once(&mut open_sub);
+        let mut mid_sub = cascade_menu(
+            vec![(
+                Action::new("file.recent", "Recent", None),
+                Some(vec![Action::new("file.r1", "a", Some(0))]),
+            )],
+            Some(0),
+            0.4,
+            |i| i,
+            tok,
+            A11y::new("c-mid", Role::Menu),
+        );
+        draw_once(&mut mid_sub);
         let _: Element<'_, Option<usize>> = cascade_menu(
             vec![(
                 Action::new("file.recent", "Recent", None),
                 Some(vec![Action::new("file.r1", "a", Some(0))]),
             )],
             Some(99),
+            0.4,
             |i| i,
             tok,
             A11y::new("c-miss", Role::Menu),
@@ -1935,6 +1977,7 @@ mod tests {
         let _: Element<'_, Option<usize>> = cascade_menu(
             vec![(Action::new("x", "X", Some(1)), None)],
             None,
+            0.0,
             |i| i,
             tok,
             A11y::new("c2", Role::Menu),
@@ -2189,6 +2232,7 @@ mod tests {
             iced::Point::ORIGIN,
             iced::Size::new(640.0, 400.0),
             (),
+            1.0,
             tok,
         );
         fn paint(el: &mut Element<'_, ()>) {
@@ -2277,6 +2321,7 @@ mod tests {
             iced::Point::new(12.0, 20.0),
             vp,
             (),
+            1.0,
             tok,
         );
         paint(&mut cm);
@@ -2285,6 +2330,7 @@ mod tests {
             iced::Point::new(800.0, 500.0),
             vp,
             (),
+            0.5,
             tok,
         );
         paint(&mut edge);
@@ -2294,13 +2340,14 @@ mod tests {
             iced::Point::new(-8.0, -4.0),
             iced::Size::new(10.0, 10.0),
             (),
+            0.0,
             tok,
         );
         paint(&mut empty);
         let many: Vec<Action<()>> = (0..30)
             .map(|i| Action::new(format!("a.{i}"), format!("A{i}"), ()))
             .collect();
-        let mut long = context_menu(many, iced::Point::new(8.0, 8.0), vp, (), tok);
+        let mut long = context_menu(many, iced::Point::new(8.0, 8.0), vp, (), 1.0, tok);
         paint(&mut long);
         let mut ld = list_detail(lab("l"), lab("d"), crate::layout::fixed(260.0), tok);
         paint(&mut ld);
@@ -2354,10 +2401,14 @@ mod tests {
             A11y::new("tp", Role::Group),
         );
         paint(&mut tp);
-        let mut dr = drawer(true, lab("n"), lab("c"), tok);
+        let mut dr = drawer(true, lab("n"), lab("c"), 1.0, tok);
         paint(&mut dr);
-        let mut shut = drawer(false, lab("n"), lab("c"), tok);
+        let mut mid = drawer(true, lab("n"), lab("c"), 0.4, tok);
+        paint(&mut mid);
+        let mut shut = drawer(false, lab("n"), lab("c"), 0.0, tok);
         paint(&mut shut);
+        let mut closing = drawer(false, lab("n"), lab("c"), 0.5, tok);
+        paint(&mut closing);
         let mut sheet = cheatsheet(&table, "sa", tok);
         paint(&mut sheet);
         let mut extra = ActionTable::new();

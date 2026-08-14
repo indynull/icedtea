@@ -153,7 +153,7 @@ Constructor: [`pattern::context_menu`](https://docs.rs/icedtea/latest/icedtea/pa
 [icedtea](https://crates.io/crates/icedtea)
 
 Stack on the window with the click point. Click-away dismisses.
-Empty table still paints a card.
+Empty table still paints a card. `progress` is 0 (gone) to 1 (rest).
 
 ### Breadcrumb
 
@@ -304,4 +304,5 @@ Constructor: [`pattern::cascade_menu`](https://docs.rs/icedtea/latest/icedtea/pa
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
-The application owns which primary row is expanded.
+The application owns which primary row is expanded. `sub_progress`
+is 0 (gone) to 1 (rest) for that panel.

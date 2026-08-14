@@ -29,10 +29,15 @@
 - `modal_card` and `side_sheet` take overlay `progress` (fade plus a
   short slide).
 - `command_palette_view` takes overlay `progress`.
+- `drawer` takes pane `progress` (width 0–220 dp).
+- `context_menu` takes overlay `progress`.
+- `cascade_menu` takes submenu `progress`.
 
 ### Collections
 
 - `expander` and `accordion_view` take height `progress`.
+- `tree_view` takes `animating` (`Option<(id, progress)>`) so a branch
+  can grow and shrink.
 
 ### Readout
 

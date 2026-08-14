@@ -54,7 +54,8 @@ Constructor: [`pattern::drawer`](https://docs.rs/icedtea/latest/icedtea/pattern/
 [source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-`open` is `list_detail` with a fixed pane. Closed paints content only.
+`open` is the committed pane. `progress` is 0 (gone) to 1 (220 dp).
+Closed at 0 paints content only.
 
 ### Workspace
 

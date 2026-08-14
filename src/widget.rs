@@ -4643,6 +4643,8 @@ where
 /// An expandable outline.
 ///
 /// The application owns expand state. Leaf rows have no twisty.
+/// `animating` is the branch that is opening or closing and its 0–1
+/// height progress. `None` paints the committed tree.
 ///
 ///
 /// ```
@@ -4662,6 +4664,7 @@ where
 /// let _: icedtea::Element<'_, Msg> = widget::tree_view(
 ///     &tree,
 ///     None,
+///     None,
 ///     on_toggle,
 ///     on_select,
 ///     tok,
@@ -4671,57 +4674,45 @@ where
 pub fn tree_view<'a, M: Clone + 'a>(
     root: &TreeNode,
     selected: Option<u64>,
+    animating: Option<(u64, f32)>,
     on_toggle: impl Fn(u64) -> M + Copy + 'a,
     on_select: impl Fn(u64) -> M + Copy + 'a,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
+    let closing = animating.map(|(id, _)| id);
+    let progress = animating.map(|(_, p)| p).unwrap_or(1.0);
+    let anim_id = animating.map(|(id, _)| id);
     let mut col = Column::new().spacing(2);
-    for (depth, id, label_s, expanded, has_children) in root.flatten() {
-        let is_sel = selected == Some(id);
-        let mut line = Row::new().spacing(4).align_y(Alignment::Center);
-        line = line.push(Space::new().width(Length::Fixed(depth as f32 * 16.0)));
-        if has_children {
-            let mark = if expanded { "▾" } else { "▸" };
-            line = line.push(themed_button(
-                mark,
-                a11y.apply_message(Some(on_toggle(id))),
-                tok,
-                Variant::Ghost,
-                Icons::NONE,
-                A11y::button(format!("toggle {label_s}"))
-                    .with_checked(expanded)
-                    .with_disabled(a11y.disabled),
-            ));
-        } else {
-            line = line.push(Space::new().width(28.0));
+    let mut branch: Vec<Element<'a, M>> = Vec::new();
+    let mut wrap_depth: Option<u32> = None;
+    for (depth, id, label_s, expanded, has_children) in root.flatten_during(closing) {
+        if wrap_depth.is_some_and(|d| depth <= d) {
+            col = tree_push_branch(col, std::mem::take(&mut branch), progress, tok);
+            wrap_depth = None;
         }
-        let title = container(label(
-            label_s.clone(),
+        let line = tree_line(
+            depth,
+            id,
+            label_s,
+            expanded,
+            has_children,
+            selected,
+            &on_toggle,
+            &on_select,
             tok,
-            A11y::new(label_s.clone(), Role::Tree).with_checked(is_sel),
-        ))
-        .width(Length::Fill)
-        .padding([6, 8]);
-        let title: Element<'a, M> = if is_sel {
-            title.style(move |_| style::list_row(tok, true)).into()
+            &a11y,
+        );
+        if Some(id) == anim_id {
+            col = col.push(line);
+            wrap_depth = Some(depth);
+        } else if wrap_depth.is_some() {
+            branch.push(line);
         } else {
-            title.into()
-        };
-        let pick: Element<'a, M> = if a11y.disabled {
-            title
-        } else {
-            mouse_area(title)
-                .on_press(on_select(id))
-                .on_right_press(on_select(id))
-                .into()
-        };
-        line = line.push(a11y::attach(
-            pick,
-            &A11y::new(label_s, Role::Tree).with_checked(is_sel),
-        ));
-        col = col.push(line);
+            col = col.push(line);
+        }
     }
+    col = tree_push_branch(col, branch, progress, tok);
     a11y::attach(
         themed_scroll(
             col.into(),
@@ -4733,6 +4724,92 @@ pub fn tree_view<'a, M: Clone + 'a>(
         ),
         &a11y,
     )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn tree_line<'a, M: Clone + 'a>(
+    depth: u32,
+    id: u64,
+    label_s: String,
+    expanded: bool,
+    has_children: bool,
+    selected: Option<u64>,
+    on_toggle: &impl Fn(u64) -> M,
+    on_select: &impl Fn(u64) -> M,
+    tok: Tokens,
+    a11y: &A11y,
+) -> Element<'a, M> {
+    let is_sel = selected == Some(id);
+    let mut line = Row::new().spacing(4).align_y(Alignment::Center);
+    line = line.push(Space::new().width(Length::Fixed(depth as f32 * 16.0)));
+    if has_children {
+        let mark = if expanded { "▾" } else { "▸" };
+        line = line.push(themed_button(
+            mark,
+            a11y.apply_message(Some(on_toggle(id))),
+            tok,
+            Variant::Ghost,
+            Icons::NONE,
+            A11y::button(format!("toggle {label_s}"))
+                .with_checked(expanded)
+                .with_disabled(a11y.disabled),
+        ));
+    } else {
+        line = line.push(Space::new().width(28.0));
+    }
+    let title = container(label(
+        label_s.clone(),
+        tok,
+        A11y::new(label_s.clone(), Role::Tree).with_checked(is_sel),
+    ))
+    .width(Length::Fill)
+    .padding([6, 8]);
+    let title: Element<'a, M> = if is_sel {
+        title.style(move |_| style::list_row(tok, true)).into()
+    } else {
+        title.into()
+    };
+    let pick: Element<'a, M> = if a11y.disabled {
+        title
+    } else {
+        mouse_area(title)
+            .on_press(on_select(id))
+            .on_right_press(on_select(id))
+            .into()
+    };
+    line = line.push(a11y::attach(
+        pick,
+        &A11y::new(label_s, Role::Tree).with_checked(is_sel),
+    ));
+    line.into()
+}
+
+fn tree_push_branch<'a, M: Clone + 'a>(
+    col: Column<'a, M>,
+    rows: Vec<Element<'a, M>>,
+    progress: f32,
+    tok: Tokens,
+) -> Column<'a, M> {
+    if rows.is_empty() {
+        return col;
+    }
+    let mut kids = Column::new().spacing(2);
+    for row in rows {
+        kids = kids.push(row);
+    }
+    let body: Element<'a, M> = kids.into();
+    let t = crate::motion::visual(progress, tok.reduced_motion);
+    if t >= 1.0 {
+        col.push(body)
+    } else {
+        col.push(crate::motion::expand(
+            body,
+            t,
+            0.0,
+            tok,
+            A11y::new("tree-branch", Role::Group),
+        ))
+    }
 }
 
 /// Map a More-list title back to its tab index.
@@ -6365,6 +6442,7 @@ mod tests {
         let _: Element<'_, ()> = tree_view(
             &tree,
             Some(2),
+            None,
             |_| (),
             |_| (),
             tok,
@@ -6447,6 +6525,7 @@ mod tests {
         let _: Element<'_, ()> = tree_view(
             &collapsed,
             selected,
+            Some((1, 0.5)),
             |_| (),
             |_| (),
             tok,
@@ -7072,12 +7151,33 @@ mod tests {
         let mut tv = tree_view(
             &tree,
             Some(1),
+            None,
             |_| (),
             |_| (),
             tok,
             role("tree", Role::Tree),
         );
         draw_once(&mut tv);
+        let mut mid = tree_view(
+            &tree,
+            Some(1),
+            Some((1, 0.5)),
+            |_| (),
+            |_| (),
+            tok,
+            role("tree", Role::Tree),
+        );
+        draw_once(&mut mid);
+        let mut shut = tree_view(
+            &tree,
+            Some(1),
+            Some((1, 0.0)),
+            |_| (),
+            |_| (),
+            tok.with_reduced_motion(true),
+            role("tree", Role::Tree),
+        );
+        draw_once(&mut shut);
         let acc = Accordion { open: Some(0) };
         let mut av = accordion_view(
             &["A".into()],
@@ -7220,6 +7320,7 @@ mod tests {
         let mut dead_tree = tree_view(
             &tree,
             Some(1),
+            None,
             |_| (),
             |_| (),
             tok,
@@ -7482,6 +7583,7 @@ mod tests {
         let _: Element<'_, u64> = tree_view(
             &tree,
             selected,
+            None,
             |id| id,
             |id| id,
             tok,
@@ -7490,6 +7592,7 @@ mod tests {
         let _: Element<'_, u64> = tree_view(
             &tree,
             None,
+            Some((1, 0.4)),
             |id| id,
             |id| id,
             tok,

@@ -828,13 +828,24 @@ impl TreeNode {
     }
 
     pub fn flatten(&self) -> Vec<(u32, u64, String, bool, bool)> {
+        self.flatten_during(None)
+    }
+
+    /// Rows on screen, including children of `id` while that node is
+    /// collapsed (close animation still running).
+    pub fn flatten_during(&self, id: Option<u64>) -> Vec<(u32, u64, String, bool, bool)> {
         let mut out = Vec::new();
-        flatten_into(self, 0, &mut out);
+        flatten_into(self, 0, id, &mut out);
         out
     }
 }
 
-fn flatten_into(node: &TreeNode, depth: u32, out: &mut Vec<(u32, u64, String, bool, bool)>) {
+fn flatten_into(
+    node: &TreeNode,
+    depth: u32,
+    during: Option<u64>,
+    out: &mut Vec<(u32, u64, String, bool, bool)>,
+) {
     let has_children = node.dir || !node.children.is_empty();
     out.push((
         depth,
@@ -843,9 +854,9 @@ fn flatten_into(node: &TreeNode, depth: u32, out: &mut Vec<(u32, u64, String, bo
         node.expanded,
         has_children,
     ));
-    if node.expanded {
+    if node.expanded || during == Some(node.id) {
         for c in &node.children {
-            flatten_into(c, depth + 1, out);
+            flatten_into(c, depth + 1, during, out);
         }
     }
 }
@@ -1177,6 +1188,8 @@ mod tests {
         assert!(tree_toggle(&mut tree, 1));
         assert!(!tree.expanded);
         assert_eq!(tree.flatten().len(), 1);
+        assert_eq!(tree.flatten_during(Some(1)).len(), 3);
+        assert_eq!(tree.flatten_during(Some(2)).len(), 1);
         assert!(tree_toggle(&mut tree, 1));
         assert!(tree_toggle(&mut tree, 2));
         assert!(!tree_toggle(&mut tree, 99));

@@ -50,6 +50,13 @@ fn fill_lazy_folder(node: &mut TreeNode, id: u64) {
     }
 }
 
+fn tree_is_open(node: &TreeNode, id: u64) -> bool {
+    if node.id == id {
+        return node.expanded;
+    }
+    node.children.iter().any(|c| tree_is_open(c, id))
+}
+
 fn named(name: &str, role: Role) -> A11y {
     A11y::new(name, role)
 }
@@ -901,6 +908,7 @@ struct Gallery {
     table: TableModel,
     tree: TreeNode,
     tree_sel: Option<u64>,
+    tree_anim: Option<(u64, icedtea::iced::Animation<bool>)>,
     /// Full mail seed; filter + page slice into [`Self::list`].
     list_all: VecList,
     /// (unread, flagged) parallel to `list_all`.
@@ -971,6 +979,10 @@ struct Gallery {
     expand_anim: icedtea::iced::Animation<bool>,
     acc_anim: icedtea::iced::Animation<bool>,
     acc_closing: bool,
+    context_anim: icedtea::iced::Animation<bool>,
+    context_closing: bool,
+    cascade_anim: icedtea::iced::Animation<bool>,
+    cascade_closing: bool,
     progress_from: f32,
     progress_to: f32,
     progress_start: Option<icedtea::iced::time::Instant>,
@@ -988,6 +1000,7 @@ struct Gallery {
     tour_at: usize,
     ws: icedtea::workspace::DockNode,
     drawer_open: bool,
+    drawer_anim: icedtea::iced::Animation<bool>,
     cheat_q: String,
     last_sel: Option<String>,
     list_heights: Vec<f32>,
@@ -1126,6 +1139,7 @@ impl Gallery {
                 ],
             ),
             tree_sel: None,
+            tree_anim: None,
             list_all: VecList {
                 items: (0..1_000).map(sample_mail).collect(),
             },
@@ -1267,6 +1281,10 @@ impl Gallery {
             expand_anim: icedtea::motion::expand_animation(false, false),
             acc_anim: icedtea::motion::expand_animation(true, false),
             acc_closing: false,
+            context_anim: icedtea::motion::overlay_animation(false, false),
+            context_closing: false,
+            cascade_anim: icedtea::motion::overlay_animation(false, false),
+            cascade_closing: false,
             progress_from: 0.4,
             progress_to: 0.4,
             progress_start: None,
@@ -1295,6 +1313,7 @@ impl Gallery {
                 ),
             ),
             drawer_open: true,
+            drawer_anim: icedtea::motion::expand_animation(true, false),
             cheat_q: String::new(),
             last_sel: None,
             list_heights: Vec::new(),
@@ -1348,9 +1367,29 @@ impl Gallery {
             || self.palette_anim.is_animating(now)
             || self.expand_anim.is_animating(now)
             || self.acc_anim.is_animating(now)
+            || self.drawer_anim.is_animating(now)
+            || self.context_anim.is_animating(now)
+            || self.cascade_anim.is_animating(now)
+            || self
+                .tree_anim
+                .as_ref()
+                .is_some_and(|(_, a)| a.is_animating(now))
             || self.progress_moving()
             || self.acc_closing
+            || self.context_closing
+            || self.cascade_closing
             || self.toasts.iter().next().is_some()
+    }
+
+    fn tree_animating(&self) -> Option<(u64, f32)> {
+        let (id, anim) = self.tree_anim.as_ref()?;
+        let now = icedtea::iced::time::Instant::now();
+        let p = Self::anim_progress(anim);
+        if anim.is_animating(now) || (p > 0.0 && p < 1.0) {
+            Some((*id, p))
+        } else {
+            None
+        }
     }
 
     fn progress_moving(&self) -> bool {
@@ -1614,11 +1653,13 @@ impl Gallery {
                     | Message::ContextDismiss
                     | Message::Sash(_)
                     | Message::Tick
+                    | Message::Motion
                     | Message::WindowSize(_)
                     | Message::WindowHeight(_)
             )
         {
             self.context = None;
+            self.context_closing = false;
         }
         match message {
             Message::Theme(name) => {
@@ -1682,7 +1723,22 @@ impl Gallery {
                 self.range_hi = hi;
             }
             Message::Segment(i) => self.segment = i,
-            Message::CascadeOpen(i) => self.cascade_open = i,
+            Message::CascadeOpen(i) => {
+                let now = icedtea::iced::time::Instant::now();
+                match i {
+                    None => {
+                        self.cascade_closing = true;
+                        self.cascade_anim.go_mut(false, now);
+                    }
+                    Some(n) => {
+                        self.cascade_open = Some(n);
+                        self.cascade_closing = false;
+                        self.cascade_anim =
+                            icedtea::motion::overlay_animation(false, self.reduced_motion);
+                        self.cascade_anim.go_mut(true, now);
+                    }
+                }
+            }
             Message::SideSheet(on) => {
                 self.side_sheet = on;
                 self.sheet_anim
@@ -1702,6 +1758,19 @@ impl Gallery {
                 self.expand_anim = icedtea::motion::expand_animation(self.expander_open, on);
                 self.acc_anim =
                     icedtea::motion::expand_animation(self.accordion.open.is_some(), on);
+                self.drawer_anim = icedtea::motion::expand_animation(self.drawer_open, on);
+                self.context_anim = icedtea::motion::overlay_animation(
+                    self.context.is_some() && !self.context_closing,
+                    on,
+                );
+                self.cascade_anim = icedtea::motion::overlay_animation(
+                    self.cascade_open.is_some() && !self.cascade_closing,
+                    on,
+                );
+                if let Some((id, _)) = self.tree_anim {
+                    let open = tree_is_open(&self.tree, id);
+                    self.tree_anim = Some((id, icedtea::motion::expand_animation(open, on)));
+                }
                 self.progress_from = self.value;
                 self.progress_to = self.value;
                 self.progress_start = None;
@@ -1713,6 +1782,19 @@ impl Gallery {
                 if self.acc_closing && !self.acc_anim.is_animating(now) {
                     self.accordion.open = None;
                     self.acc_closing = false;
+                }
+                if self.context_closing && !self.context_anim.is_animating(now) {
+                    self.context = None;
+                    self.context_closing = false;
+                }
+                if self.cascade_closing && !self.cascade_anim.is_animating(now) {
+                    self.cascade_open = None;
+                    self.cascade_closing = false;
+                }
+                if let Some((_, anim)) = &self.tree_anim {
+                    if !anim.is_animating(now) {
+                        self.tree_anim = None;
+                    }
                 }
             }
             Message::SearchClear => self.query = String::new(),
@@ -1796,7 +1878,11 @@ impl Gallery {
                     self.note = "Outline docked on the right".into();
                 }
             }
-            Message::DrawerToggle => self.drawer_open = !self.drawer_open,
+            Message::DrawerToggle => {
+                self.drawer_open = !self.drawer_open;
+                self.drawer_anim
+                    .go_mut(self.drawer_open, icedtea::iced::time::Instant::now());
+            }
             Message::Cheat(q) => self.cheat_q = q,
             Message::WsPress(i) => {
                 self.ws_sash = Some(i);
@@ -1839,8 +1925,13 @@ impl Gallery {
             }
             Message::Sort(c) => self.table.sort(c),
             Message::Tree(id) => {
+                let now = icedtea::iced::time::Instant::now();
+                let opening = !tree_is_open(&self.tree, id);
                 let _ = icedtea::collection::tree_toggle(&mut self.tree, id);
                 fill_lazy_folder(&mut self.tree, id);
+                let mut anim = icedtea::motion::expand_animation(!opening, self.reduced_motion);
+                anim.go_mut(opening, now);
+                self.tree_anim = Some((id, anim));
             }
             Message::TreeSelect(id) => self.tree_sel = Some(id),
             Message::ListScroll(w) => {
@@ -2217,10 +2308,17 @@ impl Gallery {
                 icedtea::layout::CursorEvent::Context => {
                     if wants_context(self.page) && self.pointer_in_content() {
                         self.context = Some(self.pointer);
+                        self.context_closing = false;
+                        self.context_anim
+                            .go_mut(true, icedtea::iced::time::Instant::now());
                     }
                 }
             },
-            Message::ContextDismiss => self.context = None,
+            Message::ContextDismiss => {
+                self.context_closing = true;
+                self.context_anim
+                    .go_mut(false, icedtea::iced::time::Instant::now());
+            }
             Message::EditCopy => {
                 let s = self.live_selection().unwrap_or_else(|| {
                     if self.page == "code" {
@@ -2593,6 +2691,7 @@ impl Gallery {
                 origin,
                 icedtea::iced::Size::new(self.window_width, self.window_height),
                 Message::ContextDismiss,
+                Self::anim_progress(&self.context_anim),
                 tok,
             )
         } else {
@@ -4056,6 +4155,7 @@ impl Gallery {
                     widget::tree_view(
                         &self.tree,
                         self.tree_sel,
+                        self.tree_animating(),
                         Message::Tree,
                         Message::TreeSelect,
                         tok,
@@ -4405,6 +4505,7 @@ impl Gallery {
                         icedtea::iced::Point::new(16.0, 16.0),
                         icedtea::iced::Size::new(480.0, 280.0),
                         Message::Nop,
+                        1.0,
                         tok,
                     ))
                     .width(Length::Fill)
@@ -4778,6 +4879,7 @@ impl Gallery {
                         ),
                     ],
                     self.cascade_open,
+                    Self::anim_progress(&self.cascade_anim),
                     Message::CascadeOpen,
                     tok,
                     named("cascade", Role::Menu),
@@ -5053,6 +5155,7 @@ impl Gallery {
                     widget::tree_view(
                         &self.tree,
                         self.tree_sel.or(Some(3)),
+                        self.tree_animating(),
                         Message::Tree,
                         Message::TreeSelect,
                         tok,
@@ -5108,6 +5211,7 @@ impl Gallery {
                         "outline" => widget::tree_view(
                             &self.tree,
                             self.tree_sel,
+                            self.tree_animating(),
                             Message::Tree,
                             Message::TreeSelect,
                             tok,
@@ -5155,6 +5259,7 @@ impl Gallery {
                 widget::tree_view(
                     &self.tree,
                     self.tree_sel,
+                    self.tree_animating(),
                     Message::Tree,
                     Message::TreeSelect,
                     tok,
@@ -5184,6 +5289,7 @@ impl Gallery {
                     widget::tree_view(
                         &self.tree,
                         self.tree_sel,
+                        self.tree_animating(),
                         Message::Tree,
                         Message::TreeSelect,
                         tok,
@@ -5194,6 +5300,7 @@ impl Gallery {
                         tok,
                         named("drawer-main", Role::Status),
                     ),
+                    Self::anim_progress(&self.drawer_anim),
                     tok,
                 ),
             ]
@@ -5856,7 +5963,8 @@ mod tests {
             .iter()
             .any(|a| a.id.as_str() == "edit.paste"));
         let _ = g.update(super::Message::ContextDismiss);
-        assert!(g.context.is_none());
+        assert!(g.context.is_some());
+        assert!(g.context_closing);
     }
 
     #[test]
