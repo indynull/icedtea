@@ -231,6 +231,7 @@ pub fn code_block<'a, M: Clone + 'a>(
         .height(Length::Shrink)
         .padding(12)
         .font(typo::MONO)
+        .size(typo::CODE)
         .wrapping(iced::widget::text::Wrapping::Word)
         .style(editor_style(tok))
         .on_action(move |a| on_action(select_only(a)));
@@ -1604,7 +1605,8 @@ pub fn number_input<'a, M: Clone + 'a>(
     let shown = format!("{value}");
     let mut i = text_input("0", &shown)
         .style(style::search_style(tok))
-        .padding(pad(tok));
+        .padding(pad(tok))
+        .size(typo::BODY);
     if !a11y.disabled {
         i = i.on_input(on_change);
     }
@@ -1655,7 +1657,8 @@ pub fn themed_text_input<'a, M: Clone + 'a>(
     let outlined = matches!(opts.face, FieldFace::Outlined);
     let mut i = text_input(placeholder, value)
         .style(style::field_style(tok, outlined))
-        .padding(pad(tok));
+        .padding(pad(tok))
+        .size(typo::BODY);
     if let Some(id) = input_id {
         i = i.id(id);
     }
@@ -1845,7 +1848,8 @@ pub fn password_input<'a, M: Clone + 'a>(
     let mut i = text_input(placeholder, value)
         .secure(masked)
         .style(style::search_style(tok))
-        .padding(pad(tok));
+        .padding(pad(tok))
+        .size(typo::BODY);
     if !a11y.disabled {
         i = i.on_input(on_input);
     }
@@ -2047,6 +2051,7 @@ pub fn textarea<'a, M: Clone + 'a>(
     let mut e = text_editor(content)
         .height(height)
         .padding(8)
+        .size(typo::BODY)
         .style(editor_style(tok));
     if !a11y.disabled {
         e = e.on_action(on_action);
@@ -2106,6 +2111,10 @@ pub fn selectable<'a, M: Clone + 'a>(
         .height(Length::Shrink)
         .padding(0)
         .font(face.font())
+        .size(match face {
+            typo::FontFace::Mono => typo::CODE,
+            typo::FontFace::Ui => typo::BODY,
+        })
         .wrapping(iced::widget::text::Wrapping::Word)
         .style(selectable_style(tok))
         .on_action(move |a| on_action(select_only(a)));
@@ -2176,6 +2185,7 @@ pub fn highlighted_code<'a, M: Clone + 'a>(
         .style(editor_style(tok))
         .highlight(syntax, theme)
         .font(typo::MONO)
+        .size(typo::CODE)
         .on_action(move |a| on_action(select_only(a)));
     container(e)
         .width(Length::Fill)
@@ -7390,7 +7400,16 @@ mod tests {
             .next()
             .unwrap();
         assert!(hl.contains("select_only"));
+        assert!(hl.contains("typo::CODE"));
         assert!(!hl.contains("if !a11y.disabled"));
+        let block_src = src
+            .split("pub fn code_block")
+            .nth(1)
+            .unwrap()
+            .split("/// A text link")
+            .next()
+            .unwrap();
+        assert!(block_src.contains("typo::CODE"));
     }
 
     #[test]
