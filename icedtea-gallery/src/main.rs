@@ -54,6 +54,47 @@ fn named(name: &str, role: Role) -> A11y {
     A11y::new(name, role)
 }
 
+fn open_docs_url(id: &str) {
+    let Some((module, name)) = catalog::constructor(id) else {
+        return;
+    };
+    let url = format!("https://docs.rs/icedtea/latest/icedtea/{module}/fn.{name}.html");
+    let cmd = if cfg!(target_os = "macos") {
+        "open"
+    } else if cfg!(target_os = "windows") {
+        "cmd"
+    } else {
+        "xdg-open"
+    };
+    let mut c = std::process::Command::new(cmd);
+    if cfg!(target_os = "windows") {
+        c.args(["/C", "start", "", &url]);
+    } else {
+        c.arg(&url);
+    }
+    let _ = c.spawn();
+}
+
+fn ctor_hover<'a>(
+    id: &'static str,
+    child: Element<'a, Message>,
+    tok: Tokens,
+) -> Element<'a, Message> {
+    let Some((module, name)) = catalog::constructor(id) else {
+        return child;
+    };
+    let job = widget_job(id).unwrap_or("See rustdoc for the call.");
+    widget::tooltip_rich(
+        child,
+        format!("{module}::{name}"),
+        format!("src/{module}.rs\n{job}"),
+        Some(("Open rustdoc".into(), Message::OpenDocs(id))),
+        widget::TooltipAnchor::Follow,
+        tok,
+        named(&format!("{id}-docs"), Role::Tooltip),
+    )
+}
+
 /// Tall notes body for expander and expand-motion. Peek is two lines.
 fn expand_notes_body<'a>(tok: Tokens) -> Element<'a, Message> {
     column![
@@ -736,6 +777,7 @@ enum Message {
     DialogOpen(bool),
     ReduceMotion(bool),
     Motion,
+    OpenDocs(&'static str),
     PaletteQuery(String),
     PalettePick(usize),
     PalettePrompt(String),
@@ -919,7 +961,9 @@ struct Gallery {
     expand_anim: icedtea::iced::Animation<bool>,
     acc_anim: icedtea::iced::Animation<bool>,
     acc_closing: bool,
-    progress_anim: icedtea::iced::Animation<f32>,
+    progress_from: f32,
+    progress_to: f32,
+    progress_start: Option<icedtea::iced::time::Instant>,
     window_width: f32,
     window_height: f32,
     pointer: icedtea::iced::Point,
@@ -1213,7 +1257,9 @@ impl Gallery {
             expand_anim: icedtea::motion::expand_animation(false, false),
             acc_anim: icedtea::motion::expand_animation(true, false),
             acc_closing: false,
-            progress_anim: icedtea::motion::value_animation(0.4, false),
+            progress_from: 0.4,
+            progress_to: 0.4,
+            progress_start: None,
             window_width: 900.0,
             window_height: 640.0,
             pointer: icedtea::iced::Point::ORIGIN,
@@ -1292,14 +1338,36 @@ impl Gallery {
             || self.palette_anim.is_animating(now)
             || self.expand_anim.is_animating(now)
             || self.acc_anim.is_animating(now)
-            || self.progress_anim.is_animating(now)
+            || self.progress_moving()
             || self.acc_closing
             || self.toasts.iter().next().is_some()
     }
 
+    fn progress_moving(&self) -> bool {
+        (self.shown_progress() - self.progress_to).abs() > 0.001
+    }
+
     fn shown_progress(&self) -> f32 {
-        self.progress_anim
-            .interpolate_with(|v| v, icedtea::iced::time::Instant::now())
+        let Some(start) = self.progress_start else {
+            return self.progress_to;
+        };
+        let dur = icedtea::motion::duration(icedtea::m3::motion::PROGRESS, self.reduced_motion);
+        if dur.is_zero() {
+            return self.progress_to;
+        }
+        let now = icedtea::iced::time::Instant::now();
+        let elapsed = now.saturating_duration_since(start);
+        let t = (elapsed.as_secs_f32() / dur.as_secs_f32()).clamp(0.0, 1.0);
+        let e = icedtea::m3::Ease::Standard.sample(t);
+        self.progress_from + (self.progress_to - self.progress_from) * e
+    }
+
+    fn go_progress(&mut self, to: f32) {
+        let to = to.clamp(0.0, 1.0);
+        self.progress_from = self.shown_progress();
+        self.progress_to = to;
+        self.progress_start = Some(icedtea::iced::time::Instant::now());
+        self.value = to;
     }
 
     fn clamp_nav(&mut self) {
@@ -1598,11 +1666,7 @@ impl Gallery {
             Message::Switch(v) => self.on = v,
             Message::Sounds(v) => self.sounds = v,
             Message::Radio(v) => self.radio = v,
-            Message::Slide(v) => {
-                self.value = v;
-                self.progress_anim
-                    .go_mut(v.clamp(0.0, 1.0), icedtea::iced::time::Instant::now());
-            }
+            Message::Slide(v) => self.go_progress(v),
             Message::RangeSlide(lo, hi) => {
                 self.range_lo = lo;
                 self.range_hi = hi;
@@ -1628,8 +1692,11 @@ impl Gallery {
                 self.expand_anim = icedtea::motion::expand_animation(self.expander_open, on);
                 self.acc_anim =
                     icedtea::motion::expand_animation(self.accordion.open.is_some(), on);
-                self.progress_anim = icedtea::motion::value_animation(self.value, on);
+                self.progress_from = self.value;
+                self.progress_to = self.value;
+                self.progress_start = None;
             }
+            Message::OpenDocs(id) => open_docs_url(id),
             Message::Motion => {
                 self.toasts.tick(16);
                 let now = icedtea::iced::time::Instant::now();
@@ -2527,6 +2594,18 @@ impl Gallery {
     fn page_view(&self) -> Element<'_, Message> {
         let tok = self.tokens;
         let title = catalog::page_title(self.page);
+        let hosted: Vec<_> = catalog::page_entries(self.page).collect();
+        let title_el: Element<'_, Message> = {
+            let t = text(title)
+                .size(icedtea::typo::PAGE)
+                .font(icedtea::typo::UI_BOLD)
+                .color(tok.scheme().on_surface);
+            if hosted.len() == 1 {
+                ctor_hover(hosted[0].id, t.into(), tok)
+            } else {
+                t.into()
+            }
+        };
         let demo = self.demo(self.page);
         let fill = page_fills(self.page);
         let card = if fill {
@@ -2540,10 +2619,7 @@ impl Gallery {
             scene_card(demo, tok)
         };
         let mut col = column![
-            text(title)
-                .size(icedtea::typo::PAGE)
-                .font(icedtea::typo::UI_BOLD)
-                .color(tok.scheme().on_surface),
+            title_el,
             widget::meta(page_job(self.page), tok, named("page-job", Role::Status),),
             card,
         ]
@@ -2571,12 +2647,15 @@ impl Gallery {
             col = col.height(Length::Fill);
         }
         for e in hosted {
-            col = col.push(
+            col = col.push(ctor_hover(
+                e.id,
                 text(e.title)
                     .size(icedtea::typo::TITLE)
                     .font(icedtea::typo::UI_BOLD)
-                    .color(tok.scheme().on_surface),
-            );
+                    .color(tok.scheme().on_surface)
+                    .into(),
+                tok,
+            ));
             if let Some(job) = widget_job(e.id) {
                 col = col.push(widget::meta(
                     job,

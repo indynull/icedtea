@@ -100,6 +100,29 @@ pub fn slider_step(range: std::ops::RangeInclusive<f32>) -> f32 {
     (span / 100.0).max(span * 1e-6)
 }
 
+/// Vertical wheel sign: up is positive (increase).
+pub fn scroll_wheel_y(delta: iced::mouse::ScrollDelta) -> f32 {
+    match delta {
+        iced::mouse::ScrollDelta::Lines { y, .. } => y,
+        iced::mouse::ScrollDelta::Pixels { y, .. } => y.signum(),
+    }
+}
+
+/// Next slider value after a wheel step. Up increases.
+pub fn slider_nudge(range: std::ops::RangeInclusive<f32>, value: f32, delta_y: f32) -> f32 {
+    let step = slider_step(range.clone());
+    let lo = *range.start();
+    let hi = *range.end();
+    let v = value.clamp(lo, hi);
+    if delta_y > 0.0 {
+        (v + step).min(hi)
+    } else if delta_y < 0.0 {
+        (v - step).max(lo)
+    } else {
+        v
+    }
+}
+
 pub fn icon_style(tok: Tokens) -> impl Fn(&iced::Theme, svg::Status) -> svg::Style {
     move |_t, _s| svg::Style {
         color: Some(tok.scheme().on_surface),
@@ -1092,8 +1115,9 @@ impl SliderMarks<'static> {
 /// Pick a number on a range.
 ///
 /// Pass min, max, and the current value. The message is the new value
-/// while the thumb moves. Disabled ignores drag. `marks` paints ticks
-/// and end labels when set.
+/// while the thumb moves. Wheel over the control steps by
+/// [`slider_step`]. Disabled ignores drag and wheel. `marks` paints
+/// ticks and end labels when set.
 ///
 ///
 /// ```
@@ -1114,13 +1138,13 @@ impl SliderMarks<'static> {
 pub fn themed_slider<'a, M: Clone + 'a>(
     range: std::ops::RangeInclusive<f32>,
     value: f32,
-    msg: impl Fn(f32) -> M + 'a,
+    msg: impl Fn(f32) -> M + Copy + 'a,
     marks: SliderMarks<'a>,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
     let slider_el: Element<'a, M> = if a11y.disabled {
-        let _ = (range, value, msg);
+        let _ = (value, msg);
         let (w, h) = if marks.vertical {
             (Length::Fixed(18.0), Length::Fill)
         } else {
@@ -1134,13 +1158,13 @@ pub fn themed_slider<'a, M: Clone + 'a>(
     } else {
         let step = slider_step(range.clone());
         if marks.vertical {
-            iced::widget::vertical_slider(range, value, msg)
+            iced::widget::vertical_slider(range.clone(), value, msg)
                 .step(step)
                 .style(style::slider_style(tok))
                 .height(Length::Fill)
                 .into()
         } else {
-            slider(range, value, msg)
+            slider(range.clone(), value, msg)
                 .step(step)
                 .style(style::slider_style(tok))
                 .width(Length::Fill)
@@ -1191,7 +1215,17 @@ pub fn themed_slider<'a, M: Clone + 'a>(
             .width(Length::Fill),
         );
     }
-    a11y::attach(col.into(), &a11y)
+    let el: Element<'a, M> = if a11y.disabled {
+        col.into()
+    } else {
+        let range_w = range.clone();
+        mouse_area(col)
+            .on_scroll(move |delta| {
+                msg(slider_nudge(range_w.clone(), value, scroll_wheel_y(delta)))
+            })
+            .into()
+    };
+    a11y::attach(el, &a11y)
 }
 
 fn disabled_slider_face(tok: Tokens) -> iced::widget::container::Style {
@@ -1287,6 +1321,15 @@ pub fn progress_label(value: f32, remaining: Option<&str>) -> String {
     }
 }
 
+fn progress_weights(value: f32, buffer: Option<f32>) -> (u16, u16, u16) {
+    let value = value.clamp(0.0, 1.0);
+    let buf = buffer.unwrap_or(value).clamp(0.0, 1.0).max(value);
+    let v = (value * 100.0).round() as u16;
+    let b = ((buf * 100.0).round() as u16).saturating_sub(v);
+    let rest = 100u16.saturating_sub(v.saturating_add(b));
+    (v, b, rest)
+}
+
 /// A determinate bar from 0 to 1.
 ///
 /// Values outside the range clamp. No message; it is a readout.
@@ -1322,29 +1365,38 @@ pub fn progress<'a, M: 'a>(
     let s = tok.scheme();
     let seg = |w: u16, fill: iced::Color, ink: iced::Color| {
         container(Space::new().height(8))
-            .width(Length::FillPortion(w.max(1)))
+            .width(Length::FillPortion(w))
             .style(move |_| style::fill(fill, ink))
     };
     let mut parts = Row::new().width(Length::Fill);
-    if indeterminate {
+    let segs: [(u16, iced::Color, iced::Color); 3] = if indeterminate {
         let (lead, mid, _tail) = crate::motion::progress_run(value, tok.reduced_motion);
         let l = (lead * 100.0).round() as u16;
-        let m = (mid * 100.0).round() as u16;
-        let t = 100u16.saturating_sub(l.saturating_add(m)).max(1);
-        parts = parts
-            .push(seg(l.max(1), s.surface_container_highest, s.on_surface))
-            .push(seg(m.max(1), s.primary, s.on_primary))
-            .push(seg(t, s.surface_container_highest, s.on_surface));
+        let m = ((mid * 100.0).round() as u16).max(1);
+        let t = 100u16.saturating_sub(l.saturating_add(m));
+        [
+            (l, s.surface_container_highest, s.on_surface),
+            (m, s.primary, s.on_primary),
+            (t, s.surface_container_highest, s.on_surface),
+        ]
     } else {
-        let buf = buffer.unwrap_or(value).clamp(0.0, 1.0).max(value);
-        let v = (value * 100.0).round() as u16;
-        let b = ((buf * 100.0).round() as u16).saturating_sub(v);
-        let rest = 100u16.saturating_sub(v.saturating_add(b)).max(1);
-        parts = parts
-            .push(seg(v, s.primary, s.on_primary))
-            .push(seg(b, s.secondary_container, s.on_secondary_container))
-            .push(seg(rest, s.surface_container_highest, s.on_surface));
+        let (v, b, rest) = progress_weights(value, buffer);
+        [
+            (v, s.primary, s.on_primary),
+            (b, s.secondary_container, s.on_secondary_container),
+            (rest, s.surface_container_highest, s.on_surface),
+        ]
     };
+    let mut any = false;
+    for (w, fill, ink) in segs {
+        if w > 0 {
+            parts = parts.push(seg(w, fill, ink));
+            any = true;
+        }
+    }
+    if !any {
+        parts = parts.push(seg(100, s.surface_container_highest, s.on_surface));
+    }
     let bar: Element<'a, M> = container(parts).width(Length::Fill).height(8).into();
     let el = if let Some(c) = copy.filter(|t| !t.is_empty()) {
         Column::new()
@@ -1584,7 +1636,7 @@ pub fn image_slot<'a, M: Clone + 'a>(
 
 /// Edit a numeric value with step buttons.
 ///
-/// The application owns the number. Step messages bump it. Disabled
+/// The application owns the number. Wheel steps by 1. Disabled
 /// freezes the value.
 ///
 ///
@@ -1603,7 +1655,7 @@ pub fn image_slot<'a, M: Clone + 'a>(
 /// ```
 pub fn number_input<'a, M: Clone + 'a>(
     value: f64,
-    on_change: impl Fn(String) -> M + 'a,
+    on_change: impl Fn(String) -> M + Copy + 'a,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
@@ -1612,10 +1664,19 @@ pub fn number_input<'a, M: Clone + 'a>(
         .style(style::search_style(tok))
         .padding(pad(tok))
         .size(typo::BODY);
-    if !a11y.disabled {
+    let el: Element<'a, M> = if a11y.disabled {
+        let _ = on_change;
+        i.into()
+    } else {
         i = i.on_input(on_change);
-    }
-    a11y::attach(i.into(), &a11y)
+        mouse_area(i)
+            .on_scroll(move |delta| {
+                let dir = if scroll_wheel_y(delta) > 0.0 { 1 } else { -1 };
+                on_change(step_number(value, 1.0, f64::MIN, f64::MAX, dir).to_string())
+            })
+            .into()
+    };
+    a11y::attach(el, &a11y)
 }
 
 /// Step a numeric value.
@@ -2387,8 +2448,8 @@ pub fn search_view<'a, M: Clone + 'a>(
 
 /// Pick one string from a list.
 ///
-/// Placeholder shows when nothing is selected. Disabled keeps the
-/// current face.
+/// Placeholder shows when nothing is selected. Wheel over the control
+/// moves the selection. Disabled keeps the current face.
 ///
 ///
 /// ```
@@ -2434,13 +2495,36 @@ where
             &a11y,
         );
     }
-    a11y::attach(
-        pick_list(options, selected, on_select)
-            .style(style::picker_style(tok))
-            .padding(pad(tok))
-            .into(),
-        &a11y,
-    )
+    let opts: Vec<T> = options.borrow().to_vec();
+    let sel = selected.clone();
+    let on_select = std::rc::Rc::new(on_select);
+    let on_pick = {
+        let on_select = on_select.clone();
+        move |t| on_select(t)
+    };
+    let picker = pick_list(options, selected, on_pick)
+        .style(style::picker_style(tok))
+        .padding(pad(tok));
+    let el: Element<'a, M> = if opts.is_empty() {
+        picker.into()
+    } else {
+        mouse_area(picker)
+            .on_scroll(move |delta| {
+                let n = opts.len();
+                let i = sel
+                    .as_ref()
+                    .and_then(|s| opts.iter().position(|o| o == s))
+                    .unwrap_or(0);
+                let j = if scroll_wheel_y(delta) < 0.0 {
+                    i.saturating_add(1).min(n - 1)
+                } else {
+                    i.saturating_sub(1)
+                };
+                on_select(opts[j].clone())
+            })
+            .into()
+    };
+    a11y::attach(el, &a11y)
 }
 
 /// Civil date (no timezone).
@@ -5369,6 +5453,17 @@ mod tests {
             scroll_delta_x(iced::mouse::ScrollDelta::Pixels { x: 8.0, y: 0.0 }),
             -8.0
         );
+        assert!(scroll_wheel_y(iced::mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 }) > 0.0);
+        assert!(scroll_wheel_y(iced::mouse::ScrollDelta::Lines { x: 0.0, y: -1.0 }) < 0.0);
+        assert_eq!(
+            slider_nudge(0.0..=1.0, 0.5, 1.0),
+            0.5 + slider_step(0.0..=1.0)
+        );
+        assert_eq!(slider_nudge(0.0..=1.0, 1.0, 1.0), 1.0);
+        assert_eq!(slider_nudge(0.0..=1.0, 0.0, -1.0), 0.0);
+        assert_eq!(progress_weights(0.0, None), (0, 0, 100));
+        assert_eq!(progress_weights(1.0, None), (100, 0, 0));
+        assert_eq!(progress_weights(0.4, Some(0.7)), (40, 30, 30));
         let _: Element<'_, ()> = themed_slider(
             0.0..=1.0,
             0.5,

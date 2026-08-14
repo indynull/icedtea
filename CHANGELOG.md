@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Guide
+
+- Motion walks the 0–1 progress path, mixing jobs, and writing a
+  custom number with `Ease::sample`.
+
 ### Theme
 
 - `m3::DurationStep` and `m3::Ease` are the Material motion tokens.
@@ -35,6 +40,13 @@
   `progress` and `progress_ring`.
 - `motion::progress_run` is the linear busy-bar phase (grows, travels,
   shrinks). Reduced motion holds a static chunk.
+- `progress` omits empty fill portions so 0% and 100% are a single
+  track or a full bar.
+
+### Controls
+
+- Wheel over `themed_slider`, `range_slider`, `number_input`, and
+  `themed_pick_list` steps the value.
 
 ## 0.7.0 — 2026-08-14
 
