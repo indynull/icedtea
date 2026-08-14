@@ -131,6 +131,10 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
 - Never grow `CHANGELOG.md` Unreleased into a session diary. 0.1.0 on
   crates.io was a publish check. 0.2 is the first library cut. Never
   call icedtea a product in user-facing copy; it is a UI library.
+  Write each version section as bullets under topic subheadings
+  (controls, collections, theme): one added, fixed, or changed
+  public thing per bullet. Never a prose paragraph that lists several
+  adds.
 - Gallery fixtures (sample documents, language snippets, bitmaps) live
   in `icedtea-gallery`. Never export them from `icedtea`.
 - Never ship a document undo stack. The application owns document
@@ -444,7 +448,8 @@ tables or essays in discussion notes.
   change. Update README install or the first-window example when that
   path changes. Documentation is part of the change, not a follow-up.
 - `CHANGELOG.md` describes the crate for a version. Fold work into
-  the Unreleased section until that version is tagged.
+  the Unreleased section until that version is tagged. Group related
+  items under topic subheadings; each item is a bullet.
 - A third-party app still needs only icedtea for chrome, actions,
   layout, and theme.
 - `git status` clean for the work you reported, or an explicit park.

@@ -348,7 +348,7 @@ mod tests {
                 .find("icedtea =")
                 .expect("install story names the crate");
             let ver_msg = "first icedtea line is the crates.io version";
-            if !src[at..].starts_with("icedtea = \"0.5\"") {
+            if !src[at..].starts_with("icedtea = \"0.6\"") {
                 panic!("{ver_msg}");
             }
         }
