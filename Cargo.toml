@@ -54,6 +54,7 @@ objc2-foundation = { version = "0.3", default-features = false }
 
 [dev-dependencies]
 iced_tiny_skia = "0.14"
+rusqlite = { version = "0.32", features = ["bundled"] }
 
 [package.metadata.docs.rs]
 all-features = true

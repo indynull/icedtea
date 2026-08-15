@@ -27,8 +27,8 @@
 ### Bug fix
 
 - `badge` Primary uses on-primary ink on the primary fill.
-- Disabled filled buttons use a stronger mute (fill 22%, ink 68%) so
-  the label reads on the brick on dark, not only on the canvas.
+- Disabled button ink uses a 68% mute so filled, Ghost, and Outlined
+  labels read on dark. Filled faces also raise the fill to 22%.
 - `command_bar` labels use on-surface body ink.
 - `dim_backdrop` rest opacity is 50% so a dialog sheet sits on a
   visible wash.
@@ -51,8 +51,6 @@
 - Gallery status note clears when the catalog page changes.
 - The Controls page packs the button group, checks, and radios beside
   buttons so those hosts sit on the first screen.
-- Ghost and Outlined disabled ink uses the same 68% mute as filled
-  faces so the label reads on dark.
 - Idle `item_grid` tiles use the outlined face so a cell reads before
   it is selected.
 - The Fields page packs number, date, and time beside text so those
@@ -63,6 +61,8 @@
 - README and Install use `cargo add icedtea`. The crates.io badge is
   the crate version.
 - README shows a Codecov coverage badge.
+- The guide cookbook walks a personal task list that writes a SQLite
+  file (`examples/tasks.rs`).
 
 ## 0.8.0 — 2026-08-14
 

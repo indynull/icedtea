@@ -190,6 +190,14 @@ and theme. A compact tool does not import iced `button`, window
 resize, or keyboard key enums to finish. The gallery is the document
 shell; the README pad is the tool-sized window.
 
+When generating an icedtea application: start from `examples/hello.rs`
+(Save, toolbar, editor, status). A list plus an on-disk SQLite file
+is `book/src/cookbook/tasks.md` and `examples/tasks.rs`. Constructors
+return `Element`s and emit the application's messages. The application
+owns state and any database. Do not add a second renderer, a
+stylesheet, or gallery-only glue. Do not send the reader to the
+gallery.
+
 Rejected alternatives live once under Non-goals below. Do not add a
 “what it is not” section anywhere else.
 
@@ -481,8 +489,10 @@ tables or essays in discussion notes.
   change. Update README install or the first-window example when that
   path changes. Never put an icedtea crate version in README or
   Install: `cargo add icedtea` is the first path, and the crates.io
-  badge is the version. Documentation is part of the change, not a
-  follow-up.
+  badge is the version. Guide snippets that must show a pin use
+  `{{ICEDTEA_VERSION}}` / `{{RUSQLITE_VERSION}}`;
+  `scripts/mdbook_version.py` fills them from `Cargo.toml` when the
+  book builds. Documentation is part of the change, not a follow-up.
 - `CHANGELOG.md` describes the crate for a version. Fold work into
   the Unreleased section until that version is tagged. Group bullets
   under Feature, Bug fix, and Chore.

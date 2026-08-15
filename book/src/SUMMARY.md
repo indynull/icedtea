@@ -17,6 +17,7 @@
     - [Compact tools](compact-tools.md)
 - [Cookbook]()
     - [Save a buffer](cookbook/save.md)
+    - [Keep a task list](cookbook/tasks.md)
     - [List and detail](cookbook/list-detail.md)
     - [Sortable table](cookbook/table.md)
     - [Command palette](cookbook/palette.md)

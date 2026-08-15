@@ -8,6 +8,9 @@ src = "book/src"
 [build]
 build-dir = "book/book"
 
+[preprocessor.version]
+command = "python3 scripts/mdbook_version.py"
+
 [output.html]
 git-repository-url = "https://github.com/indynull/icedtea"
 edit-url-template = "https://github.com/indynull/icedtea/edit/master/book/src/{path}"

@@ -1,9 +1,10 @@
 //! Native desktop widgets and chrome for [iced](https://iced.rs/).
 //!
-//! icedtea starts a themed window, paints controls from semantic tokens,
+//! icedtea opens a themed window, paints controls from semantic tokens,
 //! and routes one [`action::Action`] table through menus, toolbars,
-//! shortcuts, and the command palette. Constructors return iced
-//! [`Element`]s and emit your messages.
+//! shortcuts, and the command palette. A constructor is a function
+//! that returns an iced [`Element`] and sends your message. Your
+//! program owns the data (and any database file).
 //!
 //! # First compose
 //!
@@ -140,7 +141,9 @@
 //!
 //! icedtea is chrome, actions, layout, and theme for iced desktop
 //! applications. Constructors return [`Element`]s and emit the
-//! application's messages.
+//! application's messages. A later job — a personal task list that
+//! writes a SQLite file — is in the
+//! [guide cookbook](https://indynull.github.io/icedtea/cookbook/tasks.html).
 //!
 //! ## Non-goals
 //!

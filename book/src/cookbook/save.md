@@ -15,3 +15,6 @@ if let Some(next) = key::handle(KeyContext::default(), &self.table, &ev) {
     return self.update(next);
 }
 ```
+
+[Keep a task list](tasks.md) is the next job: a list, Add, mark done,
+and a SQLite file on disk.

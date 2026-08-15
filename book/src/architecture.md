@@ -1,8 +1,16 @@
 # Architecture
 
-You build a window by starting it, coloring it, filling an action
-table that chrome reads, calling constructors, wrapping those in
-patterns, and keeping state in your `update`.
+A window is a loop you write in Rust:
+
+1. **Start it** (`Boot`, `run!`).
+2. **Color it** (`Tokens`).
+3. **Name the commands** (`ActionTable`).
+4. **Draw controls** (constructors return `Element`s and send your
+   messages).
+5. **Arrange them** (patterns and layout).
+6. **Keep the data in your program.** `update` changes that data when
+   a message arrives. A database file, if you have one, is yours —
+   icedtea does not write it.
 
 <img src="images/compose.svg" alt="Boot starts the window. Tokens color it. An ActionTable of many Actions feeds the toolbar and shortcuts. A list/detail pattern lays out the list_view and textarea constructors." width="800"/>
 
@@ -63,6 +71,8 @@ An open modal consumes keys first. Otherwise a focused field owns
 unmodified typing. Otherwise `key::handle` matches the action table.
 
 [First window](first-window.md) is the smallest case of this compose.
+[Keep a task list](cookbook/tasks.md) is the same loop with a list and
+a SQLite file the application opens and writes.
 The [reference](widgets.md) names every public constructor.
 [Crate docs](https://docs.rs/icedtea) ·
 [source](https://github.com/indynull/icedtea).

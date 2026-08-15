@@ -6,13 +6,15 @@
 [![check](https://github.com/indynull/icedtea/actions/workflows/ci.yml/badge.svg)][actions]
 [![Coverage](https://codecov.io/gh/indynull/icedtea/graph/badge.svg)][codecov]
 
-Native desktop widgets and chrome for [iced](https://iced.rs/).
-Built on [Material Design 3](https://m3.material.io/get-started)
-foundations (`m3` module). Desktop chrome is rectangular (M3 shape None).
+A Rust library that draws a native desktop window: buttons, lists,
+menus, and the chrome around them, on [iced](https://iced.rs/).
+You keep the data. Color and type follow
+[Material Design 3](https://m3.material.io/get-started) roles
+(`m3` module). Desktop chrome is rectangular (M3 shape None).
 
-`icedtea::run!` starts a themed window. One `Action` feeds the toolbar,
-menus, and shortcuts. Constructors return iced `Element`s and emit
-your messages.
+`icedtea::run!` opens the window. One `Action` is a command you write
+once; the toolbar, menus, and shortcuts can all run it. A constructor
+is a function that draws one control and sends your message.
 
 ![A themed icedtea window](https://github.com/indynull/icedtea/raw/master/assets/gallery.gif)
 
@@ -39,8 +41,8 @@ icedtea::run!(
 
 ## Where to look
 
-- [Guide](https://indynull.github.io/icedtea/) — first window, actions,
-  cookbook jobs, and a reference for every control
+- [Guide](https://indynull.github.io/icedtea/) — first window, then a
+  one-day task list that writes a SQLite file, then every control
 - [Crate docs](https://docs.rs/icedtea) — `widget`, `theme`, `action`,
   `layout`, `window`, `pattern`
 - [crates.io](https://crates.io/crates/icedtea) ·
