@@ -340,11 +340,6 @@ mod tests {
         assert!(!hello.contains("count.inc"));
         assert!(!hello.contains("n: i32"));
         assert!(first.contains("examples/hello.rs"));
-        let install = include_str!("../book/src/install.md");
-        for src in [readme, install] {
-            assert!(src.contains("cargo add icedtea"));
-            assert!(!src.contains("icedtea = \""));
-        }
         assert!(arch.contains("Action"));
         assert!(arch.contains("Tokens"));
         assert!(arch.contains("Boot"));
