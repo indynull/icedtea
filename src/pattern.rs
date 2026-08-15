@@ -2357,6 +2357,16 @@ mod tests {
         paint(&mut tv);
         let mut mc = modal_card(lab("b"), lab("c"), 1.0, tok);
         paint(&mut mc);
+        let mut mc_mid = modal_card(lab("b"), lab("c"), 0.4, tok);
+        paint(&mut mc_mid);
+        let mut pal_mid =
+            command_palette_view("", &res, 0, |_| (), |_| (), None, |_| (), None, 0.4, tok);
+        paint(&mut pal_mid);
+        let body = lab("x");
+        let scene = lab("s");
+        let mut sheet_mid: Element<'_, ()> =
+            side_sheet(scene, "I", body, Some(()), true, 240.0, 0.4, tok);
+        paint(&mut sheet_mid);
         let mut cb = command_bar(table.iter(), tok, ltr);
         paint(&mut cb);
         let mut dlg = dialog_sheet(

@@ -133,9 +133,7 @@ pub fn install_platform_faces() {
     static ONCE: OnceLock<()> = OnceLock::new();
     ONCE.get_or_init(|| {
         let lock = font_system();
-        let Ok(mut system) = lock.write() else {
-            return;
-        };
+        let mut system = lock.write().expect("font system");
         let db = system.raw().db_mut();
         let covers = faces_from_db(db);
         let sans_current = db.family_name(&DbFamily::SansSerif).to_string();

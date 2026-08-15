@@ -1387,15 +1387,10 @@ pub fn progress<'a, M: 'a>(
             (rest, s.surface_container_highest, s.on_surface),
         ]
     };
-    let mut any = false;
     for (w, fill, ink) in segs {
         if w > 0 {
             parts = parts.push(seg(w, fill, ink));
-            any = true;
         }
-    }
-    if !any {
-        parts = parts.push(seg(100, s.surface_container_highest, s.on_surface));
     }
     let bar: Element<'a, M> = container(parts).width(Length::Fill).height(8).into();
     let el = if let Some(c) = copy.filter(|t| !t.is_empty()) {
@@ -5533,11 +5528,21 @@ mod tests {
         assert!(scroll_wheel_y(iced::mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 }) > 0.0);
         assert!(scroll_wheel_y(iced::mouse::ScrollDelta::Lines { x: 0.0, y: -1.0 }) < 0.0);
         assert_eq!(
+            scroll_wheel_y(iced::mouse::ScrollDelta::Pixels { x: 0.0, y: 8.0 }),
+            1.0
+        );
+        assert_eq!(
+            scroll_wheel_y(iced::mouse::ScrollDelta::Pixels { x: 0.0, y: -3.0 }),
+            -1.0
+        );
+        assert_eq!(
             slider_nudge(0.0..=1.0, 0.5, 1.0),
             0.5 + slider_step(0.0..=1.0)
         );
         assert_eq!(slider_nudge(0.0..=1.0, 1.0, 1.0), 1.0);
         assert_eq!(slider_nudge(0.0..=1.0, 0.0, -1.0), 0.0);
+        assert_eq!(slider_nudge(0.0..=1.0, 0.4, 0.0), 0.4);
+        assert_eq!(slider_step(3.0..=3.0), f32::EPSILON);
         assert_eq!(progress_weights(0.0, None), (0, 0, 100));
         assert_eq!(progress_weights(1.0, None), (100, 0, 0));
         assert_eq!(progress_weights(0.4, Some(0.7)), (40, 30, 30));
@@ -9261,5 +9266,243 @@ mod tests {
             ),
         );
         assert!((open_size.width - 300.0).abs() < 1.0);
+    }
+
+    fn pump_wheel<M: Clone>(el: &mut Element<'_, M>, delta: iced::mouse::ScrollDelta) -> Vec<M> {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::mouse;
+        use iced::{Event, Font, Pixels, Point, Rectangle, Size};
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(320.0, 200.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let bounds = layout.bounds();
+        let at = Point::new(
+            bounds.x + bounds.width * 0.5,
+            bounds.y + bounds.height - 2.0,
+        );
+        let cursor = mouse::Cursor::Available(at);
+        let viewport = Rectangle::new(Point::ORIGIN, Size::new(320.0, 200.0));
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::CursorMoved { position: at }),
+                layout,
+                cursor,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::WheelScrolled { delta }),
+                layout,
+                cursor,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        messages
+    }
+
+    #[test]
+    fn wheel_steps_slider_number_and_pick() {
+        let tok = named("dark").tokens;
+        let mut slider: Element<'_, f32> = themed_slider(
+            0.0..=1.0,
+            0.4,
+            |v| v,
+            SliderMarks {
+                ticks: 3,
+                min: "lo",
+                max: "hi",
+                ..SliderMarks::NONE
+            },
+            tok,
+            A11y::new("s", Role::Slider),
+        );
+        let up = pump_wheel(
+            &mut slider,
+            iced::mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 },
+        );
+        assert!(!up.is_empty());
+        assert!(up[0] > 0.4);
+        let down = pump_wheel(
+            &mut slider,
+            iced::mouse::ScrollDelta::Pixels { x: 0.0, y: -4.0 },
+        );
+        assert!(!down.is_empty());
+        assert!(down[0] < 0.4);
+
+        let mut num: Element<'_, String> =
+            number_input(3.0, |s| s, tok, A11y::new("n", Role::SpinButton));
+        let n_up = pump_wheel(&mut num, iced::mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 });
+        assert_eq!(n_up, ["4".to_string()]);
+        let n_down = pump_wheel(
+            &mut num,
+            iced::mouse::ScrollDelta::Lines { x: 0.0, y: -1.0 },
+        );
+        assert_eq!(n_down, ["2".to_string()]);
+
+        let opts = ["alpha".to_string(), "beta".to_string(), "gamma".to_string()];
+        let mut pick: Element<'_, String> = themed_pick_list(
+            opts.clone(),
+            Some("beta".into()),
+            |s| s,
+            tok,
+            A11y::new("p", Role::ComboBox),
+        );
+        let next = pump_wheel(
+            &mut pick,
+            iced::mouse::ScrollDelta::Lines { x: 0.0, y: -1.0 },
+        );
+        assert_eq!(next, ["gamma".to_string()]);
+        let prev = pump_wheel(
+            &mut pick,
+            iced::mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 },
+        );
+        assert_eq!(prev, ["alpha".to_string()]);
+        let cmd = pump_pick_command_wheel(&mut pick, -1.0);
+        assert!(!cmd.is_empty());
+        let empty: &[String] = &[];
+        let _: Element<'_, String> =
+            themed_pick_list(empty, None, |s| s, tok, A11y::new("empty", Role::ComboBox));
+    }
+
+    fn pump_pick_command_wheel(el: &mut Element<'_, String>, y: f32) -> Vec<String> {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::keyboard;
+        use iced::mouse;
+        use iced::{Event, Font, Pixels, Point, Rectangle, Size};
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(320.0, 200.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let bounds = layout.bounds();
+        let at = Point::new(bounds.x + 8.0, bounds.y + 8.0);
+        let cursor = mouse::Cursor::Available(at);
+        let viewport = Rectangle::new(Point::ORIGIN, Size::new(320.0, 200.0));
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Keyboard(keyboard::Event::ModifiersChanged(crate::shortcut::primary())),
+                layout,
+                cursor,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::WheelScrolled {
+                    delta: mouse::ScrollDelta::Lines { x: 0.0, y },
+                }),
+                layout,
+                cursor,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        messages
+    }
+
+    #[test]
+    fn tree_wraps_a_closing_sibling_and_expander_grows() {
+        let tok = named("dark").tokens;
+        let mut tree = TreeNode::branch(
+            1,
+            "root",
+            vec![
+                TreeNode::branch(2, "a", vec![TreeNode::leaf(3, "a1")]),
+                TreeNode::branch(4, "b", vec![TreeNode::leaf(5, "b1")]),
+            ],
+        );
+        tree.expanded = true;
+        tree.children[0].expanded = false;
+        tree.children[1].expanded = true;
+        let mut closing: Element<'_, u64> = tree_view(
+            &tree,
+            Some(2),
+            Some((2, 0.4)),
+            |id| id,
+            |id| id,
+            tok,
+            A11y::new("tree", Role::Tree),
+        );
+        draw_once(&mut closing);
+        let mut done: Element<'_, u64> = tree_view(
+            &tree,
+            None,
+            Some((2, 1.0)),
+            |id| id,
+            |id| id,
+            tok,
+            A11y::new("tree", Role::Tree).with_disabled(true),
+        );
+        draw_once(&mut done);
+
+        let tall = Column::new()
+            .spacing(8)
+            .push(label("one", tok, A11y::new("one", Role::Status)))
+            .push(label("two", tok, A11y::new("two", Role::Status)))
+            .push(label("three", tok, A11y::new("three", Role::Status)))
+            .push(label("four", tok, A11y::new("four", Role::Status)))
+            .into();
+        let mut mid: Element<'_, bool> = expander(
+            "Notes",
+            tall,
+            Peek::from(48.0),
+            true,
+            0.45,
+            |open| open,
+            tok,
+            A11y::new("exp", Role::Group),
+        );
+        draw_once(&mut mid);
+
+        let mut acc: Element<'_, ()> = accordion_view(
+            &["A".into()],
+            vec![label("b", tok, A11y::new("b", Role::Header))],
+            &Accordion { open: Some(0) },
+            0.4,
+            |_| (),
+            tok,
+            A11y::new("acc", Role::Group),
+        );
+        draw_once(&mut acc);
+
+        let toast = Toast {
+            id: 3,
+            kind: ToastKind::Warning,
+            text: "mid".into(),
+            ttl_ms: 4000,
+            age_ms: 75,
+        };
+        let mut tv: Element<'_, ()> = toast_view(&toast, (), tok, A11y::new("mid", Role::Status));
+        draw_once(&mut tv);
     }
 }

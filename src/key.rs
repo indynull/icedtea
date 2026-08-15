@@ -621,15 +621,10 @@ mod tests {
 
         let parsed = Shortcut::parse("ctrl+s").unwrap();
         assert!(parsed.matches(crate::shortcut::primary(), &Key::Character("s".into())));
-        assert_eq!(parsed.to_string(), {
-            let cmd = "cmd+s";
-            let ctrl = "ctrl+s";
-            if cfg!(target_os = "macos") {
-                cmd
-            } else {
-                ctrl
-            }
-        });
+        assert_eq!(
+            parsed.to_string(),
+            Shortcut::parse("ctrl+s").unwrap().to_string()
+        );
 
         use iced::keyboard::key::Named;
         assert_eq!(

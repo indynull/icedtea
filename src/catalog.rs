@@ -294,6 +294,7 @@ mod tests {
         assert!(get("button").is_some());
         assert!(get("about").is_some());
         assert!(get("missing").is_none());
+        assert!(constructor("missing").is_none());
         assert_eq!(
             groups(),
             [

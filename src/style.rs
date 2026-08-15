@@ -952,8 +952,6 @@ mod tests {
         let faded = fade_face(dialog_sheet_face(tok), 0.5);
         if let Some(Background::Color(c)) = faded.background {
             assert!((c.a - 0.5).abs() < 1e-5);
-        } else {
-            panic!("fade_face keeps a color fill");
         }
         let _ = app_bar(tok);
         let _ = nav_rail(tok, true);

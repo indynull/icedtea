@@ -577,6 +577,14 @@ mod tests {
         assert!((bounce_out(1.0) - 1.0).abs() < 1e-5);
         let bmid = bounce_out(0.5);
         assert!(bmid > 0.7 && bmid < 1.0);
+        // Third hop (2/D1 .. 2.5/D1).
+        let b3 = bounce_out(0.85);
+        assert!(b3 > 0.9 && b3 < 1.0);
+        assert_eq!(bounce_out(-1.0), 0.0);
+        assert!((bounce_out(2.0) - 1.0).abs() < 1e-5);
+        assert_eq!(pulse(-0.5), 0.0);
+        assert_eq!(shake(-0.5), 0.0);
+        assert_eq!(shake(2.0), 0.0);
         assert_eq!(pulse(0.0), 0.0);
         assert!((pulse(0.5) - 1.0).abs() < 1e-5);
         assert!((pulse(1.0)).abs() < 1e-5);
@@ -785,5 +793,12 @@ mod tests {
             drive(&mut el, vp);
             drive(&mut el, miss);
         }
+        let far = iced::Rectangle::new(iced::Point::new(4000.0, 4000.0), iced::Size::new(4.0, 4.0));
+        let mut hidden: Element<'_, ()> =
+            expand(body(), 0.0, 0.0, tok, A11y::new("gone", Role::Group));
+        drive(&mut hidden, far);
+        let mut clipped: Element<'_, ()> =
+            expand(body(), 1.0, 0.0, tok, A11y::new("full", Role::Group));
+        drive(&mut clipped, far);
     }
 }
