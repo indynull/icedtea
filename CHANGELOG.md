@@ -17,6 +17,10 @@
 
 ### Collections
 
+- List, table, grid, and tree row presses are `ItemClick` (button and
+  modifiers). Right-click no longer equals left-click select.
+  `Selection::apply_item_click` is the desktop rule. `listen_cursor`
+  Context only fires when the event was not captured.
 - Flush list titles wrap on a tall row; `list_detail` uses
   `layout::LIST_PANE` (360px). Short flush rows still ellipsize on a
   word boundary.

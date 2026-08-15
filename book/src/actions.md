@@ -47,10 +47,12 @@ table.
 layer list. Most windows only need `key::handle` and `KeyContext`.
 
 `pattern::context_menu` places the same `Action` list under the
-pointer. The application stores the point (`layout::listen_cursor`)
-and whether the menu is open. Click-away and Escape close it. Editors
-enable Cut/Copy from `text_editor::Content::selection`. Lists select
-on right-click, then the application opens the menu.
+pointer. The application stores the point and whether the menu is
+open. Click-away and Escape close it. Empty-space right-click is
+`layout::listen_cursor` (only when no widget captured the event).
+List, table, grid, and tree rows emit `ItemClick`; secondary on an
+already-selected row keeps the selection. Editors enable Cut/Copy
+from `text_editor::Content::selection`.
 
 Subscribe with `key::listen` and map events into `update`, as
 `examples/hello.rs` does.

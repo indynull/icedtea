@@ -5,7 +5,7 @@ and scroll write application state.
 
 ```rust
 use icedtea::a11y::{A11y, Role};
-use icedtea::collection::{ColumnLayout, Selection, TableModel, VisibleWindow};
+use icedtea::collection::{ColumnLayout, ItemClick, Selection, TableModel, VisibleWindow};
 use icedtea::theme;
 use icedtea::widget;
 use icedtea::{Element, Task};
@@ -19,7 +19,7 @@ struct App {
 
 #[derive(Clone)]
 enum Message {
-    Cell(usize, usize),
+    Cell(ItemClick, usize),
     Sort(usize),
     Scroll(VisibleWindow),
 }
@@ -27,7 +27,7 @@ enum Message {
 impl App {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::Cell(row, _col) => self.sel.select_single(row),
+            Message::Cell(click, _col) => self.sel.apply_item_click(click),
             Message::Sort(col) => self.table.sort(col),
             Message::Scroll(w) => self.window = w,
         }

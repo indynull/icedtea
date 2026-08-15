@@ -351,6 +351,36 @@ impl ListModel for VecList {
     }
 }
 
+/// Mouse button that hit a list, table, grid, or tree row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ItemButton {
+    Primary,
+    Secondary,
+}
+
+/// A pointer press on a collection row.
+///
+/// `id` is the row index for lists, tables, and grids, or the node id
+/// for a tree. Shift+primary extends; Command/Ctrl+primary toggles.
+/// Secondary on an already-selected row keeps the selection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ItemClick<Id = usize> {
+    pub id: Id,
+    pub button: ItemButton,
+    pub modifiers: iced::keyboard::Modifiers,
+}
+
+impl ItemClick<usize> {
+    /// Left click, no modifiers.
+    pub fn primary(id: usize) -> Self {
+        Self {
+            id,
+            button: ItemButton::Primary,
+            modifiers: iced::keyboard::Modifiers::empty(),
+        }
+    }
+}
+
 /// Selection for lists/tables/trees.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Selection {
@@ -382,7 +412,13 @@ impl Selection {
                     v.sort_unstable();
                 }
             }
-            _ => *self = Self::Multi(vec![i]),
+            Self::Single(s) if *s == i => *self = Self::Multi(vec![i]),
+            Self::Single(s) => {
+                let mut v = vec![*s, i];
+                v.sort_unstable();
+                *self = Self::Multi(v);
+            }
+            Self::None => *self = Self::Multi(vec![i]),
         }
     }
 
@@ -405,6 +441,18 @@ impl Selection {
     pub fn extend_to(&mut self, to: usize) {
         let from = self.primary().unwrap_or(to);
         self.select_range(from, to);
+    }
+
+    /// Apply a desktop list click: shift extends, Command/Ctrl toggles,
+    /// secondary keeps an already-selected row.
+    pub fn apply_item_click(&mut self, click: ItemClick<usize>) {
+        match click.button {
+            ItemButton::Secondary if self.contains(click.id) => {}
+            ItemButton::Secondary => self.select_single(click.id),
+            ItemButton::Primary if click.modifiers.shift() => self.extend_to(click.id),
+            ItemButton::Primary if click.modifiers.command() => self.toggle_multi(click.id),
+            ItemButton::Primary => self.select_single(click.id),
+        }
     }
 
     /// Move the primary index by `delta`, clamped to `0..len`.
@@ -1359,6 +1407,34 @@ mod tests {
         assert!(sel.contains(1) && sel.contains(3));
         sel.extend_to(4);
         assert!(sel.contains(4));
+        let mut click = Selection::Single(2);
+        click.apply_item_click(ItemClick {
+            id: 2,
+            button: ItemButton::Secondary,
+            modifiers: iced::keyboard::Modifiers::empty(),
+        });
+        assert_eq!(click, Selection::Single(2));
+        click.apply_item_click(ItemClick {
+            id: 5,
+            button: ItemButton::Secondary,
+            modifiers: iced::keyboard::Modifiers::empty(),
+        });
+        assert_eq!(click, Selection::Single(5));
+        click.apply_item_click(ItemClick {
+            id: 7,
+            button: ItemButton::Primary,
+            modifiers: iced::keyboard::Modifiers::SHIFT,
+        });
+        assert!(click.contains(5) && click.contains(7));
+        let mut tog = Selection::Single(1);
+        tog.apply_item_click(ItemClick {
+            id: 3,
+            button: ItemButton::Primary,
+            modifiers: iced::keyboard::Modifiers::COMMAND,
+        });
+        assert!(tog.contains(1) && tog.contains(3));
+        tog.apply_item_click(ItemClick::primary(0));
+        assert_eq!(tog, Selection::Single(0));
         assert_eq!(sel.move_primary(1, 5), Some(2));
         let mut empty = Selection::None;
         assert_eq!(empty.move_primary(0, 0), None);

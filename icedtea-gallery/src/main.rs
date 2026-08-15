@@ -842,7 +842,9 @@ fn parse_inject_line(line: &str) -> Option<Message> {
         }
         "filter" => Some(Message::FilterChip(parts.next()?.parse().ok()?)),
         "sheet" => Some(Message::SideSheet(parts.next()? == "true")),
-        "list" => Some(Message::ListSel(parts.next()?.parse().ok()?)),
+        "list" => Some(Message::ListSel(icedtea::collection::ItemClick::primary(
+            parts.next()?.parse().ok()?,
+        ))),
         "opt" => Some(Message::OptSel(parts.next()?.parse().ok()?)),
         "expand-card" | "expand_card" => Some(Message::ExpandCard(parts.next()?.parse().ok()?)),
         "face" | "list-face" | "list_face" => {
@@ -860,9 +862,15 @@ fn parse_inject_line(line: &str) -> Option<Message> {
         "reduce-motion" | "reduce_motion" => Some(Message::ReduceMotion(parts.next()? == "true")),
         "page" => Some(Message::Page(parts.next()?.parse().ok()?)),
         "tab" => Some(Message::Tab(parts.next()?.parse().ok()?)),
-        "grid" => Some(Message::Grid(parts.next()?.parse().ok()?)),
+        "grid" => Some(Message::Grid(icedtea::collection::ItemClick::primary(
+            parts.next()?.parse().ok()?,
+        ))),
         "tree" => Some(Message::Tree(parts.next()?.parse().ok()?)),
-        "tree-sel" | "tree_sel" => Some(Message::TreeSelect(parts.next()?.parse().ok()?)),
+        "tree-sel" | "tree_sel" => Some(Message::TreeSelect(icedtea::collection::ItemClick {
+            id: parts.next()?.parse().ok()?,
+            button: icedtea::collection::ItemButton::Primary,
+            modifiers: Default::default(),
+        })),
         "swatch" => Some(Message::Swatch),
         "md-move" | "md_move" => Some(Message::MdPointer(icedtea::select::MarkdownPointer::Move(
             parts.next()?.parse().ok()?,
@@ -970,13 +978,13 @@ enum Message {
     ListFilter(String),
     ListBucket(ListBucket),
     Tree(u64),
-    TreeSelect(u64),
+    TreeSelect(icedtea::collection::ItemClick<u64>),
     ListScroll(VisibleWindow),
     TableScroll(VisibleWindow),
-    ListSel(usize),
+    ListSel(icedtea::collection::ItemClick),
     VcScroll(VisibleWindow),
     ExpandCard(usize),
-    TableCell(usize, usize),
+    TableCell(icedtea::collection::ItemClick, usize),
     OptSel(usize),
     MdJump(usize),
     MdLink(String),
@@ -992,7 +1000,7 @@ enum Message {
     DismissWrap(usize),
     DismissCardTag,
     BannerGo,
-    Grid(usize),
+    Grid(icedtea::collection::ItemClick),
     NavTo(&'static str),
     NavBack,
     PinTab(usize),
@@ -1759,6 +1767,13 @@ impl Gallery {
         self.pointer.x > side
     }
 
+    fn open_row_context(&mut self) {
+        self.context = Some(self.pointer);
+        self.context_closing = false;
+        self.context_anim
+            .go_mut(true, icedtea::iced::time::Instant::now());
+    }
+
     /// Rebuild the list page from `list_all` using search, bucket, and page.
     /// Application owns filter + pagination; the list paints one page.
     fn refresh_list_view(&mut self) {
@@ -2280,7 +2295,16 @@ impl Gallery {
                 anim.go_mut(opening, now);
                 self.tree_anim = Some((id, anim));
             }
-            Message::TreeSelect(id) => self.tree_sel = Some(id),
+            Message::TreeSelect(click) => {
+                let keep = click.button == icedtea::collection::ItemButton::Secondary
+                    && self.tree_sel == Some(click.id);
+                if !keep {
+                    self.tree_sel = Some(click.id);
+                }
+                if click.button == icedtea::collection::ItemButton::Secondary {
+                    self.open_row_context();
+                }
+            }
             Message::ListScroll(w) => {
                 if self.page == "list-detail" {
                     self.list_detail_window = w;
@@ -2301,11 +2325,14 @@ impl Gallery {
                     icedtea::collection::expand_card_heights(self.list_all.len(), 52.0, &open);
             }
             Message::TableScroll(w) => self.table_window = w,
-            Message::ListSel(i) => {
+            Message::ListSel(click) => {
                 if self.page == "list-detail" {
-                    self.list_detail_sel.select_single(i);
+                    self.list_detail_sel.apply_item_click(click);
                 } else {
-                    self.list_sel.select_single(i);
+                    self.list_sel.apply_item_click(click);
+                }
+                if click.button == icedtea::collection::ItemButton::Secondary {
+                    self.open_row_context();
                 }
             }
             Message::LogScroll(w) => self.log_window = w,
@@ -2397,9 +2424,17 @@ impl Gallery {
                 self.banner_on = false;
                 self.note = "Install started".into();
             }
-            Message::Grid(i) => {
-                self.grid_sel = Some(i);
-                self.note = format!("Opened tile {i}");
+            Message::Grid(click) => {
+                let mut sel = self
+                    .grid_sel
+                    .map(icedtea::collection::Selection::Single)
+                    .unwrap_or(icedtea::collection::Selection::None);
+                sel.apply_item_click(click);
+                self.grid_sel = sel.primary();
+                self.note = format!("Opened tile {}", click.id);
+                if click.button == icedtea::collection::ItemButton::Secondary {
+                    self.open_row_context();
+                }
             }
             Message::NavTo(id) => {
                 self.nav.push(id);
@@ -2428,9 +2463,12 @@ impl Gallery {
                     self.opt_sel.toggle_multi(i);
                 }
             }
-            Message::TableCell(r, c) => {
-                self.table_cursor = (r, c);
-                self.sel.select_single(r);
+            Message::TableCell(click, c) => {
+                self.table_cursor = (click.id, c);
+                self.sel.apply_item_click(click);
+                if click.button == icedtea::collection::ItemButton::Secondary {
+                    self.open_row_context();
+                }
             }
             Message::Submit => {
                 self.dialog_note = format!("submit: {}", self.name);
@@ -6260,7 +6298,7 @@ mod tests {
         ));
         assert!(matches!(
             super::parse_inject_line("list 3"),
-            Some(super::Message::ListSel(3))
+            Some(super::Message::ListSel(c)) if c == icedtea::collection::ItemClick::primary(3)
         ));
         assert!(matches!(
             super::parse_inject_line("expand-card 1"),
@@ -6364,7 +6402,9 @@ mod tests {
         assert_eq!(g.chips.len(), n - 1);
         let _ = g.update(super::Message::BannerGo);
         assert!(!g.banner_on);
-        let _ = g.update(super::Message::Grid(2));
+        let _ = g.update(super::Message::Grid(
+            icedtea::collection::ItemClick::primary(2),
+        ));
         assert_eq!(g.grid_sel, Some(2));
         let _ = g.update(super::Message::NavTo("files"));
         assert_eq!(g.nav.current(), "files");
@@ -6422,12 +6462,25 @@ mod tests {
         }
         g.page = "list";
         g.pointer = icedtea::iced::Point::new(400.0, 80.0);
-        let _ = g.update(super::Message::ListSel(3));
+        let _ = g.update(super::Message::ListSel(
+            icedtea::collection::ItemClick::primary(3),
+        ));
         let _ = g.update(super::Message::Cursor(
             icedtea::layout::CursorEvent::Context,
         ));
         assert!(g.context.is_some());
         assert_eq!(g.list_sel.primary(), Some(3));
+        g.list_sel.select_range(1, 3);
+        let _ = g.update(super::Message::ListSel(icedtea::collection::ItemClick {
+            id: 2,
+            button: icedtea::collection::ItemButton::Secondary,
+            modifiers: Default::default(),
+        }));
+        assert!(g.list_sel.contains(1) && g.list_sel.contains(3));
+        let _ = g.update(super::Message::ListSel(
+            icedtea::collection::ItemClick::primary(5),
+        ));
+        assert_eq!(g.list_sel, icedtea::collection::Selection::Single(5));
         let _ = g.view();
         let _ = g.update(super::Message::CopyValue);
         g.page = "markdown";

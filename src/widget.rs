@@ -25,6 +25,9 @@
 //! );
 //! ```
 
+use iced::advanced::layout;
+use iced::advanced::widget::{tree, Tree};
+use iced::advanced::{Clipboard, Layout, Shell, Widget};
 use iced::gradient::Linear;
 use iced::widget::canvas::Canvas;
 use iced::widget::markdown;
@@ -35,7 +38,7 @@ use iced::widget::{
     scrollable, slider, stack, svg, text, text_editor, text_input, toggler, tooltip, Column, Id,
     Row, Space, Stack,
 };
-use iced::{Alignment, Background, Color, Element, Length, Padding, Radians};
+use iced::{keyboard, Alignment, Background, Color, Element, Event, Length, Padding, Radians};
 
 use crate::chrome::SCROLL_RAIL_WIDTH;
 use crate::host_canvas::{ArcRing, SpinnerDots};
@@ -43,8 +46,8 @@ use crate::scroll::{ClipLayer, ScrollRail};
 
 use crate::a11y::{self, A11y, Role};
 use crate::collection::{
-    page_range, virtual_pads, window_after_scroll, window_after_scroll_var, Accordion, ListModel,
-    RowFace, RowHeights, Selection, Tabs, TreeNode, VisibleWindow,
+    page_range, virtual_pads, window_after_scroll, window_after_scroll_var, Accordion, ItemButton,
+    ItemClick, ListModel, RowFace, RowHeights, Selection, Tabs, TreeNode, VisibleWindow,
 };
 use crate::i18n::Direction;
 use crate::icon::{Icon, Icons};
@@ -4209,6 +4212,290 @@ pub fn virtual_column<'a, M: Clone + 'a>(
     )
 }
 
+/// Emit [`ItemButton`] plus current modifiers when the child is pressed.
+pub fn item_press<'a, M: Clone + 'a>(
+    child: Element<'a, M>,
+    on_click: impl Fn(ItemButton, keyboard::Modifiers) -> M + 'a,
+) -> Element<'a, M> {
+    ItemPress {
+        content: child,
+        on_click: Box::new(on_click),
+    }
+    .into()
+}
+
+/// Swallow mouse presses on `child` so they do not fall through.
+pub fn capture_press<'a, M: 'a>(child: Element<'a, M>) -> Element<'a, M> {
+    CapturePress { content: child }.into()
+}
+
+struct ItemPress<'a, Message> {
+    content: Element<'a, Message>,
+    on_click: Box<dyn Fn(ItemButton, keyboard::Modifiers) -> Message + 'a>,
+}
+
+#[derive(Default)]
+struct PressState {
+    modifiers: keyboard::Modifiers,
+}
+
+impl<'a, Message: Clone> Widget<Message, iced::Theme, iced::Renderer> for ItemPress<'a, Message> {
+    fn tag(&self) -> tree::Tag {
+        tree::Tag::of::<PressState>()
+    }
+
+    fn state(&self) -> tree::State {
+        tree::State::new(PressState::default())
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.content)]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_ref(&self.content));
+    }
+
+    fn size(&self) -> iced::Size<Length> {
+        self.content.as_widget().size()
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        self.content
+            .as_widget_mut()
+            .layout(&mut tree.children[0], renderer, limits)
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        renderer: &iced::Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &iced::Rectangle,
+    ) {
+        self.content.as_widget_mut().update(
+            &mut tree.children[0],
+            event,
+            layout,
+            cursor,
+            renderer,
+            clipboard,
+            shell,
+            viewport,
+        );
+        let state = tree.state.downcast_mut::<PressState>();
+        match event {
+            Event::Keyboard(keyboard::Event::ModifiersChanged(m)) => state.modifiers = *m,
+            Event::Keyboard(keyboard::Event::KeyPressed { modifiers, .. })
+            | Event::Keyboard(keyboard::Event::KeyReleased { modifiers, .. }) => {
+                state.modifiers = *modifiers;
+            }
+            Event::Mouse(iced::mouse::Event::ButtonPressed(button))
+                if !shell.is_event_captured() =>
+            {
+                let Some(pos) = cursor.position() else {
+                    return;
+                };
+                if !layout.bounds().contains(pos) {
+                    return;
+                }
+                let item = match button {
+                    iced::mouse::Button::Left => ItemButton::Primary,
+                    iced::mouse::Button::Right => ItemButton::Secondary,
+                    _ => return,
+                };
+                shell.publish((self.on_click)(item, state.modifiers));
+                shell.capture_event();
+            }
+            _ => {}
+        }
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut iced::Renderer,
+        theme: &iced::Theme,
+        style: &iced::advanced::renderer::Style,
+        layout: Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        viewport: &iced::Rectangle,
+    ) {
+        self.content.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            layout,
+            cursor,
+            viewport,
+        );
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &iced::Renderer,
+        operation: &mut dyn iced::advanced::widget::Operation,
+    ) {
+        self.content
+            .as_widget_mut()
+            .operate(&mut tree.children[0], layout, renderer, operation);
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        viewport: &iced::Rectangle,
+        renderer: &iced::Renderer,
+    ) -> iced::mouse::Interaction {
+        self.content.as_widget().mouse_interaction(
+            &tree.children[0],
+            layout,
+            cursor,
+            viewport,
+            renderer,
+        )
+    }
+}
+
+impl<'a, Message: Clone + 'a> From<ItemPress<'a, Message>> for Element<'a, Message> {
+    fn from(value: ItemPress<'a, Message>) -> Self {
+        Self::new(value)
+    }
+}
+
+struct CapturePress<'a, Message> {
+    content: Element<'a, Message>,
+}
+
+impl<'a, Message> Widget<Message, iced::Theme, iced::Renderer> for CapturePress<'a, Message> {
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.content)]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_ref(&self.content));
+    }
+
+    fn size(&self) -> iced::Size<Length> {
+        self.content.as_widget().size()
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        self.content
+            .as_widget_mut()
+            .layout(&mut tree.children[0], renderer, limits)
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        renderer: &iced::Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &iced::Rectangle,
+    ) {
+        self.content.as_widget_mut().update(
+            &mut tree.children[0],
+            event,
+            layout,
+            cursor,
+            renderer,
+            clipboard,
+            shell,
+            viewport,
+        );
+        if shell.is_event_captured() {
+            return;
+        }
+        if let Event::Mouse(iced::mouse::Event::ButtonPressed(_)) = event {
+            if cursor
+                .position()
+                .is_some_and(|p| layout.bounds().contains(p))
+            {
+                shell.capture_event();
+            }
+        }
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut iced::Renderer,
+        theme: &iced::Theme,
+        style: &iced::advanced::renderer::Style,
+        layout: Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        viewport: &iced::Rectangle,
+    ) {
+        self.content.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            layout,
+            cursor,
+            viewport,
+        );
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &iced::Renderer,
+        operation: &mut dyn iced::advanced::widget::Operation,
+    ) {
+        self.content
+            .as_widget_mut()
+            .operate(&mut tree.children[0], layout, renderer, operation);
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        viewport: &iced::Rectangle,
+        renderer: &iced::Renderer,
+    ) -> iced::mouse::Interaction {
+        self.content.as_widget().mouse_interaction(
+            &tree.children[0],
+            layout,
+            cursor,
+            viewport,
+            renderer,
+        )
+    }
+}
+
+impl<'a, Message: 'a> From<CapturePress<'a, Message>> for Element<'a, Message> {
+    fn from(value: CapturePress<'a, Message>) -> Self {
+        Self::new(value)
+    }
+}
+
 /// A virtualized row list.
 ///
 /// `empty` is the copy when `model` has no rows. `meta_color` paints
@@ -4227,7 +4514,7 @@ pub fn virtual_column<'a, M: Clone + 'a>(
 /// let tok = icedtea::theme::named("dark").tokens;
 /// #[derive(Clone, Copy)]
 /// enum Msg {
-///     Select(usize),
+///     Select(icedtea::collection::ItemClick),
 ///     Scroll(VisibleWindow),
 ///     Check(usize),
 /// }
@@ -4254,7 +4541,7 @@ pub fn virtual_column<'a, M: Clone + 'a>(
 pub fn list_view<'a, M, L>(
     model: &'a L,
     selection: &'a Selection,
-    on_select: impl Fn(usize) -> M + Copy + 'a,
+    on_select: impl Fn(ItemClick) -> M + Copy + 'a,
     tok: Tokens,
     window: VisibleWindow,
     row_h: impl Into<RowHeights<'a>>,
@@ -4327,10 +4614,13 @@ where
                         let body: Element<'a, M> = if disabled {
                             painted
                         } else {
-                            mouse_area(painted)
-                                .on_press(on_select(i))
-                                .on_right_press(on_select(i))
-                                .into()
+                            item_press(painted, move |button, modifiers| {
+                                on_select(ItemClick {
+                                    id: i,
+                                    button,
+                                    modifiers,
+                                })
+                            })
                         };
                         let row: Element<'a, M> = row![
                             row_slot_el(model.leading(i), i, on_check, tok, disabled),
@@ -4366,7 +4656,7 @@ where
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let labels = vec!["Inbox".into(), "Mail".into()];
-/// let on_select = |i| i;
+/// let on_select = |c: icedtea::collection::ItemClick| c.id;
 /// let _: icedtea::Element<'_, usize> = widget::item_grid(
 ///     &labels,
 ///     on_select,
@@ -4377,7 +4667,7 @@ where
 /// ```
 pub fn item_grid<'a, M: Clone + 'a>(
     labels: &[String],
-    on_select: impl Fn(usize) -> M + Copy + 'a,
+    on_select: impl Fn(ItemClick) -> M + Copy + 'a,
     selected: Option<usize>,
     tok: Tokens,
     a11y: A11y,
@@ -4400,7 +4690,7 @@ pub fn item_grid<'a, M: Clone + 'a>(
                 // M3: selected tile = tonal (secondary container); idle = ghost.
                 let tile = themed_button_sized(
                     s.clone(),
-                    a11y.apply_message(Some(on_select(i))),
+                    None,
                     tok,
                     if on { Variant::Quiet } else { Variant::Ghost },
                     Icons::NONE,
@@ -4413,7 +4703,13 @@ pub fn item_grid<'a, M: Clone + 'a>(
                 r = r.push(if a11y.disabled {
                     tile
                 } else {
-                    mouse_area(tile).on_right_press(on_select(i)).into()
+                    item_press(tile, move |button, modifiers| {
+                        on_select(ItemClick {
+                            id: i,
+                            button,
+                            modifiers,
+                        })
+                    })
                 });
                 i += 1;
             } else {
@@ -4428,7 +4724,8 @@ pub fn item_grid<'a, M: Clone + 'a>(
 #[allow(clippy::too_many_arguments)]
 /// A virtualized table. Last column fills.
 ///
-/// `on_cell` is (row, column). `on_sort` is the header click. Empty
+/// `on_cell` is an [`ItemClick`] (row) plus the column. `on_sort` is
+/// the header click. Empty
 /// rows still paint headers. `columns.frozen` stays in view;
 /// `on_h_scroll` is the unfrozen strip.
 ///
@@ -4449,7 +4746,7 @@ pub fn item_grid<'a, M: Clone + 'a>(
 /// let cols = icedtea::collection::ColumnLayout::new(vec![120.0]);
 /// #[derive(Clone, Copy)]
 /// enum Msg {
-///     Cell(usize, usize),
+///     Cell(icedtea::collection::ItemClick, usize),
 ///     Sort(usize),
 ///     Scroll(VisibleWindow),
 ///     HScroll(f32),
@@ -4486,7 +4783,7 @@ pub fn data_table<'a, M, T>(
     window: VisibleWindow,
     row_h: f32,
     overscan: usize,
-    on_cell: impl Fn(usize, usize) -> M + Copy + 'a,
+    on_cell: impl Fn(ItemClick, usize) -> M + Copy + 'a,
     on_sort: impl Fn(usize) -> M + Copy + 'a,
     on_scroll: impl Fn(VisibleWindow) -> M + Copy + 'a,
     on_h_scroll: impl Fn(f32) -> M + Copy + 'a,
@@ -4602,10 +4899,16 @@ where
                             let cell: Element<'a, M> = if disabled {
                                 face.into()
                             } else {
-                                mouse_area(face)
-                                    .on_press(on_cell(i, c))
-                                    .on_right_press(on_cell(i, c))
-                                    .into()
+                                item_press(face.into(), move |button, modifiers| {
+                                    on_cell(
+                                        ItemClick {
+                                            id: i,
+                                            button,
+                                            modifiers,
+                                        },
+                                        c,
+                                    )
+                                })
                             };
                             line.push(a11y::attach(
                                 cell,
@@ -4680,7 +4983,7 @@ where
 /// #[derive(Clone, Copy)]
 /// enum Msg {
 ///     Toggle(u64),
-///     Select(u64),
+///     Select(icedtea::collection::ItemClick<u64>),
 /// }
 /// let on_toggle = Msg::Toggle;
 /// let on_select = Msg::Select;
@@ -4699,7 +5002,7 @@ pub fn tree_view<'a, M: Clone + 'a>(
     selected: Option<u64>,
     animating: Option<(u64, f32)>,
     on_toggle: impl Fn(u64) -> M + Copy + 'a,
-    on_select: impl Fn(u64) -> M + Copy + 'a,
+    on_select: impl Fn(ItemClick<u64>) -> M + Copy + 'a,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
@@ -4722,7 +5025,7 @@ pub fn tree_view<'a, M: Clone + 'a>(
             has_children,
             selected,
             &on_toggle,
-            &on_select,
+            on_select,
             tok,
             &a11y,
         );
@@ -4758,7 +5061,7 @@ fn tree_line<'a, M: Clone + 'a>(
     has_children: bool,
     selected: Option<u64>,
     on_toggle: &impl Fn(u64) -> M,
-    on_select: &impl Fn(u64) -> M,
+    on_select: impl Fn(ItemClick<u64>) -> M + Copy + 'a,
     tok: Tokens,
     a11y: &A11y,
 ) -> Element<'a, M> {
@@ -4795,10 +5098,13 @@ fn tree_line<'a, M: Clone + 'a>(
     let pick: Element<'a, M> = if a11y.disabled {
         title
     } else {
-        mouse_area(title)
-            .on_press(on_select(id))
-            .on_right_press(on_select(id))
-            .into()
+        item_press(title, move |button, modifiers| {
+            on_select(ItemClick {
+                id,
+                button,
+                modifiers,
+            })
+        })
     };
     line = line.push(a11y::attach(
         pick,
@@ -5301,6 +5607,71 @@ mod tests {
     #[should_panic(expected = "cover-must")]
     fn must_rejects_a_failed_check() {
         must(false, "cover-must");
+    }
+
+    #[test]
+    fn item_press_reports_button_and_modifiers() {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Point, Rectangle, Size};
+        let tok = named("dark").tokens;
+        let face = label("row", tok, A11y::new("row", Role::ListItem));
+        let mut el: Element<'_, ItemClick> = item_press(face, |button, modifiers| ItemClick {
+            id: 3,
+            button,
+            modifiers,
+        });
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(200.0, 40.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let viewport = Rectangle::new(Point::ORIGIN, Size::new(200.0, 40.0));
+        let mut clipboard = clipboard::Null;
+        {
+            let mut messages = Vec::new();
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Keyboard(keyboard::Event::ModifiersChanged(
+                    keyboard::Modifiers::SHIFT,
+                )),
+                layout,
+                iced::mouse::Cursor::Available(Point::new(8.0, 8.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(iced::mouse::Event::ButtonPressed(
+                    iced::mouse::Button::Right,
+                )),
+                layout,
+                iced::mouse::Cursor::Available(Point::new(8.0, 8.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert_eq!(
+            messages,
+            vec![ItemClick {
+                id: 3,
+                button: ItemButton::Secondary,
+                modifiers: keyboard::Modifiers::SHIFT,
+            }]
+        );
     }
 
     fn draw_once<M: Clone>(el: &mut Element<'_, M>) {
@@ -7649,7 +8020,7 @@ mod tests {
             selected,
             None,
             |id| id,
-            |id| id,
+            |c| c.id,
             tok,
             A11y::new("tree", Role::Tree),
         );
@@ -7658,7 +8029,7 @@ mod tests {
             None,
             Some((1, 0.4)),
             |id| id,
-            |id| id,
+            |c| c.id,
             tok,
             A11y::new("tree", Role::Tree),
         );
@@ -7920,7 +8291,7 @@ mod tests {
         let mut el: Element<'_, usize> = list_view(
             &list,
             &Sel::None,
-            |i| i,
+            |c| c.id,
             tok,
             win,
             24.0,
@@ -8793,7 +9164,7 @@ mod tests {
         let mut el: Element<'_, usize> = list_view(
             &list,
             &Sel::Single(0),
-            |i| i,
+            |c| c.id,
             tok,
             win,
             64.0,
@@ -9546,7 +9917,7 @@ mod tests {
             Some(2),
             Some((2, 0.4)),
             |id| id,
-            |id| id,
+            |c| c.id,
             tok,
             A11y::new("tree", Role::Tree),
         );
@@ -9556,7 +9927,7 @@ mod tests {
             None,
             Some((2, 1.0)),
             |id| id,
-            |id| id,
+            |c| c.id,
             tok,
             A11y::new("tree", Role::Tree).with_disabled(true),
         );

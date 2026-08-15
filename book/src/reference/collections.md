@@ -24,7 +24,9 @@ Constructor: [`widget::list_view`](https://docs.rs/icedtea/latest/icedtea/widget
 [icedtea](https://crates.io/crates/icedtea)
 
 `empty` is the copy when the model has no rows. Selection stays on
-indices. Disabled drops row messages. `on_scroll` reports the window
+indices. A row press is [`ItemClick`](https://docs.rs/icedtea/latest/icedtea/collection/struct.ItemClick.html):
+shift+primary extends, Command/Ctrl+primary toggles, secondary on a
+selected row keeps the selection. Disabled drops row messages. `on_scroll` reports the window
 after a wheel or rail move. Pass `RowHeights::PerRow` for variable
 row heights (`visible_range_var`). `RowFace::Flush` is one clipped
 line. `RowFace::Card` is a surface, wrapped title, and an optional
@@ -87,7 +89,8 @@ Constructor: [`widget::data_table`](https://docs.rs/icedtea/latest/icedtea/widge
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-`TableModel` holds headers and rows. `on_cell` is (row, column).
+`TableModel` holds headers and rows. `on_cell` is an `ItemClick` plus
+the column.
 `on_sort` is the header click. `ColumnLayout` order is scroll order;
 `frozen` keeps the first *n* columns in view. `on_h_scroll` moves
 the rest. `TableSource::row_checked` plus `on_check` paint a leading

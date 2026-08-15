@@ -5,7 +5,7 @@ which row is selected.
 
 ```rust
 use icedtea::a11y::{A11y, Role};
-use icedtea::collection::{Selection, VecList, VisibleWindow};
+use icedtea::collection::{ItemClick, Selection, VecList, VisibleWindow};
 use icedtea::i18n::Direction;
 use icedtea::pattern;
 use icedtea::theme;
@@ -20,14 +20,14 @@ struct App {
 
 #[derive(Clone)]
 enum Message {
-    Select(usize),
+    Select(ItemClick),
     Scroll(VisibleWindow),
 }
 
 impl App {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::Select(i) => self.sel.select_single(i),
+            Message::Select(click) => self.sel.apply_item_click(click),
             Message::Scroll(w) => self.window = w,
         }
         Task::none()

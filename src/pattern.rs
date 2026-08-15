@@ -1395,9 +1395,11 @@ pub fn context_origin(origin: Point, size: Size, viewport: Size) -> Point {
 
 /// Place a context menu at `origin` in the window. Left click-away dismisses.
 ///
-/// Right-click is the application's (`listen_cursor`). Empty `actions`
-/// still paints a card. `viewport` clamps the card to its real size.
-/// `progress` is 0 (gone) to 1 (rest).
+/// Presses on the card are captured so they do not fall through.
+/// Empty-space right-click is `listen_cursor` (Ignored only). Row
+/// widgets emit [`crate::collection::ItemClick`] instead. Empty
+/// `actions` still paints a card. `viewport` clamps the card to its
+/// real size. `progress` is 0 (gone) to 1 (rest).
 ///
 ///
 /// ```
@@ -1460,13 +1462,15 @@ pub fn context_menu<'a, M: Clone + 'a>(
             .width(Length::Fixed(size.width))
             .height(Length::Fixed(size.height))
     };
-    let card = container(inner).style(move |_| style::fade_face(style::raised_card(tok), t));
-    let placed = container(card).padding(Padding {
-        top: at.y,
-        right: 0.0,
-        bottom: 0.0,
-        left: at.x,
-    });
+    let card = crate::widget::capture_press(
+        container(inner)
+            .style(move |_| style::fade_face(style::raised_card(tok), t))
+            .into(),
+    );
+    let placed = column![
+        Space::new().height(Length::Fixed(at.y)),
+        row![Space::new().width(Length::Fixed(at.x)), card],
+    ];
     Stack::new()
         .push(
             mouse_area(Space::new().width(Length::Fill).height(Length::Fill)).on_press(on_dismiss),

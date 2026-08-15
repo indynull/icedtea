@@ -120,19 +120,22 @@ pub enum CursorEvent {
     Context,
 }
 
-/// Cursor motion and right-button press in window space.
+/// Cursor motion always. Right-button press only when no widget
+/// captured the event (row widgets emit their own [`crate::collection::ItemClick`]).
 pub fn listen_cursor() -> Subscription<CursorEvent> {
     iced::event::listen_with(cursor_listen)
 }
 
 fn cursor_listen(
     event: iced::Event,
-    _status: iced::event::Status,
+    status: iced::event::Status,
     _id: iced::window::Id,
 ) -> Option<CursorEvent> {
     match event {
         Event::Mouse(mouse::Event::CursorMoved { position }) => Some(CursorEvent::Move(position)),
-        Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Right)) => {
+        Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Right))
+            if status == iced::event::Status::Ignored =>
+        {
             Some(CursorEvent::Context)
         }
         _ => None,
@@ -286,11 +289,19 @@ mod tests {
         let right = Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Right));
         assert_eq!(
             cursor_listen(
-                right,
+                right.clone(),
                 iced::event::Status::Ignored,
                 iced::window::Id::unique(),
             ),
             Some(CursorEvent::Context)
+        );
+        assert_eq!(
+            cursor_listen(
+                right,
+                iced::event::Status::Captured,
+                iced::window::Id::unique(),
+            ),
+            None
         );
         assert!(cursor_listen(
             released,
