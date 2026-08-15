@@ -8,6 +8,8 @@ Type, icons, documents, and images.
 
 ![Labels, icons, and type](../images/content.png)
 
+Each constructor takes `A11y` unless noted. iced 0.14 publishes the widget id only.
+
 ## Select and copy
 
 Readable body, code, and markdown share one contract (module
@@ -50,6 +52,8 @@ Constructor: [`widget::icon_svg`](https://docs.rs/icedtea/latest/icedtea/widget/
 Chrome set only (`Icon::Search`, `Close`, and the rest). Tokens tint
 the fill.
 
+Pass `A11y`.
+
 ### Tooltip
 
 **`tooltip`** — Hover text on a child.
@@ -87,6 +91,8 @@ Constructor: [`widget::hyperlink`](https://docs.rs/icedtea/latest/icedtea/widget
 The application opens the URL or navigates. Disabled paints muted
 text and drops the press.
 
+Pass `A11y`.
+
 ### Markdown
 
 **`markdown`** — A parsed document.
@@ -106,6 +112,8 @@ across blocks with `select::markdown_select`; covered blocks paint
 the `MarkdownSpan` wash. Ctrl+C / Cmd+C copies `MarkdownSpan::text`.
 Copy the whole document with `icedtea::copy_text` on `doc.source`.
 
+Pass `A11y`.
+
 ### Code
 
 **`code`** — Highlighted source.
@@ -120,6 +128,8 @@ The application owns the buffer and the language name. Highlighter
 face follows the active colorway (`theme::code_highlight`). Typing
 does not change the buffer. Select and copy like `selectable`.
 
+Pass `A11y`.
+
 ### Image
 
 **`image`** — A slot that keeps its box.
@@ -132,6 +142,8 @@ Constructor: [`widget::image_slot`](https://docs.rs/icedtea/latest/icedtea/widge
 
 Ready keeps the requested width and height. Missing bytes show the
 empty slot, not a collapsed layout.
+
+Pass `A11y`.
 
 ### Selectable
 
@@ -147,3 +159,6 @@ Looks like body text. The application owns `text_editor::Content` and
 posts `Content::selection()` with `icedtea::copy_text`. `FontFace::Ui`
 is prose; `FontFace::Mono` is a path or raw value. Disabled still
 allows select-and-copy.
+
+Pass `A11y`.
+

@@ -1,8 +1,12 @@
 # Widgets
 
-Every public constructor returns an iced `Element` and emits the
-application's messages. It takes `Tokens` and `A11y` (name, role,
-disabled, checked). The application owns state.
+Drawing constructors in `widget` return an iced `Element` and emit
+the application's messages. They take `Tokens` and `A11y` (name,
+role, value, hint, disabled, checked / selected / toggled, expanded,
+live, required, error). Chrome rows take an `ActionTable`. Layout
+recipes do not take `A11y`. iced 0.14 publishes the widget id only.
+Keyboard order is the working path: see
+[Accessibility](accessibility.md). The application owns state.
 
 | Group | Page |
 | --- | --- |

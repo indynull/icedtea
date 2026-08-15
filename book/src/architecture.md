@@ -40,9 +40,10 @@ on macOS, Control on Linux and Windows. See [Actions](actions.md).
 ## Call constructors
 
 Functions in [`widget`](https://docs.rs/icedtea/latest/icedtea/widget/index.html)
-return iced `Element`s and emit your messages. Each takes `A11y` and
-tokens. The application owns the buffer, the selection, and the rest
-of the state. `update` applies the message.
+return iced `Element`s and emit your messages. Each widget constructor
+takes `A11y` and tokens. Chrome rows take an `ActionTable`. The
+application owns the buffer, the selection, and the rest of the state.
+`update` applies the message. See [Accessibility](accessibility.md).
 
 ## Move it
 

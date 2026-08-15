@@ -8,6 +8,8 @@ Text, numbers, dates, and picks.
 
 ![Text, numbers, dates, and picks](../images/fields.png)
 
+Each constructor takes `A11y` unless noted. iced 0.14 publishes the widget id only.
+
 ### Text input
 
 **`text-input`** — A single-line editor.
@@ -23,6 +25,8 @@ label when the value is non-empty, and an optional character count.
 Optional iced `Id` so you can `focus` after show. Disabled greys the
 field and drops edit. Empty value is a valid state.
 
+Pass `A11y`.
+
 ### Password
 
 **`password`** — A masked single-line editor.
@@ -36,6 +40,8 @@ Constructor: [`widget::password_input`](https://docs.rs/icedtea/latest/icedtea/w
 Characters paint as dots. The application owns the string. Disabled
 drops edit.
 
+Pass `A11y`.
+
 ### Secret field
 
 **`secret`** — A settings row: masked field, reveal, and copy.
@@ -47,6 +53,8 @@ Constructor: [`widget::secret_field`](https://docs.rs/icedtea/latest/icedtea/wid
 
 Reveal toggles the mask. Copy is an `Action` whose message the
 application handles with `icedtea::copy_text`.
+
+Pass `A11y`.
 
 ### Value field
 
@@ -68,6 +76,8 @@ select-and-copy contract as body and code: app-owned buffer,
 [Content: Select and copy](content.md#select-and-copy) and
 [`select`](https://docs.rs/icedtea/latest/icedtea/select/index.html).
 
+Pass `A11y`.
+
 ### Text area
 
 **`textarea`** — A multi-line editor.
@@ -81,6 +91,8 @@ Constructor: [`widget::textarea`](https://docs.rs/icedtea/latest/icedtea/widget/
 Height is `layout::FILL` or `layout::fixed`. The application owns the
 `text_editor::Content`. Disabled drops edit.
 
+Pass `A11y`.
+
 ### Search
 
 **`search`** — A query field with a search icon.
@@ -92,6 +104,8 @@ Constructor: [`widget::search_input`](https://docs.rs/icedtea/latest/icedtea/wid
 [iced](https://crates.io/crates/iced)
 
 Use for palette and list filters. Empty query means “show all”.
+
+Pass `A11y`.
 
 ### Search view
 
@@ -105,6 +119,8 @@ Constructor: [`widget::search_view`](https://docs.rs/icedtea/latest/icedtea/widg
 The application owns the query and the hit list. Empty hits show
 `empty`. Disabled drops pick and clear.
 
+Pass `A11y`.
+
 ### Suggest
 
 **`suggest`** — A text field with a pick list of completions.
@@ -116,6 +132,8 @@ Constructor: [`widget::suggest_field`](https://docs.rs/icedtea/latest/icedtea/wi
 
 The application owns the query and the suggestion list. Picking a
 row writes that string.
+
+Pass `A11y`.
 
 ### Select
 
@@ -130,6 +148,8 @@ Constructor: [`widget::themed_pick_list`](https://docs.rs/icedtea/latest/icedtea
 Placeholder shows when nothing is selected. Disabled keeps the
 current face.
 
+Pass `A11y`.
+
 ### Number
 
 **`number`** — Edit a numeric value with step buttons.
@@ -142,6 +162,7 @@ Constructor: [`widget::number_input`](https://docs.rs/icedtea/latest/icedtea/wid
 The application owns the number. Step messages bump it. Disabled
 freezes the value.
 
+Pass `A11y`.
 
 ### Date
 
@@ -153,6 +174,8 @@ Constructor: [`widget::date_picker`](https://docs.rs/icedtea/latest/icedtea/widg
 [icedtea](https://crates.io/crates/icedtea)
 
 The application owns the selected day. Disabled ignores picks.
+
+Pass `A11y`.
 
 ### Time
 
@@ -167,6 +190,8 @@ Constructor: [`widget::time_picker`](https://docs.rs/icedtea/latest/icedtea/widg
 (12-hour or 24-hour, optional seconds). `TimeField` is the unit that
 steps. Disabled freezes the fields.
 
+Pass `A11y`.
+
 ### Field support
 
 **`field-support`** — Supporting or error text under a field.
@@ -178,3 +203,6 @@ Constructor: [`widget::field_support`](https://docs.rs/icedtea/latest/icedtea/wi
 [iced](https://crates.io/crates/iced)
 
 `support` is quiet helper copy. `error` uses the error role and wins when both are set.
+
+Pass `A11y`.
+

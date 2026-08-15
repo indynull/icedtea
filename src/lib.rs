@@ -168,6 +168,7 @@
 //! | [`app`] / [`run!`] | Boot the window |
 //! | [`action`] / [`key`] / [`shortcut`] | Commands and chords |
 //! | [`theme`] / [`variant`] / [`typo`] / [`motion`] | Color, variant, type, motion |
+//! | [`a11y`] | Name, role, value, hint, and state on every constructor |
 //! | [`widget`] / [`collection`] | Controls, lists, tables |
 //! | [`select`] | Select-and-copy contract for content text |
 //! | [`layout`] / [`pattern`] / [`window`] | Recipes and chrome |

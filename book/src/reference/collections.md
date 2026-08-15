@@ -8,6 +8,8 @@ Lists, tables, trees, tabs, expanders, and pages.
 
 ![A virtualized list with filters and pagination](../images/collections.png)
 
+Each constructor takes `A11y` unless noted. iced 0.14 publishes the widget id only.
+
 `VisibleWindow.scroll` is the only list and table offset. The rail and
 the wheel write it. Variable-height rows use `row_offsets` /
 `visible_range_var`. `scroll_id` names the list clip pane.
@@ -30,6 +32,8 @@ line. `RowFace::Card` is a surface, wrapped title, and an optional
 `RowSlot::Check` on the same virtualized rows. `on_check` toggles a
 check slot.
 
+Pass `A11y`.
+
 ### Virtual column
 
 **`virtual-column`** — Virtualized free-form rows with known heights.
@@ -44,6 +48,8 @@ expand cards, custom bodies. Build heights with
 `collection::expand_card_heights` (closed estimate plus open-row
 heights). Title/meta model lists stay on `list_view`.
 
+Pass `A11y`.
+
 ### Log
 
 **`log`** — Append-only lines that stick to the end.
@@ -57,6 +63,8 @@ Virtualizes long logs. Iced's end anchor reports offset 0, so the log
 reads the reversed offset and mounts the tail. Empty lines show
 “No lines”.
 
+Pass `A11y`.
+
 ### Item grid
 
 **`grid`** — Tiles that share the row width.
@@ -67,6 +75,8 @@ Constructor: [`widget::item_grid`](https://docs.rs/icedtea/latest/icedtea/widget
 [icedtea](https://crates.io/crates/icedtea)
 
 Pass titles. Click sends the index. Empty grid is an empty column.
+
+Pass `A11y`.
 
 ### Data table
 
@@ -83,6 +93,8 @@ Constructor: [`widget::data_table`](https://docs.rs/icedtea/latest/icedtea/widge
 the rest. `TableSource::row_checked` plus `on_check` paint a leading
 checkbox column. Empty rows still paint headers.
 
+Pass `A11y`.
+
 ### Tree
 
 **`tree`** — An expandable outline.
@@ -96,6 +108,7 @@ The application owns expand state. Leaf rows have no twisty. Empty
 tree is an empty column. `animating` is the branch that is opening or
 closing and its 0–1 height progress.
 
+Pass `A11y`.
 
 ### Tabs
 
@@ -113,6 +126,8 @@ is set and titles do not fit, extra tabs move into a More list. Select
 sends the index. See also
 [`pattern::tab_view`](patterns.md#tab-view).
 
+Pass `A11y`.
+
 ### Accordion
 
 **`accordion`** — An open row shows a body under the header.
@@ -125,6 +140,8 @@ Constructor: [`widget::accordion_view`](https://docs.rs/icedtea/latest/icedtea/w
 The application owns which row is open and a 0–1 `progress` for
 height. Closed rows are headers only. The chevron sits on the
 trailing edge.
+
+Pass `A11y`.
 
 ### Expander
 
@@ -141,6 +158,8 @@ for the last descent) and fades the cut. Title starts; the chevron
 sits on the trailing edge. Accordion is many headers; this is one
 card.
 
+Pass `A11y`.
+
 ### Pagination
 
 **`pagination`** — Page through a long list.
@@ -152,3 +171,6 @@ Constructor: [`widget::pagination`](https://docs.rs/icedtea/latest/icedtea/widge
 
 Pass page count and the current page. Messages are previous, next,
 and jump. One page hides the control or disables the arrows.
+
+Pass `A11y`.
+

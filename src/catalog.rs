@@ -1,8 +1,9 @@
 //! Public widget and pattern ids.
 //!
-//! Each id has one constructor. That `pub fn` takes [`crate::a11y::A11y`]
-//! and tokens. Chrome rows take an [`crate::action::ActionTable`].
-//! Rustdoc with a working example sits immediately above the function.
+//! Each id has one constructor. Drawing constructors take
+//! [`crate::a11y::A11y`] and tokens. Chrome rows take an
+//! [`crate::action::ActionTable`]. Rustdoc with a working example sits
+//! immediately above the function.
 //!
 //! ```
 //! assert!(icedtea::catalog::get("button").is_some());
@@ -239,7 +240,7 @@ pub fn constructor(id: &str) -> Option<(&'static str, &'static str)> {
         "chip" => ("widget", "chip"),
         "filter-chips" => ("widget", "filter_chips"),
         "badge" => ("widget", "badge"),
-        "wrap" => ("widget", "wrap"),
+        "wrap" => ("layout", "wrap"),
         "banner" => ("widget", "banner"),
         "command-bar" => ("pattern", "command_bar"),
         "context-menu" => ("pattern", "context_menu"),
@@ -349,6 +350,7 @@ mod tests {
             "layout.md",
             "theming.md",
             "architecture.md",
+            "accessibility.md",
             "m3-foundations.md",
             "motion.md",
             "navigation.md",
@@ -405,6 +407,21 @@ mod tests {
                 let section = &rest[..end];
                 let ctor = constructor(e.id).map(|(_, n)| n).unwrap();
                 assert!(section.contains(ctor), "{} section must name {ctor}", e.id);
+                if let Some((module, name)) = constructor(e.id) {
+                    let takes =
+                        module_src(module).is_some_and(|src| fn_params_mention(src, name, "A11y"));
+                    if takes {
+                        must(
+                            section.contains("A11y"),
+                            format!("{} section must mention A11y", e.id),
+                        );
+                    } else {
+                        must(
+                            !section.contains("Pass `A11y`"),
+                            format!("{} section must not say Pass A11y", e.id),
+                        );
+                    }
+                }
                 must(
                     section.contains("docs.rs/icedtea"),
                     format!("{} section must link rustdoc", e.id),
@@ -742,6 +759,46 @@ mod tests {
         }
     }
 
+    fn module_src(module: &str) -> Option<&'static str> {
+        Some(match module {
+            "widget" => include_str!("widget.rs"),
+            "pattern" => include_str!("pattern.rs"),
+            "motion" => include_str!("motion.rs"),
+            "theme" => include_str!("theme.rs"),
+            "key" => include_str!("key.rs"),
+            "layout" => include_str!("layout/recipes.rs"),
+            _ => return None,
+        })
+    }
+
+    fn fn_params_mention(src: &str, name: &str, needle: &str) -> bool {
+        let Some(at) = find_pub_fn(src, name) else {
+            return false;
+        };
+        let rest = &src[at..];
+        let open = match rest.find('(') {
+            Some(i) => i,
+            None => return false,
+        };
+        let bytes = rest.as_bytes();
+        let mut depth = 0i32;
+        let mut i = open;
+        while i < bytes.len() {
+            match bytes[i] {
+                b'(' => depth += 1,
+                b')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return rest[open..=i].contains(needle);
+                    }
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+        false
+    }
+
     fn find_pub_fn(src: &str, name: &str) -> Option<usize> {
         let pat = format!("pub fn {name}");
         let mut start = 0;
@@ -792,6 +849,58 @@ mod tests {
             break;
         }
         docs.iter().any(|l| l.contains("```"))
+    }
+
+    #[test]
+    fn fn_params_mention_reads_the_shipped_signature() {
+        assert!(fn_params_mention(
+            include_str!("widget.rs"),
+            "themed_button",
+            "A11y"
+        ));
+        assert!(!fn_params_mention(
+            include_str!("pattern.rs"),
+            "toolbar",
+            "A11y"
+        ));
+        assert!(!fn_params_mention(
+            include_str!("pattern.rs"),
+            "dialog_sheet",
+            "A11y"
+        ));
+        assert!(!fn_params_mention(
+            include_str!("layout/recipes.rs"),
+            "wrap",
+            "A11y"
+        ));
+        assert!(fn_params_mention(
+            include_str!("pattern.rs"),
+            "nav_rail",
+            "A11y"
+        ));
+        assert_eq!(constructor("wrap"), Some(("layout", "wrap")));
+    }
+
+    #[test]
+    fn accessibility_guide_names_who_takes_the_record() {
+        let page = include_str!("../book/src/accessibility.md");
+        let widgets = include_str!("../book/src/widgets.md");
+        must(
+            !page
+                .to_ascii_lowercase()
+                .contains("every public constructor"),
+            "accessibility.md must not say every public constructor takes A11y",
+        );
+        must(
+            page.contains("toolbar")
+                && page.contains("dialog_sheet")
+                && page.contains("layout::wrap"),
+            "accessibility.md must name chrome rows and wrap as not taking A11y",
+        );
+        must(
+            widgets.contains("Chrome rows") && widgets.contains("recipes do not take"),
+            "widgets.md must split widget A11y from chrome rows and layout",
+        );
     }
 
     #[test]
@@ -861,6 +970,7 @@ mod tests {
         assert!(summary.contains("- [Reference]()"));
         assert!(summary.contains("    - [Install](install.md)"));
         assert!(summary.contains("    - [Widgets](widgets.md)"));
+        assert!(summary.contains("    - [Accessibility](accessibility.md)"));
         let pages: [(&str, &[&str]); 4] = [
             (
                 include_str!("../book/src/cookbook/save.md"),

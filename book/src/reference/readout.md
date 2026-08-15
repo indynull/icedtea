@@ -8,6 +8,8 @@ Progress, sparks, and a large reading.
 
 ![Progress bars, rings, and a spinner](../images/readout.png)
 
+Each constructor takes `A11y` unless noted. iced 0.14 publishes the widget id only.
+
 ### Progress
 
 **`progress`** — A determinate bar from 0 to 1.
@@ -26,6 +28,8 @@ Optional buffer is a second fill on the same track.
 `progress_label` builds the remaining-time copy. Values outside 0..=1
 clamp. No message; it is a readout.
 
+Pass `A11y`.
+
 ### Progress ring
 
 **`progress-ring`** — A determinate arc from 0 to 1.
@@ -39,6 +43,7 @@ Constructor: [`widget::progress_ring`](https://docs.rs/icedtea/latest/icedtea/wi
 Same fraction contract as the bar, drawn as a ring. Interpolate
 `value` with `motion::value_animation`.
 
+Pass `A11y`.
 
 ### Spinner
 
@@ -52,4 +57,6 @@ Constructor: [`widget::spinner`](https://docs.rs/icedtea/latest/icedtea/widget/f
 
 `phase` is 0..=1 and comes from application time. Advance it each
 frame while work is running.
+
+Pass `A11y`.
 

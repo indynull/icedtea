@@ -8,6 +8,10 @@ Theme, marks, rows, and feedback.
 
 ![Menu, toolbar, and status](../images/chrome.png)
 
+Widget constructors on this page take `A11y`. Menu, toolbar, status,
+command bar, and cheatsheet take the action table. `layout::wrap` does
+not. iced 0.14 publishes the widget id only.
+
 ### Theme
 
 **`theme`** — Look up a built-in colorway by name.
@@ -69,6 +73,8 @@ Constructor: [`widget::group_box`](https://docs.rs/icedtea/latest/icedtea/widget
 Same constructor as group-box. `CardFace` is elevated, filled, or
 outlined. Empty title is a border only.
 
+Pass `A11y`.
+
 ### Rule
 
 **`rule`** — A horizontal divider.
@@ -80,6 +86,8 @@ Constructor: [`widget::rule_h`](https://docs.rs/icedtea/latest/icedtea/widget/fn
 [iced](https://crates.io/crates/iced)
 
 `rule_v` is the vertical twin.
+
+Pass `A11y`.
 
 ### Chip
 
@@ -94,6 +102,8 @@ Constructor: [`widget::chip`](https://docs.rs/icedtea/latest/icedtea/widget/fn.c
 press, and dismiss. META type, chip wash, shrink width. Disabled keeps
 the face and drops press.
 
+Pass `A11y`.
+
 ### Badge
 
 **`badge`** — A count or status mark.
@@ -105,6 +115,8 @@ Constructor: [`widget::badge`](https://docs.rs/icedtea/latest/icedtea/widget/fn.
 
 `BadgeSize` is small or large. Pass a host element to overlap the mark
 on an icon. Empty string is an empty pill.
+
+Pass `A11y`.
 
 ### Wrap
 
@@ -118,8 +130,6 @@ Constructor: [`layout::wrap`](https://docs.rs/icedtea/latest/icedtea/layout/fn.w
 Pass child width, gap, and available width. Empty children yield an
 empty column.
 
-
-
 ### Banner
 
 **`banner`** — A page-level message with an optional action.
@@ -131,6 +141,7 @@ Constructor: [`widget::banner`](https://docs.rs/icedtea/latest/icedtea/widget/fn
 
 Use for “offline” or “update available”. Optional button message.
 
+Pass `A11y`.
 
 ### Command bar
 
@@ -166,6 +177,8 @@ Constructor: [`widget::breadcrumb`](https://docs.rs/icedtea/latest/icedtea/widge
 
 Crumbs before the last send a message. The last crumb is the current
 page. Empty path is empty.
+
+Pass `A11y`.
 
 ### Menu
 
@@ -203,7 +216,6 @@ Constructor: [`pattern::status_bar`](https://docs.rs/icedtea/latest/icedtea/patt
 Left is status copy (`meta`, or `info_bar` when a tone is set). Right
 is `table.footer_hints()`, or an optional caption string.
 
-
 ### Scrollbar
 
 **`scrollbar`** — A themed scroller with a usable handle.
@@ -216,6 +228,8 @@ Constructor: [`widget::themed_scroll`](https://docs.rs/icedtea/latest/icedtea/wi
 
 Lists and tables use a 24px rail. This constructor is the themed
 iced scroller for other panes.
+
+Pass `A11y`.
 
 ### Toast
 
@@ -231,6 +245,8 @@ The application owns the `Toast` queue and dismiss. Empty queue
 paints nothing. Enter and the last slice of TTL fade through
 `motion::overlay`.
 
+Pass `A11y`.
+
 ### Busy overlay
 
 **`busy`** — Dim plus spinner over a child.
@@ -242,6 +258,8 @@ Constructor: [`widget::busy_overlay`](https://docs.rs/icedtea/latest/icedtea/wid
 
 When `busy` is false the child is unmodified. Advance spinner
 `phase` while true.
+
+Pass `A11y`.
 
 ### Motion
 
@@ -259,6 +277,8 @@ Reduced-motion tokens snap to 0 or 1. Duration and easing live in
 `m3::motion`. `bounce_out`, `pulse`, and `shake` are curves you
 sample like `Ease`; see [Motion](../motion.md).
 
+Pass `A11y`.
+
 ### Expand motion
 
 **`expand-motion`** — Clip a child between a peek height and its open
@@ -272,6 +292,8 @@ Constructor: [`motion::expand`](https://docs.rs/icedtea/latest/icedtea/motion/fn
 Expander and accordion paint through this. `progress` 0 is the peek;
 1 is the laid-out height.
 
+Pass `A11y`.
+
 ### Filter chips
 
 **`filter-chips`** — Multi-select filter chip set.
@@ -283,6 +305,8 @@ Constructor: [`widget::filter_chips`](https://docs.rs/icedtea/latest/icedtea/wid
 [iced](https://crates.io/crates/iced)
 
 The application owns which indices are on. Press toggles one chip.
+
+Pass `A11y`.
 
 ### Sectioned menu
 
@@ -296,6 +320,8 @@ Constructor: [`pattern::sectioned_menu`](https://docs.rs/icedtea/latest/icedtea/
 
 Pass [`MenuSection`](https://docs.rs/icedtea/latest/icedtea/pattern/struct.MenuSection.html) groups of actions.
 
+Pass `A11y`.
+
 ### Cascade menu
 
 **`cascade-menu`** — Two-level menu with an optional open submenu.
@@ -308,3 +334,6 @@ Constructor: [`pattern::cascade_menu`](https://docs.rs/icedtea/latest/icedtea/pa
 
 The application owns which primary row is expanded. `sub_progress`
 is 0 (gone) to 1 (rest) for that panel.
+
+Pass `A11y`.
+

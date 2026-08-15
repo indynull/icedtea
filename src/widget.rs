@@ -3,7 +3,10 @@
 //! Every drawing constructor returns an [`iced::Element`], emits the
 //! application's messages, and takes [`A11y`] plus [`Tokens`]. Rustdoc
 //! on the function is the call: the job, the arguments that matter,
-//! and a compiling example.
+//! and a compiling example. iced 0.14 has no AccessKit slot: [`A11y`]
+//! is the in-library record; [`crate::a11y::attach`] sets the widget id.
+//! Keyboard order (`key::handle`, modal first, focused text next) is
+//! the working desktop path.
 //!
 //! ```
 //! use icedtea::a11y::A11y;
@@ -454,10 +457,7 @@ pub fn toggle_button<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let title = title.into();
-    let a11y = A11y {
-        checked: Some(pressed),
-        ..a11y
-    };
+    let a11y = a11y.merge_checked(pressed).merge_selected(pressed);
     themed_button(
         title,
         (!a11y.disabled).then_some(msg),
@@ -499,6 +499,7 @@ pub fn themed_checkbox<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
+    let a11y = a11y.merge_checked(checked);
     let name = a11y.apply_name(label_s);
     let is_on = a11y.apply_checked(checked);
     let mut c = checkbox(is_on)
@@ -943,10 +944,7 @@ pub fn icon_button_toggle<'a, M: Clone + 'a>(
     size: ControlSize,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let a11y = A11y {
-        checked: Some(pressed),
-        ..a11y
-    };
+    let a11y = a11y.merge_checked(pressed).merge_selected(pressed);
     icon_button(
         icon,
         (!a11y.disabled).then_some(msg),
@@ -988,8 +986,9 @@ pub fn themed_switch<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
+    let a11y = a11y.merge_toggled(on).merge_checked(on);
     let name = a11y.apply_name(label_s);
-    let on = a11y.apply_checked(on);
+    let on = a11y.apply_toggled(on);
     let mut t = toggler(on).label(name).style(style::switch_style(tok));
     if !a11y.disabled {
         t = t.on_toggle(msg);
@@ -1029,6 +1028,7 @@ pub fn themed_radio<'a, V, M: Clone + 'a>(
 where
     V: Copy + Eq,
 {
+    let a11y = a11y.merge_checked(selected == Some(value));
     let name = a11y.apply_name(label_s);
     if a11y.disabled {
         let on = a11y.apply_checked(selected == Some(value));
@@ -1143,6 +1143,7 @@ pub fn themed_slider<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
+    let a11y = a11y.merge_value(format!("{value}"));
     let slider_el: Element<'a, M> = if a11y.disabled {
         let _ = (value, msg);
         let (w, h) = if marks.vertical {
@@ -1280,6 +1281,7 @@ pub fn range_slider<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let (low, high) = clamp_range_pair(range.clone(), low, high);
+    let a11y = a11y.merge_value(format!("{low}–{high}"));
     let lo = themed_slider(
         range.clone(),
         low,
@@ -1361,6 +1363,7 @@ pub fn progress<'a, M: 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
+    let a11y = a11y.merge_value(format!("{value}"));
     let value = value.clamp(0.0, 1.0);
     let s = tok.scheme();
     let seg = |w: u16, fill: iced::Color, ink: iced::Color| {
@@ -1447,6 +1450,7 @@ pub fn progress_ring<'a, M: 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
+    let a11y = a11y.merge_value(format!("{value}"));
     let (start, end) = ring_angles(value);
     // M3 progress track: surface_container_highest under the primary arc.
     let s = tok.scheme();
@@ -1534,6 +1538,9 @@ pub fn busy_overlay<'a, M: Clone + 'a>(
 ///     widget::spinner(tok, 0.2, A11y::new("spin", Role::Progress));
 /// ```
 pub fn spinner<'a, M: 'a>(tok: Tokens, phase: f32, a11y: A11y) -> Element<'a, M> {
+    let a11y = a11y
+        .merge_live(a11y::Live::Polite)
+        .merge_value(format!("{phase}"));
     a11y::attach(
         Canvas::new(SpinnerDots {
             phase: phase.rem_euclid(1.0),
@@ -1715,6 +1722,7 @@ pub fn themed_text_input<'a, M: Clone + 'a>(
     a11y: A11y,
     input_id: Option<Id>,
 ) -> Element<'a, M> {
+    let a11y = a11y.merge_value(value.to_string());
     let outlined = matches!(opts.face, FieldFace::Outlined);
     let mut i = text_input(placeholder, value)
         .style(style::field_style(tok, outlined))
@@ -1798,6 +1806,7 @@ pub fn field_support<'a, M: 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
+    let a11y = a11y.merge_error(error).merge_hint(support.unwrap_or(""));
     let s = tok.scheme();
     let mut col = column![child].spacing(4).width(Length::Fill);
     if let Some(err) = error.filter(|t| !t.is_empty()) {
@@ -3536,6 +3545,7 @@ pub fn banner<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
+    let a11y = a11y.merge_live(a11y::Live::Polite);
     let text_s = a11y.apply_name(text_s);
     let mut r = row![label(text_s.clone(), tok, A11y::new(text_s, Role::Status))]
         .spacing(12)
@@ -3581,6 +3591,7 @@ pub fn info_bar<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
+    let a11y = a11y.merge_live(a11y::Live::Polite);
     let text_s = a11y.apply_name(text_s);
     a11y::attach(
         container(label(text_s.clone(), tok, A11y::new(text_s, Role::Status)))
@@ -3665,6 +3676,9 @@ pub fn toast_view<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
+    let a11y = a11y
+        .merge_live(a11y::Live::Polite)
+        .merge_value(toast.text.clone());
     let kind = toast.kind;
     let text_s = toast.text.clone();
     let fade_ms =
@@ -5045,6 +5059,7 @@ pub fn accordion_view<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
+    let a11y = a11y.merge_expanded(state.open.is_some());
     let mut col = Column::new().spacing(0).width(Length::Fill);
     for (i, (title, body)) in titles.iter().zip(bodies).enumerate() {
         let open = state.open == Some(i);
@@ -5180,6 +5195,7 @@ pub fn expander<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
+    let a11y = a11y.merge_expanded(open);
     let title = a11y.apply_name(title);
     let header = disclosure_header(
         title.clone(),

@@ -10,6 +10,8 @@ Buttons, toggles, and a slider. Faces paint from M3 roles and
 
 ![Buttons, checks, radios, and sliders](../images/controls.png)
 
+Each constructor takes `A11y` unless noted. iced 0.14 publishes the widget id only.
+
 ### Button
 
 **`button`** — Press a labeled control to send a message.
@@ -39,6 +41,8 @@ Constructor: [`widget::split_button`](https://docs.rs/icedtea/latest/icedtea/wid
 `primary` is the main message. `more` opens the overflow. Disabled
 drops both.
 
+Pass `A11y`.
+
 ### Toggle button
 
 **`toggle-button`** — A button that stays pressed while on.
@@ -51,6 +55,8 @@ Constructor: [`widget::toggle_button`](https://docs.rs/icedtea/latest/icedtea/wi
 
 Pass the current on/off state. The message fires on press. Disabled
 keeps the face and drops the handler.
+
+Pass `A11y`.
 
 ### Checkbox
 
@@ -65,6 +71,8 @@ Constructor: [`widget::themed_checkbox`](https://docs.rs/icedtea/latest/icedtea/
 The application owns the bool. The message carries the next value.
 Disabled keeps the box visible and ignores clicks.
 
+Pass `A11y`.
+
 ### Radio
 
 **`radio`** — Pick one value from a small set.
@@ -78,6 +86,8 @@ Constructor: [`widget::themed_radio`](https://docs.rs/icedtea/latest/icedtea/wid
 Compare the selected value to this option. Disabled rows stay in the
 group and do not change the selection.
 
+Pass `A11y`.
+
 ### Switch
 
 **`switch`** — A sliding on/off control.
@@ -90,6 +100,8 @@ Constructor: [`widget::themed_switch`](https://docs.rs/icedtea/latest/icedtea/wi
 
 Same contract as checkbox: the application owns the bool. Disabled
 freezes the thumb.
+
+Pass `A11y`.
 
 ### Slider
 
@@ -105,6 +117,8 @@ Pass min, max, and the current value. `SliderMarks` paints ticks and
 end labels, a `vertical` rail, and an optional thumb value label. The
 message is the new value while the thumb moves. Disabled ignores drag.
 
+Pass `A11y`.
+
 ### Segmented button
 
 **`segmented-button`** — Exclusive choice among labeled segments.
@@ -116,6 +130,8 @@ Constructor: [`widget::segmented_button`](https://docs.rs/icedtea/latest/icedtea
 [iced](https://crates.io/crates/iced)
 
 The application owns the selected index. Cells may carry an icon. Press emits the new index. Disabled freezes every segment.
+
+Pass `A11y`.
 
 ### Button group
 
@@ -129,6 +145,8 @@ Constructor: [`widget::button_group`](https://docs.rs/icedtea/latest/icedtea/wid
 Each cell is a label plus optional icon (`Cell`). Press sends the index.
 Empty cells paint an empty row. Disabled drops every press.
 
+Pass `A11y`.
+
 ### Icon button
 
 **`icon-button`** — Icon-only press control for dense toolbars.
@@ -141,6 +159,8 @@ Constructor: [`widget::icon_button`](https://docs.rs/icedtea/latest/icedtea/widg
 
 `Variant` picks the wash. `ControlSize` is the hit box. Disabled drops the press.
 
+Pass `A11y`.
+
 ### Toggle icon button
 
 **`toggle-icon-button`** — Icon button that stays pressed while on.
@@ -151,6 +171,8 @@ Constructor: [`widget::icon_button_toggle`](https://docs.rs/icedtea/latest/icedt
 [icedtea](https://crates.io/crates/icedtea)
 
 Same wash as toggle button. Disabled keeps the face.
+
+Pass `A11y`.
 
 ### Range slider
 
@@ -164,6 +186,8 @@ Constructor: [`widget::range_slider`](https://docs.rs/icedtea/latest/icedtea/wid
 
 Messages are the clamped pair with `low <= high`. Disabled freezes both thumbs.
 
+Pass `A11y`.
+
 ### Indeterminate checkbox
 
 **`checkbox-indeterminate`** — Three-state checkbox including partial selection.
@@ -175,3 +199,6 @@ Constructor: [`widget::checkbox_indeterminate`](https://docs.rs/icedtea/latest/i
 [iced](https://crates.io/crates/iced)
 
 Uses [`CheckState`](https://docs.rs/icedtea/latest/icedtea/widget/enum.CheckState.html). Press follows `CheckState::toggle`.
+
+Pass `A11y`.
+

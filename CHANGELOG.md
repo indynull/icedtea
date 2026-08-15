@@ -4,6 +4,10 @@
 
 ### Controls
 
+- `A11y` keeps hint, selected, toggled, expanded, live, required, and
+  error next to name, role, value, disabled, and checked. Constructors
+  fill unset fields from their arguments. iced 0.14 still publishes
+  only the widget id.
 - `badge` Primary uses on-primary ink on the primary fill.
 - Disabled filled buttons use a stronger mute (fill 22%, ink 68%) so
   the label reads on the brick on dark, not only on the canvas.
@@ -23,6 +27,8 @@
 
 ### Guide
 
+- Accessibility names the record, keyboard order, and the iced 0.14
+  AccessKit limit.
 - README and Install use `cargo add icedtea`. The crates.io badge is
   the crate version.
 - README shows a Codecov coverage badge.

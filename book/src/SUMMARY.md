@@ -6,6 +6,7 @@
     - [First window](first-window.md)
 - [Compose]()
     - [Architecture](architecture.md)
+    - [Accessibility](accessibility.md)
     - [Material Design 3](m3-foundations.md)
     - [Actions](actions.md)
     - [Layout](layout.md)

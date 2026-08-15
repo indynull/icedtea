@@ -8,6 +8,10 @@ Composed chrome.
 
 ![A list beside a filling detail pane](../images/patterns.png)
 
+Window recipes take children and tokens. `nav_rail`, `tool_panel`,
+`workspace`, `sectioned_menu`, and `cascade_menu` take `A11y`. iced
+0.14 publishes the widget id only.
+
 ### Dialogs
 
 **`dialogs`** — A confirm / message / save sheet.
@@ -70,6 +74,8 @@ Constructor: [`pattern::workspace`](https://docs.rs/icedtea/latest/icedtea/patte
 `pane` is called with each leaf id so every leaf can hold application
 content.
 
+Pass `A11y`.
+
 ### Tool panel
 
 **`tool-panel`** — Title chrome plus a Dock control.
@@ -81,6 +87,8 @@ Constructor: [`pattern::tool_panel`](https://docs.rs/icedtea/latest/icedtea/patt
 
 Title plus body. `on_dock` is the Dock control. Empty body is title
 chrome only.
+
+Pass `A11y`.
 
 ### Navigation rail
 
@@ -95,6 +103,8 @@ Selected row uses the rail wash. Press emits the destination index.
 `RailDest` carries an optional icon and badge. `expanded` is the wide
 labeled rail; compact shows the icon or the first letter in a 72 px
 column. Empty items paint an empty column.
+
+Pass `A11y`.
 
 ### Navigation view
 
@@ -192,3 +202,4 @@ Constructor: [`pattern::side_sheet`](https://docs.rs/icedtea/latest/icedtea/patt
 
 `end` docks the trailing edge. Optional dismiss closes the sheet.
 `progress` fades the scrim and slides the pane.
+
