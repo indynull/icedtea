@@ -342,14 +342,8 @@ mod tests {
         assert!(first.contains("examples/hello.rs"));
         let install = include_str!("../book/src/install.md");
         for src in [readme, install] {
-            assert!(
-                src.contains("cargo add icedtea"),
-                "install story is cargo add icedtea"
-            );
-            assert!(
-                !src.contains("icedtea = \""),
-                "no frozen crate version; the crates.io badge is the version"
-            );
+            assert!(src.contains("cargo add icedtea"));
+            assert!(!src.contains("icedtea = \""));
         }
         assert!(arch.contains("Action"));
         assert!(arch.contains("Tokens"));
