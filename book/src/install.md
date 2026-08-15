@@ -4,12 +4,10 @@ icedtea is a Rust library. Add it to a desktop app and take widgets,
 tokens, and chrome from it. This guide is also at
 <https://indynull.github.io/icedtea/>.
 
-Toolchain: Rust 1.89 or newer.
+Toolchain: Rust 1.89 or newer. icedtea tracks iced 0.14.
 
-```toml
-[dependencies]
-iced = "0.14"
-icedtea = "0.8"
+```bash
+cargo add icedtea
 ```
 
 [Crate docs](https://docs.rs/icedtea) ·

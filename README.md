@@ -17,11 +17,8 @@ your messages.
 
 ## First window
 
-```toml
-[dependencies]
-iced = "0.14"
-icedtea = "0.8"
-```
+`cargo add icedtea`. It tracks iced 0.14. The crates.io badge above is
+the crate version.
 
 The program is [`examples/hello.rs`](examples/hello.rs): a notes buffer,
 Save on `ctrl+s`, a toolbar, and a status line.
@@ -50,10 +47,6 @@ icedtea::run!(
 
 Linux needs `libxkbcommon-dev` and `libwayland-dev`. macOS needs the
 Xcode command-line tools. Windows needs the MSVC build tools.
-
-| iced | icedtea |
-| --- | --- |
-| 0.14 | 0.8 |
 
 [documentation]: https://docs.rs/icedtea
 [crates-io]: https://crates.io/crates/icedtea

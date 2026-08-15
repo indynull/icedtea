@@ -342,13 +342,14 @@ mod tests {
         assert!(first.contains("examples/hello.rs"));
         let install = include_str!("../book/src/install.md");
         for src in [readme, install] {
-            let at = src
-                .find("icedtea =")
-                .expect("install story names the crate");
-            let ver = env!("CARGO_PKG_VERSION");
-            let minor = ver.rsplit_once('.').map(|(a, _)| a).unwrap_or(ver);
-            let pin = format!("icedtea = \"{minor}\"");
-            assert!(src[at..].starts_with(&pin), "install pin should be {pin}");
+            assert!(
+                src.contains("cargo add icedtea"),
+                "install story is cargo add icedtea"
+            );
+            assert!(
+                !src.contains("icedtea = \""),
+                "no frozen crate version; the crates.io badge is the version"
+            );
         }
         assert!(arch.contains("Action"));
         assert!(arch.contains("Tokens"));
