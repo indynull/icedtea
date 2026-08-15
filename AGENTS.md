@@ -133,6 +133,9 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   state. Never demo a usable control with `Nop` or a hardcoded value.
   When a page looks broken, read the widget (offset, stick, viewport)
   before blaming seed data.
+- Never leave a gallery QA ugly as residual when the fix is known.
+  Residual only when the path is genuinely blocked (unclear fix,
+  other host, missing pointer).
 - 4 dp M3 spacing grid (default density 8 dp, 48 dp touch). Design-system
   numbers live in `m3` / `density`, `typo`, `chrome`, and tokens — not
   one-off magic in widgets.
@@ -144,10 +147,10 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
 - Never grow `CHANGELOG.md` Unreleased into a session diary. 0.1.0 on
   crates.io was a publish check. 0.2 is the first library cut. Never
   call icedtea a product in user-facing copy; it is a UI library.
-  Write each version section as bullets under topic subheadings
-  (controls, collections, theme): one added, fixed, or changed
-  public thing per bullet. Never a prose paragraph that lists several
-  adds.
+  Write each version section as bullets under Feature, Bug fix, and
+  Chore (omit an empty heading). One public thing per bullet. Never
+  topic subheadings (controls, collections, theme). Never a prose
+  paragraph that lists several adds.
 - Gallery fixtures (sample documents, language snippets, bitmaps) live
   in `icedtea-gallery`. Never export them from `icedtea`.
 - Never ship a document undo stack. The application owns document
@@ -309,6 +312,9 @@ Working code only. Plausibility is not correctness.
   command output. Read, run, or say you do not know.
 - Two plausible interpretations that change the result → ask once.
 - Every changed line must trace to the request. No drive-by refactors.
+- Never leave a gallery QA ugly as residual when the fix is known.
+  Residual only when the path is genuinely blocked (unclear fix,
+  other host, missing pointer).
 - Chat with the human: short by default (~15–20 lines). Answer first,
   one compact list if needed. Expand only when they ask for a design,
   review, or draft.
@@ -478,8 +484,8 @@ tables or essays in discussion notes.
   badge is the version. Documentation is part of the change, not a
   follow-up.
 - `CHANGELOG.md` describes the crate for a version. Fold work into
-  the Unreleased section until that version is tagged. Group related
-  items under topic subheadings; each item is a bullet.
+  the Unreleased section until that version is tagged. Group bullets
+  under Feature, Bug fix, and Chore.
 - A third-party app still needs only icedtea for chrome, actions,
   layout, and theme.
 - `git status` clean for the work you reported, or an explicit park.

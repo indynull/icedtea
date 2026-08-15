@@ -517,7 +517,7 @@ fn page_job(page: &str) -> &'static str {
         "fields" => "Typed values the application owns. Select-and-copy is on for labeled rows.",
         "readout" => "Progress, a ring, and an indeterminate spinner.",
         "type" => "Labels, icons, links, and a tooltip.",
-        "markdown" => "Rendered document. Drag to select; Ctrl+C copies the range.",
+        "markdown" => "Rendered document. Copy takes the selected range; Copy all posts the source.",
         "code" => "Highlighted source. Select a range and copy.",
         "image" => "The slot keeps its box while loading or on error.",
         "selectable" => "Body text the user can drag-select and copy.",
@@ -872,9 +872,14 @@ fn parse_inject_line(line: &str) -> Option<Message> {
             modifiers: Default::default(),
         })),
         "swatch" => Some(Message::Swatch),
-        "md-move" | "md_move" => Some(Message::MdPointer(icedtea::select::MarkdownPointer::Move(
-            parts.next()?.parse().ok()?,
-        ))),
+        "md-move" | "md_move" => {
+            let a: f32 = parts.next()?.parse().ok()?;
+            let y = parts.next().and_then(|s| s.parse().ok());
+            Some(Message::MdPointer(match y {
+                Some(y) => icedtea::select::MarkdownPointer::Move { x: a, y },
+                None => icedtea::select::MarkdownPointer::at_y(a),
+            }))
+        }
         "md-press" | "md_press" => {
             Some(Message::MdPointer(icedtea::select::MarkdownPointer::Press))
         }
@@ -1256,6 +1261,7 @@ struct Gallery {
     drawer_anim: icedtea::iced::Animation<bool>,
     cheat_q: String,
     last_sel: Option<String>,
+    last_field: Option<String>,
     list_heights: Vec<f32>,
     list_card: bool,
     vc_window: VisibleWindow,
@@ -1284,6 +1290,14 @@ impl Gallery {
         actions.insert(
             Action::new("file.save", "Save", Message::FileSave)
                 .with_shortcut(Shortcut::parse("ctrl+s").unwrap()),
+        );
+        actions.insert(
+            Action::new("edit.copy", "Copy", Message::EditCopy)
+                .with_shortcut(Shortcut::parse("ctrl+c").unwrap()),
+        );
+        actions.insert(
+            Action::new("edit.select-all", "Select all", Message::EditSelectAll)
+                .with_shortcut(Shortcut::parse("ctrl+a").unwrap()),
         );
         actions.insert(
             Action::new("edit.undo", "Undo", Message::Note("Nothing to undo".into()))
@@ -1578,6 +1592,7 @@ impl Gallery {
             drawer_anim: icedtea::motion::expand_animation(true, false),
             cheat_q: String::new(),
             last_sel: None,
+            last_field: None,
             list_heights: Vec::new(),
             list_card: true,
             vc_window: VisibleWindow::new(220.0),
@@ -1876,13 +1891,7 @@ impl Gallery {
 
     fn copy_value(&self) -> String {
         match self.page {
-            "markdown" => {
-                if self.md_sel.span.is_empty() {
-                    self.md.source.clone()
-                } else {
-                    self.md_sel.span.text(&self.md.items)
-                }
-            }
+            "markdown" => self.md.source.clone(),
             "list" => self
                 .list_sel
                 .primary()
@@ -1934,7 +1943,10 @@ impl Gallery {
     fn context_actions(&self) -> Vec<Action<Message>> {
         let mut v = Vec::new();
         let editor = self.page == "fields";
-        let select_body = matches!(self.page, "selectable" | "code");
+        let select_body = matches!(
+            self.page,
+            "selectable" | "code" | "markdown" | "value-field"
+        );
         if editor {
             let has = self.live_selection().is_some();
             v.push(
@@ -1957,12 +1969,19 @@ impl Gallery {
                 Message::EditSelectAll,
             ));
         } else if select_body {
-            let has = self.live_selection().is_some();
+            let has = if self.page == "markdown" {
+                !self.md_sel.span.is_empty()
+            } else {
+                self.live_selection().is_some()
+            };
             v.push(
                 Action::new("edit.copy", "Copy", Message::EditCopy)
                     .with_shortcut(Shortcut::parse("ctrl+c").unwrap()),
             );
             v.last_mut().unwrap().enabled = has;
+            if self.page == "markdown" {
+                v.push(Action::new("edit.copy-all", "Copy all", Message::CopyValue));
+            }
             v.push(Action::new(
                 "edit.select-all",
                 "Select all",
@@ -1986,6 +2005,9 @@ impl Gallery {
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
+        if self.context.is_some() && matches!(message, Message::MdPointer(_)) {
+            return Task::none();
+        }
         if self.context.is_some()
             && !matches!(
                 message,
@@ -2164,6 +2186,7 @@ impl Gallery {
                 self.editor.perform(action);
             }
             Message::Field(id, action) => {
+                self.last_field = Some(id.to_string());
                 let before = self.fields.get(id).and_then(|c| c.selection());
                 self.fields.perform(id, action);
                 if let Some(s) = self.fields.get(id).and_then(|c| c.selection()) {
@@ -2706,13 +2729,23 @@ impl Gallery {
                     .go_mut(false, icedtea::iced::time::Instant::now());
             }
             Message::EditCopy => {
-                let s = self.live_selection().unwrap_or_else(|| {
-                    if self.page == "code" {
-                        self.code_editor.text()
-                    } else {
+                let s = if self.page == "markdown" {
+                    if self.md_sel.span.is_empty() {
                         String::new()
+                    } else {
+                        self.md_sel.span.text(&self.md.items)
                     }
-                });
+                } else {
+                    self.live_selection().unwrap_or_else(|| {
+                        if self.page == "code" {
+                            self.code_editor.text()
+                        } else if self.page == "selectable" {
+                            self.field("body").text()
+                        } else {
+                            String::new()
+                        }
+                    })
+                };
                 if !s.is_empty() {
                     self.note = "Copied".into();
                     self.context = None;
@@ -2753,8 +2786,17 @@ impl Gallery {
             }
             Message::Pasted(None) => self.note = "Clipboard empty".into(),
             Message::EditSelectAll => {
-                self.edit_content_mut()
-                    .perform(icedtea::iced::widget::text_editor::Action::SelectAll);
+                if self.page == "markdown" {
+                    self.md_sel = icedtea::select::markdown_select_all(&self.md.items);
+                } else if self.page == "value-field" {
+                    if let Some(id) = self.last_field.clone() {
+                        self.fields
+                            .perform(&id, icedtea::iced::widget::text_editor::Action::SelectAll);
+                    }
+                } else {
+                    self.edit_content_mut()
+                        .perform(icedtea::iced::widget::text_editor::Action::SelectAll);
+                }
                 self.note = "Selected all".into();
                 self.context = None;
             }
@@ -2794,6 +2836,7 @@ impl Gallery {
             }
             Message::Select(id) => {
                 self.page = id;
+                self.note.clear();
                 if let Some(e) = catalog::page_entries(id).next() {
                     self.collapsed.remove(e.group);
                 }
@@ -2851,6 +2894,7 @@ impl Gallery {
 
     fn apply_tour_beat(&mut self, beat: &TourBeat) {
         self.page = beat.page;
+        self.note.clear();
         if let Some(e) = catalog::page_entries(beat.page).next() {
             self.collapsed.remove(e.group);
         }
@@ -3109,30 +3153,53 @@ impl Gallery {
         }
         let tok = self.tokens;
         let fill = page_fills(page);
-        let mut col = icedtea::iced::widget::Column::new().spacing(28);
-        if fill {
-            col = col.height(Length::Fill);
-        }
-        for e in hosted {
-            col = col.push(ctor_heading(
-                e.id,
-                text(e.title)
-                    .size(icedtea::typo::TITLE)
-                    .font(icedtea::typo::UI_BOLD)
-                    .color(tok.scheme().on_surface)
-                    .into(),
-                tok,
-            ));
-            if let Some(job) = widget_job(e.id) {
-                col = col.push(widget::meta(
-                    job,
-                    tok,
-                    named(&format!("{}-job", e.id), Role::Status),
-                ));
+        let stack = |hosts: &[&icedtea::catalog::Entry]| {
+            let mut col = icedtea::iced::widget::Column::new().spacing(20);
+            if fill {
+                col = col.height(Length::Fill);
             }
-            col = col.push(self.demo_widget(e.id));
+            for e in hosts {
+                col = col.push(ctor_heading(
+                    e.id,
+                    text(e.title)
+                        .size(icedtea::typo::TITLE)
+                        .font(icedtea::typo::UI_BOLD)
+                        .color(tok.scheme().on_surface)
+                        .into(),
+                    tok,
+                ));
+                if let Some(job) = widget_job(e.id) {
+                    col = col.push(widget::meta(
+                        job,
+                        tok,
+                        named(&format!("{}-job", e.id), Role::Status),
+                    ));
+                }
+                col = col.push(self.demo_widget(e.id));
+            }
+            col
+        };
+        // Two columns share the width so fill-width hosts keep a real
+        // column. Controls start the second column at the button group
+        // so that row, checks, and radios sit on the first screen.
+        // Fields put number, date, and time beside the text hosts.
+        let pack_at = match page {
+            "controls" => Some("button-group"),
+            "fields" => Some("number"),
+            _ => None,
+        };
+        if let Some(id) = pack_at {
+            if let Some(mid) = hosted.iter().position(|e| e.id == id) {
+                return row![
+                    stack(&hosted[..mid]).width(Length::Fill),
+                    stack(&hosted[mid..]).width(Length::Fill),
+                ]
+                .spacing(24)
+                .align_y(Alignment::Start)
+                .into();
+            }
         }
-        col.into()
+        stack(&hosted).into()
     }
 
     fn demo_widget(&self, id: &str) -> Element<'_, Message> {
@@ -3145,30 +3212,34 @@ impl Gallery {
                     tok,
                     named("hint", Role::Status),
                 ));
-                let mut row_on = row![].spacing(8);
-                for v in Variant::ALL {
-                    row_on = row_on.push(widget::themed_button(
-                        format!("{v:?}"),
-                        Some(Message::Note(format!("{v:?}"))),
-                        tok,
-                        v,
-                        Icons::NONE,
-                        btn(&format!("{v:?}")),
-                    ));
+                for chunk in Variant::ALL.chunks(5) {
+                    let mut row_on = row![].spacing(8);
+                    for v in chunk {
+                        row_on = row_on.push(widget::themed_button(
+                            format!("{v:?}"),
+                            Some(Message::Note(format!("{v:?}"))),
+                            tok,
+                            *v,
+                            Icons::NONE,
+                            btn(&format!("{v:?}")),
+                        ));
+                    }
+                    col = col.push(row_on);
                 }
-                col = col.push(row_on);
-                let mut row_off = row![].spacing(8);
-                for v in Variant::ALL {
-                    row_off = row_off.push(widget::themed_button(
-                        format!("{v:?}"),
-                        None,
-                        tok,
-                        v,
-                        Icons::NONE,
-                        btn(&format!("{v:?}")).with_disabled(true),
-                    ));
+                for chunk in Variant::ALL.chunks(5) {
+                    let mut row_off = row![].spacing(8);
+                    for v in chunk {
+                        row_off = row_off.push(widget::themed_button(
+                            format!("{v:?}"),
+                            None,
+                            tok,
+                            *v,
+                            Icons::NONE,
+                            btn(&format!("{v:?}")).with_disabled(true),
+                        ));
+                    }
+                    col = col.push(row_off);
                 }
-                col = col.push(row_off);
                 col = col.push(
                     row![
                         widget::themed_button(
@@ -3661,7 +3732,7 @@ impl Gallery {
                 &self.editor,
                 Message::Editor,
                 tok,
-                layout::FILL,
+                layout::fixed(160.0),
                 named("body", Role::TextBox),
             ),
             "search" => widget::search_input_clear(
@@ -3898,13 +3969,18 @@ impl Gallery {
                     .and_then(|i| self.md_heads.iter().find(|h| h.index == i))
                     .map(|h| format!("Showing {}", h.title))
                     .unwrap_or_else(|| {
-                        "Drag to select in the document. Ctrl+C copies the range. Copy source posts all."
+                        "Drag or double-click a range. Copy takes that text. Copy all posts the source."
                             .into()
                     });
+                let mut copy = Action::new("edit.copy", "Copy", Message::EditCopy);
+                copy.enabled = !self.md_sel.span.is_empty();
                 column![
                     widget::meta(showing, tok, named("md-hash", Role::Status)),
                     pattern::command_bar(
-                        [Action::new("edit.copy", "Copy source", Message::CopyValue)],
+                        [
+                            copy,
+                            Action::new("edit.copy-all", "Copy all", Message::CopyValue),
+                        ],
                         tok,
                         self.direction,
                     ),
@@ -6266,24 +6342,147 @@ mod tests {
                 .map(icedtea::select::markdown_item_extent)
                 .sum::<f32>();
         let _ = g.update(super::Message::MdPointer(
-            icedtea::select::MarkdownPointer::Move(0.0),
+            icedtea::select::MarkdownPointer::at_y(0.0),
         ));
         let _ = g.update(super::Message::MdPointer(
             icedtea::select::MarkdownPointer::Press,
         ));
         let _ = g.update(super::Message::MdPointer(
-            icedtea::select::MarkdownPointer::Move(end_y),
+            icedtea::select::MarkdownPointer::at_y(end_y),
         ));
         let _ = g.update(super::Message::MdPointer(
             icedtea::select::MarkdownPointer::Release,
         ));
-        let copied = g.copy_value();
         assert!(!g.md_sel.span.is_empty());
-        assert_eq!(copied, g.md_sel.span.text(&g.md.items));
+        let copied = g.md_sel.span.text(&g.md.items);
         assert_ne!(copied, g.md.source);
+        assert_eq!(g.copy_value(), g.md.source);
         assert!(copied.contains("Markdown") || copied.contains("Heading"));
-        assert!(g.note.starts_with("Selected "));
-        assert!(!g.note.contains('\n'));
+        g.note.clear();
+        let _ = g.update(super::Message::EditCopy);
+        assert_eq!(g.note, "Copied");
+        g.md_sel = icedtea::select::MarkdownSelect::default();
+        g.note.clear();
+        let _ = g.update(super::Message::EditCopy);
+        assert_ne!(g.note, "Copied");
+        assert!(g
+            .context_actions()
+            .iter()
+            .any(|a| a.id.as_str() == "edit.copy-all"));
+        let _ = g.update(super::Message::EditSelectAll);
+        assert_eq!(
+            g.md_sel.span,
+            icedtea::select::MarkdownSpan::all(&g.md.items)
+        );
+        assert!(g
+            .context_actions()
+            .iter()
+            .any(|a| a.id.as_str() == "edit.select-all"));
+        let _ = g.update(super::Message::EditCopy);
+        assert_eq!(g.note, "Copied");
+        g.page = "markdown";
+        g.pointer = icedtea::iced::Point::new(400.0, 80.0);
+        let _ = g.update(super::Message::Cursor(
+            icedtea::layout::CursorEvent::Context,
+        ));
+        assert!(g.context.is_some());
+        let _ = g.update(super::Message::MdPointer(
+            icedtea::select::MarkdownPointer::at_y(40.0),
+        ));
+        assert!(g.context.is_some());
+        g.md_sel = icedtea::select::MarkdownSelect::default();
+        g.context = None;
+        let _ = g.update(super::Message::MdPointer(
+            icedtea::select::MarkdownPointer::Double,
+        ));
+        // Double without a hover still no-ops on empty docs only.
+        let _ = g.update(super::Message::MdPointer(
+            icedtea::select::MarkdownPointer::Move { x: 16.0, y: 8.0 },
+        ));
+        let _ = g.update(super::Message::MdPointer(
+            icedtea::select::MarkdownPointer::Double,
+        ));
+        assert!(!g.md_sel.span.is_empty());
+        assert!(g
+            .context_actions()
+            .iter()
+            .any(|a| a.id.as_str() == "edit.copy" && a.enabled));
+        g.md_sel = icedtea::select::MarkdownSelect::default();
+        let _ = g.update(super::Message::MdPointer(
+            icedtea::select::MarkdownPointer::Move { x: 0.0, y: 8.0 },
+        ));
+        let _ = g.update(super::Message::MdPointer(
+            icedtea::select::MarkdownPointer::Press,
+        ));
+        let _ = g.update(super::Message::MdPointer(
+            icedtea::select::MarkdownPointer::Move { x: 140.0, y: 8.0 },
+        ));
+        let _ = g.update(super::Message::MdPointer(
+            icedtea::select::MarkdownPointer::Release,
+        ));
+        assert!(!g.md_sel.span.is_empty());
+        let line = g.md_sel.span.text(&g.md.items);
+        assert_ne!(line, g.md.source);
+        assert!(g
+            .context_actions()
+            .iter()
+            .any(|a| a.id.as_str() == "edit.copy" && a.enabled));
+        let kept = g.md_sel.span;
+        let _ = g.update(super::Message::Cursor(
+            icedtea::layout::CursorEvent::Context,
+        ));
+        assert!(g.context.is_some());
+        assert_eq!(g.md_sel.span, kept);
+        assert!(g
+            .context_actions()
+            .iter()
+            .any(|a| a.id.as_str() == "edit.copy" && a.enabled));
+        let _ = g.update(super::Message::ContextDismiss);
+        assert!(g.context_closing || g.context.is_none());
+    }
+
+    #[test]
+    fn page_change_clears_the_status_note() {
+        let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
+        g.page = "markdown";
+        g.note = "Selected 402 characters".into();
+        let _ = g.update(super::Message::Select("code"));
+        assert_eq!(g.page, "code");
+        assert!(g.note.is_empty());
+    }
+
+    #[test]
+    fn one_line_copy_stays_enabled_when_context_opens() {
+        let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
+        g.page = "markdown";
+        g.pointer = icedtea::iced::Point::new(400.0, 80.0);
+        let _ = g.update(super::Message::MdPointer(
+            icedtea::select::MarkdownPointer::Move { x: 16.0, y: 8.0 },
+        ));
+        let _ = g.update(super::Message::MdPointer(
+            icedtea::select::MarkdownPointer::Double,
+        ));
+        assert!(!g.md_sel.span.is_empty());
+        let line = g.md_sel.span.text(&g.md.items);
+        assert!(!line.is_empty());
+        assert_ne!(line, g.md.source);
+        assert!(g
+            .context_actions()
+            .iter()
+            .any(|a| a.id.as_str() == "edit.copy" && a.enabled));
+        let kept = g.md_sel.span;
+        let _ = g.update(super::Message::Cursor(
+            icedtea::layout::CursorEvent::Context,
+        ));
+        assert!(g.context.is_some());
+        assert_eq!(g.md_sel.span, kept);
+        assert!(g
+            .context_actions()
+            .iter()
+            .any(|a| a.id.as_str() == "edit.copy" && a.enabled));
+        let _ = g.update(super::Message::ContextDismiss);
+        assert!(g.context_closing || g.context.is_none());
+        assert_eq!(g.md_sel.span, kept);
     }
 
     #[test]

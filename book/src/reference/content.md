@@ -18,10 +18,10 @@ drag a contiguous range of **visible** text, then host copy (Ctrl+C /
 Cmd+C or `icedtea::copy_text`). Typing does not apply on these
 surfaces.
 
-| Surface | Who owns the text | Range copy | Full document |
+| Surface | Who owns the text | Range copy | Select all / full |
 | --- | --- | --- | --- |
-| [`selectable`](#selectable), code | App `text_editor::Content` via `select_only` | `Content::selection()` → `copy_text` | whole buffer |
-| [`markdown`](#markdown) | Paint-side document (layout stays real) | `MarkdownSpan` across blocks → `copy_text` | `copy_text` on `MarkdownDoc::source` |
+| [`selectable`](#selectable), code | App `text_editor::Content` via `select_only` | `Content::selection()` → `copy_text` | `Action::SelectAll` / whole buffer |
+| [`markdown`](#markdown) | Paint-side document (layout stays real) | `MarkdownSpan` → `copy_text` | `markdown_select_all` / `doc.source` |
 
 Labeled values use the same editor path under [Fields](fields.md#value-field)
 and `field::Selectables`. Chrome (menus, buttons, status meta) is not
@@ -108,9 +108,13 @@ slicing the source before parse. Body is `typo::BODY`; H1 is
 `typo::PAGE` (same step as a window title). Links and inline code use
 `Tokens::scheme()` (`primary`, `on_surface`, `surface_container_high`).
 Real markdown layout (headings, lists, code frames). Drag a range
-across blocks with `select::markdown_select`; covered blocks paint
-the `MarkdownSpan` wash. Ctrl+C / Cmd+C copies `MarkdownSpan::text`.
-Copy the whole document with `icedtea::copy_text` on `doc.source`.
+with `select::markdown_select` (X and Y; a same-line drag is a
+range). A double-click selects that line. Pointer events reach
+`markdown_select` when the paint-side widget captures the press.
+In-block ranges keep paint-side highlight. A span that crosses
+blocks washes only fully covered items. Copy is that span only.
+Select all is `markdown_select_all`. The whole source is a
+separate Copy-all path (`doc.source`).
 
 Pass `A11y`.
 

@@ -32,8 +32,8 @@ use crate::theme::Tokens;
 use crate::typo;
 use crate::variant::Variant;
 use crate::widget::{
-    dismiss_button, group_box, label, meta, tab_bar, themed_button, themed_scroll,
-    themed_text_input, CardFace, FieldOpts,
+    dismiss_button, group_box, label, meta, tab_bar, themed_button, themed_button_sized,
+    themed_scroll, themed_text_input, CardFace, FieldOpts,
 };
 
 /// Group actions by the id prefix before `.` (`file.save` → `file`).
@@ -1434,14 +1434,16 @@ pub fn context_menu<'a, M: Clone + 'a>(
     let n = actions.len();
     let size = context_card_size(n, viewport);
     let at = context_origin(origin, size, viewport);
-    let mut col = Column::new().spacing(2).padding(6);
+    let mut col = Column::new().spacing(2).padding(6).width(Length::Fill);
     for a in actions {
-        col = col.push(themed_button(
+        col = col.push(themed_button_sized(
             a.title.clone(),
             a.invoke(),
             paint,
             Variant::Ghost,
             Icons::NONE,
+            Length::Fill,
+            Length::Fixed(34.0),
             A11y::new(a.title.clone(), Role::MenuItem).with_disabled(!a.enabled),
         ));
     }
@@ -1472,9 +1474,11 @@ pub fn context_menu<'a, M: Clone + 'a>(
         row![Space::new().width(Length::Fixed(at.x)), card],
     ];
     Stack::new()
-        .push(
-            mouse_area(Space::new().width(Length::Fill).height(Length::Fill)).on_press(on_dismiss),
-        )
+        .push(crate::widget::capture_press(
+            mouse_area(Space::new().width(Length::Fill).height(Length::Fill))
+                .on_press(on_dismiss)
+                .into(),
+        ))
         .push(crate::motion::overlay(
             placed.into(),
             t,
@@ -1787,7 +1791,13 @@ pub fn cheatsheet<'a, M: Clone + 'a>(
     tok: Tokens,
 ) -> Element<'a, M> {
     let q = query.trim().to_ascii_lowercase();
-    let mut col = Column::new().spacing(4).padding(8);
+    let rail = crate::chrome::SCROLL_RAIL_WIDTH;
+    let mut col = Column::new().spacing(4).padding(Padding {
+        top: 8.0,
+        right: 8.0 + rail,
+        bottom: 8.0,
+        left: 8.0,
+    });
     for a in table.iter() {
         if !a.enabled {
             continue;
@@ -2274,6 +2284,31 @@ mod tests {
                 &viewport,
             );
         }
+        fn menu_row_width(el: &mut Element<'_, ()>) -> f32 {
+            use iced::advanced::layout::{Layout, Limits};
+            use iced::advanced::widget::Tree;
+            use iced::{Font, Pixels, Size};
+            let mut tree = Tree::new(el.as_widget());
+            let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+                Font::DEFAULT,
+                Pixels::from(16u32),
+            ));
+            let limits = Limits::new(Size::ZERO, Size::new(640.0, 400.0));
+            let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+            let layout = Layout::new(&node);
+            fn walk(layout: Layout<'_>, best: &mut f32) {
+                let b = layout.bounds();
+                if (b.height - 34.0).abs() < 2.0 && b.width > 80.0 {
+                    *best = best.max(b.width);
+                }
+                for child in layout.children() {
+                    walk(child, best);
+                }
+            }
+            let mut best = 0.0;
+            walk(layout, &mut best);
+            best
+        }
         let mut bar = menu_bar(&table, tok, ltr, &cat);
         paint(&mut bar);
         let mut tb = toolbar(acts.iter().copied(), tok, ltr);
@@ -2339,6 +2374,12 @@ mod tests {
             tok,
         );
         paint(&mut cm);
+        let card = context_card_size(table.iter().count(), vp);
+        let row_w = menu_row_width(&mut cm);
+        assert!(
+            row_w + 1.0 >= card.width - 16.0,
+            "menu row {row_w} should fill the {card:?} card"
+        );
         let mut edge = context_menu(
             table.iter().cloned(),
             iced::Point::new(800.0, 500.0),
@@ -2530,5 +2571,93 @@ mod tests {
             A11y::new("ws-empty", Role::Group),
         );
         paint(&mut ews);
+    }
+
+    #[test]
+    fn context_menu_outside_press_dismisses() {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::mouse;
+        use iced::{Event, Font, Pixels, Point, Rectangle, Size};
+        #[derive(Clone, Debug, PartialEq)]
+        enum Msg {
+            Dismiss,
+            Save,
+        }
+        let tok = crate::theme::named("dark").tokens;
+        let mut table = ActionTable::new();
+        table.insert(Action::new("file.save", "Save", Msg::Save));
+        let vp = Size::new(640.0, 400.0);
+        let mut el = context_menu(
+            table.iter().cloned(),
+            Point::new(24.0, 48.0),
+            vp,
+            Msg::Dismiss,
+            1.0,
+            tok,
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, vp);
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let viewport = Rectangle::new(Point::ORIGIN, vp);
+        let mut clipboard = clipboard::Null;
+        let miss = Point::new(500.0, 300.0);
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(miss),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert_eq!(messages, vec![Msg::Dismiss]);
+        let hit = Point::new(40.0, 64.0);
+        let mut on_row = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut on_row);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(hit),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        {
+            let mut shell = iced::advanced::Shell::new(&mut on_row);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(hit),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(
+            on_row.contains(&Msg::Save),
+            "row press should run the action, got {on_row:?}"
+        );
+        assert!(
+            !on_row.iter().all(|m| *m == Msg::Dismiss),
+            "row press must not be dismiss-only, got {on_row:?}"
+        );
     }
 }

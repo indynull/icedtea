@@ -3019,9 +3019,11 @@ pub fn parse(source: &str) -> MarkdownDoc {
 /// (window title), not iced's 2× blog heading. Drag a range with
 /// [`crate::select::markdown_select`] so it can start in one block and
 /// end in another; pass the live [`crate::select::MarkdownSpan`] here.
-/// The view is not flattened into one mixed-size `Rich`. Ctrl+C /
-/// Cmd+C on a span is [`MarkdownSpan::text`] via [`crate::copy_text`].
-/// Full document copy is [`MarkdownDoc::source`].
+/// The view is not flattened into one mixed-size `Rich`. Pointer
+/// events reach `on_pointer` when the paint-side widget captures
+/// the press (a double-click selects that line).
+/// Ctrl+C / Cmd+C on a span is [`crate::select::MarkdownSpan::text`] via
+/// [`crate::copy_text`]. Full document copy is [`MarkdownDoc::source`].
 ///
 ///
 /// ```
@@ -3052,14 +3054,15 @@ pub fn markdown_view<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let settings = crate::select::markdown_paint_settings(markdown_style(tok));
+    // In-block ranges stay on one viewer so paint-side highlight
+    // survives. Cross-block ranges wash only fully covered items.
     let body: Element<'a, M> = match span.copied().filter(|s| !s.is_empty()) {
-        None => iced_selection::markdown::view(items, settings).map(on_link),
-        Some(span) => {
+        Some(span) if span.start.item != span.end.item => {
             let mut col = Column::new().spacing(settings.spacing).width(Length::Fill);
             for (i, item) in items.iter().enumerate() {
                 let block = iced_selection::markdown::view(std::slice::from_ref(item), settings)
                     .map(on_link);
-                let block: Element<'a, M> = if span.covers(i) {
+                let block: Element<'a, M> = if span.fully_covers(items, i) {
                     container(block)
                         .width(Length::Fill)
                         .style(move |_| style::list_row(tok, true))
@@ -3071,15 +3074,193 @@ pub fn markdown_view<'a, M: Clone + 'a>(
             }
             col.into()
         }
+        _ => iced_selection::markdown::view(items, settings).map(on_link),
     };
-    a11y::attach(
-        mouse_area(body)
-            .on_move(move |p| on_pointer(crate::select::MarkdownPointer::Move(p.y)))
-            .on_press(on_pointer(crate::select::MarkdownPointer::Press))
-            .on_release(on_pointer(crate::select::MarkdownPointer::Release))
-            .into(),
-        &a11y,
-    )
+    a11y::attach(markdown_listen(body, on_pointer), &a11y)
+}
+
+/// Publish markdown pointer events even when the child captured the press.
+fn markdown_listen<'a, M: Clone + 'a>(
+    child: Element<'a, M>,
+    on_pointer: impl Fn(crate::select::MarkdownPointer) -> M + 'a,
+) -> Element<'a, M> {
+    MarkdownListen {
+        content: child,
+        on_pointer: Box::new(on_pointer),
+    }
+    .into()
+}
+
+struct MarkdownListen<'a, Message> {
+    content: Element<'a, Message>,
+    on_pointer: Box<dyn Fn(crate::select::MarkdownPointer) -> Message + 'a>,
+}
+
+#[derive(Default)]
+struct MarkdownListenState {
+    previous_click: Option<iced::advanced::mouse::Click>,
+    last: Option<iced::Point>,
+}
+
+impl<'a, Message: Clone> Widget<Message, iced::Theme, iced::Renderer>
+    for MarkdownListen<'a, Message>
+{
+    fn tag(&self) -> tree::Tag {
+        tree::Tag::of::<MarkdownListenState>()
+    }
+
+    fn state(&self) -> tree::State {
+        tree::State::new(MarkdownListenState::default())
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.content)]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_ref(&self.content));
+    }
+
+    fn size(&self) -> iced::Size<Length> {
+        self.content.as_widget().size()
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        self.content
+            .as_widget_mut()
+            .layout(&mut tree.children[0], renderer, limits)
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        renderer: &iced::Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &iced::Rectangle,
+    ) {
+        self.content.as_widget_mut().update(
+            &mut tree.children[0],
+            event,
+            layout,
+            cursor,
+            renderer,
+            clipboard,
+            shell,
+            viewport,
+        );
+        let Some(local) = cursor.position_in(layout.bounds()) else {
+            return;
+        };
+        let state = tree.state.downcast_mut::<MarkdownListenState>();
+        if state.last != Some(local) {
+            state.last = Some(local);
+            shell.publish((self.on_pointer)(crate::select::MarkdownPointer::Move {
+                x: local.x,
+                y: local.y,
+            }));
+        }
+        match event {
+            Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)) => {
+                let click = iced::advanced::mouse::Click::new(
+                    cursor.position().unwrap_or(local),
+                    iced::mouse::Button::Left,
+                    state.previous_click,
+                );
+                shell.publish((self.on_pointer)(crate::select::MarkdownPointer::Press));
+                if click.kind() != iced::advanced::mouse::click::Kind::Single {
+                    shell.publish((self.on_pointer)(crate::select::MarkdownPointer::Double));
+                }
+                state.previous_click = Some(click);
+                shell.capture_event();
+            }
+            Event::Mouse(iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left)) => {
+                shell.publish((self.on_pointer)(crate::select::MarkdownPointer::Release));
+            }
+            _ => {}
+        }
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut iced::Renderer,
+        theme: &iced::Theme,
+        style: &iced::advanced::renderer::Style,
+        layout: Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        viewport: &iced::Rectangle,
+    ) {
+        self.content.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            layout,
+            cursor,
+            viewport,
+        );
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &iced::Renderer,
+        operation: &mut dyn iced::advanced::widget::Operation,
+    ) {
+        self.content
+            .as_widget_mut()
+            .operate(&mut tree.children[0], layout, renderer, operation);
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        viewport: &iced::Rectangle,
+        renderer: &iced::Renderer,
+    ) -> iced::mouse::Interaction {
+        self.content.as_widget().mouse_interaction(
+            &tree.children[0],
+            layout,
+            cursor,
+            viewport,
+            renderer,
+        )
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &iced::Renderer,
+        viewport: &iced::Rectangle,
+        translation: iced::Vector,
+    ) -> Option<iced::advanced::overlay::Element<'b, Message, iced::Theme, iced::Renderer>> {
+        self.content.as_widget_mut().overlay(
+            &mut tree.children[0],
+            layout,
+            renderer,
+            viewport,
+            translation,
+        )
+    }
+}
+
+impl<'a, Message: Clone + 'a> From<MarkdownListen<'a, Message>> for Element<'a, Message> {
+    fn from(value: MarkdownListen<'a, Message>) -> Self {
+        Self::new(value)
+    }
 }
 
 fn markdown_style(tok: Tokens) -> markdown::Style {
@@ -4224,7 +4405,7 @@ pub fn item_press<'a, M: Clone + 'a>(
     .into()
 }
 
-/// Swallow mouse presses on `child` so they do not fall through.
+/// Swallow mouse events on `child` so they do not fall through.
 pub fn capture_press<'a, M: 'a>(child: Element<'a, M>) -> Element<'a, M> {
     CapturePress { content: child }.into()
 }
@@ -4429,7 +4610,7 @@ impl<'a, Message> Widget<Message, iced::Theme, iced::Renderer> for CapturePress<
         if shell.is_event_captured() {
             return;
         }
-        if let Event::Mouse(iced::mouse::Event::ButtonPressed(_)) = event {
+        if let Event::Mouse(_) = event {
             if cursor
                 .position()
                 .is_some_and(|p| layout.bounds().contains(p))
@@ -4687,12 +4868,16 @@ pub fn item_grid<'a, M: Clone + 'a>(
             if i < labels.len() {
                 let s = labels[i].clone();
                 let on = selected == Some(i);
-                // M3: selected tile = tonal (secondary container); idle = ghost.
+                // M3: selected tile = tonal; idle = outlined so the cell reads.
                 let tile = themed_button_sized(
                     s.clone(),
                     None,
                     tok,
-                    if on { Variant::Quiet } else { Variant::Ghost },
+                    if on {
+                        Variant::Quiet
+                    } else {
+                        Variant::Outlined
+                    },
                     Icons::NONE,
                     Length::Fill,
                     Length::Fill,
@@ -5672,6 +5857,42 @@ mod tests {
                 modifiers: keyboard::Modifiers::SHIFT,
             }]
         );
+    }
+
+    #[test]
+    fn capture_press_swallows_a_move() {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Point, Rectangle, Size};
+        let face: Element<'_, ()> = Space::new().width(80).height(40).into();
+        let mut el = capture_press(face);
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(80.0, 40.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let viewport = Rectangle::new(Point::ORIGIN, Size::new(80.0, 40.0));
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        let mut shell = iced::advanced::Shell::new(&mut messages);
+        el.as_widget_mut().update(
+            &mut tree,
+            &Event::Mouse(iced::mouse::Event::CursorMoved {
+                position: Point::new(8.0, 8.0),
+            }),
+            layout,
+            iced::mouse::Cursor::Available(Point::new(8.0, 8.0)),
+            &renderer,
+            &mut clipboard,
+            &mut shell,
+            &viewport,
+        );
+        assert!(shell.is_event_captured());
+        assert!(messages.is_empty());
     }
 
     fn draw_once<M: Clone>(el: &mut Element<'_, M>) {
@@ -8232,11 +8453,12 @@ mod tests {
         assert!(md.contains("iced_selection::markdown::view"));
         assert!(!md.contains("Rich::with_spans"));
         assert!(!md.contains("let _ = span"));
-        assert!(md.contains("covers"));
+        assert!(md.contains("fully_covers"));
+        assert!(md.contains("markdown_listen"));
         let mut st = crate::select::markdown_select(
             &doc.items,
             crate::select::MarkdownSelect::default(),
-            crate::select::MarkdownPointer::Move(0.0),
+            crate::select::MarkdownPointer::at_y(0.0),
         );
         st = crate::select::markdown_select(&doc.items, st, crate::select::MarkdownPointer::Press);
         let end_y = doc
@@ -8247,7 +8469,7 @@ mod tests {
         st = crate::select::markdown_select(
             &doc.items,
             st,
-            crate::select::MarkdownPointer::Move(end_y),
+            crate::select::MarkdownPointer::at_y(end_y),
         );
         let mut painted: Element<'_, crate::select::MarkdownPointer> = markdown_view(
             &doc.items,
@@ -8273,6 +8495,136 @@ mod tests {
             A11y::new("md-head", Role::Group),
         );
         draw_once(&mut part);
+    }
+
+    #[test]
+    fn markdown_view_posts_pointer_after_child_captures() {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::mouse;
+        use iced::{Font, Pixels, Point, Rectangle, Size};
+        let tok = named("dark").tokens;
+        let doc = parse("# Title that continues for a while\n\nA paragraph of body text.");
+        let mut el: Element<'_, crate::select::MarkdownPointer> = markdown_view(
+            &doc.items,
+            None,
+            |ev| ev,
+            tok,
+            |_| crate::select::MarkdownPointer::Release,
+            A11y::new("md-press", Role::Group),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(400.0, 240.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let viewport = Rectangle::new(Point::ORIGIN, Size::new(400.0, 240.0));
+        let mut clipboard = clipboard::Null;
+        let at = Point::new(24.0, 12.0);
+        let mut first = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut first);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(at),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(
+            first.contains(&crate::select::MarkdownPointer::Press),
+            "press must reach on_pointer after paint-side capture, got {first:?}"
+        );
+        assert!(first
+            .iter()
+            .any(|m| matches!(m, crate::select::MarkdownPointer::Move { .. })));
+        let mut second = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut second);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(at),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(
+            second.contains(&crate::select::MarkdownPointer::Double),
+            "double-click must reach on_pointer, got {second:?}"
+        );
+        let mut st = crate::select::MarkdownSelect::default();
+        for ev in first.iter().chain(second.iter()) {
+            st = crate::select::markdown_select(&doc.items, st, *ev);
+        }
+        assert!(!st.span.is_empty());
+        let copied = st.span.text(&doc.items);
+        assert!(!copied.is_empty());
+        assert_ne!(copied, doc.source);
+        let mut up = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut up);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(at),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(up.contains(&crate::select::MarkdownPointer::Release));
+        let mut miss = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut miss);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(Point::new(900.0, 900.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(
+            !miss.contains(&crate::select::MarkdownPointer::Press),
+            "a miss must not post Press, got {miss:?}"
+        );
+        let mut moved = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut moved);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::CursorMoved {
+                    position: Point::new(40.0, 20.0),
+                }),
+                layout,
+                mouse::Cursor::Available(Point::new(40.0, 20.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(moved.iter().any(|m| matches!(
+            m,
+            crate::select::MarkdownPointer::Move { x, y } if (*x - 40.0).abs() < 1.0 && (*y - 20.0).abs() < 1.0
+        )));
     }
 
     #[test]

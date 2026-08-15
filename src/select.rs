@@ -7,11 +7,11 @@
 //! (Ctrl/Cmd+C or the host clipboard path the surface documents).
 //! Typing does not apply on read-only surfaces.
 //!
-//! | Surface | Constructor | Who owns text | Range copy | Full document |
+//! | Surface | Constructor | Who owns text | Range copy | Select all |
 //! | --- | --- | --- | --- | --- |
-//! | Body / path | [`crate::widget::selectable`], [`crate::widget::value_field`] | App `text_editor::Content` / [`crate::field::Selectables`] | `Content::selection()` → [`crate::copy_text`] | whole buffer via `text()` / `Selectables::copy` |
-//! | Code | [`crate::widget::highlighted_code`], [`crate::widget::code_block`] | App `Content` | same | same |
-//! | Markdown | [`crate::widget::markdown_view`] | Structured paint (per block) | [`MarkdownSpan`] across blocks → [`crate::copy_text`] | [`crate::copy_text`] on [`crate::widget::MarkdownDoc::source`] |
+//! | Body / path | [`crate::widget::selectable`], [`crate::widget::value_field`] | App `text_editor::Content` / [`crate::field::Selectables`] | `Content::selection()` → [`crate::copy_text`] | `Action::SelectAll` / [`crate::field::Selectables::perform`] |
+//! | Code | [`crate::widget::highlighted_code`], [`crate::widget::code_block`] | App `Content` | same | `Action::SelectAll` |
+//! | Markdown | [`crate::widget::markdown_view`] | Structured paint (per block) | [`MarkdownSpan`] → [`crate::copy_text`] | [`markdown_select_all`] |
 //!
 //! Chrome (menus, buttons, status meta) is not drag-selectable.
 //!
@@ -246,6 +246,23 @@ impl MarkdownSpan {
         self.start == self.end
     }
 
+    /// The whole document, start of the first block through the end of
+    /// the last.
+    pub fn all(items: &[Item]) -> Self {
+        if items.is_empty() {
+            return Self::default();
+        }
+        let last = items.len() - 1;
+        let end = markdown_item_plain(&items[last]).len();
+        Self {
+            start: MarkdownPos { item: 0, offset: 0 },
+            end: MarkdownPos {
+                item: last,
+                offset: end,
+            },
+        }
+    }
+
     /// Plain text of this range in document order (blocks joined by blank lines).
     pub fn text(self, items: &[Item]) -> String {
         if items.is_empty() {
@@ -279,14 +296,45 @@ impl MarkdownSpan {
     pub fn covers(self, item: usize) -> bool {
         item >= self.start.item && item <= self.end.item && !self.is_empty()
     }
+
+    /// True when this range includes every character of `item`.
+    ///
+    /// A one-line drag inside a paragraph does not fully cover it.
+    /// Cross-block paint washes only these items.
+    pub fn fully_covers(self, items: &[Item], item: usize) -> bool {
+        if !self.covers(item) || items.is_empty() {
+            return false;
+        }
+        let last = items.len() - 1;
+        let i = item.min(last);
+        let n = markdown_item_plain(&items[i]).len();
+        let from_start = i > self.start.item || self.start.offset == 0;
+        let to_end = i < self.end.item || self.end.offset >= n;
+        from_start && to_end
+    }
 }
 
 /// Pointer event for [`markdown_select`].
+///
+/// `Move` carries the point inside the markdown pane so a horizontal
+/// drag on one line is a real range (Y-only carets stay empty).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MarkdownPointer {
     Press,
-    Move(f32),
+    Move {
+        x: f32,
+        y: f32,
+    },
+    /// Second click in place: select the line under the caret.
+    Double,
     Release,
+}
+
+impl MarkdownPointer {
+    /// Vertical-only move (x stays 0). Prefer [`Self::Move`] with both axes.
+    pub fn at_y(y: f32) -> Self {
+        Self::Move { x: 0.0, y }
+    }
 }
 
 /// Live drag state for [`crate::widget::markdown_view`].
@@ -295,6 +343,7 @@ pub struct MarkdownSelect {
     pub span: MarkdownSpan,
     pub dragging: bool,
     pub anchor: MarkdownPos,
+    pub hover_x: f32,
     pub hover_y: f32,
 }
 
@@ -306,16 +355,21 @@ pub fn markdown_select(
 ) -> MarkdownSelect {
     match ev {
         MarkdownPointer::Press => {
-            let pos = markdown_pos_at(items, state.hover_y);
+            let pos = markdown_pos_at(items, state.hover_x, state.hover_y);
             state.dragging = true;
             state.anchor = pos;
             state.span = MarkdownSpan::from_drag(pos, pos);
         }
-        MarkdownPointer::Move(y) => {
+        MarkdownPointer::Move { x, y } => {
+            state.hover_x = x;
             state.hover_y = y;
             if state.dragging {
-                state.span = MarkdownSpan::from_drag(state.anchor, markdown_pos_at(items, y));
+                state.span = MarkdownSpan::from_drag(state.anchor, markdown_pos_at(items, x, y));
             }
+        }
+        MarkdownPointer::Double => {
+            state.dragging = false;
+            state.span = markdown_line_span(items, state.hover_x, state.hover_y);
         }
         MarkdownPointer::Release => {
             state.dragging = false;
@@ -324,29 +378,103 @@ pub fn markdown_select(
     state
 }
 
-/// Map a Y offset in the markdown column to a caret.
-pub fn markdown_pos_at(items: &[Item], y: f32) -> MarkdownPos {
+/// Select every block. Same span [`MarkdownSpan::text`] uses for a
+/// full-document copy.
+pub fn markdown_select_all(items: &[Item]) -> MarkdownSelect {
+    let span = MarkdownSpan::all(items);
+    MarkdownSelect {
+        span,
+        dragging: false,
+        anchor: span.start,
+        hover_x: 0.0,
+        hover_y: 0.0,
+    }
+}
+
+/// Map a point in the markdown column to a caret.
+///
+/// Y picks the block and line; X picks the column on that line so a
+/// same-line drag is a non-empty range.
+pub fn markdown_pos_at(items: &[Item], x: f32, y: f32) -> MarkdownPos {
     if items.is_empty() {
         return MarkdownPos::default();
     }
     let y = y.max(0.0);
+    let x = x.max(0.0);
     let mut acc = 0.0;
     let mut pos = MarkdownPos::default();
+    const COL: f32 = 64.0;
+    let char_w = (crate::typo::BODY as f32) * 0.5;
     for (i, item) in items.iter().enumerate() {
         let h = markdown_item_extent(item).max(1.0);
-        let frac = ((y - acc) / h).clamp(0.0, 1.0);
-        let plain = markdown_item_plain(item);
-        let raw = (plain.len() as f32 * frac).round() as usize;
-        pos = MarkdownPos {
-            item: i,
-            offset: floor_char_boundary(&plain, raw.min(plain.len())),
-        };
-        if y < acc + h {
+        let last = i + 1 == items.len();
+        if y < acc + h || last {
+            let plain = markdown_item_plain(item);
+            let raw = if y >= acc + h {
+                plain.len()
+            } else {
+                let n_lines = ((plain.len() as f32) / COL).ceil().max(1.0);
+                let line_h = (h / n_lines).max(1.0);
+                let line_i = ((y - acc) / line_h).floor().clamp(0.0, n_lines - 1.0);
+                let per_line = ((plain.len() as f32) / n_lines).ceil().max(1.0);
+                let col = (x / char_w).floor().min(per_line);
+                (line_i * per_line + col) as usize
+            };
+            pos = MarkdownPos {
+                item: i,
+                offset: floor_char_boundary(&plain, raw.min(plain.len())),
+            };
             break;
         }
         acc += h;
     }
     pos
+}
+
+/// The estimated visual line under `(x, y)` (double-click).
+pub fn markdown_line_span(items: &[Item], x: f32, y: f32) -> MarkdownSpan {
+    if items.is_empty() {
+        return MarkdownSpan::default();
+    }
+    let pos = markdown_pos_at(items, x, y);
+    let last = items.len() - 1;
+    let item = pos.item.min(last);
+    let plain = markdown_item_plain(&items[item]);
+    if plain.is_empty() {
+        return MarkdownSpan {
+            start: MarkdownPos { item, offset: 0 },
+            end: MarkdownPos { item, offset: 0 },
+        };
+    }
+    let (a, b) = if plain.contains('\n') {
+        let mut start = 0;
+        let mut end = plain.len();
+        for (i, ch) in plain.char_indices() {
+            if ch == '\n' {
+                if i < pos.offset {
+                    start = i + 1;
+                } else {
+                    end = i;
+                    break;
+                }
+            }
+        }
+        (start, end)
+    } else {
+        const COL: f32 = 64.0;
+        let n_lines = ((plain.len() as f32) / COL).ceil().max(1.0);
+        let per_line = ((plain.len() as f32) / n_lines).ceil().max(1.0) as usize;
+        let line_i = (pos.offset / per_line.max(1)).min(n_lines as usize - 1);
+        let start = line_i * per_line;
+        let end = ((line_i + 1) * per_line).min(plain.len());
+        (start, end.max(start + 1).min(plain.len()))
+    };
+    let a = floor_char_boundary(&plain, a.min(plain.len()));
+    let b = ceil_char_boundary(&plain, b.min(plain.len()).max(a));
+    MarkdownSpan {
+        start: MarkdownPos { item, offset: a },
+        end: MarkdownPos { item, offset: b },
+    }
 }
 
 pub(crate) fn markdown_item_plain(item: &Item) -> String {
@@ -530,6 +658,21 @@ mod tests {
     }
 
     #[test]
+    fn markdown_select_all_covers_every_block() {
+        let items: Vec<_> = markdown::parse("# A\n\nB line").collect();
+        assert!(items.len() >= 2);
+        let sel = markdown_select_all(&items);
+        assert!(!sel.span.is_empty());
+        assert_eq!(sel.span.start.item, 0);
+        assert_eq!(sel.span.end.item, items.len() - 1);
+        let text = sel.span.text(&items);
+        assert!(text.contains('A'));
+        assert!(text.contains("B line"));
+        assert_eq!(MarkdownSpan::all(&[]), MarkdownSpan::default());
+        assert!(markdown_select_all(&[]).span.is_empty());
+    }
+
+    #[test]
     fn markdown_plain_covers_lists_code_quote_rule_image_table() {
         let source = r#"# H1
 ## H2
@@ -603,10 +746,10 @@ fn b() {}
         let items: Vec<_> = markdown::parse("# Title\n\nA paragraph.\n\n- alpha\n- beta").collect();
         assert!(items.len() >= 3);
         let mut st = MarkdownSelect::default();
-        st = markdown_select(&items, st, MarkdownPointer::Move(0.0));
+        st = markdown_select(&items, st, MarkdownPointer::at_y(0.0));
         st = markdown_select(&items, st, MarkdownPointer::Press);
         let end_y = items.iter().map(markdown_item_extent).sum::<f32>();
-        st = markdown_select(&items, st, MarkdownPointer::Move(end_y));
+        st = markdown_select(&items, st, MarkdownPointer::at_y(end_y));
         st = markdown_select(&items, st, MarkdownPointer::Release);
         assert!(!st.dragging);
         assert!(st.span.start.item < st.span.end.item);
@@ -615,9 +758,9 @@ fn b() {}
         assert!(copied.contains("paragraph"), "{copied}");
         assert!(copied.contains("alpha") || copied.contains('•'), "{copied}");
         let mut back = MarkdownSelect::default();
-        back = markdown_select(&items, back, MarkdownPointer::Move(end_y));
+        back = markdown_select(&items, back, MarkdownPointer::at_y(end_y));
         back = markdown_select(&items, back, MarkdownPointer::Press);
-        back = markdown_select(&items, back, MarkdownPointer::Move(0.0));
+        back = markdown_select(&items, back, MarkdownPointer::at_y(0.0));
         let rev = back.span.text(&items);
         assert!(rev.contains("Title") && rev.contains("paragraph"));
         assert_eq!(
@@ -629,5 +772,64 @@ fn b() {}
         assert!(MarkdownSpan::default().is_empty());
         assert!(!st.span.covers(99));
         assert!(st.span.covers(st.span.start.item));
+    }
+
+    #[test]
+    fn markdown_same_line_drag_is_a_nonempty_range() {
+        let items: Vec<_> =
+            markdown::parse("# Short title here that continues for a while").collect();
+        assert_eq!(items.len(), 1);
+        let mut st = MarkdownSelect::default();
+        st = markdown_select(&items, st, MarkdownPointer::Move { x: 0.0, y: 8.0 });
+        st = markdown_select(&items, st, MarkdownPointer::Press);
+        assert!(st.span.is_empty());
+        st = markdown_select(&items, st, MarkdownPointer::Move { x: 56.0, y: 8.0 });
+        st = markdown_select(&items, st, MarkdownPointer::Release);
+        assert!(!st.span.is_empty());
+        let copied = st.span.text(&items);
+        assert!(!copied.is_empty());
+        let all = MarkdownSpan::all(&items).text(&items);
+        assert!(copied.len() < all.len(), "{copied} vs {all}");
+        let mut click = MarkdownSelect::default();
+        click = markdown_select(&items, click, MarkdownPointer::Move { x: 8.0, y: 8.0 });
+        click = markdown_select(&items, click, MarkdownPointer::Press);
+        click = markdown_select(&items, click, MarkdownPointer::Release);
+        assert!(click.span.is_empty());
+        let mut dbl = MarkdownSelect::default();
+        dbl = markdown_select(&items, dbl, MarkdownPointer::Move { x: 16.0, y: 8.0 });
+        dbl = markdown_select(&items, dbl, MarkdownPointer::Double);
+        assert!(!dbl.span.is_empty());
+        let line = dbl.span.text(&items);
+        assert!(!line.is_empty());
+        assert_eq!(line, all);
+        assert!(MarkdownSpan::all(&items).fully_covers(&items, 0));
+        assert!(!st.span.fully_covers(&items, 0));
+        assert!(!MarkdownSpan::default().fully_covers(&items, 0));
+        assert!(!MarkdownSpan::all(&items).fully_covers(&[], 0));
+        let mid = MarkdownSpan {
+            start: MarkdownPos { item: 0, offset: 2 },
+            end: MarkdownPos { item: 0, offset: 8 },
+        };
+        assert!(mid.covers(0));
+        assert!(!mid.fully_covers(&items, 0));
+        let many: Vec<_> = markdown::parse("# Title\n\nA paragraph.\n\n- alpha").collect();
+        let across = MarkdownSpan {
+            start: MarkdownPos { item: 0, offset: 0 },
+            end: MarkdownPos {
+                item: 2,
+                offset: markdown_item_plain(&many[2]).len(),
+            },
+        };
+        assert!(across.fully_covers(&many, 1));
+        assert!(across.fully_covers(&many, 0));
+        let from_mid = MarkdownSpan {
+            start: MarkdownPos { item: 0, offset: 2 },
+            end: MarkdownPos {
+                item: 2,
+                offset: markdown_item_plain(&many[2]).len(),
+            },
+        };
+        assert!(!from_mid.fully_covers(&many, 0));
+        assert!(from_mid.fully_covers(&many, 1));
     }
 }

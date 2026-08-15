@@ -164,7 +164,8 @@ Constructor: [`pattern::context_menu`](https://docs.rs/icedtea/latest/icedtea/pa
 [icedtea](https://crates.io/crates/icedtea)
 
 Stack on the window with the click point. Click-away dismisses.
-Empty table still paints a card. `progress` is 0 (gone) to 1 (rest).
+Rows fill the card. Empty table still paints a card. `progress` is
+0 (gone) to 1 (rest).
 
 ### Breadcrumb
 

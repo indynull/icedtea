@@ -2,21 +2,12 @@
 
 ## Unreleased
 
-### Controls
+### Feature
 
 - `A11y` keeps hint, selected, toggled, expanded, live, required, and
   error next to name, role, value, disabled, and checked. Constructors
   fill unset fields from their arguments. iced 0.14 still publishes
   only the widget id.
-- `badge` Primary uses on-primary ink on the primary fill.
-- Disabled filled buttons use a stronger mute (fill 22%, ink 68%) so
-  the label reads on the brick on dark, not only on the canvas.
-- `command_bar` labels use on-surface body ink.
-- `dim_backdrop` rest opacity is 50% so a dialog sheet sits on a
-  visible wash.
-
-### Collections
-
 - List, table, grid, and tree row presses are `ItemClick` (button and
   modifiers). Right-click no longer equals left-click select.
   `Selection::apply_item_click` is the desktop rule. `listen_cursor`
@@ -24,15 +15,51 @@
 - Flush list titles wrap on a tall row; `list_detail` uses
   `layout::LIST_PANE` (360px). Short flush rows still ellipsize on a
   word boundary.
+- `markdown_select_all` / `MarkdownSpan::all` select every block.
+- Markdown pointer moves carry X and Y so a same-line drag is a
+  real range. A double-click selects that line. Copy is that span;
+  Copy all is the source.
+- `MarkdownSpan::fully_covers` is the cross-block wash. A partial
+  in-block range does not paint the whole item.
+- Accessibility names the record, keyboard order, and the iced 0.14
+  AccessKit limit.
+
+### Bug fix
+
+- `badge` Primary uses on-primary ink on the primary fill.
+- Disabled filled buttons use a stronger mute (fill 22%, ink 68%) so
+  the label reads on the brick on dark, not only on the canvas.
+- `command_bar` labels use on-surface body ink.
+- `dim_backdrop` rest opacity is 50% so a dialog sheet sits on a
+  visible wash.
+- `motion::overlay` hit-tests the slid child so a press lands on the
+  painted face, not the dismiss layer behind it.
+- `context_menu` captures pointer moves on the dismiss layer so a
+  move toward the menu does not reach the page underneath.
+- Context menu rows fill the card so the press target is the whole
+  row, not only the label.
+- The overlay no longer captures clicks on the placement spacers, so
+  a miss reaches the dismiss surface.
 - `themed_scroll` scissors through `ClipLayer` so rows cannot paint
   through sticky search or other chrome above the pane.
 - Gallery catalog nav omits rows above the scroll offset so section
   titles cannot show through the sticky Search field.
+- `markdown_view` publishes pointer events when the paint-side
+  widget captures the press, so a one-line select enables Copy.
+- `cheatsheet` insets shortcut labels so they do not sit under the
+  scroll rail.
+- Gallery status note clears when the catalog page changes.
+- The Controls page packs the button group, checks, and radios beside
+  buttons so those hosts sit on the first screen.
+- Ghost and Outlined disabled ink uses the same 68% mute as filled
+  faces so the label reads on dark.
+- Idle `item_grid` tiles use the outlined face so a cell reads before
+  it is selected.
+- The Fields page packs number, date, and time beside text so those
+  hosts sit on the first screen.
 
-### Guide
+### Chore
 
-- Accessibility names the record, keyboard order, and the iced 0.14
-  AccessKit limit.
 - README and Install use `cargo add icedtea`. The crates.io badge is
   the crate version.
 - README shows a Codecov coverage badge.

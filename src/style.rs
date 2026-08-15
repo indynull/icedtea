@@ -243,14 +243,17 @@ pub fn skeleton(tok: Tokens) -> container::Style {
     fill(s.surface_container_highest, s.on_surface_variant)
 }
 
-/// Map icedtea [`Variant`] onto M3 button color styles.
-///
-/// - Primary → filled
-/// - Quiet → filled tonal
-/// - Ghost → text
-/// - Chip → tonal (assist chip container)
-/// - Danger → filled error
-/// - Success / Warning → filled tonal with desktop roles
+/// Unfilled disabled ink. Same 68% mute as filled `face`, so Ghost /
+/// Outlined labels stay readable on dark canvas.
+fn disabled_ink(surface: Color) -> Color {
+    let ink = if crate::m3::color::relative_luma(surface) < 0.5 {
+        Color::WHITE
+    } else {
+        Color::BLACK
+    };
+    layer_on(surface, ink, 0.68)
+}
+
 fn button_border(comp: Component) -> Border {
     Border {
         color: Color::TRANSPARENT,
@@ -259,6 +262,14 @@ fn button_border(comp: Component) -> Border {
     }
 }
 
+/// Map icedtea [`Variant`] onto M3 button color styles.
+///
+/// - Primary → filled
+/// - Quiet → filled tonal
+/// - Ghost → text
+/// - Chip → tonal (assist chip container)
+/// - Danger → filled error
+/// - Success / Warning → filled tonal with desktop roles
 fn button_face(
     tok: Tokens,
     variant: Variant,
@@ -283,9 +294,7 @@ fn button_face(
         }
         Variant::Ghost => {
             let (bg, fg) = match state {
-                ControlState::Disabled => {
-                    (Color::TRANSPARENT, layer_on(surface, s.on_surface, 0.38))
-                }
+                ControlState::Disabled => (Color::TRANSPARENT, disabled_ink(surface)),
                 ControlState::Hovered | ControlState::Focused => {
                     (layer_on(surface, s.primary, 0.08), s.primary)
                 }
@@ -317,9 +326,7 @@ fn button_face(
         }
         Variant::Outlined => {
             let (bg, fg) = match state {
-                ControlState::Disabled => {
-                    (Color::TRANSPARENT, layer_on(surface, s.on_surface, 0.38))
-                }
+                ControlState::Disabled => (Color::TRANSPARENT, disabled_ink(surface)),
                 ControlState::Hovered | ControlState::Focused => {
                     (layer_on(surface, s.primary, 0.08), s.primary)
                 }
@@ -829,6 +836,14 @@ mod tests {
             assert!(
                 (ink - fill).abs() > 0.15,
                 "{v:?}: disabled ink vanishes on its fill"
+            );
+        }
+        for v in [Variant::Ghost, Variant::Outlined] {
+            let st = button_style(tok, v)(&theme, button::Status::Disabled);
+            let ink = relative_luma(st.text_color);
+            assert!(
+                (ink - canvas).abs() > 0.15,
+                "{v:?}: disabled ink vanishes on dark canvas"
             );
         }
     }

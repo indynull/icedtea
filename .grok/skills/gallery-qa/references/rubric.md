@@ -15,7 +15,7 @@ one primary class per defect. Severity first, then taste.
 | Tag | Meaning | Ship bar |
 |-----|---------|----------|
 | **ok** | Intentional hierarchy, honest demo, states clear | Allowed |
-| **ugly** | Usable but weak contrast, density, alignment, or chrome | Full cut: fix or residual |
+| **ugly** | Usable but weak contrast, density, alignment, or chrome | Full cut: fix. Residual only if the fix is unclear |
 | **broken** | Wrong, empty, dead, bleed, cross-talk, unreadable, first-paint fail | Must fix |
 
 Industry design-QA and usability heuristics (consistency, status,

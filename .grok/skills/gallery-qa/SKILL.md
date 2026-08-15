@@ -41,8 +41,9 @@ Shots land under `tmp/gallery-qa/<timestamp>/` (or `--out DIR`).
    `src/`. Packing, seeds, job copy, page group → gallery. Never hide a
    library bug by shrinking the demo.
 3. **Severity order.** Fix every **broken** before batching **ugly**.
-   Cap **3** fix→recapture cycles per defect; then residual only if truly
-   blocked (need human pointer, other host).
+   Cap **3** fix→recapture cycles per defect. Residual only when the
+   fix is genuinely unclear (need a human pointer, other host). A
+   known packing, contrast, or clip fix is not residual.
 4. **Inject ≠ pointer.** Inject proves `update`. Scroll clip, slider
    drag, menu/flyout need live pass or a real unit/layout test.
 5. **Prove what you claim.** Xephyr ≠ macOS type. Do not call a font
@@ -58,8 +59,8 @@ Shots land under `tmp/gallery-qa/<timestamp>/` (or `--out DIR`).
 4. Full cut / pre-release: also run the **live pass**
    (`references/manual-pass.md`) on collections, overlays, and pages
    you touched. Fix as you go.
-5. When no broken remains and uglies are fixed or explicitly residual:
-   `just check` (or targeted tests + full check before release claim).
+5. When no broken remains and every known ugly is fixed: `just check`
+   (or targeted tests + full check before release claim).
 6. Recapture the published tour (`just gallery-gif`) after a gallery
    layout, nav-clip, or public-chrome change. Score **that file**
    (sticky Search at scrolled sidebar beats), not only `tmp/gallery-qa/`
@@ -74,7 +75,7 @@ only if pointer classes apply.
 
 | Bar | Meaning |
 |-----|---------|
-| **Ready** | No broken on shipped constructors/demos; uglies fixed or listed residual with reason; checks green |
+| **Ready** | No broken on shipped constructors/demos; known uglies fixed; residual only if the fix is unclear; checks green |
 | **Not ready** | Any broken left, or pointer/platform residual on paths you changed without a pass |
 
 Chat the human a **short** status: what you fixed, what residual remains

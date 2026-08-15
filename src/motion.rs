@@ -278,6 +278,13 @@ struct OverlayLayer<'a, Message> {
     reduced: bool,
 }
 
+impl<Message> OverlayLayer<'_, Message> {
+    fn slide_delta(&self) -> iced::Vector {
+        let t = visual(self.progress, self.reduced);
+        self.slide.delta(1.0 - t)
+    }
+}
+
 impl<'a, Message> Widget<Message, iced::Theme, iced::Renderer> for OverlayLayer<'a, Message> {
     fn children(&self) -> Vec<Tree> {
         vec![Tree::new(&self.content)]
@@ -324,6 +331,8 @@ impl<'a, Message> Widget<Message, iced::Theme, iced::Renderer> for OverlayLayer<
         if t <= 0.0 {
             return;
         }
+        // Draw translates by `slide_delta`; hit-test must match.
+        let cursor = cursor - self.slide_delta();
         self.content.as_widget_mut().update(
             &mut tree.children[0],
             event,
@@ -350,7 +359,7 @@ impl<'a, Message> Widget<Message, iced::Theme, iced::Renderer> for OverlayLayer<
         self.content.as_widget().mouse_interaction(
             &tree.children[0],
             layout.children().next().unwrap(),
-            cursor,
+            cursor - self.slide_delta(),
             viewport,
             renderer,
         )
@@ -797,6 +806,133 @@ mod tests {
         let mut clipped: Element<'_, ()> =
             expand(body(), 1.0, 0.0, tok, A11y::new("full", Role::Group));
         drive(&mut clipped, far);
+    }
+
+    #[test]
+    fn overlay_press_hits_the_slid_child() {
+        use crate::variant::Variant;
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Event, Font, Pixels, Point, Size};
+        let tok = named("dark").tokens;
+        let face = widget::themed_button(
+            "Copy",
+            Some(()),
+            tok,
+            Variant::Ghost,
+            crate::icon::Icons::NONE,
+            A11y::button("Copy"),
+        );
+        let progress = 0.5;
+        let mut el: Element<'_, ()> = overlay(
+            face,
+            progress,
+            Slide::Up,
+            tok,
+            A11y::new("menu", Role::Group),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(320.0, 240.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let delta = Slide::Up.delta(1.0 - visual(progress, false));
+        let at = Point::new(24.0, 12.0) + delta;
+        let viewport = iced::Rectangle::new(Point::ORIGIN, Size::new(320.0, 240.0));
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(at),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(at),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert_eq!(messages, vec![()]);
+    }
+
+    #[test]
+    fn overlay_spacer_press_is_not_captured() {
+        use crate::variant::Variant;
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::widget::{column, row, Space};
+        use iced::{Event, Font, Pixels, Point, Size};
+        let tok = named("dark").tokens;
+        let face = widget::themed_button(
+            "Copy",
+            Some(()),
+            tok,
+            Variant::Ghost,
+            crate::icon::Icons::NONE,
+            A11y::button("Copy"),
+        );
+        let placed = column![
+            Space::new().height(Length::Fixed(80.0)),
+            row![Space::new().width(Length::Fixed(80.0)), face],
+        ];
+        let mut el: Element<'_, ()> = overlay(
+            placed.into(),
+            1.0,
+            Slide::Up,
+            tok,
+            A11y::new("place", Role::Group),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(320.0, 240.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let viewport = iced::Rectangle::new(Point::ORIGIN, Size::new(320.0, 240.0));
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        let captured;
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(Point::new(8.0, 8.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+            captured = shell.is_event_captured();
+        }
+        assert!(
+            !captured,
+            "a press on the placement spacer must reach the dismiss surface"
+        );
+        assert!(messages.is_empty(), "spacer press must not run the row");
     }
 
     #[test]
