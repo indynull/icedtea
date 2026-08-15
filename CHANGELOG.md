@@ -6,6 +6,7 @@
 
 - README and Install use `cargo add icedtea`. The crates.io badge is
   the crate version.
+- README shows a Codecov coverage badge.
 
 ## 0.8.0 — 2026-08-14
 

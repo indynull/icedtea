@@ -34,7 +34,7 @@ just book-stills    # recapture book/src/images/ constructor stills
 | `TODO.md` | Remaining work |
 | `assets/icons/` | Chrome SVGs |
 | `.github/workflows/ci.yml` | Linux lint and docs; tests with coverage on Linux, macOS, Windows |
-| `.github/workflows/publish.yml` | Tag `vX.Y.Z` publishes `icedtea` to crates.io |
+| `.github/workflows/publish.yml` | Tag `vX.Y.Z` publishes `icedtea` to crates.io and opens a GitHub release from that version's changelog |
 | `.github/workflows/book.yml` | `mdbook build`; deploys the guide on `master` |
 
 Workspace members: `icedtea`, `icedtea-gallery`.
@@ -281,7 +281,9 @@ exact command and result you ran.
   `cargo test --workspace --all-features`. A new push cancels the
   previous run on the same branch or pull request. Tag `vX.Y.Z`
   (matching `Cargo.toml` `version`) publishes `icedtea` to crates.io
-  via `.github/workflows/publish.yml` (`cargo publish --locked`).
+  via `.github/workflows/publish.yml` (`cargo publish --locked`) and
+  opens a GitHub release whose body is that version's changelog
+  section (`scripts/changelog_section.py`).
   This environment proves Linux; do not invent green results for the
   others.
 - Lint and format before commit or handoff (`just lint` or package

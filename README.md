@@ -4,6 +4,7 @@
 [![Crates.io](https://img.shields.io/crates/v/icedtea.svg)][crates-io]
 [![License](https://img.shields.io/crates/l/icedtea)][license]
 [![check](https://github.com/indynull/icedtea/actions/workflows/ci.yml/badge.svg)][actions]
+[![Coverage](https://codecov.io/gh/indynull/icedtea/graph/badge.svg)][codecov]
 
 Native desktop widgets and chrome for [iced](https://iced.rs/).
 Built on [Material Design 3](https://m3.material.io/get-started)
@@ -52,3 +53,4 @@ Xcode command-line tools. Windows needs the MSVC build tools.
 [crates-io]: https://crates.io/crates/icedtea
 [license]: https://github.com/indynull/icedtea/blob/master/LICENSE
 [actions]: https://github.com/indynull/icedtea/actions
+[codecov]: https://app.codecov.io/gh/indynull/icedtea
