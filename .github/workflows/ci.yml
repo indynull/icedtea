@@ -129,7 +129,24 @@ jobs:
       # Leave target/llvm-cov-target so rust-cache can reuse it. Local
       # `just cov` still deletes the tree after a passing report.
       - name: Line coverage
-        run: cargo llvm-cov --locked --package icedtea --all-features --fail-under-lines 99 --ignore-filename-regex 'src[/\\]host'
+        run: cargo llvm-cov --locked --package icedtea --all-features --ignore-filename-regex 'src[/\\]host' --lcov --output-path lcov.info
+      - name: HTML report
+        if: always()
+        run: cargo llvm-cov report --ignore-filename-regex 'src[/\\]host' --html --output-dir coverage-html
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-html
+          path: coverage-html
+          if-no-files-found: error
+      - uses: codecov/codecov-action@v5
+        if: always()
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.info
+          fail_ci_if_error: false
+      - name: Fail under 99
+        run: cargo llvm-cov report --ignore-filename-regex 'src[/\\]host' --fail-under-lines 99
 
   # Upcoming compilers. Tests only; rustfmt/clippy stay on the 1.89 pin.
   rustc:

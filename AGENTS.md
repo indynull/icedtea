@@ -215,7 +215,9 @@ Rejected alternatives live once under Non-goals below. Do not add a
 Only `just cov` and the coverage job set `CARGO_INCREMENTAL=0`
 (llvm-cov uses `target/llvm-cov-target`). After a passing local
 `just cov`, delete `target/llvm-cov-target` (and `target/llvm-cov`).
-The coverage job leaves that tree so rust-cache can reuse it. Local
+The coverage job leaves that tree so rust-cache can reuse it, writes
+`lcov.info` plus an HTML report (artifact `coverage-html`), and uploads
+the lcov file to Codecov (`CODECOV_TOKEN`). Local
 `just test` / `just clippy` / `just doc` keep the debug incremental
 graph. `just clean` is `cargo clean`. Recipes: `just lint`,
 `just fmt-check`, `just clippy`, `just test`, `just doc`, `just cov`.
@@ -268,7 +270,8 @@ exact command and result you ran.
 - Continuous integration (`.github/workflows/ci.yml`) runs lint, docs,
   and coverage on Ubuntu at Rust 1.89, and `cargo test --workspace
   --all-features` on Linux, macOS, and Windows at 1.89 plus Ubuntu
-  `stable` and `beta`. Coverage is Ubuntu-only. A new push cancels the
+  `stable` and `beta`. Coverage is Ubuntu-only and publishes an HTML
+  artifact plus a Codecov upload. A new push cancels the
   previous run on the same branch or pull request. Tag `vX.Y.Z`
   (matching `Cargo.toml` `version`) publishes `icedtea` to crates.io
   via `.github/workflows/publish.yml` (`cargo publish --locked`).
