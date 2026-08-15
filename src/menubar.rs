@@ -1012,6 +1012,29 @@ mod tests {
                 &mut tree,
                 &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
                 layout,
+                away,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(Widget::<u8, Theme, iced_tiny_skia::Renderer>::overlay(
+            &mut widget,
+            &mut tree,
+            layout,
+            &renderer,
+            &viewport,
+            Vector::ZERO,
+        )
+        .is_none());
+        {
+            let mut shell = Shell::new(&mut messages);
+            Widget::<u8, Theme, iced_tiny_skia::Renderer>::update(
+                &mut widget,
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
                 over,
                 &renderer,
                 &mut clipboard,
@@ -1112,6 +1135,18 @@ mod tests {
                 &mut shell,
                 &viewport,
             );
+        }
+        assert!(Widget::<u8, Theme, iced_tiny_skia::Renderer>::overlay(
+            &mut widget,
+            &mut tree,
+            layout,
+            &renderer,
+            &viewport,
+            Vector::ZERO,
+        )
+        .is_none());
+        {
+            let mut shell = Shell::new(&mut messages);
             Widget::<u8, Theme, iced_tiny_skia::Renderer>::update(
                 &mut widget,
                 &mut tree,

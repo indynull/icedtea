@@ -798,4 +798,41 @@ mod tests {
             expand(body(), 1.0, 0.0, tok, A11y::new("full", Role::Group));
         drive(&mut clipped, far);
     }
+
+    #[test]
+    fn expand_draw_returns_when_viewport_misses() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::renderer::Style;
+        use iced::advanced::widget::{Tree, Widget};
+        use iced::{Font, Pixels, Point, Size, Theme};
+
+        let tok = named("dark").tokens;
+        let body = widget::label("more", tok, A11y::new("more", Role::Status));
+        let mut layer = ExpandLayer {
+            content: body,
+            progress: 1.0,
+            peek: 0.0,
+            reduced: false,
+        };
+        let mut tree = Tree::new(&layer as &dyn Widget<(), Theme, iced::Renderer>);
+        let mut renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(320.0, 240.0));
+        let node =
+            Widget::<(), Theme, iced::Renderer>::layout(&mut layer, &mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let miss = Rectangle::new(Point::new(800.0, 800.0), Size::new(10.0, 10.0));
+        Widget::<(), Theme, iced::Renderer>::draw(
+            &layer,
+            &tree,
+            &mut renderer,
+            &Theme::Dark,
+            &Style::default(),
+            layout,
+            mouse::Cursor::Unavailable,
+            &miss,
+        );
+    }
 }

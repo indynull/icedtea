@@ -33,7 +33,7 @@ just book-stills    # recapture book/src/images/ constructor stills
 | `book/` | Guide (mdBook). Published from `master` to GitHub Pages |
 | `TODO.md` | Remaining work |
 | `assets/icons/` | Chrome SVGs |
-| `.github/workflows/ci.yml` | Linux lint, docs, coverage; tests on Linux, macOS, Windows |
+| `.github/workflows/ci.yml` | Linux lint and docs; tests with coverage on Linux, macOS, Windows |
 | `.github/workflows/publish.yml` | Tag `vX.Y.Z` publishes `icedtea` to crates.io |
 | `.github/workflows/book.yml` | `mdbook build`; deploys the guide on `master` |
 
@@ -110,8 +110,8 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   `select` module rustdoc. Gallery demos only public constructors.
 - Always recapture handbook stills with `just book-stills` in the same change when the painted constructor or chrome in a published still changes. Never hand-edit those PNGs or generate them.
 - Always drop `target/llvm-cov-target` after a passing local coverage
-  run. `just clean` is `cargo clean`. Only `just cov` and the coverage
-  job set `CARGO_INCREMENTAL=0`. Targeted `cargo test` /
+  run. `just clean` is `cargo clean`. Only `just cov` and the test jobs
+  set `CARGO_INCREMENTAL=0`. Targeted `cargo test` /
   `cargo check` / `just test` leave incremental on.
 - Never prefix a targeted cargo command with `CARGO_INCREMENTAL=0`.
   That rebuilds iced and the workspace on every turn.
@@ -120,8 +120,10 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   or Do pointing at finished work. Never park or discard a job because
   no application has asked for it.
 - Coverage fail-under is 100 on lcov/Codecov source-line hits
-  (`scripts/lcov-fail-under.py`). Do not use `llvm-cov --fail-under-lines`
-  (macro expansions).
+  (`codecov.yml` project and patch target). Do not use
+  `llvm-cov --fail-under-lines` (macro expansions). Never rewrite
+  production so a coverage counter stops flagging a line. Cover the
+  real path or leave the miss.
 - `catalog::ENTRIES` is the gallery checklist. Adding an export means
   adding an entry, a constructor rustdoc example, the catalog test
   map row, and a gallery page in the same change. Related atoms share
@@ -210,19 +212,22 @@ Rejected alternatives live once under Non-goals below. Do not add a
 ## Check and coverage
 
 `just check` is the **public** local handoff: `just lint` (`cargo fmt
---all -- --check`, clippy workspace `-D warnings`), `just test`,
-`just doc`, `just cov` (`cargo llvm-cov` on `icedtea` with
-`--ignore-filename-regex 'src[/\\]host'`, then
-`scripts/lcov-fail-under.py` at 100).
-Only `just cov` and the coverage job set `CARGO_INCREMENTAL=0`
+--all -- --check`, clippy workspace `-D warnings`), `just doc`,
+`just cov` (`cargo llvm-cov --workspace` with
+`--ignore-filename-regex 'src[/\\]host'`). That is the one test run
+on the handoff path. `just test` is incremental `cargo test` for
+iteration.
+Only `just cov` and the test jobs set `CARGO_INCREMENTAL=0`
 (llvm-cov uses `target/llvm-cov-target`). After a passing local
 `just cov`, delete `target/llvm-cov-target` (and `target/llvm-cov`).
-The coverage job leaves that tree so rust-cache can reuse it, writes
-`lcov.info` plus an HTML report (artifact `coverage-html`), and uploads
-the lcov file to Codecov (`CODECOV_TOKEN`). Local
-`just test` / `just clippy` / `just doc` keep the debug incremental
-graph. `just clean` is `cargo clean`. Recipes: `just lint`,
-`just fmt-check`, `just clippy`, `just test`, `just doc`, `just cov`.
+The test jobs leave that tree so rust-cache can reuse it, write
+`lcov.info`, upload it to Codecov (`CODECOV_TOKEN`), and keep an HTML
+report on Linux (artifact `coverage-html`). Fail-under is
+`codecov.yml` (project and patch target 100 after the three host
+uploads). Local `just test` / `just clippy` / `just doc` keep the
+debug incremental graph. `just clean` is `cargo clean`. Recipes:
+`just lint`, `just fmt-check`, `just clippy`, `just test`, `just doc`,
+`just cov`.
 
 **Agent verification (default: targeted, not full `just check`)**
 
@@ -250,8 +255,8 @@ exact command and result you ran.
   convenience.
 - Fail-under is 100 on lcov/Codecov source-line hits (a `DA` record
   with count 0). That is the HTML uncovered set, not llvm-cov's
-  macro-mapped misses. Exercise every real branch; do not add
-  ignore prefixes.
+  macro-mapped misses. Gate is `codecov.yml`. Exercise every real
+  branch; do not add ignore prefixes.
 - Tests are named after production behavior, never leftover line counts
   or coverage percentages. Drive shipped entry points. No `*_for_test`
   library hooks, no `#[cfg(test)]` library paths.
@@ -269,11 +274,11 @@ exact command and result you ran.
   record. Do not hand-edit those GIF files. Read the stills, not the
   animation. `ICEDTEA_GALLERY_ISOLATED=0` records on the current display
   and must float a tiled window first.
-- Continuous integration (`.github/workflows/ci.yml`) runs lint, docs,
-  and coverage on Ubuntu at Rust 1.89, and `cargo test --workspace
-  --all-features` on Linux, macOS, and Windows at 1.89 plus Ubuntu
-  `stable` and `beta`. Coverage is Ubuntu-only and publishes an HTML
-  artifact plus a Codecov upload. A new push cancels the
+- Continuous integration (`.github/workflows/ci.yml`) runs lint and
+  docs on Ubuntu at Rust 1.89. The test job on Linux, macOS, and
+  Windows at 1.89 is `cargo llvm-cov --workspace --all-features` and
+  uploads lcov to Codecov. Ubuntu `stable` and `beta` run
+  `cargo test --workspace --all-features`. A new push cancels the
   previous run on the same branch or pull request. Tag `vX.Y.Z`
   (matching `Cargo.toml` `version`) publishes `icedtea` to crates.io
   via `.github/workflows/publish.yml` (`cargo publish --locked`).

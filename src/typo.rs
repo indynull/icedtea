@@ -411,6 +411,16 @@ mod tests {
     }
 
     #[test]
+    fn bold_alias_counts_toward_ui_family() {
+        let faces = vec![
+            cover_alias("System Font", ".SF NS", false, 400),
+            cover_alias("System Font", ".SF NS", false, 700),
+        ];
+        let name = select_family(&faces, FamilyKind::Ui, &[".SF NS".into()], "other");
+        assert_eq!(name, "System Font");
+    }
+
+    #[test]
     fn last_resort_keeps_current_when_nothing_usable() {
         let faces = vec![cover("Thin", false, 400)];
         let name = select_family(&faces, FamilyKind::Ui, &[], "Thin");

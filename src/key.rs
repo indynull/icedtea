@@ -592,6 +592,11 @@ mod tests {
         );
         let f24 = press(Key::Named(Named::F24), Modifiers::empty());
         assert_eq!(handle(chrome, &table, &f24), Some(5));
+        table.insert(
+            Action::new("focus.next", "Next", 6u8).with_shortcut(Shortcut::parse("tab").unwrap()),
+        );
+        let tab = press(Key::Named(Named::Tab), Modifiers::empty());
+        assert_eq!(handle(chrome, &table, &tab), None);
     }
 
     #[test]

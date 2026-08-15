@@ -175,6 +175,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn primary_is_the_host_accelerator() {
+        if cfg!(target_os = "macos") {
+            assert_eq!(primary(), Modifiers::LOGO);
+        } else {
+            assert_eq!(primary(), Modifiers::CTRL);
+        }
+    }
+
+    #[test]
     fn parse_and_match_common_chords() {
         let s = Shortcut::parse("ctrl+s").unwrap();
         assert!(s.matches(primary(), &Key::Character("s".into())));

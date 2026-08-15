@@ -63,8 +63,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 40
     env:
+      CARGO_INCREMENTAL: "0"
       CARGO_PROFILE_DEV_DEBUG: "0"
       CARGO_PROFILE_TEST_DEBUG: "0"
     steps:
@@ -72,17 +73,40 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.89
+          components: llvm-tools-preview
       - uses: Swatinem/rust-cache@v2
         with:
-          key: test-${{ runner.os }}
+          key: test-cov-${{ runner.os }}
           cache-on-failure: true
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
       - name: Linux graphics libraries
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev lld
       - name: Faster linker
         if: runner.os == 'Linux'
         run: echo "RUSTFLAGS=-C link-arg=-fuse-ld=lld" >> "$GITHUB_ENV"
-      - run: cargo test --locked --workspace --all-features
+      # Leave target/llvm-cov-target so rust-cache can reuse it. Local
+      # `just cov` still deletes the tree after a passing report.
+      - name: Tests and coverage
+        run: cargo llvm-cov --locked --workspace --all-features --ignore-filename-regex 'src[/\\]host' --lcov --output-path lcov.info
+      - name: HTML report
+        if: runner.os == 'Linux' && always()
+        run: cargo llvm-cov report --ignore-filename-regex 'src[/\\]host' --html --output-dir coverage-html
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux' && always()
+        with:
+          name: coverage-html
+          path: coverage-html
+          if-no-files-found: error
+      - uses: codecov/codecov-action@v5
+        if: always()
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.info
+          flags: ${{ runner.os }}
+          fail_ci_if_error: true
 
   doc:
     runs-on: ubuntu-latest
@@ -103,50 +127,6 @@ jobs:
       - name: Faster linker
         run: echo "RUSTFLAGS=-C link-arg=-fuse-ld=lld" >> "$GITHUB_ENV"
       - run: cargo doc --locked --package icedtea --no-deps --document-private-items
-
-  cov:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      CARGO_INCREMENTAL: "0"
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: 1.89
-          components: llvm-tools-preview
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: cov
-          cache-on-failure: true
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-llvm-cov
-      - name: Linux graphics libraries
-        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libwayland-dev lld
-      - name: Faster linker
-        run: echo "RUSTFLAGS=-C link-arg=-fuse-ld=lld" >> "$GITHUB_ENV"
-      # Leave target/llvm-cov-target so rust-cache can reuse it. Local
-      # `just cov` still deletes the tree after a passing report.
-      - name: Line coverage
-        run: cargo llvm-cov --locked --package icedtea --all-features --ignore-filename-regex 'src[/\\]host' --lcov --output-path lcov.info
-      - name: HTML report
-        if: always()
-        run: cargo llvm-cov report --ignore-filename-regex 'src[/\\]host' --html --output-dir coverage-html
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage-html
-          path: coverage-html
-          if-no-files-found: error
-      - uses: codecov/codecov-action@v5
-        if: always()
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: lcov.info
-          fail_ci_if_error: true
-      - name: Fail under 100
-        run: python3 scripts/lcov-fail-under.py lcov.info
 
   # Upcoming compilers. Tests only; rustfmt/clippy stay on the 1.89 pin.
   rustc:

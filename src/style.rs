@@ -950,9 +950,16 @@ mod tests {
         let _ = dim_backdrop(tok);
         let _ = dialog_sheet_face(tok);
         let faded = fade_face(dialog_sheet_face(tok), 0.5);
-        if let Some(Background::Color(c)) = faded.background {
-            assert!((c.a - 0.5).abs() < 1e-5);
-        }
+        let blank = fade_face(container::Style::default(), 0.5);
+        let alphas: Vec<f32> = [faded, blank]
+            .into_iter()
+            .filter_map(|face| match face.background {
+                Some(Background::Color(c)) => Some(c.a),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(alphas.len(), 1);
+        assert!((alphas[0] - 0.5).abs() < 1e-5);
         let _ = app_bar(tok);
         let _ = nav_rail(tok, true);
         let _ = nav_rail(tok, false);
