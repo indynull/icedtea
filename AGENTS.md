@@ -119,8 +119,9 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   into Do / Consider / discard in the same change. Never leave Order
   or Do pointing at finished work. Never park or discard a job because
   no application has asked for it.
-- Coverage fail-under is 99 on `just check` (llvm-cov const/macro
-  mapping). Never claim 100 while the tool reports less.
+- Coverage fail-under is 100 on lcov/Codecov source-line hits
+  (`scripts/lcov-fail-under.py`). Do not use `llvm-cov --fail-under-lines`
+  (macro expansions).
 - `catalog::ENTRIES` is the gallery checklist. Adding an export means
   adding an entry, a constructor rustdoc example, the catalog test
   map row, and a gallery page in the same change. Related atoms share
@@ -211,7 +212,8 @@ Rejected alternatives live once under Non-goals below. Do not add a
 `just check` is the **public** local handoff: `just lint` (`cargo fmt
 --all -- --check`, clippy workspace `-D warnings`), `just test`,
 `just doc`, `just cov` (`cargo llvm-cov` on `icedtea` with
-`--fail-under-lines 99 --ignore-filename-regex 'src[/\\]host'`).
+`--ignore-filename-regex 'src[/\\]host'`, then
+`scripts/lcov-fail-under.py` at 100).
 Only `just cov` and the coverage job set `CARGO_INCREMENTAL=0`
 (llvm-cov uses `target/llvm-cov-target`). After a passing local
 `just cov`, delete `target/llvm-cov-target` (and `target/llvm-cov`).
@@ -246,10 +248,10 @@ exact command and result you ran.
   clipboard tasks), `src/host_canvas.rs` (iced canvas stroke), and
   other `src/host*` host readers. Do not grow that prefix for
   convenience.
-- Fail-under is 99: `llvm-cov` still counts some macro-mapped lines
-  as missed while the HTML report shows 0 uncovered. Do not claim
-  100 while the tool prints less. Exercise every real branch; do
-  not add ignore prefixes.
+- Fail-under is 100 on lcov/Codecov source-line hits (a `DA` record
+  with count 0). That is the HTML uncovered set, not llvm-cov's
+  macro-mapped misses. Exercise every real branch; do not add
+  ignore prefixes.
 - Tests are named after production behavior, never leftover line counts
   or coverage percentages. Drive shipped entry points. No `*_for_test`
   library hooks, no `#[cfg(test)]` library paths.

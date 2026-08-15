@@ -144,9 +144,9 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: lcov.info
-          fail_ci_if_error: false
-      - name: Fail under 99
-        run: cargo llvm-cov report --ignore-filename-regex 'src[/\\]host' --fail-under-lines 99
+          fail_ci_if_error: true
+      - name: Fail under 100
+        run: python3 scripts/lcov-fail-under.py lcov.info
 
   # Upcoming compilers. Tests only; rustfmt/clippy stay on the 1.89 pin.
   rustc:

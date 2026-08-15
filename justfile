@@ -25,9 +25,11 @@ doc:
 # Isolated coverage tree. Incremental off only here so rustc flags do not
 # poison target/debug. Delete the tree after a passing local report.
 # The coverage job leaves the tree so rust-cache can reuse it.
+# Fail-under is lcov/Codecov source-line hits (100), not llvm-cov macros.
 cov:
-    CARGO_INCREMENTAL=0 cargo llvm-cov --package icedtea --all-features --fail-under-lines 99 --ignore-filename-regex 'src[/\\]host'
-    rm -rf target/llvm-cov-target target/llvm-cov
+    CARGO_INCREMENTAL=0 cargo llvm-cov --package icedtea --all-features --ignore-filename-regex 'src[/\\]host' --lcov --output-path target/lcov.info
+    python3 scripts/lcov-fail-under.py target/lcov.info
+    rm -rf target/llvm-cov-target target/llvm-cov target/lcov.info
 
 check: lint test doc cov
 
