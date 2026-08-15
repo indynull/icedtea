@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.8.0 — 2026-08-14
+
 ### Theme
 
 - `m3::DurationStep` and `m3::Ease` are the Material motion tokens.
