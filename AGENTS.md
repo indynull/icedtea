@@ -410,7 +410,9 @@ Conventional Commits prefixes, scopes, or emoji. Strong verb + specific
 what (`Add`, `Fix`, `Remove`, `Update`, `Ensure`). ~50–72 characters; no
 trailing period. Body only when the why is not obvious (blank line, then
 why). One logical change per commit. Changelog line when cutting a
-version: `Update changelog for X.Y.Z`. No AI attribution footers.
+version: `Update changelog for X.Y.Z`. That commit also bumps the
+README and Install `icedtea =` pin and the iced compatibility table.
+No AI attribution footers.
 
 Good: `Fix sash drag using window-space pointer events`
 
@@ -461,7 +463,9 @@ tables or essays in discussion notes.
   `catalog` tests, a gallery page if it is a widget or pattern, and
   the matching book page (or a short glue paragraph) in the same
   change. Update README install or the first-window example when that
-  path changes. Documentation is part of the change, not a follow-up.
+  path changes. A version cut updates the README and Install
+  `icedtea =` pin and the iced compatibility table in the same
+  changelog commit. Documentation is part of the change, not a follow-up.
 - `CHANGELOG.md` describes the crate for a version. Fold work into
   the Unreleased section until that version is tagged. Group related
   items under topic subheadings; each item is a bullet.

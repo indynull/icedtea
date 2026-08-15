@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Guide
+
+- README and Install pin `icedtea` at `0.8`.
+
 ## 0.8.0 — 2026-08-14
 
 ### Theme

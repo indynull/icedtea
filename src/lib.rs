@@ -345,7 +345,10 @@ mod tests {
             let at = src
                 .find("icedtea =")
                 .expect("install story names the crate");
-            assert!(src[at..].starts_with("icedtea = \"0.6\""));
+            let ver = env!("CARGO_PKG_VERSION");
+            let minor = ver.rsplit_once('.').map(|(a, _)| a).unwrap_or(ver);
+            let pin = format!("icedtea = \"{minor}\"");
+            assert!(src[at..].starts_with(&pin), "install pin should be {pin}");
         }
         assert!(arch.contains("Action"));
         assert!(arch.contains("Tokens"));
