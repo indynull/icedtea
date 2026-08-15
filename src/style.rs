@@ -147,7 +147,7 @@ pub fn dim_backdrop_at(tok: Tokens, progress: f32) -> container::Style {
             scrim.r,
             scrim.g,
             scrim.b,
-            0.32 * t,
+            0.50 * t,
         ))),
         snap: false,
         ..container::Style::default()
@@ -805,6 +805,35 @@ mod tests {
     }
 
     #[test]
+    fn disabled_filled_button_ink_reads_on_dark() {
+        use crate::m3::color::relative_luma;
+        let tok = named("dark").tokens;
+        let theme = crate::theme::iced_theme("dark", tok);
+        let canvas = relative_luma(tok.scheme().surface);
+        for v in [
+            Variant::Primary,
+            Variant::Danger,
+            Variant::Success,
+            Variant::Warning,
+        ] {
+            let st = button_style(tok, v)(&theme, button::Status::Disabled);
+            let ink = relative_luma(st.text_color);
+            let fill = match st.background {
+                Some(Background::Color(c)) => relative_luma(c),
+                other => panic!("{v:?}: filled disabled needs a color fill, got {other:?}"),
+            };
+            assert!(
+                (ink - canvas).abs() > 0.15,
+                "{v:?}: disabled ink vanishes on dark canvas"
+            );
+            assert!(
+                (ink - fill).abs() > 0.15,
+                "{v:?}: disabled ink vanishes on its fill"
+            );
+        }
+    }
+
+    #[test]
     fn list_row_selected_is_secondary_container() {
         let tok = named("dark").tokens;
         let s = tok.scheme();
@@ -935,6 +964,17 @@ mod tests {
     }
 
     #[test]
+    fn dim_backdrop_at_rest_reads_on_dark() {
+        let tok = named("dark").tokens;
+        match dim_backdrop(tok).background {
+            Some(Background::Color(c)) => {
+                assert!(c.a >= 0.45, "rest dim must read on dark surface-container");
+            }
+            other => panic!("dim backdrop needs a color fill, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn styles_cover_states_and_variants() {
         let tok = named("dark").tokens;
         let theme = crate::theme::iced_theme("dark", tok);
@@ -947,7 +987,13 @@ mod tests {
         let _ = panel(tok);
         let _ = footer(tok);
         let _ = hairline(tok);
-        let _ = dim_backdrop(tok);
+        let dim = dim_backdrop(tok);
+        match dim.background {
+            Some(Background::Color(c)) => {
+                assert!(c.a >= 0.45, "rest dim must read on dark surface-container");
+            }
+            other => panic!("dim backdrop needs a color fill, got {other:?}"),
+        }
         let _ = dialog_sheet_face(tok);
         let faded = fade_face(dialog_sheet_face(tok), 0.5);
         let blank = fade_face(container::Style::default(), 0.5);

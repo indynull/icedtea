@@ -168,7 +168,21 @@ pub fn face(
 ) -> (Color, Color) {
     use super::state::ControlState;
     match state {
-        ControlState::Disabled => (layer_on(surface, on, 0.12), layer_on(surface, on, 0.38)),
+        // Filled pairs use on-primary / on-error (dark ink on a bright
+        // fill). Layering that ink on the canvas is a near-black brick
+        // on dark. Disabled uses muted on-surface: light on dark canvas,
+        // dark on light.
+        ControlState::Disabled => {
+            let ink = if relative_luma(surface) < 0.5 {
+                Color::WHITE
+            } else {
+                Color::BLACK
+            };
+            // 0.12 / 0.38 is the M3 mute, but 0.38 on 0.12 is muddy on
+            // dark surface-container. Stronger fill and ink keep the
+            // label readable on the brick, not only on the canvas.
+            (layer_on(surface, ink, 0.22), layer_on(surface, ink, 0.68))
+        }
         ControlState::Hovered => (layer_on(base, on, 0.08), on),
         ControlState::Focused => (layer_on(base, on, 0.10), on),
         ControlState::Pressed => (layer_on(base, on, 0.12), on),
@@ -280,6 +294,26 @@ mod tests {
         let _ = face(s.primary, s.on_primary, s.surface, ControlState::Error);
         let layered = layer_on(s.primary, s.on_primary, 0.08);
         assert_ne!(layered, s.primary);
+    }
+
+    #[test]
+    fn disabled_filled_ink_contrasts_with_canvas() {
+        use crate::m3::ControlState;
+        for name in ["dark", "light"] {
+            let s = crate::theme::named(name).tokens.scheme();
+            let (bg, fg) = face(s.primary, s.on_primary, s.surface, ControlState::Disabled);
+            let canvas = relative_luma(s.surface);
+            assert!(
+                (relative_luma(fg) - canvas).abs() > 0.15,
+                "{name}: disabled ink {fg:?} vanishes on {canvas}"
+            );
+            assert_ne!(bg, s.surface, "{name}: disabled fill equals canvas");
+            let danger = face(s.error, s.on_error, s.surface, ControlState::Disabled);
+            assert!(
+                (relative_luma(danger.1) - canvas).abs() > 0.15,
+                "{name}: disabled danger ink vanishes"
+            );
+        }
     }
 
     #[test]

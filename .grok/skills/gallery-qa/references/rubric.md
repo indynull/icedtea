@@ -82,14 +82,27 @@ the shot (not a zero-width bar).
 - Virtualized rows do not paint **over** filters, headers, or siblings
 - Soft container clip is not enough when backgrounds fill layout boxes —
   library needs a real scissor/layer for overscan
+- `themed_scroll` and any sibling scroller clip **below** sticky chrome.
+  Section titles and rows must not paint through a Search field or other
+  header that sits above the list (opaque header + scissor, not hope)
 - First useful frame shows content (empty list until scroll message = broken)
 - Sticky/frozen columns stay put; horizontal scroll does not orphan them
 - Overlays (menu, context, palette, dialog) sit above content with clear
   z-order; flyouts align to parent row and do not needlessly overlap
+- Published tour (`assets/gallery.gif`, `book/src/gallery.gif`) is a
+  ship artifact. After a layout, nav-clip, or public-chrome commit,
+  recapture it in the same change and score **the published frames**
+  (sticky header at scrolled sidebar beats). A layout-source commit
+  whose tour still shows the pre-fix paint is **broken**. Encoder
+  input is a live window grab, not a still sequence.
 
 ## 7. Interaction integrity
 
+- A shot that is byte-identical to the previous beat's file is not
+  a score for this page when the beats are different pages. Recapture.
+  Same pixels on a same-page extra beat (already-open) can be honest.
 - Inject after-shot ≠ idle in the way `expect` describes
+- Inject match is a token, not a substring of another word
 - One message must not flip unrelated widgets (**cross-talk** = broken)
 - Progress/slider/list/table have non-zero size (**Fill collapse** = broken)
 - Keyboard story where the library owns it: focus order, Escape on

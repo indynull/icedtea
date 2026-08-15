@@ -563,9 +563,17 @@ DEFAULT_INTERACT: list[dict[str, str]] = [
 ]
 
 
+def _caption_hits(caption: str, match: str) -> bool:
+    """Token match: `table:` must not fire on `Selectable:`."""
+    i = caption.find(match)
+    if i < 0:
+        return False
+    return i == 0 or not caption[i - 1].isalpha()
+
+
 def interactions_for_caption(caption: str) -> list[dict[str, str]]:
     c = caption.casefold()
-    return [x for x in DEFAULT_INTERACT if x["match"].casefold() in c]
+    return [x for x in DEFAULT_INTERACT if _caption_hits(c, x["match"].casefold())]
 
 
 def inject_script(inject_path: Path, script: str, timeout_s: float = 6.0) -> int:
@@ -1054,8 +1062,18 @@ def main() -> int:
         cleanup()
 
 
+def _self_check() -> None:
+    names = {x["name"] for x in interactions_for_caption("Selectable: drag to copy")}
+    if "table-sort" in names:
+        raise SystemExit("table: must not match Selectable:")
+    names = {x["name"] for x in interactions_for_caption("Table: frozen leading columns")}
+    if "table-sort" not in names:
+        raise SystemExit("table: must match Table:")
+
+
 if __name__ == "__main__":
     try:
+        _self_check()
         raise SystemExit(main())
     except KeyboardInterrupt:
         raise SystemExit(130)

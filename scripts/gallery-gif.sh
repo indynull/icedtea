@@ -363,6 +363,35 @@ apply_host_chrome() {
   echo "gallery-gif: host chrome face=$face"
 }
 
+# Visible frame rectangle (client plus window-manager chrome).
+frame_geom() {
+  local id="$1"
+  local x y w h map ext L rest R T B
+  read -r x y w h map <<<"$(window_geom "$id")"
+  if ! on_screen "$x" "$y" "$w" "$h"; then
+    echo "gallery-gif: window moved off-screen (${w}x${h}+${x}+${y})" >&2
+    return 1
+  fi
+  ext="$(xprop -id "$id" _NET_FRAME_EXTENTS 2>/dev/null | awk -F'= ' '{ print $2 }' | tr -d ' ')"
+  L=0
+  R=0
+  T=0
+  B=0
+  if [[ "$ext" == *,*,*,* ]]; then
+    L="${ext%%,*}"; rest="${ext#*,}"
+    R="${rest%%,*}"; rest="${rest#*,}"
+    T="${rest%%,*}"; B="${rest#*,}"
+  fi
+  fx=$((x - L))
+  fy=$((y - T))
+  fw=$((w + L + R))
+  fh=$((h + T + B))
+  if (( fx < 0 || fy < 0 || fx + fw > screen_w + 4 || fy + fh > screen_h + 4 )); then
+    echo "gallery-gif: frame ${fw}x${fh}+${fx}+${fy} is not on screen" >&2
+    return 1
+  fi
+}
+
 # import -window is the visible backing store (cropped by the tile).
 # Crop the root at the frame rectangle after the window is floating.
 capture_window() {
@@ -517,23 +546,38 @@ if [[ -z "$caption_font" ]]; then
   exit 1
 fi
 
-burn_caption() {
-  local src=$1
-  local text=$2
-  local out=$3
-  local wh w h band
-  wh="$(identify -format '%wx%h' "$src")"
-  w="${wh%x*}"
-  h="${wh#*x}"
-  band=72
-  convert "$src" \
-    -fill 'rgba(12,12,12,0.78)' -draw "rectangle 0,$((h - band)) $w,$h" \
-    -font "$caption_font" -pointsize 28 -fill white \
-    -gravity SouthWest -annotate +28+22 "$text" \
-    "$out"
+srt_stamp() {
+  python3 -c 'import sys
+s=float(sys.argv[1])
+h=int(s//3600); m=int((s%3600)//60); sec=s-h*3600-m*60
+print("%02d:%02d:%06.3f" % (h, m, sec))' "$1" | tr '.' ','
 }
 
-hold_s="$(awk "BEGIN { print $hold_ms / 1000 }")"
+frame_geom "$wid" || exit 1
+# libx264 needs even dimensions.
+if (( fw % 2 )); then fw=$((fw - 1)); fi
+if (( fh % 2 )); then fh=$((fh - 1)); fi
+disp="${DISPLAY#:}"
+echo "gallery-gif: live grab ${fw}x${fh}+${fx},${fy} on :$disp"
+
+# Continuous grab of the running window. Not a still sequence.
+ffmpeg -y -hide_banner -loglevel error \
+  -f x11grab -draw_mouse 1 -framerate 12 \
+  -video_size "${fw}x${fh}" -i "${DISPLAY}+${fx},${fy}" \
+  -c:v libx264 -preset ultrafast -pix_fmt yuv420p \
+  "$workdir/live.mkv" &
+grab_pid=$!
+sleep 0.4
+if ! kill -0 "$grab_pid" 2>/dev/null; then
+  echo "gallery-gif: ffmpeg x11grab failed to start" >&2
+  exit 1
+fi
+t0="$(date +%s.%N)"
+: >"$workdir/captions.srt"
+srt_i=0
+last_srt_t="0.000"
+last_cap=""
+
 # 0-based beats. Script seeks; gallery does not auto-advance or wrap.
 for i in $(seq 0 $((pages - 1))); do
   printf '%s\n' "$i" >"$cmdfile"
@@ -550,33 +594,65 @@ for i in $(seq 0 $((pages - 1))); do
   done
   if [[ "$ack" != "$i" ]]; then
     echo "gallery-gif: gallery did not acknowledge beat $i" >&2
+    kill "$grab_pid" 2>/dev/null || true
     exit 1
   fi
   apply_host_chrome "$wid"
+  cap="$(tr -d '\r' <"${ackfile}.caption" 2>/dev/null || true)"
+  if [[ -z "$cap" ]]; then
+    cap="Beat $i"
+  fi
+  now="$(date +%s.%N)"
+  now_s="$(awk -v a="$now" -v b="$t0" 'BEGIN { printf "%.3f", a-b }')"
+  if [[ -n "$last_cap" ]]; then
+    srt_i=$((srt_i + 1))
+    {
+      echo "$srt_i"
+      echo "$(srt_stamp "$last_srt_t") --> $(srt_stamp "$now_s")"
+      echo "$last_cap"
+      echo
+    } >>"$workdir/captions.srt"
+  fi
+  last_srt_t="$now_s"
+  last_cap="$cap"
   hold_file="${ackfile}.hold"
   hold_beat=""
   if [[ -f "$hold_file" ]]; then
     hold_beat="$(tr -d '[:space:]' <"$hold_file")"
   fi
   if [[ "$hold_beat" =~ ^[1-9][0-9]*$ ]]; then
-    sleep "$(awk "BEGIN { print $hold_beat / 1000 }")"
+    sleep "$(awk "BEGIN { print ($hold_beat / 1000) + 0.85 }")"
   elif [[ -f "${ackfile}.face" ]] && [[ "$(tr -d '[:space:]' <"${ackfile}.face")" == "light" ]]; then
-    sleep 1.0
+    sleep 1.2
   else
-    sleep 0.35
+    sleep 0.95
   fi
-  capture_window "$wid" "$workdir/raw-$((i + 1)).png"
-  png_ok "$workdir/raw-$((i + 1)).png"
-  cap="$(tr -d '\r' <"${ackfile}.caption" 2>/dev/null || true)"
-  if [[ -z "$cap" ]]; then
-    cap="Beat $i"
-  fi
-  burn_caption "$workdir/raw-$((i + 1)).png" "$cap" "$workdir/$((i + 1)).png"
 done
+now="$(date +%s.%N)"
+now_s="$(awk -v a="$now" -v b="$t0" 'BEGIN { printf "%.3f", a-b }')"
+if [[ -n "$last_cap" ]]; then
+  srt_i=$((srt_i + 1))
+  {
+    echo "$srt_i"
+    echo "$(srt_stamp "$last_srt_t") --> $(srt_stamp "$now_s")"
+    echo "$last_cap"
+    echo
+  } >>"$workdir/captions.srt"
+fi
 
+sleep 0.25
+kill -INT "$grab_pid" 2>/dev/null || true
+wait "$grab_pid" 2>/dev/null || true
+
+if [[ ! -s "$workdir/live.mkv" ]]; then
+  echo "gallery-gif: live grab is empty" >&2
+  exit 1
+fi
+
+# Encode the live grab (not %d.png stills) and burn step captions.
 ffmpeg -y -hide_banner -loglevel error \
-  -framerate "1/${hold_s}" -i "$workdir/%d.png" \
-  -vf "split[s0][s1];[s0]palettegen=max_colors=256:stats_mode=full[p];[s1][p]paletteuse=dither=sierra2_4a" \
+  -i "$workdir/live.mkv" \
+  -vf "subtitles=$workdir/captions.srt:force_style='FontName=DejaVu Sans,FontSize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=3,Outline=1,Shadow=0,MarginV=28',split[s0][s1];[s0]palettegen=max_colors=192:stats_mode=single[p];[s1][p]paletteuse=dither=sierra2_4a" \
   -loop 0 "$dest"
 cp -f "$dest" "$book"
 

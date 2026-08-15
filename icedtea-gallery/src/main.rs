@@ -182,41 +182,44 @@ fn nav_item<'a>(
     selected: bool,
     tok: Tokens,
 ) -> Element<'a, Message> {
-    button(text(title).size(icedtea::typo::BODY))
-        .padding(Padding {
-            top: 6.0,
-            right: 10.0,
-            bottom: 6.0,
-            left: 28.0,
-        })
-        .width(Length::Fill)
-        .style(move |_theme, status| {
-            let hover = matches!(status, button::Status::Hovered | button::Status::Pressed);
-            let s = tok.scheme();
-            let bg = if selected {
-                s.secondary_container
-            } else if hover {
-                icedtea::theme::hover_fill(tok)
-            } else {
-                icedtea::iced::Color::TRANSPARENT
-            };
-            let fg = if selected {
-                s.on_secondary_container
-            } else {
-                s.on_surface
-            };
-            button::Style {
-                background: Some(icedtea::iced::Background::Color(bg)),
-                text_color: fg,
-                border: icedtea::iced::border::Border {
-                    radius: icedtea::m3::shape::Component::Button.radius(),
-                    ..icedtea::iced::border::Border::default()
-                },
-                ..button::Style::default()
-            }
-        })
-        .on_press(Message::Select(id))
-        .into()
+    container(
+        button(text(title).size(icedtea::typo::BODY))
+            .padding(Padding {
+                top: 6.0,
+                right: 10.0,
+                bottom: 6.0,
+                left: 28.0,
+            })
+            .width(Length::Fill)
+            .style(move |_theme, status| {
+                let hover = matches!(status, button::Status::Hovered | button::Status::Pressed);
+                let s = tok.scheme();
+                let bg = if selected {
+                    s.secondary_container
+                } else if hover {
+                    icedtea::theme::hover_fill(tok)
+                } else {
+                    icedtea::iced::Color::TRANSPARENT
+                };
+                let fg = if selected {
+                    s.on_secondary_container
+                } else {
+                    s.on_surface
+                };
+                button::Style {
+                    background: Some(icedtea::iced::Background::Color(bg)),
+                    text_color: fg,
+                    border: icedtea::iced::border::Border {
+                        radius: icedtea::m3::shape::Component::Button.radius(),
+                        ..icedtea::iced::border::Border::default()
+                    },
+                    ..button::Style::default()
+                }
+            })
+            .on_press(Message::Select(id)),
+    )
+    .id(icedtea::iced::widget::Id::from(format!("nav-{id}")))
+    .into()
 }
 
 const NAV_ITEM_H: f32 = 26.0;
@@ -276,6 +279,145 @@ fn nav_offset(page: &str, query: &str, collapsed: &HashSet<&'static str>) -> f32
     y
 }
 
+/// Rows whose top is above `scroll` are omitted so iced cannot paint
+/// their titles through the sticky Search field.
+fn catalog_nav<'a>(
+    query: &str,
+    page: &'static str,
+    collapsed: &HashSet<&'static str>,
+    scroll: f32,
+    tok: Tokens,
+) -> Element<'a, Message> {
+    let q = query.to_ascii_lowercase();
+    let total = nav_offset("\0", query, collapsed);
+    let mut y = 0.0;
+    let mut first_group = true;
+    let mut top_pad = 0.0;
+    let mut last_bottom = 0.0;
+    let mut started = false;
+    let mut rows: Vec<Element<'a, Message>> = Vec::new();
+    for g in catalog::groups() {
+        let mut page_ids: Vec<&'static str> = Vec::new();
+        for e in catalog::ENTRIES {
+            if e.group != g {
+                continue;
+            }
+            if !q.is_empty()
+                && !e.title.to_ascii_lowercase().contains(&q)
+                && !e.id.contains(q.as_str())
+            {
+                continue;
+            }
+            if !page_ids.contains(&e.page) {
+                page_ids.push(e.page);
+            }
+        }
+        if page_ids.is_empty() {
+            continue;
+        }
+        let expanded = !collapsed.contains(g) || !q.is_empty();
+        if page_ids.len() == 1 {
+            let h = NAV_ITEM_H;
+            if y >= scroll {
+                if !started {
+                    top_pad = y;
+                    started = true;
+                }
+                rows.push(nav_item(page_ids[0], g, page == page_ids[0], tok));
+                last_bottom = y + h;
+            }
+            y += h + NAV_GAP;
+            continue;
+        }
+        let gh = nav_group_h(first_group);
+        if y >= scroll {
+            if !started {
+                top_pad = y;
+                started = true;
+            }
+            rows.push(group_header(g, expanded, tok, first_group));
+            last_bottom = y + gh;
+        }
+        y += gh + NAV_GAP;
+        first_group = false;
+        if expanded {
+            for p in page_ids {
+                let h = NAV_ITEM_H;
+                if y >= scroll {
+                    if !started {
+                        top_pad = y;
+                        started = true;
+                    }
+                    rows.push(nav_item(p, catalog::page_title(p), page == p, tok));
+                    last_bottom = y + h;
+                }
+                y += h + NAV_GAP;
+            }
+        }
+    }
+    let mut nav = icedtea::iced::widget::Column::new()
+        .spacing(NAV_GAP)
+        .padding(Padding {
+            top: 4.0,
+            right: 8.0,
+            bottom: 20.0,
+            left: 8.0,
+        });
+    // Always lead with the pad so later rows keep a stable child index
+    // when the window slides (iced diffs the column by position).
+    nav = nav.push(Space::new().height(if top_pad > NAV_GAP {
+        top_pad - NAV_GAP
+    } else {
+        0.0
+    }));
+    for row in rows {
+        nav = nav.push(row);
+    }
+    let bottom = (total - last_bottom).max(0.0);
+    if bottom > NAV_GAP {
+        nav = nav.push(Space::new().height(bottom - NAV_GAP));
+    }
+    nav.into()
+}
+
+fn catalog_header<'a>(query: &'a str, tok: Tokens) -> Element<'a, Message> {
+    column![
+        text("icedtea")
+            .size(icedtea::typo::PAGE)
+            .font(icedtea::typo::UI_BOLD)
+            .color(tok.primary),
+        widget::search_input(
+            query,
+            Message::CatalogQuery,
+            tok,
+            named("catalog-search", Role::TextBox),
+        ),
+    ]
+    .spacing(12)
+    .padding(Padding {
+        top: 16.0,
+        right: 16.0,
+        bottom: 8.0,
+        left: 16.0,
+    })
+    .into()
+}
+
+/// Layout height of [`catalog_header`].
+#[cfg(test)]
+fn catalog_header_height(tok: Tokens) -> f32 {
+    let title = f32::from(
+        icedtea::iced::widget::text::LineHeight::default()
+            .to_absolute(icedtea::iced::Pixels(icedtea::typo::PAGE as f32)),
+    );
+    let body = f32::from(
+        icedtea::iced::widget::text::LineHeight::default()
+            .to_absolute(icedtea::iced::Pixels(icedtea::typo::BODY as f32)),
+    );
+    let v = icedtea::density::Density::snap(tok.density.pad.saturating_sub(4).max(4)) as f32;
+    16.0 + title + 12.0 + body + v + v + 8.0
+}
+
 fn group_header<'a>(
     name: &'static str,
     expanded: bool,
@@ -283,44 +425,47 @@ fn group_header<'a>(
     first: bool,
 ) -> Element<'a, Message> {
     let s = tok.scheme();
-    button(
-        row![
-            text(if expanded { "▾" } else { "▸" })
-                .size(icedtea::typo::TITLE)
-                .color(s.on_surface_variant),
-            text(name)
-                .size(icedtea::typo::TITLE)
-                .font(icedtea::typo::UI_BOLD)
-                .color(s.on_surface),
-        ]
-        .spacing(8)
-        .align_y(Alignment::Center),
+    container(
+        button(
+            row![
+                text(if expanded { "▾" } else { "▸" })
+                    .size(icedtea::typo::TITLE)
+                    .color(s.on_surface_variant),
+                text(name)
+                    .size(icedtea::typo::TITLE)
+                    .font(icedtea::typo::UI_BOLD)
+                    .color(s.on_surface),
+            ]
+            .spacing(8)
+            .align_y(Alignment::Center),
+        )
+        .padding(Padding {
+            top: if first { 8.0 } else { 14.0 },
+            right: 8.0,
+            bottom: 6.0,
+            left: 8.0,
+        })
+        .width(Length::Fill)
+        .style(move |_theme, status| {
+            let hover = matches!(status, button::Status::Hovered | button::Status::Pressed);
+            let s = tok.scheme();
+            button::Style {
+                background: Some(icedtea::iced::Background::Color(if hover {
+                    icedtea::theme::hover_fill(tok)
+                } else {
+                    icedtea::iced::Color::TRANSPARENT
+                })),
+                text_color: s.on_surface,
+                border: icedtea::iced::border::Border {
+                    radius: icedtea::m3::shape::Component::Button.radius(),
+                    ..icedtea::iced::border::Border::default()
+                },
+                ..button::Style::default()
+            }
+        })
+        .on_press(Message::ToggleGroup(name)),
     )
-    .padding(Padding {
-        top: if first { 8.0 } else { 14.0 },
-        right: 8.0,
-        bottom: 6.0,
-        left: 8.0,
-    })
-    .width(Length::Fill)
-    .style(move |_theme, status| {
-        let hover = matches!(status, button::Status::Hovered | button::Status::Pressed);
-        let s = tok.scheme();
-        button::Style {
-            background: Some(icedtea::iced::Background::Color(if hover {
-                icedtea::theme::hover_fill(tok)
-            } else {
-                icedtea::iced::Color::TRANSPARENT
-            })),
-            text_color: s.on_surface,
-            border: icedtea::iced::border::Border {
-                radius: icedtea::m3::shape::Component::Button.radius(),
-                ..icedtea::iced::border::Border::default()
-            },
-            ..button::Style::default()
-        }
-    })
-    .on_press(Message::ToggleGroup(name))
+    .id(icedtea::iced::widget::Id::from(format!("nav-group-{name}")))
     .into()
 }
 
@@ -751,16 +896,17 @@ fn read_tour_cmd() -> Option<usize> {
 fn write_tour_ack(beat: usize) {
     if let Some(path) = tour_ack_path() {
         let beat_meta = tour_beat(beat);
-        let _ = std::fs::write(&path, beat.to_string());
         let mut face = path.clone();
         face.set_extension("face");
         let _ = std::fs::write(face, beat_meta.theme);
         let mut caption = path.clone();
         caption.set_extension("caption");
         let _ = std::fs::write(caption, beat_meta.caption);
-        let mut hold = path;
+        let mut hold = path.clone();
         hold.set_extension("hold");
         let _ = std::fs::write(hold, beat_meta.hold_ms.to_string());
+        // Number last so a waiter that sees the beat also sees caption/face.
+        let _ = std::fs::write(&path, beat.to_string());
     }
 }
 
@@ -800,6 +946,7 @@ enum Message {
     Select(&'static str),
     Theme(String),
     Query(String),
+    PrefsQuery(String),
     Name(String),
     Toggle(bool),
     Number(String),
@@ -864,6 +1011,7 @@ enum Message {
     Key(icedtea::iced::keyboard::Event),
     Drop(icedtea::dnd::DragPayload),
     CatalogQuery(String),
+    NavScroll(f32),
     CodeLang(String),
     CodeEdit(icedtea::iced::widget::text_editor::Action),
     FileOpen,
@@ -965,6 +1113,7 @@ struct Gallery {
     tokens: Tokens,
     catalog: Catalog,
     query: String,
+    prefs_query: String,
     name: String,
     secret: String,
     secret_revealed: bool,
@@ -1090,6 +1239,9 @@ struct Gallery {
     ws_sash: Option<usize>,
     ws_drag: SashDrag,
     collapsed: HashSet<&'static str>,
+    /// Content offset of the catalog nav scroller. View only mounts
+    /// rows at or below this so titles cannot paint through Search.
+    nav_scroll: f32,
     tour_at: usize,
     ws: icedtea::workspace::DockNode,
     drawer_open: bool,
@@ -1157,6 +1309,7 @@ impl Gallery {
             tokens,
             catalog: Catalog::builtin(),
             query: String::new(),
+            prefs_query: String::new(),
             name: String::new(),
             secret: "hunter2".into(),
             secret_revealed: false,
@@ -1399,6 +1552,7 @@ impl Gallery {
             ws_sash: None,
             ws_drag: SashDrag::default(),
             collapsed: HashSet::new(),
+            nav_scroll: 0.0,
             tour_at: 0,
             ws: icedtea::workspace::DockNode::split(
                 Axis::Horizontal,
@@ -1865,6 +2019,7 @@ impl Gallery {
                 }
             }
             Message::Name(s) => self.name = s,
+            Message::PrefsQuery(q) => self.prefs_query = q,
             Message::Query(q) => {
                 self.query = q;
                 let needle = self.query.to_ascii_lowercase();
@@ -2391,6 +2546,7 @@ impl Gallery {
             }
             Message::Drop(_p) => {}
             Message::CatalogQuery(q) => self.catalog_query = q,
+            Message::NavScroll(y) => self.nav_scroll = y.max(0.0),
             Message::CodeLang(name) => {
                 self.code_lang = name.clone();
                 if let Some(lang) = CodeLang::named(&name) {
@@ -2692,8 +2848,9 @@ impl Gallery {
         }
     }
 
-    fn reveal_nav(&self) -> Task<Message> {
+    fn reveal_nav(&mut self) -> Task<Message> {
         let y = (nav_offset(self.page, &self.catalog_query, &self.collapsed) - 8.0).max(0.0);
+        self.nav_scroll = y;
         icedtea::iced::widget::operation::scroll_to(
             icedtea::iced::widget::Id::new("gallery-nav"),
             icedtea::iced::widget::scrollable::AbsoluteOffset { x: 0.0, y },
@@ -2741,81 +2898,25 @@ impl Gallery {
 
     fn view(&self) -> Element<'_, Message> {
         let tok = self.tokens;
-        let q = self.catalog_query.to_ascii_lowercase();
-        let header = column![
-            text("icedtea")
-                .size(icedtea::typo::PAGE)
-                .font(icedtea::typo::UI_BOLD)
-                .color(tok.primary),
-            widget::search_input(
-                &self.catalog_query,
-                Message::CatalogQuery,
-                tok,
-                named("catalog-search", Role::TextBox),
-            ),
-        ]
-        .spacing(12)
-        .padding(Padding {
-            top: 16.0,
-            right: 16.0,
-            bottom: 8.0,
-            left: 16.0,
-        });
-        let mut nav = icedtea::iced::widget::Column::new()
-            .spacing(2)
-            .padding(Padding {
-                top: 4.0,
-                right: 8.0,
-                bottom: 20.0,
-                left: 8.0,
-            });
-        let mut first_group = true;
-        for g in catalog::groups() {
-            let mut page_ids: Vec<&'static str> = Vec::new();
-            for e in catalog::ENTRIES {
-                if e.group != g {
-                    continue;
-                }
-                if !q.is_empty()
-                    && !e.title.to_ascii_lowercase().contains(&q)
-                    && !e.id.contains(q.as_str())
-                {
-                    continue;
-                }
-                if !page_ids.contains(&e.page) {
-                    page_ids.push(e.page);
-                }
-            }
-            if page_ids.is_empty() {
-                continue;
-            }
-            let expanded = !self.collapsed.contains(g) || !q.is_empty();
-            if page_ids.len() == 1 {
-                nav = nav.push(nav_item(page_ids[0], g, self.page == page_ids[0], tok));
-                continue;
-            }
-            nav = nav.push(group_header(g, expanded, tok, first_group));
-            first_group = false;
-            if expanded {
-                for page in page_ids {
-                    nav = nav.push(nav_item(
-                        page,
-                        catalog::page_title(page),
-                        self.page == page,
-                        tok,
-                    ));
-                }
-            }
-        }
         let sidebar = column![
-            header,
+            container(catalog_header(&self.catalog_query, tok))
+                .width(Length::Fill)
+                .style(move |_| icedtea::style::panel(tok)),
             widget::themed_scroll(
-                nav.into(),
+                catalog_nav(
+                    &self.catalog_query,
+                    self.page,
+                    &self.collapsed,
+                    self.nav_scroll,
+                    tok,
+                ),
                 tok,
                 named("nav", Role::List),
                 false,
                 Some(icedtea::iced::widget::Id::new("gallery-nav")),
-                None::<fn(_) -> Message>,
+                Some(|vp: icedtea::iced::widget::scrollable::Viewport| {
+                    Message::NavScroll(vp.absolute_offset().y)
+                },),
             ),
         ]
         .height(Length::Fill);
@@ -4757,14 +4858,17 @@ impl Gallery {
                         named(&format!("scroll-{i}"), Role::Header),
                     ));
                 }
-                widget::themed_scroll(
+                container(widget::themed_scroll(
                     lines.into(),
                     tok,
                     named("scroll", Role::Group),
                     false,
                     Some(icedtea::iced::widget::Id::from("gallery-scroll")),
                     None::<fn(_) -> Message>,
-                )
+                ))
+                .width(Length::Fill)
+                .height(Length::Fixed(160.0))
+                .into()
             }
             "callout" => widget::info_bar(
                 ToastKind::Warning,
@@ -5113,7 +5217,7 @@ impl Gallery {
                     Message::ListSel,
                     tok,
                     self.list_detail_window,
-                    48.0,
+                    64.0,
                     OVERSCAN,
                     Message::ListScroll,
                     "No rows",
@@ -5146,7 +5250,7 @@ impl Gallery {
                     .spacing(8)
                     .into()
                 },
-                layout::fixed(260.0),
+                layout::fixed(layout::LIST_PANE),
                 tok,
             ),
             "nav-rail" => pattern::nav_rail(
@@ -5274,8 +5378,8 @@ impl Gallery {
             }
             "preferences" => pattern::preferences_page(
                 &self.prefs,
-                &self.query,
-                Message::Query,
+                &self.prefs_query,
+                Message::PrefsQuery,
                 tok,
                 &self.catalog,
             ),
@@ -5914,6 +6018,51 @@ mod tests {
     }
 
     #[test]
+    fn reveal_scroll_leaves_the_previous_row_unmounted() {
+        let empty = std::collections::HashSet::new();
+        let list = super::nav_offset("list", "", &empty);
+        let selectable = super::nav_offset("selectable", "", &empty);
+        let scroll = (list - 8.0).max(0.0);
+        assert!(
+            selectable < scroll,
+            "Selectable top {selectable} must sit above list scroll {scroll}"
+        );
+        let fields = super::nav_offset("fields", "", &empty);
+        let controls = super::nav_offset("controls", "", &empty);
+        let scroll = (fields - 8.0).max(0.0);
+        assert!(
+            controls < scroll,
+            "Controls top {controls} must sit above fields scroll {scroll}"
+        );
+        let prefs = super::nav_offset("preferences", "", &empty);
+        let theme = super::nav_offset("theme", "", &empty);
+        let scroll = (prefs - 8.0).max(0.0);
+        assert!(
+            theme < scroll,
+            "Chrome/Theme top {theme} must sit above preferences scroll {scroll}"
+        );
+    }
+
+    #[test]
+    fn catalog_search_paints_above_the_nav_scroller() {
+        let tok = icedtea::theme::named("dark").tokens;
+        let h = super::catalog_header_height(tok);
+        assert!(h > 72.0 && h < 140.0, "header height {h}");
+        let src = include_str!("main.rs");
+        assert!(src.contains("fn catalog_nav"));
+        assert!(src.contains("if y >= scroll"));
+        let view = src
+            .split("fn view(")
+            .nth(1)
+            .unwrap()
+            .split("fn page_view")
+            .next()
+            .unwrap();
+        assert!(view.contains("catalog_nav("));
+        assert!(view.contains("style(move |_| icedtea::style::panel(tok))"));
+    }
+
+    #[test]
     fn follow_os_maps_gnome_default_to_light() {
         let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
         assert!(g.follow_os);
@@ -5961,6 +6110,38 @@ mod tests {
         let _ = g.update(super::Message::Theme("nord".into()));
         assert!(!g.follow_os);
         assert_eq!(g.theme, "nord");
+    }
+
+    #[test]
+    fn preferences_keep_groups_when_fields_query_is_set() {
+        let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
+        let _ = g.update(super::Message::Query("in".into()));
+        assert_eq!(g.query, "in");
+        assert!(g.prefs_query.is_empty());
+        assert!(!icedtea::pattern::filter_prefs(&g.prefs, &g.prefs_query).is_empty());
+    }
+
+    #[test]
+    fn gallery_gif_records_a_live_grab() {
+        let src = include_str!("../../scripts/gallery-gif.sh");
+        assert!(src.contains("x11grab"), "tour must grab the live window");
+        assert!(src.contains("live.mkv"));
+        assert!(
+            !src.contains(r#"workdir/%d.png"#),
+            "tour must not encode a still sequence"
+        );
+    }
+
+    #[test]
+    fn tour_log_and_grid_are_distinct_beats() {
+        let pages = icedtea::catalog::pages();
+        let log_i = pages.iter().position(|p| *p == "log").unwrap();
+        let grid_i = pages.iter().position(|p| *p == "grid").unwrap();
+        assert!(log_i < super::theme_page_index());
+        assert_eq!(super::tour_beat(log_i).page, "log");
+        assert!(super::tour_beat(log_i).caption.starts_with("Log:"));
+        assert_eq!(super::tour_beat(grid_i).page, "grid");
+        assert!(super::tour_beat(grid_i).caption.starts_with("Item grid:"));
     }
 
     #[test]

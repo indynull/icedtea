@@ -28,7 +28,7 @@ clip, dead overflow, empty first paint, or stub demos from the gallery.
 just gallery-qa --interact                   # full tour + inject
 just gallery-qa --interact --beats 0,8       # iterate a fix
 just gallery-qa --backend host --interact    # fonts / OS chrome
-just gallery-gif                             # only if public chrome shipped
+just gallery-gif                             # after layout, nav clip, or public chrome
 ```
 
 Shots land under `tmp/gallery-qa/<timestamp>/` (or `--out DIR`).
@@ -60,7 +60,11 @@ Shots land under `tmp/gallery-qa/<timestamp>/` (or `--out DIR`).
    you touched. Fix as you go.
 5. When no broken remains and uglies are fixed or explicitly residual:
    `just check` (or targeted tests + full check before release claim).
-6. `just gallery-gif` only if public gallery chrome shipped.
+6. Recapture the published tour (`just gallery-gif`) after a gallery
+   layout, nav-clip, or public-chrome change. Score **that file**
+   (sticky Search at scrolled sidebar beats), not only `tmp/gallery-qa/`
+   shots. A source fix whose published tour still shows the old paint
+   is **broken**.
 7. Commit fixes. Working tree clean for the work you finished.
 
 Narrow change: shot-pass affected beats + one neighbor for rhythm; live
@@ -89,7 +93,13 @@ unless they ask for a written audit.
 | `--settle-ms` | Slow GPU |
 
 Inject table: `DEFAULT_INTERACT` in `scripts/gallery_qa.py`. After-inject
-state must be **visible on screen**.
+state must be **visible on screen**. A match is a **token**, not a
+substring of another word (`table:` must not fire on `Selectable:`).
+
+Hash consecutive shot files. A pair that is byte-identical across
+**different** tour pages is not evidence — the grab landed before the
+page painted. Recapture those beats (`--settle-ms` if paint is slow).
+Only if a second grab is still the previous page is the gallery stuck.
 
 ## Not this skill
 

@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### Controls
+
+- `badge` Primary uses on-primary ink on the primary fill.
+- Disabled filled buttons use a stronger mute (fill 22%, ink 68%) so
+  the label reads on the brick on dark, not only on the canvas.
+- `command_bar` labels use on-surface body ink.
+- `dim_backdrop` rest opacity is 50% so a dialog sheet sits on a
+  visible wash.
+
+### Collections
+
+- Flush list titles wrap on a tall row; `list_detail` uses
+  `layout::LIST_PANE` (360px). Short flush rows still ellipsize on a
+  word boundary.
+- `themed_scroll` scissors through `ClipLayer` so rows cannot paint
+  through sticky search or other chrome above the pane.
+- Gallery catalog nav omits rows above the scroll offset so section
+  titles cannot show through the sticky Search field.
+
 ### Guide
 
 - README and Install use `cargo add icedtea`. The crates.io badge is

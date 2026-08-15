@@ -92,13 +92,15 @@ page — nothing else should have changed unless the demo says so.
 
 ## Scroll and clip protocol
 
-On every virtualized pane:
+On every scroller (virtual list **or** `themed_scroll` nav/page):
 
 1. Note first row title at rest.
 2. Scroll down several pages; first rows must disappear **into** the clip,
    not draw on top of chrome above the list.
-3. Scroll to end; last rows fully visible; rail handle usable.
-4. Scroll back to top; no permanent wrong offset.
+3. Check sticky siblings (Search, section titles, filters): scrolled
+   labels must not show through those fields.
+4. Scroll to end; last rows fully visible; rail handle usable.
+5. Scroll back to top; no permanent wrong offset.
 
 If bleed occurs: library scissor/layer issue until proven otherwise.
 
@@ -125,5 +127,8 @@ Batch pure density/alignment uglies after the broken set is green.
 
 1. Recapture shot pass for pages you changed (`--beats` or full).
 2. Confirm each fixed defect is gone in the new shots (or live recheck).
-3. Commit library/demo fixes; do not commit harness PNGs. Ship GIF only
-   via `just gallery-gif` when public chrome changed.
+3. Commit library/demo fixes; do not commit harness PNGs. Recapture the
+   published tour with `just gallery-gif` when gallery layout, nav clip,
+   or public chrome changed. Score that file for sticky-header bleed
+   (Search and other headers above a scrolled list), not only the
+   `tmp/gallery-qa/` shots.

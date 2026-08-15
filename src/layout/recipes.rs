@@ -21,6 +21,15 @@ pub const SHRINK: Length = Length::Shrink;
 /// ```
 pub const FORM_LABEL: f32 = 140.0;
 
+/// List pane width for [`crate::pattern::list_detail`] (px).
+///
+/// Fits a two-line mail title beside a checkbox and peek at body size.
+///
+/// ```
+/// assert_eq!(icedtea::layout::LIST_PANE, 360.0);
+/// ```
+pub const LIST_PANE: f32 = 360.0;
+
 /// Fixed length in pixels.
 ///
 /// ```
@@ -486,6 +495,8 @@ mod tests {
         assert_eq!(FILL, Length::Fill);
         assert_eq!(SHRINK, Length::Shrink);
         assert_eq!(fixed(260.0), Length::Fixed(260.0));
+        assert_eq!(LIST_PANE, 360.0);
+        assert_eq!(fixed(LIST_PANE), Length::Fixed(360.0));
         assert!(stretches(FILL));
         assert!(stretches(Length::FillPortion(1)));
         assert!(!stretches(SHRINK));

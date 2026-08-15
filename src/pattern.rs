@@ -219,8 +219,8 @@ pub fn command_bar<'a, M: Clone + 'a>(
         }));
     for a in actions {
         let face = text(a.title.clone())
-            .size(typo::META)
-            .color(tok.scheme().on_surface_variant);
+            .size(typo::BODY)
+            .color(tok.scheme().on_surface);
         let mut b = button(face)
             .padding([2, 6])
             .style(style::button_style(tok, Variant::Ghost));
@@ -619,7 +619,7 @@ pub fn preferences_page<'a, M: Clone + 'a>(
 /// let _: icedtea::Element<'_, ()> = pattern::list_detail(
 ///     widget::label("Inbox", tok, A11y::new("Inbox", icedtea::a11y::Role::Header)),
 ///     widget::label("Detail", tok, A11y::new("Detail", icedtea::a11y::Role::Header)),
-///     icedtea::layout::fixed(260.0),
+///     icedtea::layout::fixed(icedtea::layout::LIST_PANE),
 ///     tok,
 /// );
 /// ```
@@ -2171,6 +2171,16 @@ mod tests {
         let _: Element<'_, ()> = toolbar(acts.iter().copied(), tok, rtl);
         let _: Element<'_, ()> = command_bar(table.iter(), tok, rtl);
         let _: Element<'_, ()> = command_bar(std::iter::empty::<Action<()>>(), tok, ltr);
+        let bar_src = src
+            .split("pub fn command_bar")
+            .nth(1)
+            .unwrap()
+            .split("pub fn status_bar")
+            .next()
+            .unwrap();
+        assert!(bar_src.contains("typo::BODY"));
+        assert!(bar_src.contains("on_surface)"));
+        assert!(!bar_src.contains("on_surface_variant"));
         let _: Element<'_, ()> = status_bar("ready", None, None, &table, tok, ltr);
         let _: Element<'_, ()> = status_bar("ready", None, None, &table, tok, rtl);
         let _: Element<'_, ()> = status_bar(

@@ -57,12 +57,18 @@ impl App {
             .and_then(|i| self.list.items.get(i).map(|r| r.title.clone()))
             .unwrap_or_else(|| "Nothing selected".into());
         let detail = widget::label(title, tok, A11y::new("detail", Role::Status));
-        pattern::list_detail(side, detail, icedtea::layout::fixed(260.0), tok)
+        pattern::list_detail(
+            side,
+            detail,
+            icedtea::layout::fixed(icedtea::layout::LIST_PANE),
+            tok,
+        )
     }
 }
 ```
 
-`layout::fixed` sizes the sidebar. The detail child fills. Selection
-stays on indices. Pass `RowHeights::PerRow` when rows are not one
-height. `RowFace::Card` wraps the title on a surface; `Flush` is one
-clipped line.
+`layout::LIST_PANE` (360px) sizes the sidebar so a two-line mail title
+fits beside a checkbox. The detail child fills. Selection stays on
+indices. Pass `RowHeights::PerRow` when rows are not one height.
+`RowFace::Card` wraps the title on a surface; `Flush` wraps when the
+row is tall enough for two lines, otherwise one clipped line.

@@ -3220,10 +3220,6 @@ pub fn dismiss_button<'a, M: Clone + 'a>(msg: M, tok: Tokens, a11y: A11y) -> Ele
     a11y::attach(b.into(), &a11y)
 }
 
-fn chip_wash(tok: Tokens, variant: Variant) -> iced::Color {
-    chip_face(tok, variant).0
-}
-
 /// Chip fill, ink, and border for a variant (M3 filter: Quiet = outline, Primary = selected fill).
 pub fn chip_face(
     tok: Tokens,
@@ -3448,15 +3444,7 @@ pub fn badge<'a, M: 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let title = a11y.apply_name(title);
-    let s = tok.scheme();
-    let ink = match variant {
-        Variant::Danger => s.error,
-        Variant::Primary => s.primary,
-        Variant::Success => s.success,
-        Variant::Warning => s.warning,
-        _ => s.on_surface_variant,
-    };
-    let wash = chip_wash(tok, variant);
+    let (wash, ink, _) = chip_face(tok, variant);
     let pad = match size {
         BadgeSize::Small => [2, 5],
         BadgeSize::Large => [4, 8],
@@ -3762,7 +3750,10 @@ where
     if let Some(f) = on_scroll {
         s = s.on_scroll(f);
     }
-    a11y::attach(s.into(), &a11y)
+    // iced's scrollable only scissors when a rail is active. Empty-fit
+    // and some text paths still paint translated rows over sibling
+    // chrome (sticky search). ClipLayer is the same scissor lists use.
+    a11y::attach(ClipLayer::new(s).into(), &a11y)
 }
 
 /// Append-only lines. Sticks to the end. `window` virtualizes long logs.
@@ -3974,13 +3965,20 @@ fn stick_align_pad(n: usize, row_h: f32, viewport: f32) -> f32 {
 }
 
 /// Truncate for a one-line face so the rail does not bisect a glyph.
+/// Breaks on a space when one sits inside the budget so a word is not cut.
 fn ellipsize_line(s: &str, max_chars: usize) -> String {
     let chars: Vec<char> = s.chars().collect();
     if max_chars == 0 || chars.len() <= max_chars {
         return s.to_string();
     }
     let keep = max_chars.saturating_sub(1);
-    format!("{}…", chars[..keep].iter().collect::<String>())
+    let cut = &chars[..keep];
+    if let Some(i) = cut.iter().rposition(|c| c.is_whitespace()) {
+        if i > 0 {
+            return format!("{}…", cut[..i].iter().collect::<String>());
+        }
+    }
+    format!("{}…", cut.iter().collect::<String>())
 }
 
 fn row_slot_el<'a, M: Clone + 'a>(
@@ -4032,24 +4030,40 @@ fn two_line_row<'a, M: 'a>(
     row_h: f32,
     tok: Tokens,
 ) -> Element<'a, M> {
-    // ~7px/char at body size; leave room for pad + rail neighbor.
-    let title = ellipsize_line(title, 42);
+    // Tall rows (list-detail at 64px) wrap the title. Short rows stay
+    // one clipped line so a 24px rail does not bisect a glyph.
+    let wrap = row_h >= 56.0;
+    let title = if wrap {
+        title.to_string()
+    } else {
+        ellipsize_line(title, 26)
+    };
+    let wrapping = if wrap {
+        iced::widget::text::Wrapping::Word
+    } else {
+        iced::widget::text::Wrapping::None
+    };
     let on = tok.scheme().on_surface;
     let mut col = column![text(title)
         .size(typo::BODY)
         .color(on)
         .font(typo::UI)
         .width(Length::Fill)
-        .wrapping(iced::widget::text::Wrapping::None)]
+        .wrapping(wrapping)]
     .spacing(2)
     .width(Length::Fill);
     if let Some(m) = meta_s.filter(|s| !s.is_empty()) {
+        let meta_t = if wrap {
+            m.to_string()
+        } else {
+            ellipsize_line(m, 32)
+        };
         col = col.push(
-            text(ellipsize_line(m, 48))
+            text(meta_t)
                 .size(typo::META)
                 .color(meta_color)
                 .width(Length::Fill)
-                .wrapping(iced::widget::text::Wrapping::None),
+                .wrapping(wrapping),
         );
     }
     container(col)
@@ -5388,6 +5402,24 @@ mod tests {
     }
 
     #[test]
+    fn badge_primary_ink_contrasts_with_fill() {
+        let tok = named("dark").tokens;
+        let s = tok.scheme();
+        let (wash, ink, _) = chip_face(tok, Variant::Primary);
+        assert_eq!(wash, s.primary);
+        assert_eq!(ink, s.on_primary);
+        assert_ne!(ink, wash);
+        let _: Element<'_, ()> = badge(
+            "2",
+            None,
+            tok,
+            Variant::Primary,
+            BadgeSize::Small,
+            A11y::new("2", Role::Status),
+        );
+    }
+
+    #[test]
     fn widgets_build_elements() {
         let tok = named("dark").tokens;
         let btn = |n: &str| A11y::button(n);
@@ -6561,6 +6593,17 @@ mod tests {
             false,
             Some(Id::from("body-scroll")),
             None::<fn(_) -> ()>,
+        );
+        let scroll_src = src
+            .split("pub fn themed_scroll")
+            .nth(1)
+            .unwrap()
+            .split("pub fn log_view")
+            .next()
+            .unwrap();
+        assert!(
+            scroll_src.contains("ClipLayer::new"),
+            "themed_scroll must scissor so nav rows cannot paint through sticky search"
         );
         assert!(crate::layout::stick_to_end(80.0, 100.0, 20.0, 4.0));
         let input_src = src
@@ -8708,8 +8751,46 @@ mod tests {
         let long = "Quarterly notes for Lisbon and the Berlin office";
         let e = ellipsize_line(long, 20);
         assert!(e.ends_with('…'));
-        assert_eq!(e.chars().count(), 20);
+        assert!(e.chars().count() <= 20);
         assert!(!e.contains("office"));
+        assert!(!e.ends_with("Lisbo…"), "break on a space, not mid-word");
+        // Short flush face: word-aware cut, not a mid-word "Lisbo…".
+        let flush = ellipsize_line(long, 26);
+        assert!(flush.ends_with('…'));
+        assert!(flush.chars().count() <= 26);
+        assert!(!flush.contains("Berlin"));
+        assert!(flush.ends_with("for…") || flush.ends_with("notes…"));
+    }
+
+    #[test]
+    fn flush_list_view_wraps_a_tall_mail_title() {
+        let tok = named("dark").tokens;
+        let list = VecList {
+            items: vec![crate::collection::ListRow::new(
+                "Quarterly notes for Lisbon and the Berlin office",
+            )
+            .with_meta("This morning")
+            .with_leading(crate::collection::RowSlot::Check(true))
+            .with_trailing(crate::collection::RowSlot::Icon(Icon::Search))],
+        };
+        let win = VisibleWindow::new(200.0);
+        let mut el: Element<'_, usize> = list_view(
+            &list,
+            &Sel::Single(0),
+            |i| i,
+            tok,
+            win,
+            64.0,
+            2,
+            |_| 0,
+            "No rows",
+            |_| tok.scheme().on_surface_variant,
+            None,
+            RowFace::FLUSH,
+            |_| 0,
+            A11y::new("mail", Role::List),
+        );
+        draw_once(&mut el);
     }
 
     fn drive_scroll(el: &mut Element<'_, f32>) -> Vec<f32> {
