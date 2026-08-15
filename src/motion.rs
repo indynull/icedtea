@@ -505,9 +505,6 @@ impl<'a, Message> Widget<Message, iced::Theme, iced::Renderer> for ExpandLayer<'
     ) {
         use iced::advanced::Renderer as _;
         let bounds = layout.bounds();
-        if bounds.height <= 0.0 {
-            return;
-        }
         let Some(clipped) = bounds.intersection(viewport) else {
             return;
         };
