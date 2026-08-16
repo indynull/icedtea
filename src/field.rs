@@ -168,6 +168,17 @@ mod tests {
     }
 
     #[test]
+    fn a_left_click_clears_the_range() {
+        let mut fields = Selectables::new();
+        fields.bind("body", "alpha beta");
+        fields.perform("body", Action::SelectAll);
+        assert_eq!(fields.first_selection().as_deref(), Some("alpha beta"));
+        fields.perform("body", Action::Click(iced::Point::new(4.0, 0.0)));
+        assert_eq!(fields.first_selection(), None);
+        assert_eq!(fields.copy("body"), "alpha beta");
+    }
+
+    #[test]
     fn first_selection_walks_bind_order() {
         let mut fields = Selectables::new();
         fields.bind("path", "p");

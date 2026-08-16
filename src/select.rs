@@ -30,6 +30,11 @@ use crate::theme::Tokens;
 
 /// Keep selection, click, drag, and scroll. Typing, paste, and delete
 /// become a zero scroll so `Content::perform` does not change the text.
+///
+/// iced's editor emits [`Action::Click`] on the left button only. A
+/// right press is [`crate::layout::listen_cursor`] `Context` and never
+/// reaches this function. Dropping `Click` here would stop a left
+/// press from clearing the range.
 pub fn select_only(action: iced::widget::text_editor::Action) -> iced::widget::text_editor::Action {
     if action.is_edit() {
         iced::widget::text_editor::Action::Scroll { lines: 0 }
@@ -859,6 +864,8 @@ mod tests {
             select_only(Action::Scroll { lines: 2 }),
             Action::Scroll { lines: 2 }
         );
+        let click = Action::Click(iced::Point::ORIGIN);
+        assert_eq!(select_only(click.clone()), click);
     }
 
     #[test]
