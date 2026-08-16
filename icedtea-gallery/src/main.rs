@@ -1227,6 +1227,7 @@ enum Message {
     NavScroll(f32),
     CodeLang(String),
     CodeEdit(icedtea::iced::widget::text_editor::Action),
+    CodeWrap(bool),
     SearchGo,
     FileOpen,
     FileSave,
@@ -1424,6 +1425,7 @@ struct Gallery {
     direction_locked: bool,
     catalog_query: String,
     code_lang: String,
+    code_wrap: bool,
     code_editor: Content,
     search_sent: String,
     dialog_note: String,
@@ -1738,6 +1740,7 @@ impl Gallery {
             direction_locked: false,
             catalog_query: String::new(),
             code_lang: "Rust".into(),
+            code_wrap: true,
             search_sent: String::new(),
             code_editor: Content::with_text(CodeLang::named("Rust").unwrap().source),
             dialog_note: String::new(),
@@ -2748,6 +2751,7 @@ impl Gallery {
             }
             Message::SearchClear => self.query = String::new(),
             Message::SearchGo => self.search_sent = self.query.clone(),
+            Message::CodeWrap(on) => self.code_wrap = on,
             Message::Editor(action) => {
                 self.editor.perform(action);
             }
@@ -4062,8 +4066,7 @@ impl Gallery {
             "segmented-button" => column![
                 widget::segmented_button(
                     [
-                        Cell::new(self.catalog.t("cal.day"))
-                            .with_icon(icedtea::icon::Icon::Search),
+                        Cell::new(self.catalog.t("cal.day")).with_icon(icedtea::icon::Icon::Search),
                         Cell::from(self.catalog.t("cal.week")),
                         Cell::from(self.catalog.t("cal.month")),
                     ],
@@ -4696,6 +4699,13 @@ impl Gallery {
                         widget::ControlSize::Default,
                         named(&self.code_lang, Role::ComboBox),
                     ),
+                    widget::themed_checkbox(
+                        self.catalog.t("code.wrap"),
+                        self.code_wrap,
+                        Message::CodeWrap,
+                        tok,
+                        named("code-wrap", Role::Checkbox),
+                    ),
                     widget::highlighted_code(
                         &self.code_editor,
                         lang.syntax,
@@ -4703,6 +4713,7 @@ impl Gallery {
                         tok,
                         &self.theme,
                         layout::FILL,
+                        self.code_wrap,
                         named(lang.name, Role::TextBox),
                     ),
                     pattern::command_bar(

@@ -9,6 +9,7 @@
 - `Tabs::with_disabled` freezes one tab. `tab_bar` skips its press.
 - `segmented_button` takes `ControlSize`. Compact is the in-pane exclusive
   strip.
+- `highlighted_code` takes wrap. `false` keeps each source line on one row.
 
 ### Bug fix
 

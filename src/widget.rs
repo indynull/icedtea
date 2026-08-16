@@ -2325,7 +2325,8 @@ fn selectable_style(
 ///
 /// The application owns the buffer and the language name. Highlighter
 /// face follows the active colorway. Typing does not change the
-/// buffer. Disabled still allows select-and-copy.
+/// buffer. Disabled still allows select-and-copy. `wrap` is word wrap;
+/// `false` keeps each source line on one row (diff hunks, search hits).
 ///
 ///
 /// ```
@@ -2342,9 +2343,11 @@ fn selectable_style(
 ///     tok,
 ///     "dark",
 ///     icedtea::layout::FILL,
+///     true,
 ///     A11y::new("src", Role::TextBox),
 /// );
 /// ```
+#[allow(clippy::too_many_arguments)]
 pub fn highlighted_code<'a, M: Clone + 'a>(
     content: &'a Content,
     syntax: &str,
@@ -2352,9 +2355,15 @@ pub fn highlighted_code<'a, M: Clone + 'a>(
     tok: Tokens,
     theme_name: &str,
     height: Length,
+    wrap: bool,
     a11y: A11y,
 ) -> Element<'a, M> {
     let theme = crate::theme::code_highlight(theme_name);
+    let wrapping = if wrap {
+        iced::widget::text::Wrapping::Word
+    } else {
+        iced::widget::text::Wrapping::None
+    };
     let e = text_editor(content)
         .height(height)
         .padding(inset(tok))
@@ -2362,6 +2371,7 @@ pub fn highlighted_code<'a, M: Clone + 'a>(
         .highlight(syntax, theme)
         .font(typo::MONO)
         .size(tok.code())
+        .wrapping(wrapping)
         .on_action(move |a| on_action(select_only(a)));
     container(e)
         .width(Length::Fill)
@@ -7195,6 +7205,7 @@ mod tests {
             tok,
             "dark",
             crate::layout::FILL,
+            true,
             role("code", Role::Group),
         );
         let light = named("light").tokens;
@@ -7205,6 +7216,7 @@ mod tests {
             light,
             "solarized-light",
             crate::layout::fixed(280.0),
+            true,
             role("code", Role::Group),
         );
         let mocha = named("catppuccin-mocha").tokens;
@@ -7215,6 +7227,7 @@ mod tests {
             mocha,
             "catppuccin-mocha",
             crate::layout::FILL,
+            true,
             role("code", Role::Group),
         );
         let _: Element<'_, ()> = tooltip_wrap(
@@ -8243,6 +8256,7 @@ mod tests {
                 tok,
                 "dark",
                 crate::layout::FILL,
+                true,
                 role("code", Role::Group),
             ),
             chip(
@@ -8538,6 +8552,7 @@ mod tests {
             tok,
             "dark",
             crate::layout::FILL,
+            true,
             role("code", Role::Group).with_disabled(true),
         );
         draw_once(&mut dead_code);
@@ -8670,8 +8685,7 @@ mod tests {
         let tok = named("dark").tokens;
         let a11y = A11y::new("find", Role::TextBox).with_disabled(true);
         assert_eq!(a11y.child(Role::TextBox).node_id(), "textbox|find|1");
-        let mut el: Element<'_, String> =
-            search_input("typed-query", |s| s, None, tok, a11y, None);
+        let mut el: Element<'_, String> = search_input("typed-query", |s| s, None, tok, a11y, None);
         let mut tree = Tree::new(el.as_widget());
         let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
             Font::DEFAULT,
@@ -8796,6 +8810,7 @@ mod tests {
             tok,
             "dark",
             crate::layout::FILL,
+            true,
             A11y::new("source", Role::TextBox),
         );
         let size = code.as_widget().size();
@@ -8840,6 +8855,7 @@ mod tests {
             .unwrap();
         assert!(hl.contains("select_only"));
         assert!(hl.contains("tok.code()"));
+        assert!(hl.contains("wrapping"));
         assert!(!hl.contains("if !a11y.disabled"));
         let block_src = src
             .split("pub fn code_block")

@@ -133,6 +133,8 @@ Constructor: [`widget::highlighted_code`](https://docs.rs/icedtea/latest/icedtea
 The application owns the buffer and the language name. Highlighter
 face follows the active colorway (`theme::code_highlight`). Typing
 does not change the buffer. Select and copy like `selectable`.
+`wrap` is word wrap. Pass `false` so each source line stays one row
+(diff hunks, search hits).
 
 Pass `A11y`.
 
