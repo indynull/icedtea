@@ -5,9 +5,6 @@
 ## Consider
 
 - Plugin surfaces and extension host chrome.
-- `segmented_button` takes `ControlSize` for in-pane exclusive choice
-  (Prompt / Assistant). `tab_bar` stays the pane strip (overflow, close,
-  underbar).
 - `markdown_view` page vs inset type map: inset uses title for H1 and
   meta for body. `font_scale` stays the user scale.
 

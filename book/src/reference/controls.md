@@ -129,7 +129,7 @@ Constructor: [`widget::segmented_button`](https://docs.rs/icedtea/latest/icedtea
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
-The application owns the selected index. Cells may carry an icon. Press emits the new index. Disabled freezes every segment.
+The application owns the selected index. Cells may carry an icon. Press emits the new index. Disabled freezes every segment. `ControlSize::Compact` is the in-pane exclusive strip. `tab_bar` stays the pane chrome.
 
 Pass `A11y`.
 

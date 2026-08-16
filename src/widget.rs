@@ -89,12 +89,23 @@ fn icon_hit_pad(size: ControlSize, tok: Tokens) -> Padding {
 
 /// Outer height of a standard padded control (body line box + vertical pad).
 fn control_height(tok: Tokens) -> f32 {
+    sized_control_height(tok, ControlSize::Default)
+}
+
+fn sized_control_height(tok: Tokens, size: ControlSize) -> f32 {
     // Same face as `themed_button` Shrink. Do not floor to the 48dp touch
     // target: iced `Fixed(48)` + pad paints a 48px face, taller than
     // labeled buttons on the same page.
+    let type_px = match size {
+        ControlSize::Compact => tok.meta(),
+        _ => tok.body(),
+    };
     let line =
-        f32::from(iced::widget::text::LineHeight::default().to_absolute(iced::Pixels(tok.body())));
-    let p = pad(tok);
+        f32::from(iced::widget::text::LineHeight::default().to_absolute(iced::Pixels(type_px)));
+    let p = match size {
+        ControlSize::Default => pad(tok),
+        other => Padding::from(f32::from(other.pad())),
+    };
     line + p.top + p.bottom
 }
 
@@ -828,12 +839,14 @@ fn indeterminate_box_face(tok: Tokens) -> iced::widget::container::Style {
 /// Exclusive choice among labeled segments (M3 segmented button).
 ///
 /// The application owns the selected index. Press emits the new index.
-/// Disabled freezes all segments.
+/// Disabled freezes all segments. Compact is the in-pane strip
+/// (`tab_bar` stays the pane chrome).
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
 /// use icedtea::theme;
 /// use icedtea::widget;
+/// use icedtea::widget::ControlSize;
 /// let tok = theme::named("dark").tokens;
 /// let on_pick = |i| i;
 /// let _: icedtea::Element<'_, usize> = widget::segmented_button(
@@ -841,6 +854,7 @@ fn indeterminate_box_face(tok: Tokens) -> iced::widget::container::Style {
 ///     0,
 ///     on_pick,
 ///     tok,
+///     ControlSize::Default,
 ///     A11y::new("Range", Role::Group),
 /// );
 /// ```
@@ -849,31 +863,47 @@ pub fn segmented_button<'a, M: Clone + 'a>(
     selected: usize,
     on_select: impl Fn(usize) -> M + Copy + 'a,
     tok: Tokens,
+    size: ControlSize,
     a11y: A11y,
 ) -> Element<'a, M> {
     let cells: Vec<(usize, Cell)> = cells.into_iter().map(Into::into).enumerate().collect();
     let cells = crate::i18n::order(tok.direction, cells);
+    let type_px = match size {
+        ControlSize::Compact => tok.meta(),
+        _ => tok.body(),
+    };
+    let face_pad = match size {
+        ControlSize::Default => pad(tok),
+        other => Padding::from(f32::from(other.pad())),
+    };
+    let height = Length::Fixed(sized_control_height(tok, size));
     let mut r = Row::new().spacing(0).align_y(Alignment::Center);
     for (i, cell) in cells.iter() {
         let on = *i == selected;
         let icons = cell.icon.map(Icons::leading).unwrap_or(Icons::NONE);
-        let face = themed_button_sized(
-            cell.label.clone(),
-            if a11y.disabled {
-                None
-            } else {
-                Some(on_select(*i))
-            },
-            tok,
-            if on { Variant::Primary } else { Variant::Quiet },
-            icons,
-            Length::Shrink,
-            Length::Fixed(control_height(tok)),
-            A11y::button(cell.label.clone())
+        let label = cell.label.clone();
+        let face: Element<'a, M> = if icons == Icons::NONE {
+            text(label.clone()).size(type_px).into()
+        } else {
+            icon_label(label.clone(), icons, tok)
+        };
+        let mut b = button(face)
+            .padding(face_pad)
+            .width(Length::Shrink)
+            .height(height)
+            .style(style::button_style(
+                tok,
+                if on { Variant::Primary } else { Variant::Quiet },
+            ));
+        if !a11y.disabled {
+            b = b.on_press(on_select(*i));
+        }
+        r = r.push(a11y::attach(
+            b.into(),
+            &A11y::button(label)
                 .with_checked(on)
                 .with_disabled(a11y.disabled),
-        );
-        r = r.push(face);
+        ));
     }
     a11y::attach(r.into(), &a11y)
 }
@@ -6649,13 +6679,20 @@ mod tests {
             tok,
             role("tri-d", Role::Checkbox).with_disabled(true),
         );
-        let _: Element<'_, ()> =
-            segmented_button(["A", "B"], 1, |_| (), tok, role("seg", Role::Group));
+        let _: Element<'_, ()> = segmented_button(
+            ["A", "B"],
+            1,
+            |_| (),
+            tok,
+            ControlSize::Default,
+            role("seg", Role::Group),
+        );
         let _: Element<'_, ()> = segmented_button(
             ["A"],
             0,
             |_| (),
             tok,
+            ControlSize::Default,
             role("seg-d", Role::Group).with_disabled(true),
         );
         let _: Element<'_, ()> = icon_button(
@@ -7780,6 +7817,7 @@ mod tests {
             0,
             |i| i,
             tok,
+            ControlSize::Default,
             A11y::new("Range", Role::Group),
         );
         let labeled_h = layout_size(&mut labeled, max).height;
@@ -7853,6 +7891,7 @@ mod tests {
             0,
             |i| i,
             tok,
+            ControlSize::Default,
             role("seg", Role::Group),
         );
         draw_once(&mut cells);
@@ -11303,6 +11342,39 @@ mod tests {
         assert!(src.contains("tok.meta()"));
         assert!(src.contains("tok.body()"));
         assert!(src.contains("size.pad()"));
+    }
+
+    fn segmented_layout_height(size: ControlSize) -> f32 {
+        use iced::advanced::layout::Limits;
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, usize> = segmented_button(
+            ["Day", "Week"],
+            0,
+            |i| i,
+            tok,
+            size,
+            A11y::new("Range", Role::Group),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(240.0, 80.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        node.size().height
+    }
+
+    #[test]
+    fn segmented_button_compact_is_shorter_than_default() {
+        let compact = segmented_layout_height(ControlSize::Compact);
+        let default = segmented_layout_height(ControlSize::Default);
+        assert!(
+            compact < default,
+            "Compact segmented ({compact}) must be shorter than Default ({default})"
+        );
     }
 
     #[test]

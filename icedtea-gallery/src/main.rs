@@ -4059,17 +4059,35 @@ impl Gallery {
                 tok,
                 named("range", Role::Slider),
             ),
-            "segmented-button" => widget::segmented_button(
-                [
-                    Cell::new(self.catalog.t("cal.day")).with_icon(icedtea::icon::Icon::Search),
-                    Cell::from(self.catalog.t("cal.week")),
-                    Cell::from(self.catalog.t("cal.month")),
-                ],
-                self.segment,
-                Message::Segment,
-                tok,
-                named("segment", Role::Group),
-            ),
+            "segmented-button" => column![
+                widget::segmented_button(
+                    [
+                        Cell::new(self.catalog.t("cal.day"))
+                            .with_icon(icedtea::icon::Icon::Search),
+                        Cell::from(self.catalog.t("cal.week")),
+                        Cell::from(self.catalog.t("cal.month")),
+                    ],
+                    self.segment,
+                    Message::Segment,
+                    tok,
+                    widget::ControlSize::Default,
+                    named("segment", Role::Group),
+                ),
+                widget::segmented_button(
+                    [
+                        Cell::from(self.catalog.t("cal.day")),
+                        Cell::from(self.catalog.t("cal.week")),
+                        Cell::from(self.catalog.t("cal.month")),
+                    ],
+                    self.segment,
+                    Message::Segment,
+                    tok,
+                    widget::ControlSize::Compact,
+                    named("segment-compact", Role::Group),
+                ),
+            ]
+            .spacing(tok.density.gap())
+            .into(),
             "button-group" => widget::button_group(
                 [
                     Cell::new(self.catalog.t("cut")).with_icon(icedtea::icon::Icon::Close),
