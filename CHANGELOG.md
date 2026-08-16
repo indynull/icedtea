@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Feature
+
+- `search_input` and `search_input_clear` take submit and an input id.
+  Placeholder is the a11y name.
+
 ### Bug fix
 
 - `chip_face` Success and Warning ink is the role color, lifted to 4.5:1

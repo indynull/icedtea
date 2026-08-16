@@ -2376,6 +2376,8 @@ pub fn editor_style(
 /// A query field with a search icon.
 ///
 /// Use for palette and list filters. Empty query means show all.
+/// Placeholder is the a11y name. `on_submit` is Enter. `input_id`
+/// focuses the field (palette, find-in-page).
 ///
 ///
 /// ```
@@ -2384,16 +2386,24 @@ pub fn editor_style(
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let on_input = |s| s;
-/// let _: icedtea::Element<'_, String> =
-///     widget::search_input("", on_input, tok, A11y::new("Search", Role::TextBox));
+/// let _: icedtea::Element<'_, String> = widget::search_input(
+///     "",
+///     on_input,
+///     None,
+///     tok,
+///     A11y::new("Search", Role::TextBox),
+///     None,
+/// );
 /// ```
 pub fn search_input<'a, M: Clone + 'a>(
     value: &str,
     on_input: impl Fn(String) -> M + 'a,
+    on_submit: Option<M>,
     tok: Tokens,
     a11y: A11y,
+    input_id: Option<Id>,
 ) -> Element<'a, M> {
-    search_input_clear(value, on_input, None, tok, a11y)
+    search_input_clear(value, on_input, None, on_submit, tok, a11y, input_id)
 }
 
 /// Search field with optional clear control when non-empty.
@@ -2411,16 +2421,20 @@ pub fn search_input<'a, M: Clone + 'a>(
 ///     "q",
 ///     on_input,
 ///     Some(clear),
+///     None,
 ///     tok,
 ///     A11y::new("Search", Role::TextBox),
+///     None,
 /// );
 /// ```
 pub fn search_input_clear<'a, M: Clone + 'a>(
     value: &str,
     on_input: impl Fn(String) -> M + 'a,
     on_clear: Option<M>,
+    on_submit: Option<M>,
     tok: Tokens,
     a11y: A11y,
+    input_id: Option<Id>,
 ) -> Element<'a, M> {
     let search_ic: Element<'a, M> = icon_svg(Icon::Search, tok, A11y::new("search", Role::Image));
     let placeholder = if a11y.name.is_empty() {
@@ -2432,11 +2446,11 @@ pub fn search_input_clear<'a, M: Clone + 'a>(
         &placeholder,
         value,
         on_input,
-        None,
+        on_submit,
         FieldOpts::NONE,
         tok,
         a11y.child(Role::TextBox),
-        None,
+        input_id,
     );
     let mut r = Row::new().spacing(gap(tok)).align_y(Alignment::Center);
     for kid in crate::i18n::order(tok.direction, [search_ic, field]) {
@@ -2496,8 +2510,10 @@ pub fn search_view<'a, M: Clone + 'a>(
         query,
         on_input,
         if a11y.disabled { None } else { on_clear },
+        None,
         tok,
         A11y::new(a11y.name.clone(), Role::TextBox).with_disabled(a11y.disabled),
+        None,
     );
     let body: Element<'a, M> = if hits.is_empty() {
         meta(empty, tok, A11y::new(empty, Role::Status))
@@ -6717,16 +6733,32 @@ mod tests {
                 );
             }
         }
-        let _: Element<'_, ()> =
-            search_input_clear("q", |_| (), Some(()), tok, role("sc", Role::TextBox));
-        let _: Element<'_, ()> =
-            search_input_clear("", |_| (), Some(()), tok, role("sc0", Role::TextBox));
+        let _: Element<'_, ()> = search_input_clear(
+            "q",
+            |_| (),
+            Some(()),
+            None,
+            tok,
+            role("sc", Role::TextBox),
+            None,
+        );
+        let _: Element<'_, ()> = search_input_clear(
+            "",
+            |_| (),
+            Some(()),
+            None,
+            tok,
+            role("sc0", Role::TextBox),
+            None,
+        );
         let _: Element<'_, ()> = search_input_clear(
             "q",
             |_| (),
             None,
+            None,
             tok,
             role("sc-n", Role::TextBox).with_disabled(true),
+            None,
         );
         let _: Element<'_, ()> = range_slider(
             0.0..=10.0,
@@ -6959,7 +6991,8 @@ mod tests {
             Direction::Rtl,
             role("vf-off", Role::Group).with_disabled(true),
         );
-        let _: Element<'_, ()> = search_input("q", |_| (), tok, role("q", Role::TextBox));
+        let _: Element<'_, ()> =
+            search_input("q", |_| (), None, tok, role("q", Role::TextBox), None);
         let mut sv: Element<'_, ()> = search_view(
             "in",
             ["Inbox", "Sent"],
@@ -8556,6 +8589,8 @@ mod tests {
             .unwrap();
         assert!(!search_src.contains("apply_name(value)"));
         assert!(search_src.contains("a11y.child(Role::TextBox)"));
+        assert!(search_src.contains("on_submit"));
+        assert!(search_src.contains("input_id"));
         assert!(src.contains("pub fn search_input_clear"));
         let vf_src = src
             .split("pub fn value_field")
@@ -8579,7 +8614,8 @@ mod tests {
         let tok = named("dark").tokens;
         let a11y = A11y::new("find", Role::TextBox).with_disabled(true);
         assert_eq!(a11y.child(Role::TextBox).node_id(), "textbox|find|1");
-        let mut el: Element<'_, String> = search_input("typed-query", |s| s, tok, a11y);
+        let mut el: Element<'_, String> =
+            search_input("typed-query", |s| s, None, tok, a11y, None);
         let mut tree = Tree::new(el.as_widget());
         let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
             Font::DEFAULT,

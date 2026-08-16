@@ -405,8 +405,10 @@ fn catalog_header<'a>(query: &'a str, tok: Tokens, cat: &'a Catalog) -> Element<
         widget::search_input(
             query,
             Message::CatalogQuery,
+            None,
             tok,
             named(cat.t("search"), Role::TextBox),
+            None,
         ),
     ]
     .spacing(12)
@@ -1225,6 +1227,7 @@ enum Message {
     NavScroll(f32),
     CodeLang(String),
     CodeEdit(icedtea::iced::widget::text_editor::Action),
+    SearchGo,
     FileOpen,
     FileSave,
     Folder,
@@ -1422,6 +1425,7 @@ struct Gallery {
     catalog_query: String,
     code_lang: String,
     code_editor: Content,
+    search_sent: String,
     dialog_note: String,
     palette: CommandPalette,
     palette_focus: bool,
@@ -1734,6 +1738,7 @@ impl Gallery {
             direction_locked: false,
             catalog_query: String::new(),
             code_lang: "Rust".into(),
+            search_sent: String::new(),
             code_editor: Content::with_text(CodeLang::named("Rust").unwrap().source),
             dialog_note: String::new(),
             palette,
@@ -2742,6 +2747,7 @@ impl Gallery {
                 }
             }
             Message::SearchClear => self.query = String::new(),
+            Message::SearchGo => self.search_sent = self.query.clone(),
             Message::Editor(action) => {
                 self.editor.perform(action);
             }
@@ -4313,13 +4319,29 @@ impl Gallery {
                 layout::fixed(160.0),
                 named("body", Role::TextBox),
             ),
-            "search" => widget::search_input_clear(
-                &self.query,
-                Message::Query,
-                Some(Message::SearchClear),
-                tok,
-                named(self.catalog.t("search.placeholder"), Role::TextBox),
-            ),
+            "search" => {
+                let sent = if self.search_sent.is_empty() {
+                    self.catalog.t("search.idle").to_string()
+                } else {
+                    self.catalog
+                        .t("search.sent")
+                        .replace("{q}", &self.search_sent)
+                };
+                column![
+                    widget::search_input_clear(
+                        &self.query,
+                        Message::Query,
+                        Some(Message::SearchClear),
+                        Some(Message::SearchGo),
+                        tok,
+                        named(self.catalog.t("search.placeholder"), Role::TextBox),
+                        Some(icedtea::iced::widget::Id::new("gallery-search")),
+                    ),
+                    widget::meta(sent, tok, named("search-sent", Role::Status)),
+                ]
+                .spacing(tok.density.gap())
+                .into()
+            }
             "search-view" => {
                 let q = self.query.to_ascii_lowercase();
                 let hits: Vec<String> = [
@@ -5051,8 +5073,10 @@ impl Gallery {
                         widget::search_input(
                             &self.list_filter,
                             Message::ListFilter,
+                            None,
                             tok,
                             named(self.catalog.t("search"), Role::TextBox),
+                            None,
                         ),
                         {
                             let buckets: Element<'_, Message> = row![

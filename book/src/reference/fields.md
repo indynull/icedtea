@@ -104,6 +104,8 @@ Constructor: [`widget::search_input`](https://docs.rs/icedtea/latest/icedtea/wid
 [iced](https://crates.io/crates/iced)
 
 Use for palette and list filters. Empty query means “show all”.
+The placeholder is the a11y name. Pass submit for Enter and an
+input id when the application must focus the field.
 
 Pass `A11y`.
 
