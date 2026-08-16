@@ -197,7 +197,7 @@ where
     ) {
         let bounds = layout.bounds();
         let scheme = self.tok.scheme();
-        let rail_r = crate::m3::shape::Component::Button.radius();
+        let rail_r = self.tok.radius(crate::m3::shape::Component::Button);
         renderer.fill_quad(
             renderer::Quad {
                 bounds,

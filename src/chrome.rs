@@ -1,7 +1,7 @@
 //! Radius and elevation presets (Material Design 3).
 
-pub use crate::m3::elevation::Elevation;
-pub use crate::m3::shape::Corner;
+pub use crate::m3::elevation::{Elevation, ElevationPolicy};
+pub use crate::m3::shape::{Corner, ShapePolicy};
 
 /// Minimum scrollbar handle on the 4 dp grid.
 pub const SCROLL_HANDLE_MIN: f32 = 24.0;

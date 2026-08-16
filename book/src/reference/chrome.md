@@ -23,7 +23,10 @@ Constructor: [`theme::named`](https://docs.rs/icedtea/latest/icedtea/theme/fn.na
 
 Unknown names resolve to `dark`, the desktop pair with `light`.
 Persist defaults follow-OS on that pair. Register more on
-`ThemeCatalog`. See [Theming](../theming.md).
+`ThemeCatalog`. Density, type scale, corners, and elevation live on
+`Tokens` (`with_density`, `with_font_scale`, `with_shape`,
+`with_elevation`) and restore from `UiState::look`. See
+[Theming](../theming.md).
 
 ### Colors
 

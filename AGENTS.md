@@ -55,8 +55,10 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   shape, elevation, density, control states). `Tokens::scheme()` maps
   short fields onto those roles. `light` and `dark` are a neutral
   desktop pair; persist defaults `follow_os` on so host chrome layers
-  onto that pair. A named colorway is a choice. Desktop chrome uses
-  `m3::Component` → shape **None** (0 dp, rectangular). High-contrast
+  onto that pair. A named colorway is a choice. `Tokens` also carries
+  density, `font_scale`, `ShapePolicy`, and `ElevationPolicy`. Default
+  chrome is `ShapePolicy::Desktop` (`m3::Component` → shape **None**,
+  0 dp). `UiState::look` and `Boot` apply the same fields. High-contrast
   and community colorways remain; apps may register more that implement
   the same roles. See `m3::mapping` for catalog inventory.
   `theme::mix` builds washes.

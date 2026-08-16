@@ -73,6 +73,12 @@ pub struct Tokens {
     pub density: crate::m3::Density,
     /// When true, motion durations are 0 ms and progress snaps.
     pub reduced_motion: bool,
+    /// Multiplier on [`crate::typo`] steps (1.0 is the M3 scale).
+    pub font_scale: f32,
+    /// Corner policy constructors read through [`Self::radius`].
+    pub shape: crate::m3::ShapePolicy,
+    /// Shadow policy constructors read through [`Self::shadow`].
+    pub elevation: crate::m3::ElevationPolicy,
     /// Exact M3 scheme. [`Self::scheme`] returns this without mixing.
     full: crate::m3::Scheme,
 }
@@ -95,6 +101,9 @@ impl From<crate::m3::Scheme> for Tokens {
             selection_text: s.on_secondary_container,
             density: crate::m3::Density::default(),
             reduced_motion: false,
+            font_scale: 1.0,
+            shape: crate::m3::ShapePolicy::Desktop,
+            elevation: crate::m3::ElevationPolicy::Desktop,
             full: s,
         }
     }
@@ -122,6 +131,98 @@ impl Tokens {
         self
     }
 
+    /// Same tokens with a type-scale multiplier (clamped 0.75..=1.5).
+    ///
+    /// ```
+    /// let tok = icedtea::theme::named("dark").tokens.with_font_scale(1.25);
+    /// assert_eq!(tok.body(), 18.0);
+    /// ```
+    pub fn with_font_scale(mut self, scale: f32) -> Self {
+        self.font_scale = scale.clamp(0.75, 1.5);
+        self
+    }
+
+    /// Same tokens with a corner policy.
+    ///
+    /// ```
+    /// use icedtea::m3::{Component, Shape, ShapePolicy};
+    /// let tok = icedtea::theme::named("dark")
+    ///     .tokens
+    ///     .with_shape(ShapePolicy::Material);
+    /// assert_eq!(
+    ///     Component::Card.shape_for(tok.shape),
+    ///     Shape::Medium
+    /// );
+    /// ```
+    pub fn with_shape(mut self, shape: crate::m3::ShapePolicy) -> Self {
+        self.shape = shape;
+        self
+    }
+
+    /// Same tokens with a shadow policy.
+    ///
+    /// ```
+    /// use icedtea::m3::{Elevation, ElevationPolicy};
+    /// let tok = icedtea::theme::named("dark")
+    ///     .tokens
+    ///     .with_elevation(ElevationPolicy::Flat);
+    /// assert_eq!(tok.shadow(Elevation::Level2).blur_radius, 0.0);
+    /// ```
+    pub fn with_elevation(mut self, elevation: crate::m3::ElevationPolicy) -> Self {
+        self.elevation = elevation;
+        self
+    }
+
+    /// Pixel size for a type role after [`Self::font_scale`].
+    pub fn type_px(self, role: crate::typo::TypeRole) -> f32 {
+        (role.size() as f32 * self.font_scale).round()
+    }
+
+    /// Body type size (M3 Body Medium × scale).
+    pub fn body(self) -> f32 {
+        self.type_px(crate::typo::TypeRole::Body)
+    }
+
+    /// Meta / label type size.
+    pub fn meta(self) -> f32 {
+        self.type_px(crate::typo::TypeRole::Meta)
+    }
+
+    /// Section title type size.
+    pub fn title(self) -> f32 {
+        self.type_px(crate::typo::TypeRole::Title)
+    }
+
+    /// Page title type size.
+    pub fn page(self) -> f32 {
+        self.type_px(crate::typo::TypeRole::Page)
+    }
+
+    /// Code / monospace type size.
+    pub fn code(self) -> f32 {
+        self.type_px(crate::typo::TypeRole::Code)
+    }
+
+    /// Display type size.
+    pub fn display(self) -> f32 {
+        self.type_px(crate::typo::TypeRole::Display)
+    }
+
+    /// Corner radius for a control family under [`Self::shape`].
+    pub fn radius(self, component: crate::m3::Component) -> iced::border::Radius {
+        component.radius_for(self.shape)
+    }
+
+    /// Drop shadow for a requested level under [`Self::elevation`].
+    ///
+    /// Flat policy zeros the shadow. Tonal surfaces stay as requested.
+    pub fn shadow(self, level: crate::m3::Elevation) -> iced::Shadow {
+        match self.elevation {
+            crate::m3::ElevationPolicy::Desktop => level.shadow(),
+            crate::m3::ElevationPolicy::Flat => iced::Shadow::default(),
+        }
+    }
+
     /// Multiply every scheme role's alpha by `amount` (0..=1).
     ///
     /// Overlay chrome builds its child with `tok.fade(progress)` so
@@ -131,6 +232,9 @@ impl Tokens {
         let mut out = Self::from(self.full.fade(amount));
         out.density = self.density;
         out.reduced_motion = self.reduced_motion;
+        out.font_scale = self.font_scale;
+        out.shape = self.shape;
+        out.elevation = self.elevation;
         out
     }
 
@@ -312,6 +416,9 @@ fn tokens(
         selection_text: text,
         density: crate::m3::Density::default(),
         reduced_motion: false,
+        font_scale: 1.0,
+        shape: crate::m3::ShapePolicy::Desktop,
+        elevation: crate::m3::ElevationPolicy::Desktop,
         full: crate::m3::scheme_dark(), // replaced by sync
     }
     .sync_full_from_aliases()
@@ -361,6 +468,9 @@ fn high_contrast() -> NamedTheme {
             selection_text: rgb(0xFF, 0xFF, 0xFF),
             density: crate::m3::Density::default(),
             reduced_motion: false,
+            font_scale: 1.0,
+            shape: crate::m3::ShapePolicy::Desktop,
+            elevation: crate::m3::ElevationPolicy::Desktop,
             full: crate::m3::scheme_dark(),
         }
         .sync_full_from_aliases(),
@@ -1007,12 +1117,43 @@ mod tests {
         let tok = named("dark")
             .tokens
             .with_reduced_motion(true)
-            .with_density(crate::m3::Density::named(crate::m3::DensityName::Compact));
+            .with_density(crate::m3::Density::named(crate::m3::DensityName::Compact))
+            .with_font_scale(1.25)
+            .with_shape(crate::m3::ShapePolicy::Material)
+            .with_elevation(crate::m3::ElevationPolicy::Flat);
         let mid = tok.fade(0.5);
         assert!(mid.reduced_motion);
         assert_eq!(
             mid.density,
             crate::m3::Density::named(crate::m3::DensityName::Compact)
+        );
+        assert!((mid.font_scale - 1.25).abs() < f32::EPSILON);
+        assert_eq!(mid.shape, crate::m3::ShapePolicy::Material);
+        assert_eq!(mid.elevation, crate::m3::ElevationPolicy::Flat);
+        assert_eq!(mid.body(), 18.0);
+        assert_eq!(mid.shadow(crate::m3::Elevation::Level3).blur_radius, 0.0);
+        assert_eq!(named("dark").tokens.with_font_scale(0.1).font_scale, 0.75);
+        assert_eq!(named("dark").tokens.with_font_scale(9.0).font_scale, 1.5);
+        let scaled = named("dark").tokens.with_font_scale(1.25);
+        assert_eq!(scaled.meta(), 15.0);
+        assert_eq!(scaled.title(), 20.0);
+        assert_eq!(scaled.page(), 28.0);
+        assert_eq!(scaled.code(), 15.0);
+        assert_eq!(scaled.display(), 45.0);
+        assert_eq!(scaled.radius(crate::m3::Component::Card).top_left, 0.0);
+        assert!(
+            named("dark")
+                .tokens
+                .shadow(crate::m3::Elevation::Level2)
+                .blur_radius
+                > 0.0
+        );
+        assert_eq!(
+            scaled
+                .with_shape(crate::m3::ShapePolicy::Soft)
+                .radius(crate::m3::Component::Button)
+                .top_left,
+            12.0
         );
         assert!((mid.scheme().surface.a - 0.5).abs() < 1e-5);
         assert!((mid.text.a - 0.5).abs() < 1e-5);

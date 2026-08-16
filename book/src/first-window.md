@@ -14,7 +14,8 @@ in the repository. `cargo run --example hello`.
 {{#include ../../examples/hello.rs}}
 ```
 
-`Boot` is the window name, size, and colors. `run!` (and `daemon!`)
+`Boot` is the window name, size, colors, and look (density, type
+scale, corners, elevation). `run!` (and `daemon!`)
 also pick an installed sans face for UI text (normal and bold) and a
 fixed face for code. Load a named family on the iced application if
 you want a specific font.

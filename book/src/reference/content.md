@@ -104,11 +104,13 @@ Constructor: [`widget::markdown_view`](https://docs.rs/icedtea/latest/icedtea/wi
 [iced](https://crates.io/crates/iced)
 
 Parse with `MarkdownDoc::parse`, then view the items. Truncate by
-slicing the source before parse. Body is `typo::BODY`; H1 is
-`typo::PAGE` (same step as a window title). Links and inline code use
+slicing the source before parse. Body is `Tokens::body()` (M3 Body
+Medium times `font_scale`); H1 is `Tokens::page()` (same step as a
+window title). Links and inline code use
 `Tokens::scheme()` (`primary`, `on_surface`, `surface_container_high`).
 Real markdown layout (headings, lists, code frames). Drag a range
-with `select::markdown_select` (X and Y; a same-line drag is a
+with `select::markdown_select` (X and Y plus the live `Tokens` so
+hit-testing matches the painted scale; a same-line drag is a
 range). A double-click selects the word under the caret. Pointer
 events reach `markdown_select` first so the painted highlight and
 Copy are that span. Copy is the span only. Select all is

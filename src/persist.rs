@@ -1,12 +1,14 @@
-//! Save and restore window geometry, splits, docks, theme, and density.
+//! Save and restore window geometry, splits, docks, theme, and look.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::density::DensityName;
+use crate::density::{Density, DensityName};
 use crate::layout::{Axis, SplitState};
+use crate::m3::{ElevationPolicy, ShapePolicy};
+use crate::theme::Tokens;
 
 /// Window position and size.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -67,6 +69,10 @@ pub struct UiState {
     pub density: DensityName,
     #[serde(default = "default_scale")]
     pub font_scale: f32,
+    #[serde(default)]
+    pub shape: ShapePolicy,
+    #[serde(default)]
+    pub elevation: ElevationPolicy,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub accent: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -88,6 +94,8 @@ impl Default for UiState {
             follow_os: true,
             density: DensityName::Default,
             font_scale: 1.0,
+            shape: ShapePolicy::Desktop,
+            elevation: ElevationPolicy::Desktop,
             accent: None,
             workspace: None,
         }
@@ -95,6 +103,24 @@ impl Default for UiState {
 }
 
 impl UiState {
+    /// Density, type scale, corners, and elevation from this blob.
+    ///
+    /// ```
+    /// let mut ui = icedtea::persist::UiState::default();
+    /// ui.font_scale = 1.25;
+    /// ui.shape = icedtea::m3::ShapePolicy::Material;
+    /// let tok = ui.look(icedtea::theme::named("dark").tokens);
+    /// assert_eq!(tok.body(), 18.0);
+    /// assert_eq!(tok.shape, icedtea::m3::ShapePolicy::Material);
+    /// ```
+    pub fn look(&self, tokens: Tokens) -> Tokens {
+        tokens
+            .with_density(Density::named(self.density))
+            .with_font_scale(self.font_scale)
+            .with_shape(self.shape)
+            .with_elevation(self.elevation)
+    }
+
     pub fn set_split(&mut self, id: impl Into<String>, state: SplitState) {
         self.splits.insert(id.into(), state.persist());
     }
@@ -187,6 +213,8 @@ mod tests {
         ui.follow_os = true;
         ui.density = DensityName::Compact;
         ui.font_scale = 1.125;
+        ui.shape = ShapePolicy::Material;
+        ui.elevation = ElevationPolicy::Flat;
         ui.accent = Some("#88c0d0".into());
         ui.workspace = Some(r#"{"Leaf":{"id":"e","title":"E","min":80.0,"max":10000.0}}"#.into());
         ui.window.x = 12.0;
@@ -210,6 +238,13 @@ mod tests {
         assert!(named_only.family.is_none());
         assert!(!named_only.follow_os);
         assert!((named_only.font_scale - 1.0).abs() < f32::EPSILON);
+        assert_eq!(named_only.shape, ShapePolicy::Desktop);
+        assert_eq!(named_only.elevation, ElevationPolicy::Desktop);
+        let looked = back.look(crate::theme::named("dark").tokens);
+        assert!((looked.font_scale - 1.125).abs() < f32::EPSILON);
+        assert_eq!(looked.shape, ShapePolicy::Material);
+        assert_eq!(looked.elevation, ElevationPolicy::Flat);
+        assert_eq!(looked.density.name, DensityName::Compact);
         assert!(named_only.accent.is_none());
         assert!(named_only.workspace.is_none());
         assert!((back.font_scale - 1.125).abs() < f32::EPSILON);

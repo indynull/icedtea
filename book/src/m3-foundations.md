@@ -30,15 +30,26 @@ Full roles (containers, inverse, scrim) are available via
 
 `m3::TypeRole` implements the M3 type scale (display through label).
 UI text still uses platform sans (`typo::UI`); code uses `typo::MONO`.
+Constructors read sizes through `Tokens::type_px` so
+`Tokens::with_font_scale` (0.75–1.5) scales body, titles, and code
+together.
 
 ## Shape and elevation
 
 `m3::Shape` is the full M3 scale (0 / 4 / 8 / 12 / 16 / 28 dp and Full).
-Public controls map through `m3::Component` and, for **desktop flat**
-chrome, every family uses shape **None** (0 dp) so cards, fields, and
-buttons stay rectangular. Switch thumbs stay circular via geometry, not
-container radius. `m3::Elevation` uses tonal surface containers plus
-optional shadow.
+Public controls map through `m3::Component`.
+[`ShapePolicy`](https://docs.rs/icedtea/latest/icedtea/m3/enum.ShapePolicy.html)
+on `Tokens` picks the map:
+
+- **Desktop** — every family is shape **None** (0 dp). This is the default.
+- **Tight / Soft / Pill** — one corner (4 / 12 / full) on every family.
+- **Material** — buttons extra-small, chips small, cards medium,
+  dialogs extra-large, app bars flush.
+
+Switch thumbs stay circular via geometry, not container radius.
+`m3::Elevation` uses tonal surface containers plus optional shadow.
+[`ElevationPolicy::Flat`](https://docs.rs/icedtea/latest/icedtea/m3/enum.ElevationPolicy.html)
+drops the shadow; surfaces stay on their tonal container.
 
 ## Density
 

@@ -20,7 +20,9 @@ use icedtea::key::KeyContext;
 use icedtea::layout;
 use icedtea::layout::{Axis, PointerDrive, SashDrag, SashEvent, SplitState};
 
+use icedtea::density::DensityName;
 use icedtea::icon::Icons;
+use icedtea::m3::{ElevationPolicy, ShapePolicy};
 use icedtea::nav::NavStack;
 use icedtea::palette::CommandPalette;
 use icedtea::pattern::{self, PrefGroup, RailDest};
@@ -528,7 +530,7 @@ fn page_job(page: &str) -> &'static str {
         "table" => "Columns stay in layout order. Frozen leading columns stay in view.",
         "tree" => "Folders expand in place. Leaves select.",
         "sections" => "Tabs, an accordion, and an expander.",
-        "theme" => "Named colorways. Follow the desktop light/dark pair and accent.",
+        "theme" => "Named colorways. The look strip sets density, type scale, shape, and elevation on Tokens.",
         "colors" => "Semantic tokens and mixes. These are the paints widgets use.",
         "keys" => "The action table drives shortcuts. The cheatsheet lists them.",
         "marks" => "Cards, chips, badges, and rules.",
@@ -860,6 +862,11 @@ fn parse_inject_line(line: &str) -> Option<Message> {
         "pulse" => Some(Message::Pulse(parts.next()? == "true")),
         "shake" => Some(Message::ShakePlay),
         "reduce-motion" | "reduce_motion" => Some(Message::ReduceMotion(parts.next()? == "true")),
+        "density" => Some(Message::Density(parts.next()?.to_string())),
+        "type" | "font-scale" | "font_scale" => Some(Message::FontScale(parts.next()?.to_string())),
+        "shape" => Some(Message::Shape(parts.next()?.to_string())),
+        "elevation" => Some(Message::Elevation(parts.next()?.to_string())),
+        "direction" => Some(Message::Direction(parts.next()?.replace('-', " "))),
         "page" => Some(Message::Page(parts.next()?.parse().ok()?)),
         "tab" => Some(Message::Tab(parts.next()?.parse().ok()?)),
         "grid" => Some(Message::Grid(icedtea::collection::ItemClick::primary(
@@ -1017,6 +1024,11 @@ enum Message {
     Tick,
     Family(String),
     Follow(bool),
+    Density(String),
+    FontScale(String),
+    Shape(String),
+    Elevation(String),
+    Direction(String),
     Spin,
     OsMode(icedtea::iced::theme::Mode),
     OsChrome(OsChrome),
@@ -1208,6 +1220,10 @@ struct Gallery {
     themes: ThemeCatalog,
     family: String,
     follow_os: bool,
+    density: DensityName,
+    font_scale: f32,
+    shape: ShapePolicy,
+    elevation: ElevationPolicy,
     spin: f32,
     appearance: Appearance,
     os_chrome: OsChrome,
@@ -1530,6 +1546,10 @@ impl Gallery {
             },
             family: "default".into(),
             follow_os: true,
+            density: DensityName::Default,
+            font_scale: 1.0,
+            shape: ShapePolicy::Desktop,
+            elevation: ElevationPolicy::Desktop,
             spin: 0.0,
             appearance: Appearance::Dark,
             os_chrome: theme::os_chrome(),
@@ -1629,8 +1649,136 @@ impl Gallery {
             .get(&name)
             .map(|t| t.tokens)
             .unwrap_or_else(|| theme::named(&name).tokens);
-        self.tokens = theme::apply_os_chrome(tokens, self.follow_os, self.os_chrome)
+        self.tokens = theme::apply_os_chrome(tokens, self.follow_os, self.os_chrome);
+        self.apply_look();
+    }
+
+    fn apply_look(&mut self) {
+        self.tokens = self
+            .tokens
+            .with_density(icedtea::density::Density::named(self.density))
+            .with_font_scale(self.font_scale)
+            .with_shape(self.shape)
+            .with_elevation(self.elevation)
             .with_reduced_motion(self.reduced_motion);
+    }
+
+    fn look_strip(&self, tok: Tokens) -> Element<'_, Message> {
+        let density = match self.density {
+            DensityName::Compact => "Compact",
+            DensityName::Default => "Default",
+            DensityName::Comfortable => "Comfortable",
+        };
+        let scale = match self.font_scale {
+            x if (x - 0.875).abs() < 0.01 => "90%",
+            x if (x - 1.125).abs() < 0.01 => "110%",
+            x if (x - 1.25).abs() < 0.01 => "125%",
+            _ => "100%",
+        };
+        let shape = match self.shape {
+            ShapePolicy::Tight => "Tight",
+            ShapePolicy::Soft => "Soft",
+            ShapePolicy::Pill => "Pill",
+            ShapePolicy::Material => "Material",
+            ShapePolicy::Desktop => "Desktop",
+        };
+        let elevation = match self.elevation {
+            ElevationPolicy::Flat => "Flat",
+            ElevationPolicy::Desktop => "Desktop",
+        };
+        let direction = match self.direction {
+            Direction::Rtl => "Right to left",
+            Direction::Ltr => "Left to right",
+        };
+        let pick = |label: &str, options: Vec<String>, current: &str, on: fn(String) -> Message| {
+            row![
+                widget::meta(label, tok, named(label, Role::Status)),
+                widget::themed_pick_list(
+                    options,
+                    Some(current.to_string()),
+                    on,
+                    tok,
+                    named(label, Role::ComboBox),
+                ),
+            ]
+            .spacing(8)
+            .align_y(Alignment::Center)
+        };
+        column![
+            row![
+                widget::meta("Theme", tok, named("theme", Role::Status)),
+                widget::themed_pick_list(
+                    self.themes.names(),
+                    Some(self.theme.clone()),
+                    Message::Theme,
+                    tok,
+                    named(&self.theme, Role::ComboBox),
+                ),
+                widget::meta(
+                    if icedtea::theme::named(&self.theme).dark {
+                        "dark colorway"
+                    } else {
+                        "light colorway"
+                    },
+                    tok,
+                    named("theme-kind", Role::Status),
+                ),
+            ]
+            .spacing(8)
+            .align_y(Alignment::Center),
+            row![
+                pick(
+                    "Density",
+                    ["Compact", "Default", "Comfortable"]
+                        .into_iter()
+                        .map(str::to_string)
+                        .collect(),
+                    density,
+                    Message::Density,
+                ),
+                pick(
+                    "Type",
+                    ["90%", "100%", "110%", "125%"]
+                        .into_iter()
+                        .map(str::to_string)
+                        .collect(),
+                    scale,
+                    Message::FontScale,
+                ),
+                pick(
+                    "Shape",
+                    ["Desktop", "Tight", "Soft", "Pill", "Material"]
+                        .into_iter()
+                        .map(str::to_string)
+                        .collect(),
+                    shape,
+                    Message::Shape,
+                ),
+                pick(
+                    "Elevation",
+                    ["Desktop", "Flat"]
+                        .into_iter()
+                        .map(str::to_string)
+                        .collect(),
+                    elevation,
+                    Message::Elevation,
+                ),
+                pick(
+                    "Direction",
+                    ["Left to right", "Right to left"]
+                        .into_iter()
+                        .map(str::to_string)
+                        .collect(),
+                    direction,
+                    Message::Direction,
+                ),
+            ]
+            .spacing(16)
+            .align_y(Alignment::Center),
+        ]
+        .spacing(8)
+        .padding([8, 12])
+        .into()
     }
 
     fn anim_progress(anim: &icedtea::iced::Animation<bool>) -> f32 {
@@ -2041,8 +2189,8 @@ impl Gallery {
                             .themes
                             .get(&name)
                             .map(|t| t.tokens)
-                            .unwrap_or_else(|| theme::named(&name).tokens)
-                            .with_reduced_motion(self.reduced_motion);
+                            .unwrap_or_else(|| theme::named(&name).tokens);
+                        self.apply_look();
                     }
                 } else {
                     self.follow_os = false;
@@ -2051,9 +2199,49 @@ impl Gallery {
                         .themes
                         .get(&name)
                         .map(|t| t.tokens)
-                        .unwrap_or_else(|| theme::named(&name).tokens)
-                        .with_reduced_motion(self.reduced_motion);
+                        .unwrap_or_else(|| theme::named(&name).tokens);
+                    self.apply_look();
                 }
+            }
+            Message::Density(name) => {
+                self.density = match name.as_str() {
+                    "Compact" => DensityName::Compact,
+                    "Comfortable" => DensityName::Comfortable,
+                    _ => DensityName::Default,
+                };
+                self.apply_look();
+            }
+            Message::FontScale(label) => {
+                self.font_scale = match label.as_str() {
+                    "90%" => 0.875,
+                    "110%" => 1.125,
+                    "125%" => 1.25,
+                    _ => 1.0,
+                };
+                self.apply_look();
+            }
+            Message::Shape(name) => {
+                self.shape = match name.as_str() {
+                    "Tight" => ShapePolicy::Tight,
+                    "Soft" => ShapePolicy::Soft,
+                    "Pill" => ShapePolicy::Pill,
+                    "Material" => ShapePolicy::Material,
+                    _ => ShapePolicy::Desktop,
+                };
+                self.apply_look();
+            }
+            Message::Elevation(name) => {
+                self.elevation = match name.as_str() {
+                    "Flat" => ElevationPolicy::Flat,
+                    _ => ElevationPolicy::Desktop,
+                };
+                self.apply_look();
+            }
+            Message::Direction(name) => {
+                self.direction = match name.as_str() {
+                    "Right to left" => Direction::Rtl,
+                    _ => Direction::Ltr,
+                };
             }
             Message::Name(s) => self.name = s,
             Message::PrefsQuery(q) => self.prefs_query = q,
@@ -2377,13 +2565,14 @@ impl Gallery {
                     icedtea::iced::widget::Id::new("gallery-md"),
                     icedtea::iced::widget::scrollable::AbsoluteOffset {
                         x: 0.0,
-                        y: self.md.item_offset(i),
+                        y: self.md.item_offset(i, self.tokens),
                     },
                 );
             }
             Message::MdLink(uri) => self.note = format!("Open {uri}"),
             Message::MdPointer(ev) => {
-                self.md_sel = icedtea::select::markdown_select(&self.md.items, self.md_sel, ev);
+                self.md_sel =
+                    icedtea::select::markdown_select(&self.md.items, self.md_sel, ev, self.tokens);
                 if !self.md_sel.span.is_empty() {
                     let n = self.md_sel.span.text(&self.md.items).chars().count();
                     self.note = format!("Selected {n} characters");
@@ -3034,32 +3223,9 @@ impl Gallery {
             self.window_width,
             Message::Sash,
         );
-        let themes = container(
-            row![
-                widget::meta("Theme", tok, named("theme", Role::Status)),
-                widget::themed_pick_list(
-                    self.themes.names(),
-                    Some(self.theme.clone()),
-                    Message::Theme,
-                    tok,
-                    named(&self.theme, Role::ComboBox),
-                ),
-                widget::meta(
-                    if icedtea::theme::named(&self.theme).dark {
-                        "dark colorway"
-                    } else {
-                        "light colorway"
-                    },
-                    tok,
-                    named("theme-kind", Role::Status),
-                ),
-            ]
-            .spacing(8)
-            .align_y(Alignment::Center)
-            .padding([8, 12]),
-        )
-        .width(Length::Fill)
-        .style(move |_| icedtea::style::panel(tok));
+        let themes = container(self.look_strip(tok))
+            .width(Length::Fill)
+            .style(move |_| icedtea::style::panel(tok));
         let shell = container(layout::dock(
             Some({
                 column![
@@ -6227,6 +6393,65 @@ mod tests {
     }
 
     #[test]
+    fn look_knobs_rebuild_tokens() {
+        let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
+        let _ = g.update(super::Message::Density("Compact".into()));
+        assert_eq!(
+            g.tokens.density.name,
+            icedtea::density::DensityName::Compact
+        );
+        let _ = g.update(super::Message::Density("Comfortable".into()));
+        assert_eq!(
+            g.tokens.density.name,
+            icedtea::density::DensityName::Comfortable
+        );
+        let _ = g.update(super::Message::Density("Default".into()));
+        assert_eq!(
+            g.tokens.density.name,
+            icedtea::density::DensityName::Default
+        );
+        let _ = g.update(super::Message::FontScale("90%".into()));
+        assert!((g.tokens.font_scale - 0.875).abs() < f32::EPSILON);
+        let _ = g.update(super::Message::FontScale("110%".into()));
+        assert!((g.tokens.font_scale - 1.125).abs() < f32::EPSILON);
+        let _ = g.update(super::Message::FontScale("125%".into()));
+        assert_eq!(g.tokens.body(), 18.0);
+        let _ = g.update(super::Message::FontScale("100%".into()));
+        assert_eq!(g.tokens.body(), 14.0);
+        let _ = g.update(super::Message::Shape("Tight".into()));
+        assert_eq!(g.tokens.shape, icedtea::m3::ShapePolicy::Tight);
+        let _ = g.update(super::Message::Shape("Soft".into()));
+        assert_eq!(g.tokens.shape, icedtea::m3::ShapePolicy::Soft);
+        let _ = g.update(super::Message::Shape("Pill".into()));
+        assert_eq!(g.tokens.shape, icedtea::m3::ShapePolicy::Pill);
+        let _ = g.update(super::Message::Shape("Material".into()));
+        assert_eq!(g.tokens.shape, icedtea::m3::ShapePolicy::Material);
+        let _ = g.update(super::Message::Shape("Desktop".into()));
+        assert_eq!(g.tokens.shape, icedtea::m3::ShapePolicy::Desktop);
+        let _ = g.update(super::Message::Elevation("Flat".into()));
+        assert_eq!(g.tokens.elevation, icedtea::m3::ElevationPolicy::Flat);
+        let _ = g.update(super::Message::Elevation("Desktop".into()));
+        assert_eq!(g.tokens.elevation, icedtea::m3::ElevationPolicy::Desktop);
+        let _ = g.update(super::Message::Direction("Right to left".into()));
+        assert_eq!(g.direction, icedtea::i18n::Direction::Rtl);
+        let _ = g.update(super::Message::Direction("Left to right".into()));
+        assert_eq!(g.direction, icedtea::i18n::Direction::Ltr);
+        let _ = g.update(super::Message::Shape("Material".into()));
+        let _ = g.update(super::Message::Theme("nord".into()));
+        assert_eq!(g.tokens.shape, icedtea::m3::ShapePolicy::Material);
+        let _ = g.look_strip(g.tokens);
+        let _ = g.update(super::Message::Density("Compact".into()));
+        let _ = g.update(super::Message::FontScale("90%".into()));
+        let _ = g.update(super::Message::FontScale("110%".into()));
+        let _ = g.update(super::Message::Shape("Tight".into()));
+        let _ = g.update(super::Message::Shape("Soft".into()));
+        let _ = g.update(super::Message::Shape("Pill".into()));
+        let _ = g.update(super::Message::Elevation("Flat".into()));
+        let _ = g.update(super::Message::Direction("Right to left".into()));
+        let _ = g.look_strip(g.tokens);
+    }
+
+    #[test]
     fn preferences_keep_groups_when_fields_query_is_set() {
         let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
         let _ = g.update(super::Message::Query("in".into()));
@@ -6339,7 +6564,7 @@ mod tests {
         let end_y =
             g.md.items
                 .iter()
-                .map(icedtea::select::markdown_item_extent)
+                .map(|i| icedtea::select::markdown_item_extent(i, g.tokens))
                 .sum::<f32>();
         let _ = g.update(super::Message::MdPointer(
             icedtea::select::MarkdownPointer::at_y(0.0),
@@ -6503,7 +6728,8 @@ mod tests {
         ));
         assert!(!g.md_sel.span.is_empty());
         let span = g.md_sel.span.text(&g.md.items);
-        let line = icedtea::select::markdown_line_span(&g.md.items, 16.0, 8.0).text(&g.md.items);
+        let line =
+            icedtea::select::markdown_line_span(&g.md.items, 16.0, 8.0, g.tokens).text(&g.md.items);
         assert_ne!(span, g.md.source);
         assert_ne!(span, line);
         let kept = g.md_sel.span;
@@ -6534,6 +6760,26 @@ mod tests {
 
     #[test]
     fn inject_lines_drive_control_state() {
+        assert!(matches!(
+            super::parse_inject_line("density Compact"),
+            Some(super::Message::Density(s)) if s == "Compact"
+        ));
+        assert!(matches!(
+            super::parse_inject_line("font-scale 125%"),
+            Some(super::Message::FontScale(s)) if s == "125%"
+        ));
+        assert!(matches!(
+            super::parse_inject_line("shape Material"),
+            Some(super::Message::Shape(s)) if s == "Material"
+        ));
+        assert!(matches!(
+            super::parse_inject_line("elevation Flat"),
+            Some(super::Message::Elevation(s)) if s == "Flat"
+        ));
+        assert!(matches!(
+            super::parse_inject_line("direction Right-to-left"),
+            Some(super::Message::Direction(s)) if s == "Right to left"
+        ));
         assert!(matches!(
             super::parse_inject_line("check true"),
             Some(super::Message::Check(true))

@@ -4,6 +4,10 @@
 
 ### Feature
 
+- `Tokens` carries type scale, corner policy, and elevation policy
+  (`with_font_scale`, `with_shape`, `with_elevation`). `Boot` and
+  `UiState::look` apply the same fields so an app can persist the look
+  the gallery strip demonstrates.
 - `A11y` keeps hint, selected, toggled, expanded, live, required, and
   error next to name, role, value, disabled, and checked. Constructors
   fill unset fields from their arguments. iced 0.14 still publishes
@@ -26,6 +30,8 @@
 
 ### Bug fix
 
+- `bootstrap` applies `Boot` density, type scale, shape, and elevation
+  onto `Prepared.tokens` and iced's default text size.
 - `badge` Primary uses on-primary ink on the primary fill.
 - Disabled button ink uses a 68% mute so filled, Ghost, and Outlined
   labels read on dark. Filled faces also raise the fill to 22%.

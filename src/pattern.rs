@@ -219,7 +219,7 @@ pub fn command_bar<'a, M: Clone + 'a>(
         }));
     for a in actions {
         let face = text(a.title.clone())
-            .size(typo::BODY)
+            .size(tok.body())
             .color(tok.scheme().on_surface);
         let mut b = button(face)
             .padding([2, 6])
@@ -494,7 +494,7 @@ pub fn about_page<'a, M: Clone + 'a>(
     group_box(
         cat.t("about"),
         column![
-            text(name).size(typo::PAGE).color(tok.scheme().on_surface),
+            text(name).size(tok.page()).color(tok.scheme().on_surface),
             meta(version, tok, A11y::new(version, Role::Status)),
             meta(license, tok, A11y::new(license, Role::Status)),
             meta(credits, tok, A11y::new(credits, Role::Status)),
@@ -1059,7 +1059,7 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
     }
     head = head.push(crate::a11y::attach(
         text(title.clone())
-            .size(typo::TITLE)
+            .size(tok.title())
             .font(typo::UI_BOLD)
             .color(tok.scheme().on_surface)
             .into(),
@@ -1439,7 +1439,7 @@ pub fn context_menu<'a, M: Clone + 'a>(
     for a in actions {
         let a11y = A11y::new(a.title.clone(), Role::MenuItem).with_disabled(!a.enabled);
         let face = text(a.title.clone())
-            .size(typo::BODY)
+            .size(tok.body())
             .width(Length::Fill)
             .align_x(Alignment::Start);
         let mut row = button(face)
@@ -2197,7 +2197,7 @@ mod tests {
             .split("pub fn status_bar")
             .next()
             .unwrap();
-        assert!(bar_src.contains("typo::BODY"));
+        assert!(bar_src.contains("tok.body()"));
         assert!(bar_src.contains("on_surface)"));
         assert!(!bar_src.contains("on_surface_variant"));
         let _: Element<'_, ()> = status_bar("ready", None, None, &table, tok, ltr);
@@ -2387,7 +2387,7 @@ mod tests {
             .next()
             .unwrap();
         assert!(cm_src.contains("Alignment::Start"));
-        assert!(cm_src.contains("typo::BODY"));
+        assert!(cm_src.contains("tok.body()"));
         let card = context_card_size(table.iter().count(), vp);
         let row_w = menu_row_width(&mut cm);
         assert!(

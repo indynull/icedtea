@@ -17,8 +17,8 @@ A window is a loop you write in Rust:
 ## Start the window
 
 [`Boot`](https://docs.rs/icedtea/latest/icedtea/app/struct.Boot.html)
-sets title, application id, theme name, locale, density, and window
-kind: application, dialog, or overlay.
+sets title, application id, theme name, locale, density, type scale,
+shape, elevation, and window kind: application, dialog, or overlay.
 [`run!`](https://docs.rs/icedtea/latest/icedtea/macro.run.html) loads
 that and starts iced.
 [`daemon!`](https://docs.rs/icedtea/latest/icedtea/macro.daemon.html)

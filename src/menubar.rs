@@ -20,7 +20,6 @@ use iced::{
 
 use crate::style;
 use crate::theme::{hover_fill, pressed_fill, Tokens};
-use crate::typo;
 
 /// Visual status of a menu title.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -127,7 +126,7 @@ impl<'a, Message> MenuTitle<'a, Message> {
             on_select: Box::new(on_select),
             tok,
             padding: Padding::from(TITLE_PAD),
-            text_size: Pixels::from(typo::BODY),
+            text_size: Pixels::from(tok.body()),
             menu_class: Box::new(style::overlay_menu_style(tok)),
             last_status: None,
         }
@@ -264,7 +263,7 @@ where
                 border: iced::Border {
                     color: Color::TRANSPARENT,
                     width: 0.0,
-                    radius: crate::m3::shape::Component::AppBar.radius(),
+                    radius: self.tok.radius(crate::m3::shape::Component::AppBar),
                 },
                 ..renderer::Quad::default()
             },
@@ -506,7 +505,7 @@ where
                 border: iced::Border {
                     color: Color::TRANSPARENT,
                     width: 0.0,
-                    radius: crate::m3::shape::Component::AppBar.radius(),
+                    radius: self.tok.radius(crate::m3::shape::Component::AppBar),
                 },
                 ..renderer::Quad::default()
             },
@@ -548,7 +547,7 @@ where
         let bounds = layout.bounds();
         let font = renderer.default_font();
         let pad = Padding::from(TITLE_PAD);
-        let width = overlay_list_width(&self.labels, pad, typo::BODY as f32);
+        let width = overlay_list_width(&self.labels, pad, self.tok.body());
         let on_select = &self.on_select;
         let menu = Menu::new(
             &mut state.menu,
@@ -561,7 +560,7 @@ where
         .width(width)
         .padding(pad)
         .font(font)
-        .text_size(Pixels::from(typo::BODY));
+        .text_size(Pixels::from(self.tok.body()));
         Some(menu.overlay(
             layout.position() + translation,
             *viewport,

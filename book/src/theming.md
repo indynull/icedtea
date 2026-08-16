@@ -8,7 +8,14 @@ Aliases: `canvas`/`surface`/`panel`/`text`/`muted`/`primary`/
 `accent`/`danger`/`border`/`selection`. Colorways sync containers from
 those aliases and recompute solid-fill `on_*` roles for contrast.
 Washes use scheme state layers (`hover_fill` / `pressed_fill`). Desktop
-control corners are M3 shape **None** (see [foundations](./m3-foundations.md)).
+control corners are M3 shape **None** unless
+[`Tokens::with_shape`](https://docs.rs/icedtea/latest/icedtea/theme/struct.Tokens.html#method.with_shape)
+selects Tight, Soft, Pill, or the Material component map
+(see [foundations](./m3-foundations.md)).
+Type size is the M3 scale times
+[`Tokens::font_scale`](https://docs.rs/icedtea/latest/icedtea/theme/struct.Tokens.html#method.with_font_scale)
+(1.0 by default). Shadows follow
+[`Tokens::with_elevation`](https://docs.rs/icedtea/latest/icedtea/theme/struct.Tokens.html#method.with_elevation).
 Constructors take `Tokens`.
 
 Built-in names are 40 palettes: `dark`, `light`, `high-contrast`, and
@@ -27,9 +34,17 @@ slicing the source before `MarkdownDoc::parse`.
 ```rust
 let mut cat = icedtea::theme::ThemeCatalog::new();
 cat.register("brand", icedtea::theme::named("dark").tokens, true);
-let tokens = cat.resolve("brand");
+let tokens = cat.resolve("brand")
+    .with_font_scale(1.125)
+    .with_shape(icedtea::m3::ShapePolicy::Material);
 let _ = tokens.primary;
 ```
+
+Persist stores the same fields on
+[`UiState`](https://docs.rs/icedtea/latest/icedtea/persist/struct.UiState.html)
+(`density`, `font_scale`, `shape`, `elevation`). Restore with
+`ui.look(tokens)`. `Boot` has the same setters so a window starts
+on that look.
 
 Live switch: store a theme name on state and return
 `icedtea::theme::iced_theme(&name, tokens)` from the theme function.

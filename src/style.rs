@@ -15,8 +15,8 @@ use crate::m3::ControlState;
 use crate::theme::{hover_fill, Tokens};
 use crate::variant::Variant;
 
-fn component_radius(c: Component) -> iced::border::Radius {
-    c.radius()
+fn component_radius(tok: Tokens, c: Component) -> iced::border::Radius {
+    tok.radius(c)
 }
 
 fn button_status(status: button::Status) -> ControlState {
@@ -47,9 +47,9 @@ pub fn card(tok: Tokens, focus: bool) -> container::Style {
         border: Border {
             color: if focus { s.primary } else { s.outline_variant },
             width: if focus { 2.0 } else { 1.0 },
-            radius: component_radius(Component::Card),
+            radius: component_radius(tok, Component::Card),
         },
-        shadow: Elevation::Level1.shadow(),
+        shadow: tok.shadow(Elevation::Level1),
         snap: false,
     }
 }
@@ -63,7 +63,7 @@ pub fn outlined_card(tok: Tokens) -> container::Style {
         border: Border {
             color: s.outline,
             width: 1.0,
-            radius: component_radius(Component::Card),
+            radius: component_radius(tok, Component::Card),
         },
         shadow: Shadow::default(),
         snap: false,
@@ -79,9 +79,9 @@ pub fn raised_card(tok: Tokens) -> container::Style {
         border: Border {
             color: s.outline_variant,
             width: 0.0,
-            radius: component_radius(Component::Card),
+            radius: component_radius(tok, Component::Card),
         },
-        shadow: Elevation::Level2.shadow(),
+        shadow: tok.shadow(Elevation::Level2),
         snap: false,
     }
 }
@@ -94,7 +94,7 @@ pub fn shell(tok: Tokens) -> container::Style {
         border: Border {
             color: s.outline,
             width: 1.0,
-            radius: component_radius(Component::Shell),
+            radius: component_radius(tok, Component::Shell),
         },
         shadow: Shadow::default(),
         snap: false,
@@ -231,7 +231,7 @@ pub fn callout(tok: Tokens, kind: crate::toast::ToastKind) -> container::Style {
         border: Border {
             color: border,
             width: 1.0,
-            radius: component_radius(Component::Card),
+            radius: component_radius(tok, Component::Card),
         },
         shadow: Shadow::default(),
         snap: false,
@@ -254,11 +254,11 @@ fn disabled_ink(surface: Color) -> Color {
     layer_on(surface, ink, 0.68)
 }
 
-fn button_border(comp: Component) -> Border {
+fn button_border(tok: Tokens, comp: Component) -> Border {
     Border {
         color: Color::TRANSPARENT,
         width: 0.0,
-        radius: component_radius(comp),
+        radius: component_radius(tok, comp),
     }
 }
 
@@ -277,7 +277,7 @@ fn button_face(
 ) -> (Color, Color, Border, Shadow) {
     let s = tok.scheme();
     let surface = s.surface;
-    let pill = button_border(Component::Button);
+    let pill = button_border(tok, Component::Button);
     match variant {
         Variant::Primary => {
             let (bg, fg) = face(s.primary, s.on_primary, surface, state);
@@ -310,7 +310,12 @@ fn button_face(
                 surface,
                 state,
             );
-            (bg, fg, button_border(Component::Chip), Shadow::default())
+            (
+                bg,
+                fg,
+                button_border(tok, Component::Chip),
+                Shadow::default(),
+            )
         }
         Variant::Danger => {
             let (bg, fg) = face(s.error, s.on_error, surface, state);
@@ -350,7 +355,7 @@ fn button_face(
         }
         Variant::Elevated => {
             let (bg, fg) = face(s.surface_container_high, s.primary, surface, state);
-            (bg, fg, pill, crate::m3::Elevation::Level1.shadow())
+            (bg, fg, pill, tok.shadow(crate::m3::Elevation::Level1))
         }
     }
 }
@@ -398,7 +403,7 @@ pub fn tab_style(
             border: Border {
                 color: Color::TRANSPARENT,
                 width: 0.0,
-                radius: component_radius(Component::Tab),
+                radius: component_radius(tok, Component::Tab),
             },
             shadow: Shadow::default(),
             snap: false,
@@ -425,9 +430,9 @@ pub fn dialog_sheet_face(tok: Tokens) -> container::Style {
         border: Border {
             color: s.outline_variant,
             width: 0.0,
-            radius: component_radius(Component::Dialog),
+            radius: component_radius(tok, Component::Dialog),
         },
-        shadow: Elevation::Level3.shadow(),
+        shadow: tok.shadow(Elevation::Level3),
         snap: false,
     }
 }
@@ -441,9 +446,9 @@ pub fn app_bar(tok: Tokens) -> container::Style {
         border: Border {
             color: s.outline_variant,
             width: 0.0,
-            radius: component_radius(Component::AppBar),
+            radius: component_radius(tok, Component::AppBar),
         },
-        shadow: Elevation::Level0.shadow(),
+        shadow: tok.shadow(Elevation::Level0),
         snap: false,
     }
 }
@@ -484,7 +489,7 @@ pub fn field_style(
             border: Border {
                 color: border_color,
                 width,
-                radius: component_radius(Component::Field),
+                radius: component_radius(tok, Component::Field),
             },
             icon: s.on_surface_variant,
             placeholder: s.on_surface_variant,
@@ -516,7 +521,7 @@ pub fn search_style(tok: Tokens) -> impl Fn(&iced::Theme, text_input::Status) ->
             border: Border {
                 color: border_color,
                 width,
-                radius: component_radius(Component::Field),
+                radius: component_radius(tok, Component::Field),
             },
             icon: s.on_surface_variant,
             placeholder: s.on_surface_variant,
@@ -541,7 +546,7 @@ pub fn picker_style(tok: Tokens) -> impl Fn(&iced::Theme, pick_list::Status) -> 
             border: Border {
                 color: if hot { s.primary } else { s.outline },
                 width: if hot { 2.0 } else { 1.0 },
-                radius: component_radius(Component::Field),
+                radius: component_radius(tok, Component::Field),
             },
         }
     }
@@ -555,13 +560,13 @@ pub fn overlay_menu_style(tok: Tokens) -> impl Fn(&iced::Theme) -> overlay_menu:
             background: Background::Color(s.surface_container),
             border: Border {
                 width: 1.0,
-                radius: component_radius(Component::Field),
+                radius: component_radius(tok, Component::Field),
                 color: s.outline_variant,
             },
             text_color: s.on_surface,
             selected_text_color: s.on_secondary_container,
             selected_background: Background::Color(s.secondary_container),
-            shadow: Elevation::Level2.shadow(),
+            shadow: tok.shadow(Elevation::Level2),
         }
     }
 }
@@ -602,7 +607,7 @@ pub fn checkbox_style(tok: Tokens) -> impl Fn(&iced::Theme, checkbox::Status) ->
             border: Border {
                 color: border_c,
                 width: 2.0,
-                radius: component_radius(Component::Field),
+                radius: component_radius(tok, Component::Field),
             },
             text_color: Some(if disabled {
                 layer_on(s.surface, s.on_surface, 0.38)
@@ -679,7 +684,7 @@ pub fn switch_style(tok: Tokens) -> impl Fn(&iced::Theme, toggler::Status) -> to
             foreground_border_width: 0.0,
             foreground_border_color: Color::TRANSPARENT,
             text_color: Some(s.on_surface),
-            border_radius: Some(component_radius(Component::Button)),
+            border_radius: Some(component_radius(tok, Component::Button)),
             padding_ratio: 0.2,
         }
     }
@@ -702,7 +707,7 @@ pub fn slider_style(tok: Tokens) -> impl Fn(&iced::Theme, slider::Status) -> sli
                 border: Border {
                     color: Color::TRANSPARENT,
                     width: 0.0,
-                    radius: component_radius(Component::Button),
+                    radius: component_radius(tok, Component::Button),
                 },
             },
             handle: slider::Handle {
@@ -724,7 +729,7 @@ pub fn progress_style(tok: Tokens) -> impl Fn(&iced::Theme) -> progress_bar::Sty
             border: Border {
                 color: Color::TRANSPARENT,
                 width: 0.0,
-                radius: component_radius(Component::Button),
+                radius: component_radius(tok, Component::Button),
             },
         }
     }
@@ -735,7 +740,7 @@ pub fn rule_style(tok: Tokens) -> impl Fn(&iced::Theme) -> rule::Style {
         let s = tok.scheme();
         rule::Style {
             color: s.outline_variant,
-            radius: component_radius(Component::Shell),
+            radius: component_radius(tok, Component::Shell),
             fill_mode: rule::FillMode::Full,
             snap: false,
         }
@@ -750,14 +755,14 @@ pub fn scroll_style(tok: Tokens) -> impl Fn(&iced::Theme, scrollable::Status) ->
             border: Border {
                 color: Color::TRANSPARENT,
                 width: 0.0,
-                radius: component_radius(Component::Button),
+                radius: component_radius(tok, Component::Button),
             },
             scroller: scrollable::Scroller {
                 background: Background::Color(s.outline),
                 border: Border {
                     color: Color::TRANSPARENT,
                     width: 0.0,
-                    radius: component_radius(Component::Button),
+                    radius: component_radius(tok, Component::Button),
                 },
             },
         };
@@ -771,7 +776,7 @@ pub fn scroll_style(tok: Tokens) -> impl Fn(&iced::Theme, scrollable::Status) ->
                 border: Border {
                     color: s.outline,
                     width: 1.0,
-                    radius: component_radius(Component::Field),
+                    radius: component_radius(tok, Component::Field),
                 },
                 shadow: Shadow::default(),
                 icon: s.on_surface,
@@ -961,9 +966,18 @@ mod tests {
         );
         assert_eq!(
             card(tok, false).border.radius,
-            component_radius(crate::m3::shape::Component::Card)
+            component_radius(tok, crate::m3::shape::Component::Card)
         );
         assert_eq!(card(tok, false).border.radius, 0.0.into());
+        let material = tok.with_shape(crate::m3::ShapePolicy::Material);
+        assert_eq!(
+            card(material, false).border.radius,
+            component_radius(material, crate::m3::shape::Component::Card)
+        );
+        assert!(card(material, false).border.radius.top_left > 0.0);
+        let flat = tok.with_elevation(crate::m3::ElevationPolicy::Flat);
+        assert_eq!(raised_card(flat).shadow.blur_radius, 0.0);
+        assert_eq!(dialog_sheet_face(flat).shadow.blur_radius, 0.0);
     }
 
     #[test]

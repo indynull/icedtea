@@ -74,9 +74,8 @@ fn control_height(tok: Tokens) -> f32 {
     // Same face as `themed_button` Shrink. Do not floor to the 48dp touch
     // target: iced `Fixed(48)` + pad paints a 48px face, taller than
     // labeled buttons on the same page.
-    let line = f32::from(
-        iced::widget::text::LineHeight::default().to_absolute(iced::Pixels(typo::BODY as f32)),
-    );
+    let line =
+        f32::from(iced::widget::text::LineHeight::default().to_absolute(iced::Pixels(tok.body())));
     let p = pad(tok);
     line + p.top + p.bottom
 }
@@ -87,7 +86,7 @@ fn icon_label<'a, M: 'a>(title: String, icons: Icons, tok: Tokens) -> Element<'a
     if let Some(ic) = icons.leading {
         r = r.push(icon_svg(ic, tok, A11y::new(title.clone(), Role::Image)));
     }
-    r = r.push(text(title.clone()).size(typo::BODY));
+    r = r.push(text(title.clone()).size(tok.body()));
     if let Some(ic) = icons.trailing {
         r = r.push(icon_svg(ic, tok, A11y::new(title, Role::Image)));
     }
@@ -180,7 +179,7 @@ pub fn label<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Elemen
     let s = a11y.apply_name(s);
     a11y::attach(
         text(s)
-            .size(typo::BODY)
+            .size(tok.body())
             .color(tok.scheme().on_surface)
             .font(typo::UI)
             .into(),
@@ -193,7 +192,7 @@ pub fn display_line<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) ->
     let s = a11y.apply_name(s);
     a11y::attach(
         text(s)
-            .size(typo::META)
+            .size(tok.meta())
             .color(tok.scheme().on_surface_variant)
             .font(typo::UI)
             .width(Length::Fill)
@@ -210,7 +209,7 @@ pub fn figure_display<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) 
     for ch in s.chars() {
         r = r.push(
             text(ch.to_string())
-                .size(typo::DISPLAY)
+                .size(tok.display())
                 .font(typo::UI_BOLD)
                 .color(tok.scheme().on_surface),
         );
@@ -222,7 +221,7 @@ pub fn meta<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Element
     let s = a11y.apply_name(s);
     a11y::attach(
         text(s)
-            .size(typo::META)
+            .size(tok.meta())
             .color(tok.scheme().on_surface_variant)
             .into(),
         &a11y,
@@ -260,7 +259,7 @@ pub fn code_block<'a, M: Clone + 'a>(
         .height(Length::Shrink)
         .padding(12)
         .font(typo::MONO)
-        .size(typo::CODE)
+        .size(tok.code())
         .wrapping(iced::widget::text::Wrapping::Word)
         .style(editor_style(tok))
         .on_action(move |a| on_action(select_only(a)));
@@ -292,7 +291,7 @@ pub fn hyperlink<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let title = a11y.apply_name(title);
-    let mut b = button(text(title).size(typo::BODY).color(tok.scheme().primary))
+    let mut b = button(text(title).size(tok.body()).color(tok.scheme().primary))
         .padding(0)
         .style(style::button_style(tok, Variant::Ghost));
     if let Some(m) = a11y.apply_message(Some(msg)) {
@@ -359,7 +358,7 @@ pub fn themed_button_sized<'a, M: Clone + 'a>(
     let label = a11y.apply_name(title);
     let face: Element<'a, M> = if icons == Icons::NONE {
         text(label)
-            .size(typo::BODY)
+            .size(tok.body())
             .width(Length::Fill)
             .align_x(Alignment::Center)
             .into()
@@ -719,7 +718,7 @@ pub fn checkbox_indeterminate<'a, M: Clone + 'a>(
             let s = tok.scheme();
             let box_face = container(
                 text("−")
-                    .size(typo::META)
+                    .size(tok.meta())
                     .color(s.on_primary)
                     .width(Length::Fill)
                     .align_x(Alignment::Center),
@@ -731,7 +730,7 @@ pub fn checkbox_indeterminate<'a, M: Clone + 'a>(
             .style(move |_| indeterminate_box_face(tok));
             let row = row![
                 box_face,
-                text(name.clone()).size(typo::BODY).color(s.on_surface)
+                text(name.clone()).size(tok.body()).color(s.on_surface)
             ]
             .spacing(8)
             .align_y(Alignment::Center);
@@ -750,7 +749,7 @@ fn indeterminate_box_face(tok: Tokens) -> iced::widget::container::Style {
     st.border = iced::border::Border {
         color: s.primary,
         width: 2.0,
-        radius: crate::m3::shape::Component::Field.radius(),
+        radius: tok.radius(crate::m3::shape::Component::Field),
     };
     st
 }
@@ -866,7 +865,7 @@ pub fn button_group<'a, M: Clone + 'a>(
                 st.border = iced::border::Border {
                     color: s.outline_variant,
                     width: 1.0,
-                    radius: crate::m3::shape::Component::Button.radius(),
+                    radius: tok.radius(crate::m3::shape::Component::Button),
                 };
                 st
             })
@@ -1044,7 +1043,7 @@ where
                     .center_y(16)
                     .style(move |_| radio_idle_face(tok, on)),
                 text(name.clone())
-                    .size(typo::BODY)
+                    .size(tok.body())
                     .color(tok.scheme().on_surface_variant),
             ]
             .spacing(8)
@@ -1184,7 +1183,7 @@ pub fn themed_slider<'a, M: Clone + 'a>(
     if !marks.thumb.is_empty() {
         col = col.push(
             text(marks.thumb)
-                .size(typo::META)
+                .size(tok.meta())
                 .color(s.on_surface)
                 .width(Length::Fill),
         );
@@ -1211,10 +1210,10 @@ pub fn themed_slider<'a, M: Clone + 'a>(
         col = col.push(
             row![
                 text(marks.min)
-                    .size(typo::META)
+                    .size(tok.meta())
                     .color(s.on_surface_variant)
                     .width(Length::Fill),
-                text(marks.max).size(typo::META).color(s.on_surface_variant),
+                text(marks.max).size(tok.meta()).color(s.on_surface_variant),
             ]
             .width(Length::Fill),
         );
@@ -1306,7 +1305,7 @@ pub fn range_slider<'a, M: Clone + 'a>(
         column![
             lo,
             text(format!("{low:.0} – {high:.0}"))
-                .size(typo::META)
+                .size(tok.meta())
                 .color(s.on_surface_variant),
             hi,
         ]
@@ -1668,7 +1667,7 @@ pub fn number_input<'a, M: Clone + 'a>(
     let mut i = text_input("0", &shown)
         .style(style::search_style(tok))
         .padding(pad(tok))
-        .size(typo::BODY);
+        .size(tok.body());
     let el: Element<'a, M> = if a11y.disabled {
         let _ = on_change;
         i.into()
@@ -1730,7 +1729,7 @@ pub fn themed_text_input<'a, M: Clone + 'a>(
     let mut i = text_input(placeholder, value)
         .style(style::field_style(tok, outlined))
         .padding(pad(tok))
-        .size(typo::BODY);
+        .size(tok.body());
     if let Some(id) = input_id {
         i = i.id(id);
     }
@@ -1756,7 +1755,7 @@ pub fn themed_text_input<'a, M: Clone + 'a>(
     if !opts.label.is_empty() && !value.is_empty() {
         col = col.push(
             text(opts.label)
-                .size(typo::META)
+                .size(tok.meta())
                 .color(tok.scheme().on_surface_variant),
         );
     }
@@ -1765,7 +1764,7 @@ pub fn themed_text_input<'a, M: Clone + 'a>(
         let n = value.chars().count();
         col = col.push(
             text(format!("{n}/{max}"))
-                .size(typo::META)
+                .size(tok.meta())
                 .color(tok.scheme().on_surface_variant)
                 .width(Length::Fill),
         );
@@ -1815,14 +1814,14 @@ pub fn field_support<'a, M: 'a>(
     if let Some(err) = error.filter(|t| !t.is_empty()) {
         col = col.push(
             text(err.to_string())
-                .size(typo::META)
+                .size(tok.meta())
                 .color(s.error)
                 .width(Length::Fill),
         );
     } else if let Some(help) = support.filter(|t| !t.is_empty()) {
         col = col.push(
             text(help.to_string())
-                .size(typo::META)
+                .size(tok.meta())
                 .color(s.on_surface_variant)
                 .width(Length::Fill),
         );
@@ -1922,7 +1921,7 @@ pub fn password_input<'a, M: Clone + 'a>(
         .secure(masked)
         .style(style::search_style(tok))
         .padding(pad(tok))
-        .size(typo::BODY);
+        .size(tok.body());
     if !a11y.disabled {
         i = i.on_input(on_input);
     }
@@ -2124,7 +2123,7 @@ pub fn textarea<'a, M: Clone + 'a>(
     let mut e = text_editor(content)
         .height(height)
         .padding(8)
-        .size(typo::BODY)
+        .size(tok.body())
         .style(editor_style(tok));
     if !a11y.disabled {
         e = e.on_action(on_action);
@@ -2185,8 +2184,8 @@ pub fn selectable<'a, M: Clone + 'a>(
         .padding(0)
         .font(face.font())
         .size(match face {
-            typo::FontFace::Mono => typo::CODE,
-            typo::FontFace::Ui => typo::BODY,
+            typo::FontFace::Mono => tok.code(),
+            typo::FontFace::Ui => tok.body(),
         })
         .wrapping(iced::widget::text::Wrapping::Word)
         .style(selectable_style(tok))
@@ -2258,7 +2257,7 @@ pub fn highlighted_code<'a, M: Clone + 'a>(
         .style(editor_style(tok))
         .highlight(syntax, theme)
         .font(typo::MONO)
-        .size(typo::CODE)
+        .size(tok.code())
         .on_action(move |a| on_action(select_only(a)));
     container(e)
         .width(Length::Fill)
@@ -2275,7 +2274,7 @@ fn editor_frame(tok: Tokens) -> iced::widget::container::Style {
         border: iced::Border {
             color: s.outline_variant,
             width: 1.0,
-            radius: crate::m3::shape::Component::Field.radius(),
+            radius: tok.radius(crate::m3::shape::Component::Field),
         },
         ..iced::widget::container::Style::default()
     }
@@ -2291,7 +2290,7 @@ pub fn editor_style(
             border: iced::Border {
                 color: s.outline_variant,
                 width: 1.0,
-                radius: crate::m3::shape::Component::Field.radius(),
+                radius: tok.radius(crate::m3::shape::Component::Field),
             },
             placeholder: s.on_surface_variant,
             value: s.on_surface,
@@ -2429,7 +2428,7 @@ pub fn search_view<'a, M: Clone + 'a>(
             let hit_a11y = A11y::button(hit.clone()).with_disabled(a11y.disabled);
             let mut b = button(
                 text(hit_a11y.apply_name(hit.clone()))
-                    .size(typo::BODY)
+                    .size(tok.body())
                     .width(Length::Fill)
                     .align_x(Alignment::Start),
             )
@@ -2493,7 +2492,7 @@ where
         return a11y::attach(
             container(
                 text(shown)
-                    .size(typo::BODY)
+                    .size(tok.body())
                     .color(tok.scheme().on_surface_variant),
             )
             .padding(pad(tok))
@@ -2512,7 +2511,7 @@ where
     let picker = pick_list(options, selected, on_pick)
         .style(style::picker_style(tok))
         .padding(pad(tok))
-        .text_size(typo::BODY);
+        .text_size(tok.body());
     let el: Element<'a, M> = if opts.is_empty() {
         picker.into()
     } else {
@@ -2766,7 +2765,7 @@ impl TimeValue {
 fn time_colon<'a, M: 'a>(tok: Tokens) -> Element<'a, M> {
     container(
         text(":")
-            .size(typo::BODY)
+            .size(tok.body())
             .font(typo::UI_BOLD)
             .color(tok.scheme().on_surface),
     )
@@ -2918,11 +2917,11 @@ impl MarkdownDoc {
 
     /// Estimated Y of item `index` in the default markdown column.
     /// Pass to `scroll_to` on the document scroller after an outline jump.
-    pub fn item_offset(&self, index: usize) -> f32 {
+    pub fn item_offset(&self, index: usize, tok: crate::theme::Tokens) -> f32 {
         self.items
             .iter()
             .take(index)
-            .map(crate::select::markdown_item_extent)
+            .map(|i| crate::select::markdown_item_extent(i, tok))
             .sum()
     }
 }
@@ -3016,8 +3015,9 @@ pub fn parse(source: &str) -> MarkdownDoc {
 /// # Select and copy
 ///
 /// Painted with real markdown layout (headings, lists, code frames,
-/// quotes). Body is [`crate::typo::BODY`]; H1 is [`crate::typo::PAGE`]
-/// (window title), not iced's 2× blog heading. Drag a range with
+/// quotes). Body is [`Tokens::body`](crate::theme::Tokens::body); H1 is
+/// [`Tokens::page`](crate::theme::Tokens::page) (window title), not
+/// iced's 2× blog heading. Drag a range with
 /// [`crate::select::markdown_select`] so it can start in one block and
 /// end in another; pass the live [`crate::select::MarkdownSpan`] here.
 /// The view is not flattened into one mixed-size `Rich`. The document
@@ -3037,7 +3037,7 @@ pub fn parse(source: &str) -> MarkdownDoc {
 /// let doc = widget::parse("# Hi\n\nBody.");
 /// let on_link = |_uri| MarkdownPointer::Release;
 /// let on_pointer = |ev| ev;
-/// let state = markdown_select(&doc.items, MarkdownSelect::default(), MarkdownPointer::Press);
+/// let state = markdown_select(&doc.items, MarkdownSelect::default(), MarkdownPointer::Press, tok);
 /// let _: icedtea::Element<'_, _> = widget::markdown_view(
 ///     &doc.items,
 ///     Some(&state.span),
@@ -3055,7 +3055,7 @@ pub fn markdown_view<'a, M: Clone + 'a>(
     on_link: impl Fn(markdown::Uri) -> M + Copy + 'a,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let settings = crate::select::markdown_paint_settings(markdown_style(tok));
+    let settings = crate::select::markdown_paint_settings(markdown_style(tok), tok);
     let fill = tok.scheme().secondary_container;
     let live = span.copied().filter(|s| !s.is_empty());
     let mut col = Column::new().spacing(settings.spacing).width(Length::Fill);
@@ -3522,7 +3522,7 @@ pub fn chip_face(
     variant: Variant,
 ) -> (iced::Color, iced::Color, iced::border::Border) {
     let s = tok.scheme();
-    let r = crate::m3::shape::Component::Chip.radius();
+    let r = tok.radius(crate::m3::shape::Component::Chip);
     match variant {
         // Selected filter / assist filled. Primary solid so ink is
         // on_primary, not the same on_surface as the idle outline.
@@ -3641,7 +3641,7 @@ pub fn chip<'a, M: Clone + 'a>(
     if let Some(ic) = icons.leading {
         line = line.push(icon_svg(ic, tok, A11y::new(title.clone(), Role::Image)));
     }
-    line = line.push(text(title.clone()).size(typo::META).color(ink));
+    line = line.push(text(title.clone()).size(tok.meta()).color(ink));
     if let Some(msg) = dismiss {
         line = line.push(dismiss_button(
             msg,
@@ -3746,8 +3746,8 @@ pub fn badge<'a, M: 'a>(
         BadgeSize::Large => [4, 8],
     };
     let type_size = match size {
-        BadgeSize::Small => typo::META.saturating_sub(2).max(10),
-        BadgeSize::Large => typo::META,
+        BadgeSize::Small => (tok.meta() - 2.0).max(10.0),
+        BadgeSize::Large => tok.meta(),
     };
     let mark: Element<'a, M> = container(text(title).size(type_size).color(ink))
         .padding(pad)
@@ -4117,7 +4117,7 @@ pub fn log_view<'a, M: Clone + 'a>(
             col = col.push(
                 container(
                     text(line.to_string())
-                        .size(typo::META)
+                        .size(tok.meta())
                         .color(tok.scheme().on_surface)
                         .font(typo::MONO),
                 )
@@ -4309,7 +4309,7 @@ fn row_slot_el<'a, M: Clone + 'a>(
                         st.border = iced::border::Border {
                             color: s.outline,
                             width: 2.0,
-                            radius: crate::m3::shape::Component::Field.radius(),
+                            radius: tok.radius(crate::m3::shape::Component::Field),
                         };
                         st
                     }
@@ -4346,7 +4346,7 @@ fn two_line_row<'a, M: 'a>(
     };
     let on = tok.scheme().on_surface;
     let mut col = column![text(title)
-        .size(typo::BODY)
+        .size(tok.body())
         .color(on)
         .font(typo::UI)
         .width(Length::Fill)
@@ -4361,7 +4361,7 @@ fn two_line_row<'a, M: 'a>(
         };
         col = col.push(
             text(meta_t)
-                .size(typo::META)
+                .size(tok.meta())
                 .color(meta_color)
                 .width(Length::Fill)
                 .wrapping(wrapping),
@@ -4392,7 +4392,7 @@ fn card_row<'a, M: 'a>(
 ) -> Element<'a, M> {
     let on = tok.scheme().on_surface;
     let mut col = column![text(title.to_string())
-        .size(typo::BODY)
+        .size(tok.body())
         .color(on)
         .font(if selected { typo::UI_BOLD } else { typo::UI })
         .width(Length::Fill)
@@ -4402,7 +4402,7 @@ fn card_row<'a, M: 'a>(
     if let Some(m) = meta_s.filter(|s| !s.is_empty()) {
         col = col.push(
             text(m.to_string())
-                .size(typo::META)
+                .size(tok.meta())
                 .color(meta_color)
                 .width(Length::Fill),
         );
@@ -5179,7 +5179,7 @@ where
                             let w = col_w(c);
                             let cell_style = style::table_cell(tok, selected, focused, stripe);
                             let ink = cell_style.text_color.unwrap_or(tok.scheme().on_surface);
-                            let face = container(text(value.clone()).size(typo::BODY).color(ink))
+                            let face = container(text(value.clone()).size(tok.body()).color(ink))
                                 .width(w)
                                 .height(h)
                                 .padding([8, 8])
@@ -5511,7 +5511,7 @@ pub fn tab_bar<'a, M: Clone + 'a>(
         if let Some(Some(ic)) = tabs.icons.get(i) {
             label_row = label_row.push(icon_svg(*ic, tok, A11y::new(title.clone(), Role::Image)));
         }
-        label_row = label_row.push(text(title.clone()).size(typo::META));
+        label_row = label_row.push(text(title.clone()).size(tok.meta()));
         if let Some(b) = badge {
             label_row = label_row.push(self::badge(
                 b,
@@ -5602,10 +5602,10 @@ fn disclosure_header<'a, M: Clone + 'a>(
     let s = tok.scheme();
     let face = row![
         text(title.clone())
-            .size(typo::BODY)
+            .size(tok.body())
             .color(s.on_surface)
             .width(Length::Fill),
-        text(mark).size(typo::BODY).color(s.on_surface_variant),
+        text(mark).size(tok.body()).color(s.on_surface_variant),
     ]
     .spacing(8)
     .align_y(Alignment::Center)
@@ -6774,7 +6774,7 @@ mod tests {
             .split("pub fn date_picker")
             .next()
             .unwrap();
-        assert!(pick_src.contains("text_size(typo::BODY)"));
+        assert!(pick_src.contains("text_size(tok.body())"));
         let _: Element<'_, ()> = date_picker(
             DateValue {
                 year: 2024,
@@ -7404,15 +7404,20 @@ mod tests {
         let none: [MdHeading; 0] = [];
         let _: Element<'_, ()> =
             markdown_outline(&none, None, |_| (), tok, role("outline-empty", Role::List));
-        assert!(outlined.item_offset(heads[1].index) > outlined.item_offset(heads[0].index));
-        assert_eq!(outlined.item_offset(0), 0.0);
-        assert!(outlined.item_offset(outlined.items.len()) > outlined.item_offset(heads[1].index));
-        let _ = deep.item_offset(deep.items.len());
+        assert!(
+            outlined.item_offset(heads[1].index, tok) > outlined.item_offset(heads[0].index, tok)
+        );
+        assert_eq!(outlined.item_offset(0, tok), 0.0);
+        assert!(
+            outlined.item_offset(outlined.items.len(), tok)
+                > outlined.item_offset(heads[1].index, tok)
+        );
+        let _ = deep.item_offset(deep.items.len(), tok);
         let rich = parse(
             "# T\n\nA paragraph with [link](https://example.com).\n\n- bullet\n  - nested\n\n1. one\n\n- [x] done\n- [ ] todo\n\n> quoted\n>\n> still quoted\n\n---\n\n```rust\nfn x() {}\n```\n\n| Name | Ready |\n| --- | --- |\n| A | yes |\n\n![Logo](pixel.png)\n",
         );
         assert!(rich.items.len() >= 8);
-        assert!(rich.item_offset(rich.items.len()) > 100.0);
+        assert!(rich.item_offset(rich.items.len(), tok) > 100.0);
     }
 
     #[test]
@@ -8421,7 +8426,7 @@ mod tests {
             .next()
             .unwrap();
         assert!(hl.contains("select_only"));
-        assert!(hl.contains("typo::CODE"));
+        assert!(hl.contains("tok.code()"));
         assert!(!hl.contains("if !a11y.disabled"));
         let block_src = src
             .split("pub fn code_block")
@@ -8430,7 +8435,7 @@ mod tests {
             .split("/// A text link")
             .next()
             .unwrap();
-        assert!(block_src.contains("typo::CODE"));
+        assert!(block_src.contains("tok.code()"));
     }
 
     #[test]
@@ -8572,17 +8577,24 @@ mod tests {
             &doc.items,
             crate::select::MarkdownSelect::default(),
             crate::select::MarkdownPointer::at_y(0.0),
+            tok,
         );
-        st = crate::select::markdown_select(&doc.items, st, crate::select::MarkdownPointer::Press);
+        st = crate::select::markdown_select(
+            &doc.items,
+            st,
+            crate::select::MarkdownPointer::Press,
+            tok,
+        );
         let end_y = doc
             .items
             .iter()
-            .map(crate::select::markdown_item_extent)
+            .map(|i| crate::select::markdown_item_extent(i, crate::theme::named("dark").tokens))
             .sum::<f32>();
         st = crate::select::markdown_select(
             &doc.items,
             st,
             crate::select::MarkdownPointer::at_y(end_y),
+            tok,
         );
         let mut painted: Element<'_, crate::select::MarkdownPointer> = markdown_view(
             &doc.items,
@@ -8706,7 +8718,7 @@ mod tests {
         );
         let mut st = crate::select::MarkdownSelect::default();
         for ev in first.iter().chain(second.iter()) {
-            st = crate::select::markdown_select(&doc.items, st, *ev);
+            st = crate::select::markdown_select(&doc.items, st, *ev, tok);
         }
         assert!(!st.span.is_empty());
         let copied = st.span.text(&doc.items);

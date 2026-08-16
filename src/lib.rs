@@ -83,8 +83,11 @@
 //! desktop pair; follow-OS layers host chrome on that pair. Other
 //! catalog names are a choice. Control paint paths read roles through
 //! [`Tokens::scheme`](theme::Tokens::scheme). Short fields (`primary`,
-//! `text`, …) are aliases of those roles. Desktop chrome is M3 shape
-//! None (0 dp, rectangular). [`theme::mix`] builds washes:
+//! `text`, …) are aliases of those roles. Type size, corners, and
+//! shadows follow [`Tokens::font_scale`](theme::Tokens::font_scale),
+//! [`Tokens::shape`](theme::Tokens::shape), and
+//! [`Tokens::elevation`](theme::Tokens::elevation). Default chrome is
+//! M3 shape None (0 dp, rectangular). [`theme::mix`] builds washes:
 //!
 //! ```
 //! use icedtea::theme;

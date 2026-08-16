@@ -1,9 +1,10 @@
 # Compact tools
 
-A tool-sized window sets size on `Boot`. Tiles use
-`themed_button_sized` and `layout::pad`. Large values use body text at
-`typo::DISPLAY` (or `m3::TypeRole::Display`) with platform bold. Keys
-use `key::press` so Shift+8 is `*`.
+A tool-sized window sets size on `Boot`. Density, type scale, corners,
+and elevation are the same `Boot` / `Tokens` fields as a full window.
+Tiles use `themed_button_sized` and `layout::pad`. Large values use
+`Tokens::display()` (M3 Display Small times `font_scale`) with platform
+bold. Keys use `key::press` so Shift+8 is `*`.
 
 ```rust,ignore
 use icedtea::density::Density;

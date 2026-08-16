@@ -2,6 +2,19 @@
 
 use super::color::Scheme;
 use iced::{Color, Shadow, Vector};
+use serde::{Deserialize, Serialize};
+
+/// Whether constructors paint the documented shadow, or none.
+///
+/// Surfaces stay on their tonal container. Default is [`Self::Desktop`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum ElevationPolicy {
+    /// Per-component M3 levels (cards 1, menus 2, dialogs 3).
+    #[default]
+    Desktop,
+    /// No drop shadow.
+    Flat,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Elevation {
@@ -75,5 +88,6 @@ mod tests {
         assert!(Elevation::Raised.shadow().blur_radius > 0.0);
         assert!(Elevation::Level5.shadow().blur_radius >= Elevation::Level3.shadow().blur_radius);
         let _ = Elevation::Level4.shadow();
+        assert_eq!(ElevationPolicy::default(), ElevationPolicy::Desktop);
     }
 }

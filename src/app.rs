@@ -4,6 +4,7 @@ use iced::{Font, Pixels, Settings, Size};
 
 use crate::density::{Density, DensityName};
 use crate::i18n::{Catalog, Locale};
+use crate::m3::{ElevationPolicy, ShapePolicy};
 use crate::theme::{self, ThemeCatalog, Tokens};
 use crate::typo;
 use crate::window::{self, DisplayBounds, WindowKind};
@@ -24,6 +25,9 @@ pub struct Boot {
     pub theme_name: String,
     pub locale: Locale,
     pub density: DensityName,
+    pub font_scale: f32,
+    pub shape: ShapePolicy,
+    pub elevation: ElevationPolicy,
     pub size: Option<Size>,
     pub min_size: Option<Size>,
     pub max_size: Option<Size>,
@@ -40,6 +44,9 @@ impl Boot {
             theme_name: "dark".into(),
             locale: Locale::default(),
             density: DensityName::Default,
+            font_scale: 1.0,
+            shape: ShapePolicy::Desktop,
+            elevation: ElevationPolicy::Desktop,
             size: None,
             min_size: None,
             max_size: None,
@@ -70,6 +77,24 @@ impl Boot {
 
     pub fn density(mut self, density: DensityName) -> Self {
         self.density = density;
+        self
+    }
+
+    /// Type-scale multiplier (1.0 is the Material body size).
+    pub fn font_scale(mut self, scale: f32) -> Self {
+        self.font_scale = scale;
+        self
+    }
+
+    /// Corner policy applied to every constructor.
+    pub fn shape(mut self, shape: ShapePolicy) -> Self {
+        self.shape = shape;
+        self
+    }
+
+    /// Shadow policy applied to every constructor.
+    pub fn elevation(mut self, elevation: ElevationPolicy) -> Self {
+        self.elevation = elevation;
         self
     }
 
@@ -128,13 +153,18 @@ pub fn bootstrap_with_catalog(boot: &Boot, themes: &ThemeCatalog) -> Prepared {
         .get(&boot.theme_name)
         .or_else(|| themes.get("dark"))
         .expect("dark theme");
-    let tokens = named.tokens;
+    let tokens = named
+        .tokens
+        .with_density(Density::named(boot.density))
+        .with_font_scale(boot.font_scale)
+        .with_shape(boot.shape)
+        .with_elevation(boot.elevation);
     let iced_theme = theme::iced_theme(&named.name, tokens);
     let iced_settings = Settings {
         id: Some(boot.application_id.clone()),
         fonts: vec![],
         default_font: typo::UI,
-        default_text_size: Pixels(typo::BODY as f32),
+        default_text_size: Pixels(tokens.body()),
         antialiasing: true,
         vsync: true,
     };
@@ -248,11 +278,18 @@ mod tests {
     fn bootstrap_loads_theme_and_window_kinds() {
         let mut boot = Boot::new("App", "dev.icedtea.app")
             .theme("nord")
-            .density(DensityName::Compact);
+            .density(DensityName::Compact)
+            .font_scale(1.25)
+            .shape(ShapePolicy::Material)
+            .elevation(ElevationPolicy::Flat);
         boot = boot.locale(Locale::new("ar"));
         let prep = bootstrap(&boot);
         assert_eq!(prep.theme_name, "nord");
         assert_eq!(prep.density.space, 4);
+        assert_eq!(prep.tokens.density.space, 4);
+        assert_eq!(prep.tokens.body(), 18.0);
+        assert_eq!(prep.tokens.shape, ShapePolicy::Material);
+        assert_eq!(prep.tokens.elevation, ElevationPolicy::Flat);
         assert_eq!(prep.locale.direction, crate::i18n::Direction::Rtl);
         assert_eq!(prep.direction(), crate::i18n::Direction::Rtl);
         assert_eq!(prep.catalog.t("direction"), "rtl");

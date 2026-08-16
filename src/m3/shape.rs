@@ -3,6 +3,7 @@
 //! See <https://m3.material.io/styles/shape/overview>.
 
 use iced::border::Radius;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Shape {
@@ -60,14 +61,60 @@ pub enum Component {
     Tab,
 }
 
+/// How constructors pick a corner from [`Component`].
+///
+/// Default is [`Self::Desktop`] (every family 0 dp). Apps that want
+/// Material corners, or one radius on every control, set this on
+/// [`crate::theme::Tokens`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum ShapePolicy {
+    /// Every family is M3 None (0 dp). Desktop default.
+    #[default]
+    Desktop,
+    /// Extra-small (4 dp) on every family.
+    Tight,
+    /// Medium (12 dp) on every family.
+    Soft,
+    /// Full pill on every family.
+    Pill,
+    /// Documented Material map (buttons extra-small, cards medium,
+    /// dialogs extra-large, app bars flush).
+    Material,
+}
+
 impl Component {
     /// Desktop flat: every family is M3 shape None (0 dp).
     pub fn shape(self) -> Shape {
-        Shape::None
+        self.shape_for(ShapePolicy::Desktop)
+    }
+
+    /// Corner for this family under `policy`.
+    pub fn shape_for(self, policy: ShapePolicy) -> Shape {
+        match policy {
+            ShapePolicy::Desktop => Shape::None,
+            ShapePolicy::Tight => Shape::ExtraSmall,
+            ShapePolicy::Soft => Shape::Medium,
+            ShapePolicy::Pill => Shape::Full,
+            ShapePolicy::Material => self.material_shape(),
+        }
+    }
+
+    fn material_shape(self) -> Shape {
+        match self {
+            Self::Button | Self::Field | Self::Checkbox | Self::Menu => Shape::ExtraSmall,
+            Self::Chip => Shape::Small,
+            Self::Card => Shape::Medium,
+            Self::Dialog => Shape::ExtraLarge,
+            Self::AppBar | Self::Shell | Self::Tab => Shape::None,
+        }
     }
 
     pub fn radius(self) -> Radius {
         self.shape().radius()
+    }
+
+    pub fn radius_for(self, policy: ShapePolicy) -> Radius {
+        self.shape_for(policy).radius()
     }
 }
 
@@ -137,6 +184,52 @@ mod tests {
             assert_eq!(c.shape(), Shape::None, "{c:?}");
             assert_eq!(c.shape().dp(), 0.0);
             assert_eq!(std::hint::black_box(c.radius()).top_left, 0.0);
+            assert_eq!(c.shape_for(ShapePolicy::Desktop), Shape::None);
+            assert_eq!(c.shape_for(ShapePolicy::Tight), Shape::ExtraSmall);
+            assert_eq!(c.shape_for(ShapePolicy::Soft), Shape::Medium);
+            assert_eq!(c.shape_for(ShapePolicy::Pill), Shape::Full);
         }
+        assert_eq!(
+            Component::Button.shape_for(ShapePolicy::Material),
+            Shape::ExtraSmall
+        );
+        assert_eq!(
+            Component::Chip.shape_for(ShapePolicy::Material),
+            Shape::Small
+        );
+        assert_eq!(
+            Component::Card.shape_for(ShapePolicy::Material),
+            Shape::Medium
+        );
+        assert_eq!(
+            Component::Dialog.shape_for(ShapePolicy::Material),
+            Shape::ExtraLarge
+        );
+        assert_eq!(
+            Component::AppBar.shape_for(ShapePolicy::Material),
+            Shape::None
+        );
+        assert_eq!(
+            Component::Field.shape_for(ShapePolicy::Material),
+            Shape::ExtraSmall
+        );
+        assert_eq!(
+            Component::Checkbox.shape_for(ShapePolicy::Material),
+            Shape::ExtraSmall
+        );
+        assert_eq!(
+            Component::Menu.shape_for(ShapePolicy::Material),
+            Shape::ExtraSmall
+        );
+        assert_eq!(
+            Component::Shell.shape_for(ShapePolicy::Material),
+            Shape::None
+        );
+        assert_eq!(Component::Tab.shape_for(ShapePolicy::Material), Shape::None);
+        assert_eq!(
+            Component::Field.radius_for(ShapePolicy::Tight).top_left,
+            4.0
+        );
+        assert_eq!(ShapePolicy::default(), ShapePolicy::Desktop);
     }
 }

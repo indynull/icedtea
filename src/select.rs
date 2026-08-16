@@ -26,7 +26,7 @@ use iced::advanced::text::Span;
 use iced::widget::markdown::{self, Bullet, HeadingLevel, Item, Settings, Text};
 use iced::Font;
 
-use crate::typo;
+use crate::theme::Tokens;
 
 /// Keep selection, click, drag, and scroll. Typing, paste, and delete
 /// become a zero scroll so `Content::perform` does not change the text.
@@ -70,21 +70,25 @@ fn ceil_char_boundary(s: &str, i: usize) -> usize {
 
 /// Paint settings for [`crate::widget::markdown_view`].
 ///
-/// Body, code, and headings use [`typo`] steps (H1 is [`typo::PAGE`]).
-pub(crate) fn markdown_paint_settings(style: markdown::Style) -> Settings {
-    let body = typo::BODY as f32;
+/// Body, code, and headings use [`typo`] steps times [`Tokens::font_scale`].
+pub(crate) fn markdown_paint_settings(style: markdown::Style, tok: Tokens) -> Settings {
+    let body = tok.body();
     Settings {
         text_size: body.into(),
-        h1_size: (typo::PAGE as f32).into(),
-        h2_size: (typo::TITLE as f32).into(),
+        h1_size: tok.page().into(),
+        h2_size: tok.title().into(),
         h3_size: body.into(),
         h4_size: body.into(),
-        h5_size: (typo::META as f32).into(),
-        h6_size: (typo::META as f32).into(),
-        code_size: (typo::CODE as f32).into(),
+        h5_size: tok.meta().into(),
+        h6_size: tok.meta().into(),
+        code_size: tok.code().into(),
         spacing: (body * 0.875).into(),
         style,
     }
+}
+
+fn measure_tok() -> Tokens {
+    crate::theme::named("dark").tokens
 }
 
 /// Plain text of a painted markdown document in document order.
@@ -92,7 +96,7 @@ pub(crate) fn markdown_paint_settings(style: markdown::Style) -> Settings {
 /// Top-level blocks are separated by blank lines. Useful for tests and
 /// for building a linear copy string; the live view selects per block.
 pub fn markdown_plain(items: &[Item]) -> String {
-    let settings = markdown_paint_settings(markdown_measure_style());
+    let settings = markdown_paint_settings(markdown_measure_style(), measure_tok());
     let spans = markdown_document_spans(items, &settings);
     spans.iter().map(|s| s.text.as_ref()).collect()
 }
@@ -353,10 +357,11 @@ pub fn markdown_select(
     items: &[Item],
     mut state: MarkdownSelect,
     ev: MarkdownPointer,
+    tok: Tokens,
 ) -> MarkdownSelect {
     match ev {
         MarkdownPointer::Press => {
-            let pos = markdown_pos_at(items, state.hover_x, state.hover_y);
+            let pos = markdown_pos_at(items, state.hover_x, state.hover_y, tok);
             state.dragging = true;
             state.anchor = pos;
             state.span = MarkdownSpan::from_drag(pos, pos);
@@ -365,12 +370,13 @@ pub fn markdown_select(
             state.hover_x = x;
             state.hover_y = y;
             if state.dragging {
-                state.span = MarkdownSpan::from_drag(state.anchor, markdown_pos_at(items, x, y));
+                state.span =
+                    MarkdownSpan::from_drag(state.anchor, markdown_pos_at(items, x, y, tok));
             }
         }
         MarkdownPointer::Double => {
             state.dragging = false;
-            state.span = markdown_word_span(items, state.hover_x, state.hover_y);
+            state.span = markdown_word_span(items, state.hover_x, state.hover_y, tok);
         }
         MarkdownPointer::Release => {
             state.dragging = false;
@@ -396,7 +402,7 @@ pub fn markdown_select_all(items: &[Item]) -> MarkdownSelect {
 ///
 /// Y picks the block and line; X picks the column on that line so a
 /// same-line drag is a non-empty range.
-pub fn markdown_pos_at(items: &[Item], x: f32, y: f32) -> MarkdownPos {
+pub fn markdown_pos_at(items: &[Item], x: f32, y: f32, tok: Tokens) -> MarkdownPos {
     if items.is_empty() {
         return MarkdownPos::default();
     }
@@ -405,9 +411,9 @@ pub fn markdown_pos_at(items: &[Item], x: f32, y: f32) -> MarkdownPos {
     let mut acc = 0.0;
     let mut pos = MarkdownPos::default();
     const COL: f32 = 64.0;
-    let char_w = (crate::typo::BODY as f32) * 0.5;
+    let char_w = tok.body() * 0.5;
     for (i, item) in items.iter().enumerate() {
-        let h = markdown_item_extent(item).max(1.0);
+        let h = markdown_item_extent(item, tok).max(1.0);
         let last = i + 1 == items.len();
         if y < acc + h || last {
             let plain = markdown_item_plain(item);
@@ -637,11 +643,11 @@ pub(crate) fn highlight_markdown_spans(
 }
 
 /// The word under `(x, y)` (double-click), same rule as a code editor.
-pub fn markdown_word_span(items: &[Item], x: f32, y: f32) -> MarkdownSpan {
+pub fn markdown_word_span(items: &[Item], x: f32, y: f32, tok: Tokens) -> MarkdownSpan {
     if items.is_empty() {
         return MarkdownSpan::default();
     }
-    let pos = markdown_pos_at(items, x, y);
+    let pos = markdown_pos_at(items, x, y, tok);
     let last = items.len() - 1;
     let item = pos.item.min(last);
     let plain = markdown_item_plain(&items[item]);
@@ -687,11 +693,11 @@ pub fn markdown_word_span(items: &[Item], x: f32, y: f32) -> MarkdownSpan {
 }
 
 /// The estimated visual line under `(x, y)`.
-pub fn markdown_line_span(items: &[Item], x: f32, y: f32) -> MarkdownSpan {
+pub fn markdown_line_span(items: &[Item], x: f32, y: f32, tok: Tokens) -> MarkdownSpan {
     if items.is_empty() {
         return MarkdownSpan::default();
     }
-    let pos = markdown_pos_at(items, x, y);
+    let pos = markdown_pos_at(items, x, y, tok);
     let last = items.len() - 1;
     let item = pos.item.min(last);
     let plain = markdown_item_plain(&items[item]);
@@ -733,7 +739,7 @@ pub fn markdown_line_span(items: &[Item], x: f32, y: f32) -> MarkdownSpan {
 }
 
 pub(crate) fn markdown_item_plain(item: &Item) -> String {
-    let settings = markdown_paint_settings(markdown_measure_style());
+    let settings = markdown_paint_settings(markdown_measure_style(), measure_tok());
     let mut spans = Vec::new();
     flatten_spans(std::slice::from_ref(item), &settings, &mut spans, 0);
     spans.iter().map(|s| s.text.as_ref()).collect()
@@ -747,8 +753,8 @@ pub(crate) fn markdown_text_len(text: &Text) -> usize {
 }
 
 /// Estimated block height (same map [`crate::widget::MarkdownDoc::item_offset`] uses).
-pub fn markdown_item_extent(item: &Item) -> f32 {
-    let settings = markdown_paint_settings(markdown_measure_style());
+pub fn markdown_item_extent(item: &Item, tok: Tokens) -> f32 {
+    let settings = markdown_paint_settings(markdown_measure_style(), tok);
     let text = f32::from(settings.text_size);
     let spacing = f32::from(settings.spacing);
     const COL: f32 = 64.0;
@@ -775,13 +781,23 @@ pub fn markdown_item_extent(item: &Item) -> f32 {
                     let kids = match b {
                         Bullet::Point { items } | Bullet::Task { items, .. } => items,
                     };
-                    text + kids.iter().map(markdown_item_extent).sum::<f32>()
+                    text + kids
+                        .iter()
+                        .map(|i| markdown_item_extent(i, tok))
+                        .sum::<f32>()
                 })
                 .sum::<f32>()
                 + spacing
         }
         Item::Image { .. } => 160.0 + spacing,
-        Item::Quote(items) => items.iter().map(markdown_item_extent).sum::<f32>() + 16.0 + spacing,
+        Item::Quote(items) => {
+            items
+                .iter()
+                .map(|i| markdown_item_extent(i, tok))
+                .sum::<f32>()
+                + 16.0
+                + spacing
+        }
         Item::Rule => 24.0 + spacing,
         Item::Table { rows, .. } => (1 + rows.len()) as f32 * text * 1.8 + spacing,
     }
@@ -800,6 +816,10 @@ fn markdown_measure_style() -> markdown::Style {
 
 #[cfg(test)]
 mod tests {
+    fn tok() -> crate::theme::Tokens {
+        crate::theme::named("dark").tokens
+    }
+
     use super::*;
     use iced::widget::markdown;
     use iced::widget::text_editor::{Action, Edit, Motion};
@@ -843,7 +863,7 @@ mod tests {
 
     #[test]
     fn markdown_paint_settings_follow_ui_type_scale() {
-        let s = markdown_paint_settings(markdown_measure_style());
+        let s = markdown_paint_settings(markdown_measure_style(), tok());
         assert_eq!(f32::from(s.text_size), crate::typo::BODY as f32);
         assert_eq!(f32::from(s.h1_size), crate::typo::PAGE as f32);
         assert_eq!(f32::from(s.h2_size), crate::typo::TITLE as f32);
@@ -853,6 +873,12 @@ mod tests {
         assert_eq!(f32::from(s.h6_size), crate::typo::META as f32);
         assert_eq!(f32::from(s.code_size), crate::typo::CODE as f32);
         assert!(f32::from(s.h1_size) > f32::from(s.text_size));
+        let grown = markdown_paint_settings(
+            markdown_measure_style(),
+            crate::theme::named("dark").tokens.with_font_scale(1.25),
+        );
+        assert_eq!(f32::from(grown.text_size), 18.0);
+        assert_eq!(f32::from(grown.h1_size), 28.0);
         let items: Vec<_> = markdown::parse("# Title\n\nBody.").collect();
         let h1 = items
             .iter()
@@ -860,7 +886,7 @@ mod tests {
             .expect("h1");
         let page = crate::typo::PAGE as f32;
         let body = crate::typo::BODY as f32;
-        assert!(markdown_item_extent(h1) <= page * 1.3 + body * 0.5 + body * 0.875 + 0.5);
+        assert!(markdown_item_extent(h1, tok()) <= page * 1.3 + body * 0.5 + body * 0.875 + 0.5);
     }
 
     #[test]
@@ -884,7 +910,7 @@ mod tests {
     #[test]
     fn markdown_document_spans_join_blocks_for_plain_order() {
         let items: Vec<_> = markdown::parse("# A\n\nB line\n\nC line").collect();
-        let settings = markdown_paint_settings(markdown_measure_style());
+        let settings = markdown_paint_settings(markdown_measure_style(), tok());
         let spans = markdown_document_spans(&items, &settings);
         let joined: String = spans.iter().map(|s| s.text.as_ref()).collect();
         assert!(joined.contains('A'));
@@ -1001,11 +1027,14 @@ fn b() {}
         let items: Vec<_> = markdown::parse("# Title\n\nA paragraph.\n\n- alpha\n- beta").collect();
         assert!(items.len() >= 3);
         let mut st = MarkdownSelect::default();
-        st = markdown_select(&items, st, MarkdownPointer::at_y(0.0));
-        st = markdown_select(&items, st, MarkdownPointer::Press);
-        let end_y = items.iter().map(markdown_item_extent).sum::<f32>();
-        st = markdown_select(&items, st, MarkdownPointer::at_y(end_y));
-        st = markdown_select(&items, st, MarkdownPointer::Release);
+        st = markdown_select(&items, st, MarkdownPointer::at_y(0.0), tok());
+        st = markdown_select(&items, st, MarkdownPointer::Press, tok());
+        let end_y = items
+            .iter()
+            .map(|i| markdown_item_extent(i, tok()))
+            .sum::<f32>();
+        st = markdown_select(&items, st, MarkdownPointer::at_y(end_y), tok());
+        st = markdown_select(&items, st, MarkdownPointer::Release, tok());
         assert!(!st.dragging);
         assert!(st.span.start.item < st.span.end.item);
         let copied = st.span.text(&items);
@@ -1013,15 +1042,20 @@ fn b() {}
         assert!(copied.contains("paragraph"), "{copied}");
         assert!(copied.contains("alpha") || copied.contains('•'), "{copied}");
         let mut back = MarkdownSelect::default();
-        back = markdown_select(&items, back, MarkdownPointer::at_y(end_y));
-        back = markdown_select(&items, back, MarkdownPointer::Press);
-        back = markdown_select(&items, back, MarkdownPointer::at_y(0.0));
+        back = markdown_select(&items, back, MarkdownPointer::at_y(end_y), tok());
+        back = markdown_select(&items, back, MarkdownPointer::Press, tok());
+        back = markdown_select(&items, back, MarkdownPointer::at_y(0.0), tok());
         let rev = back.span.text(&items);
         assert!(rev.contains("Title") && rev.contains("paragraph"));
         assert_eq!(
-            markdown_select(&[], MarkdownSelect::default(), MarkdownPointer::Press)
-                .span
-                .text(&[]),
+            markdown_select(
+                &[],
+                MarkdownSelect::default(),
+                MarkdownPointer::Press,
+                tok()
+            )
+            .span
+            .text(&[]),
             ""
         );
         assert!(MarkdownSpan::default().is_empty());
@@ -1035,24 +1069,34 @@ fn b() {}
             markdown::parse("# Short title here that continues for a while").collect();
         assert_eq!(items.len(), 1);
         let mut st = MarkdownSelect::default();
-        st = markdown_select(&items, st, MarkdownPointer::Move { x: 0.0, y: 8.0 });
-        st = markdown_select(&items, st, MarkdownPointer::Press);
+        st = markdown_select(&items, st, MarkdownPointer::Move { x: 0.0, y: 8.0 }, tok());
+        st = markdown_select(&items, st, MarkdownPointer::Press, tok());
         assert!(st.span.is_empty());
-        st = markdown_select(&items, st, MarkdownPointer::Move { x: 56.0, y: 8.0 });
-        st = markdown_select(&items, st, MarkdownPointer::Release);
+        st = markdown_select(&items, st, MarkdownPointer::Move { x: 56.0, y: 8.0 }, tok());
+        st = markdown_select(&items, st, MarkdownPointer::Release, tok());
         assert!(!st.span.is_empty());
         let copied = st.span.text(&items);
         assert!(!copied.is_empty());
         let all = MarkdownSpan::all(&items).text(&items);
         assert!(copied.len() < all.len(), "{copied} vs {all}");
         let mut click = MarkdownSelect::default();
-        click = markdown_select(&items, click, MarkdownPointer::Move { x: 8.0, y: 8.0 });
-        click = markdown_select(&items, click, MarkdownPointer::Press);
-        click = markdown_select(&items, click, MarkdownPointer::Release);
+        click = markdown_select(
+            &items,
+            click,
+            MarkdownPointer::Move { x: 8.0, y: 8.0 },
+            tok(),
+        );
+        click = markdown_select(&items, click, MarkdownPointer::Press, tok());
+        click = markdown_select(&items, click, MarkdownPointer::Release, tok());
         assert!(click.span.is_empty());
         let mut dbl = MarkdownSelect::default();
-        dbl = markdown_select(&items, dbl, MarkdownPointer::Move { x: 16.0, y: 8.0 });
-        dbl = markdown_select(&items, dbl, MarkdownPointer::Double);
+        dbl = markdown_select(
+            &items,
+            dbl,
+            MarkdownPointer::Move { x: 16.0, y: 8.0 },
+            tok(),
+        );
+        dbl = markdown_select(&items, dbl, MarkdownPointer::Double, tok());
         assert!(!dbl.span.is_empty());
         let word = dbl.span.text(&items);
         assert!(!word.is_empty());
@@ -1102,7 +1146,7 @@ fn b() {}
         assert_eq!(joined, all);
     }
 
-    fn first_paragraph<'a>(item: &'a Item) -> Option<&'a Text> {
+    fn first_paragraph(item: &Item) -> Option<&Text> {
         match item {
             Item::Paragraph(t) => Some(t),
             Item::List { bullets, .. } => bullets.iter().find_map(|b| {
