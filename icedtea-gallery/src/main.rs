@@ -6486,6 +6486,53 @@ mod tests {
     }
 
     #[test]
+    fn markdown_copy_is_the_span_not_the_line() {
+        let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
+        g.page = "markdown";
+        let _ = g.update(super::Message::MdPointer(
+            icedtea::select::MarkdownPointer::Move { x: 0.0, y: 8.0 },
+        ));
+        let _ = g.update(super::Message::MdPointer(
+            icedtea::select::MarkdownPointer::Press,
+        ));
+        let _ = g.update(super::Message::MdPointer(
+            icedtea::select::MarkdownPointer::Move { x: 48.0, y: 8.0 },
+        ));
+        let _ = g.update(super::Message::MdPointer(
+            icedtea::select::MarkdownPointer::Release,
+        ));
+        assert!(!g.md_sel.span.is_empty());
+        let span = g.md_sel.span.text(&g.md.items);
+        let line = icedtea::select::markdown_line_span(&g.md.items, 16.0, 8.0).text(&g.md.items);
+        assert_ne!(span, g.md.source);
+        assert_ne!(span, line);
+        let kept = g.md_sel.span;
+        let _ = g.update(super::Message::Cursor(
+            icedtea::layout::CursorEvent::Context,
+        ));
+        assert_eq!(g.md_sel.span, kept);
+        assert!(g
+            .context_actions()
+            .iter()
+            .any(|a| a.id.as_str() == "edit.copy" && a.enabled));
+        g.note.clear();
+        let _ = g.update(super::Message::EditCopy);
+        assert_eq!(g.note, "Copied");
+        assert_eq!(g.md_sel.span.text(&g.md.items), span);
+        let (mut code, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
+        code.page = "code";
+        code.code_editor
+            .perform(icedtea::iced::widget::text_editor::Action::SelectAll);
+        let all = code.code_editor.selection().expect("select-all is a range");
+        assert_eq!(all, code.code_editor.text());
+        code.code_editor
+            .perform(icedtea::iced::widget::text_editor::Action::Click(
+                icedtea::iced::Point::new(0.0, 0.0),
+            ));
+        assert!(code.code_editor.selection().is_none());
+    }
+
+    #[test]
     fn inject_lines_drive_control_state() {
         assert!(matches!(
             super::parse_inject_line("check true"),

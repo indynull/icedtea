@@ -18,8 +18,9 @@
 //! Editor surfaces use [`select_only`] so the buffer cannot be mutated
 //! by typing. Markdown keeps real block layout. Drag uses
 //! [`markdown_select`] so a range can start in one block and end in
-//! another. Flattening every block into one rich surface breaks layout
-//! and multi-line selection paint, so it is not the shipped path.
+//! another. Highlight and Copy read that span. A press without a drag
+//! is empty; a double-click selects the word. Flattening every block
+//! into one rich surface breaks layout, so it is not the shipped path.
 
 use iced::advanced::text::Span;
 use iced::widget::markdown::{self, Bullet, HeadingLevel, Item, Settings, Text};
@@ -369,7 +370,7 @@ pub fn markdown_select(
         }
         MarkdownPointer::Double => {
             state.dragging = false;
-            state.span = markdown_line_span(items, state.hover_x, state.hover_y);
+            state.span = markdown_word_span(items, state.hover_x, state.hover_y);
         }
         MarkdownPointer::Release => {
             state.dragging = false;
@@ -431,7 +432,261 @@ pub fn markdown_pos_at(items: &[Item], x: f32, y: f32) -> MarkdownPos {
     pos
 }
 
-/// The estimated visual line under `(x, y)` (double-click).
+/// Byte range of `span` inside top-level `item`, if that item is covered.
+pub fn markdown_item_range(
+    span: MarkdownSpan,
+    items: &[Item],
+    item: usize,
+) -> Option<(usize, usize)> {
+    if !span.covers(item) || items.is_empty() {
+        return None;
+    }
+    let last = items.len() - 1;
+    let i = item.min(last);
+    let n = markdown_item_plain(&items[i]).len();
+    let a = if i == span.start.item {
+        span.start.offset.min(n)
+    } else {
+        0
+    };
+    let b = if i == span.end.item {
+        span.end.offset.min(n).max(a)
+    } else {
+        n
+    };
+    (a < b).then_some((a, b))
+}
+
+/// Byte range of `fragment` inside `item`, using the same flatten as
+/// [`markdown_item_plain`].
+pub fn markdown_fragment_range(item: &Item, fragment: &Text) -> Option<(usize, usize)> {
+    let mut at = 0usize;
+    find_fragment(std::slice::from_ref(item), fragment, &mut at, 0)
+}
+
+fn find_fragment(
+    items: &[Item],
+    needle: &Text,
+    at: &mut usize,
+    depth: usize,
+) -> Option<(usize, usize)> {
+    for (i, item) in items.iter().enumerate() {
+        if i > 0 {
+            *at += if depth == 0 { 2 } else { 1 };
+        }
+        match item {
+            Item::Heading(_, text) | Item::Paragraph(text) => {
+                let n = markdown_text_len(text);
+                if std::ptr::eq(text, needle) {
+                    return Some((*at, *at + n));
+                }
+                *at += n;
+            }
+            Item::CodeBlock { lines, code, .. } => {
+                if lines.is_empty() {
+                    *at += code.len();
+                } else {
+                    for (li, line) in lines.iter().enumerate() {
+                        if li > 0 {
+                            *at += 1;
+                        }
+                        let n = markdown_text_len(line);
+                        if std::ptr::eq(line, needle) {
+                            return Some((*at, *at + n));
+                        }
+                        *at += n;
+                    }
+                }
+            }
+            Item::List { start, bullets } => {
+                for (bi, bullet) in bullets.iter().enumerate() {
+                    if bi > 0 {
+                        *at += 1;
+                    }
+                    let prefix = match bullet {
+                        Bullet::Task { done: true, .. } => "[x] ".to_string(),
+                        Bullet::Task { done: false, .. } => "[ ] ".to_string(),
+                        Bullet::Point { .. } => {
+                            if let Some(n) = *start {
+                                format!("{}. ", n + bi as u64)
+                            } else {
+                                "• ".to_string()
+                            }
+                        }
+                    };
+                    *at += prefix.len();
+                    let kids = match bullet {
+                        Bullet::Point { items } | Bullet::Task { items, .. } => items.as_slice(),
+                    };
+                    if let Some(found) = find_fragment(kids, needle, at, depth + 1) {
+                        return Some(found);
+                    }
+                }
+            }
+            Item::Quote(inner) => {
+                if let Some(found) = find_fragment(inner, needle, at, depth + 1) {
+                    return Some(found);
+                }
+            }
+            Item::Rule => {
+                *at += "———".len();
+            }
+            Item::Image { alt, title, .. } => {
+                let n = markdown_text_len(alt);
+                if std::ptr::eq(alt, needle) {
+                    return Some((*at, *at + n));
+                }
+                *at += n;
+                if !title.is_empty() {
+                    *at += 3 + title.len();
+                }
+            }
+            Item::Table { .. } => {
+                *at += "[table]".len();
+            }
+        }
+    }
+    None
+}
+
+/// Local `[from, to)` inside `fragment` for painting `span` on `item`.
+pub fn markdown_paint_range(
+    span: MarkdownSpan,
+    items: &[Item],
+    item: usize,
+    fragment: &Text,
+) -> Option<(usize, usize)> {
+    if items.is_empty() {
+        return None;
+    }
+    let last = items.len() - 1;
+    let i = item.min(last);
+    let (sel_a, sel_b) = markdown_item_range(span, items, i)?;
+    let (frag_a, frag_b) = markdown_fragment_range(&items[i], fragment)?;
+    let a = sel_a.max(frag_a);
+    let b = sel_b.min(frag_b);
+    if a < b && a >= frag_a {
+        Some((a - frag_a, b - frag_a))
+    } else {
+        None
+    }
+}
+
+fn own_span(span: &Span<'_, markdown::Uri, Font>) -> Span<'static, markdown::Uri, Font> {
+    let mut owned = Span::new(span.text.to_string());
+    owned.size = span.size;
+    owned.line_height = span.line_height;
+    owned.font = span.font;
+    owned.color = span.color;
+    owned.link = span.link.clone();
+    owned.highlight = span.highlight;
+    owned.padding = span.padding;
+    owned.underline = span.underline;
+    owned.strikethrough = span.strikethrough;
+    owned
+}
+
+/// Paint a highlight on the slice `[from, to)` of flattened block spans.
+pub(crate) fn highlight_markdown_spans(
+    spans: &[Span<'_, markdown::Uri, Font>],
+    from: usize,
+    to: usize,
+    fill: iced::Color,
+) -> Vec<Span<'static, markdown::Uri, Font>> {
+    if from >= to || spans.is_empty() {
+        return spans.iter().map(own_span).collect();
+    }
+    let mut out = Vec::new();
+    let mut at = 0usize;
+    for span in spans {
+        let n = span.text.len();
+        let a = at;
+        let b = at + n;
+        at = b;
+        let owned = own_span(span);
+        if b <= from || a >= to {
+            out.push(owned);
+            continue;
+        }
+        let local_from = from.max(a) - a;
+        let local_to = to.min(b) - a;
+        let text = owned.text.clone().into_owned();
+        if local_from == 0 && local_to == n {
+            out.push(owned.background(fill));
+            continue;
+        }
+        if local_from > 0 {
+            let mut left = owned.clone();
+            left.text = text[..local_from].to_string().into();
+            left.highlight = None;
+            out.push(left);
+        }
+        if local_to > local_from {
+            let mut mid = owned.clone();
+            mid.text = text[local_from..local_to].to_string().into();
+            out.push(mid.background(fill));
+        }
+        if local_to < n {
+            let mut right = owned.clone();
+            right.text = text[local_to..].to_string().into();
+            right.highlight = None;
+            out.push(right);
+        }
+    }
+    out
+}
+
+/// The word under `(x, y)` (double-click), same rule as a code editor.
+pub fn markdown_word_span(items: &[Item], x: f32, y: f32) -> MarkdownSpan {
+    if items.is_empty() {
+        return MarkdownSpan::default();
+    }
+    let pos = markdown_pos_at(items, x, y);
+    let last = items.len() - 1;
+    let item = pos.item.min(last);
+    let plain = markdown_item_plain(&items[item]);
+    if plain.is_empty() {
+        return MarkdownSpan {
+            start: MarkdownPos { item, offset: 0 },
+            end: MarkdownPos { item, offset: 0 },
+        };
+    }
+    let mut i = pos.offset.min(plain.len());
+    if i == plain.len() && i > 0 {
+        i -= 1;
+    }
+    i = floor_char_boundary(&plain, i);
+    let mut start = 0;
+    for (idx, ch) in plain[..i].char_indices().rev() {
+        if ch.is_whitespace() {
+            start = idx + ch.len_utf8();
+            break;
+        }
+        start = idx;
+    }
+    let mut end = plain.len();
+    for (idx, ch) in plain[i..].char_indices() {
+        if ch.is_whitespace() {
+            end = i + idx;
+            break;
+        }
+        end = i + idx + ch.len_utf8();
+    }
+    if start == end {
+        end = ceil_char_boundary(&plain, (start + 1).min(plain.len()));
+    }
+    let start = floor_char_boundary(&plain, start);
+    let end = ceil_char_boundary(&plain, end.max(start));
+    MarkdownSpan {
+        start: MarkdownPos {
+            item,
+            offset: start,
+        },
+        end: MarkdownPos { item, offset: end },
+    }
+}
+
+/// The estimated visual line under `(x, y)`.
 pub fn markdown_line_span(items: &[Item], x: f32, y: f32) -> MarkdownSpan {
     if items.is_empty() {
         return MarkdownSpan::default();
@@ -799,9 +1054,10 @@ fn b() {}
         dbl = markdown_select(&items, dbl, MarkdownPointer::Move { x: 16.0, y: 8.0 });
         dbl = markdown_select(&items, dbl, MarkdownPointer::Double);
         assert!(!dbl.span.is_empty());
-        let line = dbl.span.text(&items);
-        assert!(!line.is_empty());
-        assert_eq!(line, all);
+        let word = dbl.span.text(&items);
+        assert!(!word.is_empty());
+        assert!(word.len() < all.len(), "{word} vs {all}");
+        assert!(!word.contains(' '), "{word}");
         assert!(MarkdownSpan::all(&items).fully_covers(&items, 0));
         assert!(!st.span.fully_covers(&items, 0));
         assert!(!MarkdownSpan::default().fully_covers(&items, 0));
@@ -831,5 +1087,160 @@ fn b() {}
         };
         assert!(!from_mid.fully_covers(&many, 0));
         assert!(from_mid.fully_covers(&many, 1));
+        let mid_text = mid.text(&items);
+        assert_ne!(mid_text, all);
+        assert_eq!(markdown_item_range(mid, &items, 0), Some((2, 8)));
+        assert_eq!(
+            markdown_item_range(MarkdownSpan::default(), &items, 0),
+            None
+        );
+        let base = [Span::new(all.clone())];
+        let painted = highlight_markdown_spans(&base, 2, 8, iced::Color::from_rgb(0.2, 0.2, 0.3));
+        assert!(painted.len() >= 2);
+        assert!(painted.iter().any(|s| s.highlight.is_some()));
+        let joined: String = painted.iter().map(|s| s.text.as_ref()).collect();
+        assert_eq!(joined, all);
+    }
+
+    fn first_paragraph<'a>(item: &'a Item) -> Option<&'a Text> {
+        match item {
+            Item::Paragraph(t) => Some(t),
+            Item::List { bullets, .. } => bullets.iter().find_map(|b| {
+                let kids = match b {
+                    Bullet::Point { items } | Bullet::Task { items, .. } => items.as_slice(),
+                };
+                kids.iter().find_map(first_paragraph)
+            }),
+            Item::Quote(inner) => inner.iter().find_map(first_paragraph),
+            _ => None,
+        }
+    }
+
+    fn highlighted_plain(spans: &[Span<'static, markdown::Uri, Font>]) -> String {
+        spans
+            .iter()
+            .filter(|s| s.highlight.is_some())
+            .map(|s| s.text.as_ref())
+            .collect()
+    }
+
+    #[test]
+    fn markdown_list_and_code_highlight_match_span_text() {
+        let items: Vec<_> =
+            markdown::parse("- hello world\n- other\n\n```\nline one\nline two\n```").collect();
+        let list_i = items
+            .iter()
+            .position(|i| matches!(i, Item::List { .. }))
+            .expect("list");
+        let plain = markdown_item_plain(&items[list_i]);
+        let hello_at = plain.find("hello").expect("hello in list flatten");
+        let span = MarkdownSpan {
+            start: MarkdownPos {
+                item: list_i,
+                offset: hello_at,
+            },
+            end: MarkdownPos {
+                item: list_i,
+                offset: hello_at + "hello".len(),
+            },
+        };
+        assert_eq!(span.text(&items), "hello");
+        let para = first_paragraph(&items[list_i]).expect("list paragraph");
+        let (a, b) = markdown_paint_range(span, &items, list_i, para).expect("list fragment");
+        let style = markdown_measure_style();
+        let painted = highlight_markdown_spans(&para.spans(style), a, b, iced::Color::WHITE);
+        assert_eq!(highlighted_plain(&painted), span.text(&items));
+        assert_ne!(b - a, hello_at + "hello".len());
+
+        let code_i = items
+            .iter()
+            .position(|i| matches!(i, Item::CodeBlock { .. }))
+            .expect("code");
+        let Item::CodeBlock { lines, .. } = &items[code_i] else {
+            panic!("code block");
+        };
+        assert!(lines.len() >= 2);
+        let code_plain = markdown_item_plain(&items[code_i]);
+        let two_at = code_plain.find("line two").expect("line two");
+        let code_span = MarkdownSpan {
+            start: MarkdownPos {
+                item: code_i,
+                offset: two_at,
+            },
+            end: MarkdownPos {
+                item: code_i,
+                offset: two_at + "line two".len(),
+            },
+        };
+        assert_eq!(code_span.text(&items), "line two");
+        let line = &lines[1];
+        let (ca, cb) =
+            markdown_paint_range(code_span, &items, code_i, line).expect("code fragment");
+        let painted = highlight_markdown_spans(&line.spans(style), ca, cb, iced::Color::WHITE);
+        assert_eq!(highlighted_plain(&painted), code_span.text(&items));
+        assert_eq!(ca, 0);
+        assert_eq!(
+            cb,
+            line.spans(style)
+                .iter()
+                .map(|s| s.text.len())
+                .sum::<usize>()
+        );
+    }
+
+    fn all_paragraphs<'a>(item: &'a Item, out: &mut Vec<&'a Text>) {
+        match item {
+            Item::Paragraph(t) => out.push(t),
+            Item::List { bullets, .. } => {
+                for b in bullets {
+                    let kids = match b {
+                        Bullet::Point { items } | Bullet::Task { items, .. } => items.as_slice(),
+                    };
+                    for kid in kids {
+                        all_paragraphs(kid, out);
+                    }
+                }
+            }
+            Item::Quote(inner) => {
+                for kid in inner {
+                    all_paragraphs(kid, out);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    #[test]
+    fn markdown_paint_range_skips_later_list_fragments() {
+        let items: Vec<_> = markdown::parse("- first\n  - nested\n- second").collect();
+        let list_i = items
+            .iter()
+            .position(|i| matches!(i, Item::List { .. }))
+            .expect("list");
+        let plain = markdown_item_plain(&items[list_i]);
+        let first_at = plain.find("first").expect("first");
+        let span = MarkdownSpan {
+            start: MarkdownPos {
+                item: list_i,
+                offset: first_at,
+            },
+            end: MarkdownPos {
+                item: list_i,
+                offset: first_at + "first".len(),
+            },
+        };
+        assert_eq!(span.text(&items), "first");
+        let mut paras = Vec::new();
+        all_paragraphs(&items[list_i], &mut paras);
+        assert!(
+            paras.len() >= 2,
+            "need a later fragment after the selected word"
+        );
+        let later = *paras.last().expect("later paragraph");
+        assert_eq!(markdown_paint_range(span, &items, list_i, later), None);
+        let all = MarkdownSpan::all(&items);
+        for para in paras {
+            let _ = markdown_paint_range(all, &items, list_i, para);
+        }
     }
 }

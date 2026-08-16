@@ -109,12 +109,11 @@ slicing the source before parse. Body is `typo::BODY`; H1 is
 `Tokens::scheme()` (`primary`, `on_surface`, `surface_container_high`).
 Real markdown layout (headings, lists, code frames). Drag a range
 with `select::markdown_select` (X and Y; a same-line drag is a
-range). A double-click selects that line. Pointer events reach
-`markdown_select` when the paint-side widget captures the press.
-In-block ranges keep paint-side highlight. A span that crosses
-blocks washes only fully covered items. Copy is that span only.
-Select all is `markdown_select_all`. The whole source is a
-separate Copy-all path (`doc.source`).
+range). A double-click selects the word under the caret. Pointer
+events reach `markdown_select` first so the painted highlight and
+Copy are that span. Copy is the span only. Select all is
+`markdown_select_all`. The whole source is a separate Copy-all
+path (`doc.source`).
 
 Pass `A11y`.
 

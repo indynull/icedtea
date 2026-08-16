@@ -34,9 +34,9 @@ use iced::widget::markdown;
 use iced::widget::scrollable::{Direction as ScrollDir, Scrollbar};
 use iced::widget::text_editor::Content;
 use iced::widget::{
-    button, checkbox, column, container, mouse_area, pick_list, progress_bar, radio, row, rule,
-    scrollable, slider, stack, svg, text, text_editor, text_input, toggler, tooltip, Column, Id,
-    Row, Space, Stack,
+    button, checkbox, column, container, mouse_area, pick_list, progress_bar, radio, rich_text,
+    row, rule, scrollable, slider, stack, svg, text, text_editor, text_input, toggler, tooltip,
+    Column, Id, Row, Space, Stack,
 };
 use iced::{keyboard, Alignment, Background, Color, Element, Event, Length, Padding, Radians};
 
@@ -3019,9 +3019,10 @@ pub fn parse(source: &str) -> MarkdownDoc {
 /// (window title), not iced's 2× blog heading. Drag a range with
 /// [`crate::select::markdown_select`] so it can start in one block and
 /// end in another; pass the live [`crate::select::MarkdownSpan`] here.
-/// The view is not flattened into one mixed-size `Rich`. Pointer
-/// events reach `on_pointer` when the paint-side widget captures
-/// the press (a double-click selects that line).
+/// The view is not flattened into one mixed-size `Rich`. The document
+/// tree stays one `view_with` whether a range is empty or not. Pointer
+/// events reach `on_pointer` first so paint and Copy share that span
+/// (a double-click selects the word under the caret).
 /// Ctrl+C / Cmd+C on a span is [`crate::select::MarkdownSpan::text`] via
 /// [`crate::copy_text`]. Full document copy is [`MarkdownDoc::source`].
 ///
@@ -3054,29 +3055,119 @@ pub fn markdown_view<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let settings = crate::select::markdown_paint_settings(markdown_style(tok));
-    // In-block ranges stay on one viewer so paint-side highlight
-    // survives. Cross-block ranges wash only fully covered items.
-    let body: Element<'a, M> = match span.copied().filter(|s| !s.is_empty()) {
-        Some(span) if span.start.item != span.end.item => {
-            let mut col = Column::new().spacing(settings.spacing).width(Length::Fill);
-            for (i, item) in items.iter().enumerate() {
-                let block = iced_selection::markdown::view(std::slice::from_ref(item), settings)
-                    .map(on_link);
-                let block: Element<'a, M> = if span.fully_covers(items, i) {
-                    container(block)
-                        .width(Length::Fill)
-                        .style(move |_| style::list_row(tok, true))
-                        .into()
-                } else {
-                    block
-                };
-                col = col.push(block);
-            }
-            col.into()
+    let fill = tok.scheme().secondary_container;
+    let live = span.copied().filter(|s| !s.is_empty());
+    let mut col = Column::new().spacing(settings.spacing).width(Length::Fill);
+    for (i, item) in items.iter().enumerate() {
+        let viewer = MarkdownPaint {
+            items,
+            index: i,
+            span: live,
+            fill,
+        };
+        col = col.push(markdown::item(&viewer, settings, item, i).map(on_link));
+    }
+    a11y::attach(markdown_listen(col.into(), on_pointer), &a11y)
+}
+
+/// One top-level markdown item. Highlight follows [`crate::select::MarkdownSpan`].
+struct MarkdownPaint<'a> {
+    items: &'a [markdown::Item],
+    index: usize,
+    span: Option<crate::select::MarkdownSpan>,
+    fill: Color,
+}
+
+impl MarkdownPaint<'_> {
+    fn paint_text(
+        &self,
+        text: &markdown::Text,
+        style: markdown::Style,
+    ) -> Vec<iced::advanced::text::Span<'static, markdown::Uri, iced::Font>> {
+        let spans = text.spans(style);
+        let local = self
+            .span
+            .and_then(|s| crate::select::markdown_paint_range(s, self.items, self.index, text));
+        match local {
+            Some((a, b)) => crate::select::highlight_markdown_spans(&spans, a, b, self.fill),
+            None => crate::select::highlight_markdown_spans(&spans, 0, 0, self.fill),
         }
-        _ => iced_selection::markdown::view(items, settings).map(on_link),
-    };
-    a11y::attach(markdown_listen(body, on_pointer), &a11y)
+    }
+}
+
+impl<'a> markdown::Viewer<'a, markdown::Uri> for MarkdownPaint<'a> {
+    fn on_link_click(url: markdown::Uri) -> markdown::Uri {
+        url
+    }
+
+    fn heading(
+        &self,
+        settings: markdown::Settings,
+        level: &'a markdown::HeadingLevel,
+        text: &'a markdown::Text,
+        index: usize,
+    ) -> Element<'a, markdown::Uri> {
+        let size = match *level {
+            markdown::HeadingLevel::H1 => settings.h1_size,
+            markdown::HeadingLevel::H2 => settings.h2_size,
+            markdown::HeadingLevel::H3 => settings.h3_size,
+            markdown::HeadingLevel::H4 => settings.h4_size,
+            markdown::HeadingLevel::H5 => settings.h5_size,
+            markdown::HeadingLevel::H6 => settings.h6_size,
+        };
+        container(
+            rich_text(self.paint_text(text, settings.style))
+                .on_link_click(Self::on_link_click)
+                .size(size),
+        )
+        .padding(iced::padding::top(if index > 0 {
+            settings.text_size / 2.0
+        } else {
+            iced::Pixels::ZERO
+        }))
+        .into()
+    }
+
+    fn paragraph(
+        &self,
+        settings: markdown::Settings,
+        text: &markdown::Text,
+    ) -> Element<'a, markdown::Uri> {
+        rich_text(self.paint_text(text, settings.style))
+            .size(settings.text_size)
+            .on_link_click(Self::on_link_click)
+            .into()
+    }
+
+    fn code_block(
+        &self,
+        settings: markdown::Settings,
+        _language: Option<&'a str>,
+        _code: &'a str,
+        lines: &'a [markdown::Text],
+    ) -> Element<'a, markdown::Uri> {
+        let painted: Vec<Element<'a, markdown::Uri>> = lines
+            .iter()
+            .map(|line| {
+                rich_text(self.paint_text(line, settings.style))
+                    .on_link_click(Self::on_link_click)
+                    .font(settings.style.code_block_font)
+                    .size(settings.code_size)
+                    .into()
+            })
+            .collect();
+        container(
+            scrollable(container(Column::with_children(painted)).padding(settings.code_size))
+                .direction(ScrollDir::Horizontal(
+                    Scrollbar::default()
+                        .width(settings.code_size / 2)
+                        .scroller_width(settings.code_size / 2),
+                )),
+        )
+        .width(Length::Fill)
+        .padding(settings.code_size / 4)
+        .into()
+    }
 }
 
 /// Publish markdown pointer events even when the child captured the press.
@@ -3147,6 +3238,47 @@ impl<'a, Message: Clone> Widget<Message, iced::Theme, iced::Renderer>
         shell: &mut Shell<'_, Message>,
         viewport: &iced::Rectangle,
     ) {
+        let local = cursor.position_in(layout.bounds());
+        let select_ev = matches!(
+            event,
+            Event::Mouse(
+                iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)
+                    | iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left)
+            )
+        );
+        if let Some(local) = local {
+            let state = tree.state.downcast_mut::<MarkdownListenState>();
+            if state.last != Some(local) {
+                state.last = Some(local);
+                shell.publish((self.on_pointer)(crate::select::MarkdownPointer::Move {
+                    x: local.x,
+                    y: local.y,
+                }));
+            }
+            match event {
+                Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)) => {
+                    let click = iced::advanced::mouse::Click::new(
+                        cursor.position().unwrap_or(local),
+                        iced::mouse::Button::Left,
+                        state.previous_click,
+                    );
+                    shell.publish((self.on_pointer)(crate::select::MarkdownPointer::Press));
+                    if click.kind() != iced::advanced::mouse::click::Kind::Single {
+                        shell.publish((self.on_pointer)(crate::select::MarkdownPointer::Double));
+                    }
+                    state.previous_click = Some(click);
+                    shell.capture_event();
+                }
+                Event::Mouse(iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left)) => {
+                    shell.publish((self.on_pointer)(crate::select::MarkdownPointer::Release));
+                    shell.capture_event();
+                }
+                _ => {}
+            }
+        }
+        if select_ev && local.is_some() {
+            return;
+        }
         self.content.as_widget_mut().update(
             &mut tree.children[0],
             event,
@@ -3157,36 +3289,6 @@ impl<'a, Message: Clone> Widget<Message, iced::Theme, iced::Renderer>
             shell,
             viewport,
         );
-        let Some(local) = cursor.position_in(layout.bounds()) else {
-            return;
-        };
-        let state = tree.state.downcast_mut::<MarkdownListenState>();
-        if state.last != Some(local) {
-            state.last = Some(local);
-            shell.publish((self.on_pointer)(crate::select::MarkdownPointer::Move {
-                x: local.x,
-                y: local.y,
-            }));
-        }
-        match event {
-            Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)) => {
-                let click = iced::advanced::mouse::Click::new(
-                    cursor.position().unwrap_or(local),
-                    iced::mouse::Button::Left,
-                    state.previous_click,
-                );
-                shell.publish((self.on_pointer)(crate::select::MarkdownPointer::Press));
-                if click.kind() != iced::advanced::mouse::click::Kind::Single {
-                    shell.publish((self.on_pointer)(crate::select::MarkdownPointer::Double));
-                }
-                state.previous_click = Some(click);
-                shell.capture_event();
-            }
-            Event::Mouse(iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left)) => {
-                shell.publish((self.on_pointer)(crate::select::MarkdownPointer::Release));
-            }
-            _ => {}
-        }
     }
 
     fn draw(
@@ -8450,10 +8552,12 @@ mod tests {
             .split("fn markdown_style")
             .next()
             .unwrap();
-        assert!(md.contains("iced_selection::markdown::view"));
+        assert!(md.contains("markdown::item"));
+        assert!(md.contains("view_with") || md.contains("markdown::item"));
         assert!(!md.contains("Rich::with_spans"));
-        assert!(!md.contains("let _ = span"));
-        assert!(md.contains("fully_covers"));
+        assert!(!md.contains("start.item != span.end.item"));
+        assert!(!md.contains("from_ref(item)"));
+        assert!(md.contains("highlight_markdown_spans"));
         assert!(md.contains("markdown_listen"));
         let mut st = crate::select::markdown_select(
             &doc.items,
@@ -8495,6 +8599,33 @@ mod tests {
             A11y::new("md-head", Role::Group),
         );
         draw_once(&mut part);
+        let nested = parse("- first\n  - nested\n- second");
+        let list_i = nested
+            .items
+            .iter()
+            .position(|i| matches!(i, iced::widget::markdown::Item::List { .. }))
+            .expect("list");
+        let plain = crate::select::markdown_item_plain(&nested.items[list_i]);
+        let at = plain.find("first").expect("first");
+        let word = crate::select::MarkdownSpan {
+            start: crate::select::MarkdownPos {
+                item: list_i,
+                offset: at,
+            },
+            end: crate::select::MarkdownPos {
+                item: list_i,
+                offset: at + "first".len(),
+            },
+        };
+        let mut nest: Element<'_, ()> = markdown_view(
+            &nested.items,
+            Some(&word),
+            |_| (),
+            tok,
+            |_| (),
+            A11y::new("md-nest", Role::Group),
+        );
+        draw_once(&mut nest);
     }
 
     #[test]

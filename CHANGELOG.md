@@ -44,8 +44,9 @@
   through sticky search or other chrome above the pane.
 - Gallery catalog nav omits rows above the scroll offset so section
   titles cannot show through the sticky Search field.
-- `markdown_view` publishes pointer events when the paint-side
-  widget captures the press, so a one-line select enables Copy.
+- `markdown_view` paints the live `MarkdownSpan` on one document tree.
+  Drag-select and Copy use that range (not a remounted block wash).
+  A double-click selects the word under the caret.
 - `cheatsheet` insets shortcut labels so they do not sit under the
   scroll rail.
 - Gallery status note clears when the catalog page changes.
