@@ -2511,7 +2511,8 @@ where
     };
     let picker = pick_list(options, selected, on_pick)
         .style(style::picker_style(tok))
-        .padding(pad(tok));
+        .padding(pad(tok))
+        .text_size(typo::BODY);
     let el: Element<'a, M> = if opts.is_empty() {
         picker.into()
     } else {
@@ -6766,6 +6767,14 @@ mod tests {
             tok,
             role("a", Role::ComboBox),
         );
+        let pick_src = include_str!("widget.rs")
+            .split("pub fn themed_pick_list")
+            .nth(1)
+            .unwrap()
+            .split("pub fn date_picker")
+            .next()
+            .unwrap();
+        assert!(pick_src.contains("text_size(typo::BODY)"));
         let _: Element<'_, ()> = date_picker(
             DateValue {
                 year: 2024,

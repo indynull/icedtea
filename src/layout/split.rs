@@ -120,22 +120,21 @@ pub enum CursorEvent {
     Context,
 }
 
-/// Cursor motion always. Right-button press only when no widget
-/// captured the event (row widgets emit their own [`crate::collection::ItemClick`]).
+/// Cursor motion always. Right-button press opens a context menu even
+/// when an editor captured the click (so Copy still has a menu). Row
+/// widgets also emit [`crate::collection::ItemClick`].
 pub fn listen_cursor() -> Subscription<CursorEvent> {
     iced::event::listen_with(cursor_listen)
 }
 
 fn cursor_listen(
     event: iced::Event,
-    status: iced::event::Status,
+    _status: iced::event::Status,
     _id: iced::window::Id,
 ) -> Option<CursorEvent> {
     match event {
         Event::Mouse(mouse::Event::CursorMoved { position }) => Some(CursorEvent::Move(position)),
-        Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Right))
-            if status == iced::event::Status::Ignored =>
-        {
+        Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Right)) => {
             Some(CursorEvent::Context)
         }
         _ => None,
@@ -301,7 +300,7 @@ mod tests {
                 iced::event::Status::Captured,
                 iced::window::Id::unique(),
             ),
-            None
+            Some(CursorEvent::Context)
         );
         assert!(cursor_listen(
             released,

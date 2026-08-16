@@ -32,8 +32,8 @@ use crate::theme::Tokens;
 use crate::typo;
 use crate::variant::Variant;
 use crate::widget::{
-    dismiss_button, group_box, label, meta, tab_bar, themed_button, themed_button_sized,
-    themed_scroll, themed_text_input, CardFace, FieldOpts,
+    dismiss_button, group_box, label, meta, tab_bar, themed_button, themed_scroll,
+    themed_text_input, CardFace, FieldOpts,
 };
 
 /// Group actions by the id prefix before `.` (`file.save` → `file`).
@@ -1396,10 +1396,11 @@ pub fn context_origin(origin: Point, size: Size, viewport: Size) -> Point {
 /// Place a context menu at `origin` in the window. Left click-away dismisses.
 ///
 /// Presses on the card are captured so they do not fall through.
-/// Empty-space right-click is `listen_cursor` (Ignored only). Row
-/// widgets emit [`crate::collection::ItemClick`] instead. Empty
-/// `actions` still paints a card. `viewport` clamps the card to its
-/// real size. `progress` is 0 (gone) to 1 (rest).
+/// Right-click is `listen_cursor` (even when an editor captured the
+/// press). Row widgets also emit [`crate::collection::ItemClick`].
+/// Empty `actions` still paints a card. `viewport` clamps the card
+/// to its real size. `progress` is 0 (gone) to 1 (rest). Labels
+/// start-align on the row.
 ///
 ///
 /// ```
@@ -1436,16 +1437,20 @@ pub fn context_menu<'a, M: Clone + 'a>(
     let at = context_origin(origin, size, viewport);
     let mut col = Column::new().spacing(2).padding(6).width(Length::Fill);
     for a in actions {
-        col = col.push(themed_button_sized(
-            a.title.clone(),
-            a.invoke(),
-            paint,
-            Variant::Ghost,
-            Icons::NONE,
-            Length::Fill,
-            Length::Fixed(34.0),
-            A11y::new(a.title.clone(), Role::MenuItem).with_disabled(!a.enabled),
-        ));
+        let a11y = A11y::new(a.title.clone(), Role::MenuItem).with_disabled(!a.enabled);
+        let face = text(a.title.clone())
+            .size(typo::BODY)
+            .width(Length::Fill)
+            .align_x(Alignment::Start);
+        let mut row = button(face)
+            .padding(Padding::from([6.0, 10.0]))
+            .width(Length::Fill)
+            .height(Length::Fixed(34.0))
+            .style(style::button_style(paint, Variant::Ghost));
+        if let Some(m) = a11y.apply_message(a.invoke()) {
+            row = row.on_press(m);
+        }
+        col = col.push(crate::a11y::attach(row.into(), &a11y));
     }
     let list: Element<'a, M> = col.into();
     let inner = if size.height + 1.0 < 12.0 + (n.max(1) as f32) * 34.0 {
@@ -2374,6 +2379,15 @@ mod tests {
             tok,
         );
         paint(&mut cm);
+        let cm_src = src
+            .split("pub fn context_menu")
+            .nth(1)
+            .unwrap()
+            .split("pub fn inspector")
+            .next()
+            .unwrap();
+        assert!(cm_src.contains("Alignment::Start"));
+        assert!(cm_src.contains("typo::BODY"));
         let card = context_card_size(table.iter().count(), vp);
         let row_w = menu_row_width(&mut cm);
         assert!(

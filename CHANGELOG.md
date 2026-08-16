@@ -11,13 +11,13 @@
 - List, table, grid, and tree row presses are `ItemClick` (button and
   modifiers). Right-click no longer equals left-click select.
   `Selection::apply_item_click` is the desktop rule. `listen_cursor`
-  Context only fires when the event was not captured.
+  Context fires on right-click even when an editor captured the press.
 - Flush list titles wrap on a tall row; `list_detail` uses
   `layout::LIST_PANE` (360px). Short flush rows still ellipsize on a
   word boundary.
 - `markdown_select_all` / `MarkdownSpan::all` select every block.
 - Markdown pointer moves carry X and Y so a same-line drag is a
-  real range. A double-click selects that line. Copy is that span;
+  real range. A double-click selects the word. Copy is that span;
   Copy all is the source.
 - `MarkdownSpan::fully_covers` is the cross-block wash. A partial
   in-block range does not paint the whole item.
@@ -30,6 +30,7 @@
 - Disabled button ink uses a 68% mute so filled, Ghost, and Outlined
   labels read on dark. Filled faces also raise the fill to 22%.
 - `command_bar` labels use on-surface body ink.
+- `themed_pick_list` uses the body type size (14), same as fields.
 - `dim_backdrop` rest opacity is 50% so a dialog sheet sits on a
   visible wash.
 - `motion::overlay` hit-tests the slid child so a press lands on the
@@ -37,7 +38,7 @@
 - `context_menu` captures pointer moves on the dismiss layer so a
   move toward the menu does not reach the page underneath.
 - Context menu rows fill the card so the press target is the whole
-  row, not only the label.
+  row, not only the label. Labels start-align at body size.
 - The overlay no longer captures clicks on the placement spacers, so
   a miss reaches the dismiss surface.
 - `themed_scroll` scissors through `ClipLayer` so rows cannot paint

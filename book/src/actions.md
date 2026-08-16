@@ -49,7 +49,7 @@ layer list. Most windows only need `key::handle` and `KeyContext`.
 `pattern::context_menu` places the same `Action` list under the
 pointer. The application stores the point and whether the menu is
 open. Click-away and Escape close it. Empty-space right-click is
-`layout::listen_cursor` (only when no widget captured the event).
+`layout::listen_cursor` (including when an editor captured the press).
 List, table, grid, and tree rows emit `ItemClick`; secondary on an
 already-selected row keeps the selection. Editors enable Cut/Copy
 from `text_editor::Content::selection`.
