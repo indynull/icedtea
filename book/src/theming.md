@@ -16,7 +16,12 @@ Type size is the M3 scale times
 [`Tokens::font_scale`](https://docs.rs/icedtea/latest/icedtea/theme/struct.Tokens.html#method.with_font_scale)
 (1.0 by default). Shadows follow
 [`Tokens::with_elevation`](https://docs.rs/icedtea/latest/icedtea/theme/struct.Tokens.html#method.with_elevation).
-Constructors take `Tokens`.
+Constructors take `Tokens`. `Tokens.density` (Compact / Default /
+Comfortable) sets control pad (`pad`), inter-item gap (`space`), and
+container inset. A `*Face` enum on the same constructor picks the
+painted look (`RowFace`, `CardFace`, `FieldFace`, `TreeFace`).
+`ControlSize` Compact and Comfortable stay per-control overrides;
+Default follows window density.
 
 Built-in names are 40 palettes: `dark`, `light`, `high-contrast`, and
 community colorways (Solarized, Gruvbox, Catppuccin, Nord, Tokyo Night,

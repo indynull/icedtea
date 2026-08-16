@@ -109,7 +109,9 @@ pub fn menu_bar<'a, M: Clone + 'a>(
     cat: &Catalog,
 ) -> Element<'a, M> {
     let groups = order(dir, menu_groups(table));
-    let mut titles = Row::new().spacing(0).padding([2, 4]);
+    let mut titles = Row::new()
+        .spacing(0)
+        .padding([2.0, tok.density.gap() / 2.0]);
     for (prefix, acts) in groups {
         let heading = menu_heading(cat, prefix);
         let entries: Vec<(String, M)> = acts
@@ -131,6 +133,7 @@ pub fn menu_bar<'a, M: Clone + 'a>(
     crate::a11y::attach(
         container(titles)
             .width(Length::Fill)
+            .align_x(crate::i18n::align_start(dir))
             .style(move |_| style::app_bar(tok))
             .into(),
         &A11y::new("menubar", Role::Menu),
@@ -159,7 +162,9 @@ pub fn toolbar<'a, M: Clone + 'a>(
     dir: Direction,
 ) -> Element<'a, M> {
     let actions: Vec<_> = order(dir, actions);
-    let mut r = Row::new().spacing(4).padding(8);
+    let mut r = Row::new()
+        .spacing(crate::density::GRID as f32)
+        .padding(tok.density.gap());
     for a in actions {
         r = r.push(themed_button(
             a.title.clone(),
@@ -173,6 +178,7 @@ pub fn toolbar<'a, M: Clone + 'a>(
     crate::a11y::attach(
         container(r)
             .width(Length::Fill)
+            .align_x(crate::i18n::align_start(dir))
             .style(move |_| style::app_bar(tok))
             .into(),
         &A11y::new("toolbar", Role::Group),
@@ -222,7 +228,7 @@ pub fn command_bar<'a, M: Clone + 'a>(
             .size(tok.body())
             .color(tok.scheme().on_surface);
         let mut b = button(face)
-            .padding([2, 6])
+            .padding([2.0, tok.density.gap()])
             .style(style::button_style(tok, Variant::Ghost));
         if let Some(m) = a.invoke() {
             b = b.on_press(m);
@@ -294,7 +300,7 @@ pub fn status_bar<'a, M: Clone + 'a>(
                 iced::widget::Space::new().width(Length::Fill),
                 ends.next().unwrap(),
             ]
-            .padding([8, 12]),
+            .padding([tok.density.gap(), tok.density.inset()]),
         )
         .width(Length::Fill)
         .style(move |_| style::footer(tok))
@@ -414,8 +420,8 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
     } else {
         list.into()
     };
-    let panel = container(column![field, hits].spacing(8))
-        .padding(12)
+    let panel = container(column![field, hits].spacing(tok.density.gap()))
+        .padding(tok.density.inset())
         .width(480)
         .max_height(360.0)
         .style(move |_| style::fade_face(style::raised_card(tok), t));
@@ -456,7 +462,7 @@ pub fn status_page<'a, M: Clone + 'a>(
         label(title.clone(), tok, A11y::new(title, Role::Header)),
         meta(body.clone(), tok, A11y::new(body, Role::Status)),
     ]
-    .spacing(8)
+    .spacing(tok.density.gap())
     .width(Length::Fill);
     if let Some((t, m)) = action {
         col = col.push(themed_button(
@@ -469,7 +475,7 @@ pub fn status_page<'a, M: Clone + 'a>(
         ));
     }
     container(col)
-        .padding(32)
+        .padding(tok.density.inset() * 2.0)
         .center_x(Length::Fill)
         .center_y(Length::Fill)
         .width(Length::Fill)
@@ -564,7 +570,7 @@ pub fn preferences_page<'a, M: Clone + 'a>(
     cat: &Catalog,
 ) -> Element<'a, M> {
     let filtered = filter_prefs(groups, query);
-    let mut body = Column::new().spacing(12);
+    let mut body = Column::new().spacing(tok.density.inset());
     if filtered.is_empty() {
         body = body.push(meta(
             cat.t("empty"),
@@ -606,7 +612,7 @@ pub fn preferences_page<'a, M: Clone + 'a>(
             None::<fn(_) -> M>,
         ),
     ]
-    .spacing(12)
+    .spacing(tok.density.inset())
     .into()
 }
 
@@ -637,19 +643,20 @@ pub fn list_detail<'a, M: 'a>(
     tok: Tokens,
     dir: Direction,
 ) -> Element<'a, M> {
-    // List pad clears the panel edge and the rail; detail gets a full 12px inset.
+    // List pad clears the panel edge and the rail; detail gets a full inset.
+    let g = tok.density.gap();
     let list_pad = match dir {
         Direction::Ltr => iced::Padding {
-            top: 8.0,
-            right: 4.0,
-            bottom: 8.0,
-            left: 8.0,
+            top: g,
+            right: crate::density::GRID as f32,
+            bottom: g,
+            left: g,
         },
         Direction::Rtl => iced::Padding {
-            top: 8.0,
-            right: 8.0,
-            bottom: 8.0,
-            left: 4.0,
+            top: g,
+            right: g,
+            bottom: g,
+            left: crate::density::GRID as f32,
         },
     };
     let list_pane: Element<'a, M> = container(list)
@@ -667,7 +674,7 @@ pub fn list_detail<'a, M: 'a>(
     let detail_pane: Element<'a, M> = container(detail)
         .width(Length::Fill)
         .height(Length::Fill)
-        .padding(iced::Padding::from(12))
+        .padding(iced::Padding::from(tok.density.inset()))
         .into();
     let mut row = Row::new();
     for child in order(dir, [list_pane, rule, detail_pane]) {
@@ -731,7 +738,7 @@ pub fn navigation_view<'a, M: Clone + 'a>(
         } else {
             crate::widget::icon_svg(Icon::Menu, tok, A11y::new("menu", Role::Image))
         };
-        column![top, content].spacing(8).into()
+        column![top, content].spacing(tok.density.gap()).into()
     }
 }
 
@@ -849,7 +856,7 @@ pub fn nav_rail<'a, M: Clone + 'a>(
     crate::a11y::attach(
         container(col)
             .width(if expanded { 220 } else { 72 })
-            .padding(8)
+            .padding(tok.density.gap())
             .style(move |_| style::panel(tok))
             .into(),
         &a11y,
@@ -1040,7 +1047,7 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
     let title = title.into();
     let body = body.into();
     // M3 dialog: extra, cancel (text) then confirm (filled), trailing edge.
-    let mut actions = Row::new().spacing(8);
+    let mut actions = Row::new().spacing(tok.density.gap());
     for (t, m) in extra {
         actions = actions.push(themed_button(
             t.clone(),
@@ -1072,7 +1079,9 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
     let actions = container(actions)
         .width(Length::Fill)
         .align_x(crate::i18n::align_end(tok.direction));
-    let mut head = Row::new().spacing(8).align_y(Alignment::Center);
+    let mut head = Row::new()
+        .spacing(tok.density.gap())
+        .align_y(Alignment::Center);
     if let Some(ic) = icon {
         head = head.push(crate::widget::icon_svg(
             ic,
@@ -1095,10 +1104,10 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
                 label(body.clone(), tok, A11y::new(body, Role::Status)),
                 actions,
             ]
-            .spacing(16)
+            .spacing(tok.density.sheet())
             .width(Length::Fill),
         )
-        .padding(24)
+        .padding(tok.density.inset() * 2.0)
         .width(Length::Fixed(280.0))
         .style(move |_| style::dialog_sheet_face(tok))
         .into(),
@@ -1167,25 +1176,36 @@ pub fn sectioned_menu<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let sections: Vec<_> = sections.into_iter().collect();
-    let mut col = Column::new().spacing(2).padding(6).width(Length::Fill);
+    let start = crate::i18n::align_start(tok.direction);
+    let mut col = Column::new()
+        .spacing(2)
+        .padding(tok.density.gap())
+        .width(Length::Fill);
     for (si, sec) in sections.into_iter().enumerate() {
         if si > 0 {
             col = col.push(menu_section_divider(tok));
         }
         if let Some(title) = sec.title {
             col = col.push(
-                container(meta(title.clone(), tok, A11y::new(title, Role::Header))).padding([4, 8]),
+                container(meta(title.clone(), tok, A11y::new(title, Role::Header)))
+                    .width(Length::Fill)
+                    .align_x(start)
+                    .padding([crate::density::GRID as f32, tok.density.gap()]),
             );
         }
         for a in sec.actions {
-            col = col.push(themed_button(
-                a.title.clone(),
-                a.invoke(),
-                tok,
-                Variant::Ghost,
-                Icons::NONE,
-                A11y::new(a.title.clone(), Role::MenuItem).with_disabled(!a.enabled),
-            ));
+            col = col.push(
+                container(themed_button(
+                    a.title.clone(),
+                    a.invoke(),
+                    tok,
+                    Variant::Ghost,
+                    Icons::NONE,
+                    A11y::new(a.title.clone(), Role::MenuItem).with_disabled(!a.enabled),
+                ))
+                .width(Length::Fill)
+                .align_x(start),
+            );
         }
     }
     crate::a11y::attach(
@@ -1229,7 +1249,7 @@ pub fn cascade_menu<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let entries: Vec<_> = entries.into_iter().collect();
-    let mut primary = Column::new().spacing(2).padding(6);
+    let mut primary = Column::new().spacing(2).padding(tok.density.gap());
     for (i, (act, kids)) in entries.iter().enumerate() {
         let has_sub = kids.as_ref().map(|k| !k.is_empty()).unwrap_or(false);
         let title = if has_sub {
@@ -1327,7 +1347,7 @@ pub fn side_sheet<'a, M: Clone + 'a>(
     let t = crate::motion::visual(progress, tok.reduced_motion);
     let paint = tok.fade(t);
     let mut head = Row::new()
-        .spacing(8)
+        .spacing(paint.density.gap())
         .align_y(Alignment::Center)
         .push(label(
             title.clone(),
@@ -1344,11 +1364,11 @@ pub fn side_sheet<'a, M: Clone + 'a>(
     }
     let sheet = container(
         column![head, body]
-            .spacing(12)
+            .spacing(paint.density.inset())
             .width(Length::Fill)
             .height(Length::Fill),
     )
-    .padding(16)
+    .padding(paint.density.sheet())
     .width(Length::Fixed(width.max(200.0)))
     .height(Length::Fill)
     .style(move |_| style::fade_face(style::dialog_sheet_face(tok), t));
@@ -1395,13 +1415,17 @@ pub fn side_sheet<'a, M: Clone + 'a>(
         .into()
 }
 
+fn context_row_h(density: crate::density::Density) -> f32 {
+    density.gap() * 3.0 + 10.0
+}
+
 /// Card size for `n` actions inside `viewport`. Long lists cap and scroll.
-pub fn context_card_size(n: usize, viewport: Size) -> Size {
+pub fn context_card_size(n: usize, viewport: Size, density: crate::density::Density) -> Size {
     const MENU_W: f32 = 220.0;
-    const ROW: f32 = 34.0;
-    const PAD: f32 = 12.0;
-    let natural = PAD + (n.max(1) as f32) * ROW;
-    let max_h = (viewport.height * 0.5).max(ROW + PAD);
+    let row = context_row_h(density);
+    let pad = density.gap();
+    let natural = pad + (n.max(1) as f32) * row;
+    let max_h = (viewport.height * 0.5).max(row + pad);
     Size::new(MENU_W.min(viewport.width.max(1.0)), natural.min(max_h))
 }
 
@@ -1437,7 +1461,7 @@ pub fn context_origin(origin: Point, size: Size, viewport: Size) -> Point {
 /// let mut table = ActionTable::new();
 /// table.insert(Action::new("file.save", "Save", ()));
 /// let vp = icedtea::iced::Size::new(800.0, 600.0);
-/// assert!(pattern::context_card_size(2, vp).height < 120.0);
+/// assert!(pattern::context_card_size(2, vp, tok.density).height < 120.0);
 /// let _: icedtea::Element<'_, ()> = pattern::context_menu(
 ///     table.iter().cloned(),
 ///     icedtea::iced::Point::new(24.0, 48.0),
@@ -1459,9 +1483,12 @@ pub fn context_menu<'a, M: Clone + 'a>(
     let paint = tok.fade(t);
     let actions: Vec<Action<M>> = actions.into_iter().collect();
     let n = actions.len();
-    let size = context_card_size(n, viewport);
+    let size = context_card_size(n, viewport, tok.density);
     let at = context_origin(origin, size, viewport);
-    let mut col = Column::new().spacing(2).padding(6).width(Length::Fill);
+    let mut col = Column::new()
+        .spacing(2)
+        .padding(paint.density.gap())
+        .width(Length::Fill);
     for a in actions {
         let a11y = A11y::new(a.title.clone(), Role::MenuItem).with_disabled(!a.enabled);
         let face = container(
@@ -1472,9 +1499,12 @@ pub fn context_menu<'a, M: Clone + 'a>(
         .width(Length::Fill)
         .align_x(crate::i18n::align_start(tok.direction));
         let mut row = button(face)
-            .padding(Padding::from([6.0, 10.0]))
+            .padding(Padding::from([
+                paint.density.gap() / 2.0 + 2.0,
+                paint.density.gap() + 2.0,
+            ]))
             .width(Length::Fill)
-            .height(Length::Fixed(34.0))
+            .height(Length::Fixed(context_row_h(paint.density)))
             .style(style::button_style(paint, Variant::Ghost));
         if let Some(m) = a11y.apply_message(a.invoke()) {
             row = row.on_press(m);
@@ -1482,7 +1512,9 @@ pub fn context_menu<'a, M: Clone + 'a>(
         col = col.push(crate::a11y::attach(row.into(), &a11y));
     }
     let list: Element<'a, M> = col.into();
-    let inner = if size.height + 1.0 < 12.0 + (n.max(1) as f32) * 34.0 {
+    let inner = if size.height + 1.0
+        < paint.density.gap() + (n.max(1) as f32) * context_row_h(paint.density)
+    {
         container(themed_scroll(
             list,
             paint,
@@ -1563,7 +1595,7 @@ pub fn inspector<'a, M: 'a>(
     let props_pane: Element<'a, M> = container(props)
         .width(layout::fixed(280.0))
         .height(Length::Fill)
-        .padding(12)
+        .padding(tok.density.inset())
         .style(move |_| style::panel(tok))
         .into();
     let mut row = Row::new().width(Length::Fill).height(Length::Fill);
@@ -1772,8 +1804,8 @@ pub fn tool_panel<'a, M: Clone + 'a>(
             A11y::button(dock).with_disabled(a11y.disabled),
         ),
     ]
-    .spacing(8)
-    .padding([4, 8]);
+    .spacing(tok.density.gap())
+    .padding([crate::density::GRID as f32, tok.density.gap()]);
     crate::a11y::attach(
         group_box(
             title,
@@ -1848,12 +1880,15 @@ pub fn cheatsheet<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let q = query.trim().to_ascii_lowercase();
     let rail = crate::chrome::SCROLL_RAIL_WIDTH;
-    let mut col = Column::new().spacing(4).padding(Padding {
-        top: 8.0,
-        right: 8.0 + rail,
-        bottom: 8.0,
-        left: 8.0,
-    });
+    let g = tok.density.gap();
+    let mut col = Column::new()
+        .spacing(crate::density::GRID as f32)
+        .padding(Padding {
+            top: g,
+            right: g + rail,
+            bottom: g,
+            left: g,
+        });
     for a in table.iter() {
         if !a.enabled {
             continue;
@@ -2184,6 +2219,31 @@ mod tests {
         );
         let _: Element<'_, ()> = menu_bar(&table, tok, ltr, &cat);
         let _: Element<'_, ()> = menu_bar(&table, tok, rtl, &cat);
+        let src = include_str!("pattern.rs");
+        let bar_src = src
+            .split("pub fn menu_bar")
+            .nth(1)
+            .unwrap()
+            .split("pub fn toolbar")
+            .next()
+            .unwrap();
+        assert!(bar_src.contains("align_start(dir)"));
+        let tool_src = src
+            .split("pub fn toolbar")
+            .nth(1)
+            .unwrap()
+            .split("pub fn command_bar")
+            .next()
+            .unwrap();
+        assert!(tool_src.contains("align_start(dir)"));
+        let sec_src = src
+            .split("pub fn sectioned_menu")
+            .nth(1)
+            .unwrap()
+            .split("pub fn cascade_menu")
+            .next()
+            .unwrap();
+        assert!(sec_src.contains("align_start(tok.direction)"));
         let empty = ActionTable::new();
         let _: Element<'_, ()> = menu_bar(&empty, tok, ltr, &cat);
         let mut disabled = ActionTable::new();
@@ -2479,10 +2539,10 @@ mod tests {
         let mut mw = main_window(lab("m"), lab("t"), lab("c"), lab("s"), tok);
         paint(&mut mw);
         let vp = iced::Size::new(640.0, 400.0);
-        let two = context_card_size(2, vp);
+        let two = context_card_size(2, vp, tok.density);
         assert!(two.height < 120.0);
         assert!(two.height > 40.0);
-        let tall = context_card_size(40, vp);
+        let tall = context_card_size(40, vp, tok.density);
         assert!(tall.height <= vp.height * 0.5 + 0.1);
         let pinned = context_origin(iced::Point::new(10.0, 390.0), two, vp);
         assert!(pinned.y + two.height <= vp.height + 0.1);
@@ -2504,7 +2564,7 @@ mod tests {
             .unwrap();
         assert!(cm_src.contains("align_start(tok.direction)"));
         assert!(cm_src.contains("tok.body()"));
-        let card = context_card_size(table.iter().count(), vp);
+        let card = context_card_size(table.iter().count(), vp, tok.density);
         let row_w = menu_row_width(&mut cm);
         assert!(
             row_w + 1.0 >= card.width - 16.0,

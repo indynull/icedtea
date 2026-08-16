@@ -109,7 +109,10 @@ Constructor: [`widget::tree_view`](https://docs.rs/icedtea/latest/icedtea/widget
 
 The application owns expand state. Leaf rows have no twisty. Empty
 tree is an empty column. `animating` is the branch that is opening or
-closing and its 0–1 height progress.
+closing and its 0–1 height progress. [`TreeFace::Outline`](https://docs.rs/icedtea/latest/icedtea/widget/enum.TreeFace.html)
+is a tight heading tree. `TreeFace::Files` is an explorer: inset
+selection and folder/file marks from `dir`. `Tokens.density` scales
+pad, gap, and indent.
 
 Pass `A11y`.
 

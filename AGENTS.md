@@ -113,6 +113,13 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   `themed_scroll`, keys subscribe with `key::listen`, sidebar recipe
   is `Breakpoint::from_width`.
 - One path per feature. Pick it and delete the other. Fallbacks re-grow.
+- Always vary a constructor’s painted look with a `*Face` enum on that
+  same call (`RowFace`, `CardFace`, `FieldFace`, `TreeFace`). Never a
+  second catalog widget or a stylesheet for the same job.
+- Always size chrome pad and inter-item gap from `Tokens.density`
+  (`Density::gap`, `Density::inset`, `pad` on the control face).
+  `ControlSize` Compact and Comfortable stay explicit per-control
+  overrides; Default follows density.
 - Select and copy: code and fields use `text_editor` + `select_only`
   and app-owned `Content` / `Selectables` (clean multi-line highlight).
   Markdown uses structured paint (`markdown_view` via

@@ -68,6 +68,25 @@ fn pad(tok: Tokens) -> Padding {
     Padding::from([v as f32, h as f32])
 }
 
+fn gap(tok: Tokens) -> f32 {
+    tok.density.gap()
+}
+
+fn inset(tok: Tokens) -> f32 {
+    tok.density.inset()
+}
+
+fn sheet(tok: Tokens) -> f32 {
+    tok.density.sheet()
+}
+
+fn icon_hit_pad(size: ControlSize, tok: Tokens) -> Padding {
+    match size {
+        ControlSize::Default => Padding::from(gap(tok)),
+        other => Padding::from(f32::from(other.pad())),
+    }
+}
+
 /// Outer height of a standard padded control (body line box + vertical pad).
 fn control_height(tok: Tokens) -> f32 {
     // Same face as `themed_button` Shrink. Do not floor to the 48dp touch
@@ -92,7 +111,7 @@ fn labeled_control<'a, M: 'a>(
         tok.scheme().on_surface
     };
     let label: Element<'a, M> = text(name).size(tok.body()).color(ink).into();
-    let mut r = Row::new().spacing(8).align_y(Alignment::Center);
+    let mut r = Row::new().spacing(gap(tok)).align_y(Alignment::Center);
     for kid in crate::i18n::order(tok.direction, [control, label]) {
         r = r.push(kid);
     }
@@ -112,7 +131,7 @@ fn icon_label<'a, M: 'a>(title: String, icons: Icons, tok: Tokens) -> Element<'a
     if let Some(ic) = icons.trailing {
         kids.push(icon_svg(ic, tok, A11y::new(title, Role::Image)));
     }
-    let mut r = Row::new().spacing(8).align_y(Alignment::Center);
+    let mut r = Row::new().spacing(gap(tok)).align_y(Alignment::Center);
     for kid in crate::i18n::order(tok.direction, kids) {
         r = r.push(kid);
     }
@@ -247,7 +266,7 @@ pub fn display_line<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) ->
 /// Segmented large figures on the type scale (clocks, meters).
 pub fn figure_display<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
     let s = a11y.apply_name(s);
-    let mut r = Row::new().spacing(8).align_y(Alignment::Center);
+    let mut r = Row::new().spacing(gap(tok)).align_y(Alignment::Center);
     for ch in s.chars() {
         r = r.push(
             text(ch.to_string())
@@ -299,7 +318,7 @@ pub fn code_block<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let e = text_editor(content)
         .height(Length::Shrink)
-        .padding(12)
+        .padding(inset(tok))
         .font(typo::MONO)
         .size(tok.code())
         .wrapping(iced::widget::text::Wrapping::Word)
@@ -622,6 +641,18 @@ pub enum CardFace {
     Elevated,
     Filled,
     Outlined,
+}
+
+/// How each tree row is painted.
+///
+/// [`Self::Outline`] is a tight heading tree: full-width selection, no
+/// folder marks. [`Self::Files`] is an explorer: inset wash, folder and
+/// file marks from `dir`. Density still scales pad and indent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TreeFace {
+    #[default]
+    Outline,
+    Files,
 }
 
 /// Badge size. Large is the default chip-like face.
@@ -952,7 +983,7 @@ pub fn icon_button<'a, M: Clone + 'a>(
         tok,
         A11y::new(a11y.name.clone(), Role::Image),
     ))
-    .padding(size.pad())
+    .padding(icon_hit_pad(size, tok))
     .style(style::button_style(tok, variant));
     if let Some(m) = a11y.apply_message(msg) {
         b = b.on_press(m);
@@ -1655,8 +1686,8 @@ pub fn image_slot<'a, M: Clone + 'a>(
                     container(Space::new().width(Length::Fill).height(14))
                         .style(move |_| style::skeleton(tok)),
                 ]
-                .spacing(8)
-                .padding(12)
+                .spacing(gap(tok))
+                .padding(inset(tok))
                 .into(),
             )
             .style(move |_| {
@@ -1780,7 +1811,7 @@ pub fn themed_text_input<'a, M: Clone + 'a>(
     }
     let mut field: Element<'a, M> = i.into();
     if opts.icons != Icons::NONE {
-        let mut r = Row::new().spacing(8).align_y(Alignment::Center);
+        let mut r = Row::new().spacing(gap(tok)).align_y(Alignment::Center);
         if let Some(ic) = opts.icons.leading {
             r = r.push(icon_svg(ic, tok, A11y::new("prefix", Role::Image)));
         }
@@ -2037,7 +2068,7 @@ pub fn secret_field<'a, M: Clone + 'a>(
         A11y::button(copy.title.clone()).with_disabled(!copy.enabled || a11y.disabled),
     );
     let kids = crate::i18n::order(dir, [field, toggle, copy_btn]);
-    let mut r = Row::new().spacing(8).align_y(Alignment::Center);
+    let mut r = Row::new().spacing(gap(tok)).align_y(Alignment::Center);
     for k in kids {
         r = r.push(k);
     }
@@ -2124,7 +2155,7 @@ pub fn value_field<'a, M: Clone + 'a>(
     }
     let kids = crate::i18n::order(dir, kids);
     let mut r = Row::new()
-        .spacing(8)
+        .spacing(gap(tok))
         .align_y(Alignment::Center)
         .width(Length::Fill);
     for k in kids {
@@ -2165,7 +2196,7 @@ pub fn textarea<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let mut e = text_editor(content)
         .height(height)
-        .padding(8)
+        .padding(pad(tok))
         .size(tok.body())
         .style(editor_style(tok));
     if !a11y.disabled {
@@ -2296,7 +2327,7 @@ pub fn highlighted_code<'a, M: Clone + 'a>(
     let theme = crate::theme::code_highlight(theme_name);
     let e = text_editor(content)
         .height(height)
-        .padding(8)
+        .padding(inset(tok))
         .style(editor_style(tok))
         .highlight(syntax, theme)
         .font(typo::MONO)
@@ -2407,7 +2438,7 @@ pub fn search_input_clear<'a, M: Clone + 'a>(
         a11y.child(Role::TextBox),
         None,
     );
-    let mut r = Row::new().spacing(8).align_y(Alignment::Center);
+    let mut r = Row::new().spacing(gap(tok)).align_y(Alignment::Center);
     for kid in crate::i18n::order(tok.direction, [search_ic, field]) {
         r = r.push(kid);
     }
@@ -2690,7 +2721,7 @@ pub fn date_picker<'a, M: Clone + 'a>(
                 A11y::button("next-day").with_disabled(a11y.disabled),
             ),
         ]
-        .spacing(8)
+        .spacing(gap(tok))
         .align_y(Alignment::Center)
         .into(),
         &a11y,
@@ -3521,7 +3552,7 @@ pub fn tooltip_wrap<'a, M: 'a>(
         tooltip(
             child,
             container(meta(tip.clone(), tok, A11y::new(tip, Role::Tooltip)))
-                .padding(6)
+                .padding(gap(tok))
                 .style(tip_style(tok)),
             anchor.position(),
         )
@@ -3583,7 +3614,7 @@ pub fn tooltip_rich<'a, M: Clone + 'a>(
     a11y::attach(
         tooltip(
             child,
-            container(col).padding(8).style(tip_style(tok)),
+            container(col).padding(inset(tok)).style(tip_style(tok)),
             anchor.position(),
         )
         .into(),
@@ -3755,7 +3786,7 @@ pub fn chip<'a, M: Clone + 'a>(
             A11y::button(format!("dismiss {title}")).with_disabled(a11y.disabled),
         ));
     }
-    let face = container(line).padding([8, 12]).style(move |_| {
+    let face = container(line).padding(pad(tok)).style(move |_| {
         let mut st = style::fill(wash, ink);
         st.border = border;
         st
@@ -3793,7 +3824,7 @@ pub fn filter_chips<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let mut r = Row::new().spacing(8).align_y(Alignment::Center);
+    let mut r = Row::new().spacing(gap(tok)).align_y(Alignment::Center);
     for (i, label) in labels.iter().enumerate() {
         let on = selected.get(i).copied().unwrap_or(false);
         r = r.push(chip(
@@ -3901,9 +3932,9 @@ pub fn group_box<'a, M: 'a>(
                 meta(title.clone(), tok, A11y::new(title, Role::Header)),
                 child
             ]
-            .spacing(8),
+            .spacing(gap(tok)),
         )
-        .padding(16)
+        .padding(sheet(tok))
         .width(Length::Fill)
         .style(move |_| match face {
             CardFace::Elevated => style::raised_card(tok),
@@ -3941,7 +3972,7 @@ pub fn banner<'a, M: Clone + 'a>(
     let a11y = a11y.merge_live(a11y::Live::Polite);
     let text_s = a11y.apply_name(text_s);
     let mut r = row![label(text_s.clone(), tok, A11y::new(text_s, Role::Status))]
-        .spacing(12)
+        .spacing(inset(tok))
         .align_y(Alignment::Center);
     if let Some((t, m)) = action {
         r = r.push(themed_button(
@@ -3956,7 +3987,7 @@ pub fn banner<'a, M: Clone + 'a>(
     a11y::attach(
         container(r)
             .width(Length::Fill)
-            .padding(12)
+            .padding(inset(tok))
             .style(move |_| style::callout(tok, ToastKind::Info))
             .into(),
         &a11y,
@@ -3989,7 +4020,7 @@ pub fn info_bar<'a, M: Clone + 'a>(
     a11y::attach(
         container(label(text_s.clone(), tok, A11y::new(text_s, Role::Status)))
             .width(Length::Fill)
-            .padding(10)
+            .padding(inset(tok))
             .style(move |_| style::callout(tok, kind))
             .into(),
         &a11y,
@@ -4024,7 +4055,7 @@ pub fn breadcrumb<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let parts = crate::i18n::order(dir, parts.iter().cloned());
-    let mut r = Row::new().spacing(6).align_y(Alignment::Center);
+    let mut r = Row::new().spacing(gap(tok)).align_y(Alignment::Center);
     for (i, (name, msg)) in parts.iter().enumerate() {
         if i > 0 {
             r = r.push(meta("/", tok, A11y::new("/", Role::Separator)));
@@ -4089,11 +4120,11 @@ pub fn toast_view<'a, M: Clone + 'a>(
                 A11y::button("dismiss").with_disabled(a11y.disabled),
             ),
         ]
-        .spacing(8)
+        .spacing(gap(paint))
         .align_y(Alignment::Center),
     )
     .width(Length::Fill)
-    .padding([8, 12])
+    .padding(pad(paint))
     .style(move |theme| style::fade_face(toast_style(tok, kind)(theme), t));
     crate::motion::overlay(face.into(), t, crate::motion::Slide::Down, tok, a11y)
 }
@@ -4216,7 +4247,7 @@ pub fn log_view<'a, M: Clone + 'a>(
                 ))
                 .width(Length::Fill)
                 .height(h)
-                .padding([2, 8])
+                .padding([2.0, gap(tok)])
                 .clip(true),
             );
         }
@@ -4450,7 +4481,7 @@ fn two_line_row<'a, M: 'a>(
     } else {
         iced::widget::text::Wrapping::None
     };
-    let (pad_l, pad_r) = crate::i18n::inline_pad(tok.direction, 8.0, 12.0);
+    let (pad_l, pad_r) = crate::i18n::inline_pad(tok.direction, gap(tok), inset(tok));
     let on = tok.scheme().on_surface;
     let mut col = column![start_label(
         title,
@@ -4481,9 +4512,9 @@ fn two_line_row<'a, M: 'a>(
         .width(Length::Fill)
         .height(row_h)
         .padding(Padding {
-            top: 8.0,
+            top: gap(tok),
             right: pad_r,
-            bottom: 8.0,
+            bottom: gap(tok),
             left: pad_l,
         })
         .clip(true)
@@ -4501,7 +4532,7 @@ fn card_row<'a, M: 'a>(
     tok: Tokens,
 ) -> Element<'a, M> {
     let on = tok.scheme().on_surface;
-    let (pad_l, pad_r) = crate::i18n::inline_pad(tok.direction, 12.0, 12.0);
+    let (pad_l, pad_r) = crate::i18n::inline_pad(tok.direction, inset(tok), inset(tok));
     let mut col = column![start_label(
         title.to_string(),
         tok.body(),
@@ -4533,9 +4564,9 @@ fn card_row<'a, M: 'a>(
         .width(Length::Fill)
         .height(row_h)
         .padding(Padding {
-            top: 8.0,
+            top: gap(tok),
             right: pad_r,
-            bottom: 8.0,
+            bottom: gap(tok),
             left: pad_l,
         })
         .clip(true)
@@ -5080,13 +5111,13 @@ pub fn item_grid<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let cols = 3;
     let mut rows = iced::widget::Column::new()
-        .spacing(8)
+        .spacing(gap(tok))
         .width(Length::Fill)
         .height(Length::Fill);
     let mut i = 0;
     while i < labels.len() {
         let mut r = iced::widget::Row::new()
-            .spacing(8)
+            .spacing(gap(tok))
             .width(Length::Fill)
             .height(Length::Fill);
         for _ in 0..cols {
@@ -5317,7 +5348,7 @@ where
                             ))
                             .width(w)
                             .height(h)
-                            .padding([8, 8])
+                            .padding([gap(tok), gap(tok)])
                             .style(move |_| cell_style);
                             let cell: Element<'a, M> = if disabled {
                                 face.into()
@@ -5395,8 +5426,10 @@ where
 
 /// Heading or file tree. The disclosure control emits `on_toggle`; the
 /// row label emits `on_select`. `selected` is the app-owned id.
-/// An expandable outline.
 ///
+/// [`TreeFace::Outline`] is a tight heading tree (full-width wash, no
+/// marks). [`TreeFace::Files`] is an explorer (inset wash, folder and
+/// file marks from `dir`). Density scales pad, gap, and indent.
 /// The application owns expand state. Leaf rows have no twisty.
 /// `animating` is the branch that is opening or closing and its 0–1
 /// height progress. `None` paints the committed tree.
@@ -5422,16 +5455,19 @@ where
 ///     None,
 ///     on_toggle,
 ///     on_select,
+///     widget::TreeFace::Outline,
 ///     tok,
 ///     A11y::new("tree", Role::Tree),
 /// );
 /// ```
+#[allow(clippy::too_many_arguments)]
 pub fn tree_view<'a, M: Clone + 'a>(
     root: &TreeNode,
     selected: Option<u64>,
     animating: Option<(u64, f32)>,
     on_toggle: impl Fn(u64) -> M + Copy + 'a,
     on_select: impl Fn(ItemClick<u64>) -> M + Copy + 'a,
+    face: TreeFace,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
@@ -5439,7 +5475,7 @@ pub fn tree_view<'a, M: Clone + 'a>(
     let progress = animating.map(|(_, p)| p).unwrap_or(1.0);
     let anim_id = animating.map(|(id, _)| id);
     let mut col = Column::new()
-        .spacing(2)
+        .spacing(0)
         .width(Length::Fill)
         .align_x(crate::i18n::align_start(tok.direction));
     let mut branch: Vec<Element<'a, M>> = Vec::new();
@@ -5458,6 +5494,7 @@ pub fn tree_view<'a, M: Clone + 'a>(
             selected,
             &on_toggle,
             on_select,
+            face,
             tok,
             &a11y,
         );
@@ -5484,6 +5521,27 @@ pub fn tree_view<'a, M: Clone + 'a>(
     )
 }
 
+/// Compact disclosure mark. A full [`themed_button`] is a control face,
+/// too tall for a file tree row.
+fn tree_twisty<'a, M: Clone + 'a>(
+    mark: &'static str,
+    msg: Option<M>,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let face = text(mark).size(tok.body()).color(tok.scheme().on_surface);
+    let mut b = button(face)
+        .padding(Padding::from((gap(tok) / 2.0).max(4.0)))
+        .style(style::button_style(tok, Variant::Ghost));
+    if let Some(m) = a11y.apply_message(msg) {
+        b = b.on_press(m);
+    }
+    a11y::attach(b.into(), &a11y)
+}
+
+const TREE_FOLDER_SVG: &[u8] = br##"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="#000"><path d="M1.5 3.5h4.1L7 5.2h7.5v7.8H1.5z"/></svg>"##;
+const TREE_FILE_SVG: &[u8] = br##"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="#000"><path d="M4 1.5h5.2L12.5 5v9.5H4z"/></svg>"##;
+
 #[allow(clippy::too_many_arguments)]
 fn tree_line<'a, M: Clone + 'a>(
     depth: u32,
@@ -5494,33 +5552,38 @@ fn tree_line<'a, M: Clone + 'a>(
     selected: Option<u64>,
     on_toggle: &impl Fn(u64) -> M,
     on_select: impl Fn(ItemClick<u64>) -> M + Copy + 'a,
+    face: TreeFace,
     tok: Tokens,
     a11y: &A11y,
 ) -> Element<'a, M> {
     let is_sel = selected == Some(id);
+    let step = match face {
+        TreeFace::Outline => gap(tok) * 2.0,
+        TreeFace::Files => gap(tok) + crate::density::GRID as f32,
+    };
     let indent: Element<'a, M> = Space::new()
-        .width(Length::Fixed(depth as f32 * 16.0))
+        .width(Length::Fixed(depth as f32 * step))
         .into();
+    let twisty_w = gap(tok) * 2.0 + 4.0;
     let twisty: Element<'a, M> = if has_children {
         let mark = if expanded {
             "▾"
         } else {
             closed_disclosure(tok)
         };
-        themed_button(
+        tree_twisty(
             mark,
             a11y.apply_message(Some(on_toggle(id))),
             tok,
-            Variant::Ghost,
-            Icons::NONE,
             A11y::button(format!("toggle {label_s}"))
                 .with_checked(expanded)
                 .with_disabled(a11y.disabled),
         )
     } else {
-        Space::new().width(28.0).into()
+        Space::new().width(twisty_w).into()
     };
     let start = crate::i18n::align_start(tok.direction);
+    let v = gap(tok);
     let title = container(start_label(
         label_s.clone(),
         tok.body(),
@@ -5531,11 +5594,25 @@ fn tree_line<'a, M: Clone + 'a>(
     ))
     .width(Length::Fill)
     .align_x(start)
-    .padding([6, 8]);
+    .padding([v / 2.0, v]);
     let title: Element<'a, M> = if is_sel {
         title.style(move |_| style::list_row(tok, true)).into()
     } else {
         title.into()
+    };
+    let title: Element<'a, M> = if face == TreeFace::Files {
+        let (pad_l, pad_r) = crate::i18n::inline_pad(tok.direction, 0.0, v / 2.0);
+        container(title)
+            .width(Length::Fill)
+            .padding(Padding {
+                top: 0.0,
+                right: pad_r,
+                bottom: 0.0,
+                left: pad_l,
+            })
+            .into()
+    } else {
+        title
     };
     let pick: Element<'a, M> = if a11y.disabled {
         title
@@ -5548,13 +5625,29 @@ fn tree_line<'a, M: Clone + 'a>(
             })
         })
     };
-    let pick: Element<'a, M> =
-        a11y::attach(pick, &A11y::new(label_s, Role::Tree).with_checked(is_sel));
+    let pick: Element<'a, M> = a11y::attach(
+        pick,
+        &A11y::new(label_s.clone(), Role::Tree).with_checked(is_sel),
+    );
+    let mut kids = vec![indent, twisty];
+    if face == TreeFace::Files {
+        let mark = if has_children {
+            TREE_FOLDER_SVG
+        } else {
+            TREE_FILE_SVG
+        };
+        kids.push(icon_svg(
+            crate::icon::Glyph::Bytes(mark),
+            tok,
+            A11y::new(label_s, Role::Image),
+        ));
+    }
+    kids.push(pick);
     let mut line = Row::new()
-        .spacing(4)
+        .spacing(crate::density::GRID as f32)
         .align_y(Alignment::Center)
         .width(Length::Fill);
-    for kid in crate::i18n::order(tok.direction, [indent, twisty, pick]) {
+    for kid in crate::i18n::order(tok.direction, kids) {
         line = line.push(kid);
     }
     line.into()
@@ -5569,7 +5662,7 @@ fn tree_push_branch<'a, M: Clone + 'a>(
     if rows.is_empty() {
         return col;
     }
-    let mut kids = Column::new().spacing(2);
+    let mut kids = Column::new().spacing(0);
     for row in rows {
         kids = kids.push(row);
     }
@@ -5682,7 +5775,7 @@ pub fn tab_bar<'a, M: Clone + 'a>(
             ));
         }
         let mut tab = button(label_row)
-            .padding([12, 16])
+            .padding(pad(tok))
             .style(style::tab_style(tok, active));
         if !a11y.disabled {
             tab = tab.on_press(on_select(i));
@@ -5770,7 +5863,7 @@ fn disclosure_header<'a, M: Clone + 'a>(
         .color(s.on_surface_variant)
         .into();
     let mut face = Row::new()
-        .spacing(8)
+        .spacing(gap(tok))
         .align_y(Alignment::Center)
         .width(Length::Fill);
     for kid in crate::i18n::order(tok.direction, [title_el, mark_el]) {
@@ -5841,7 +5934,7 @@ pub fn accordion_view<'a, M: Clone + 'a>(
         if t > 0.0 {
             let pane = container(body)
                 .width(Length::Fill)
-                .padding(12)
+                .padding(inset(tok))
                 .style(move |_| style::panel(tok));
             col = col.push(crate::motion::expand(
                 pane.into(),
@@ -5982,8 +6075,8 @@ pub fn expander<'a, M: Clone + 'a>(
         crate::motion::expand(child, t, peek_h, tok, A11y::new(title.clone(), Role::Group))
     };
     a11y::attach(
-        container(column![header, body].spacing(8))
-            .padding(12)
+        container(column![header, body].spacing(gap(tok)))
+            .padding(inset(tok))
             .width(Length::Fill)
             .style(move |_| style::card(tok, false))
             .into(),
@@ -6037,7 +6130,7 @@ pub fn pagination<'a, M: Clone + 'a>(
                 A11y::button("Next").with_disabled(a11y.disabled || page + 1 >= pages),
             ),
         ]
-        .spacing(8)
+        .spacing(gap(tok))
         .align_y(Alignment::Center)
         .into(),
         &a11y,
@@ -7374,6 +7467,7 @@ mod tests {
             None,
             |_| (),
             |_| (),
+            TreeFace::Outline,
             tok,
             role("tree", Role::Tree),
         );
@@ -7457,6 +7551,7 @@ mod tests {
             Some((1, 0.5)),
             |_| (),
             |_| (),
+            TreeFace::Outline,
             tok,
             role("tree", Role::Tree),
         );
@@ -7906,6 +8001,7 @@ mod tests {
         assert_eq!(TooltipAnchor::Start.position(), tooltip::Position::Left);
         assert_eq!(FieldFace::default(), FieldFace::Filled);
         assert_eq!(CardFace::default(), CardFace::Elevated);
+        assert_eq!(TreeFace::default(), TreeFace::Outline);
         assert_eq!(BadgeSize::default(), BadgeSize::Large);
         assert_eq!(ChipKind::default(), ChipKind::Assist);
         assert_eq!(TooltipAnchor::default(), TooltipAnchor::Follow);
@@ -8099,6 +8195,7 @@ mod tests {
             None,
             |_| (),
             |_| (),
+            TreeFace::Outline,
             tok,
             role("tree", Role::Tree),
         );
@@ -8109,6 +8206,7 @@ mod tests {
             Some((1, 0.5)),
             |_| (),
             |_| (),
+            TreeFace::Outline,
             tok,
             role("tree", Role::Tree),
         );
@@ -8119,6 +8217,7 @@ mod tests {
             Some((1, 0.0)),
             |_| (),
             |_| (),
+            TreeFace::Outline,
             tok.with_reduced_motion(true),
             role("tree", Role::Tree),
         );
@@ -8268,6 +8367,7 @@ mod tests {
             None,
             |_| (),
             |_| (),
+            TreeFace::Outline,
             tok,
             role("tree", Role::Tree).with_disabled(true),
         );
@@ -8533,6 +8633,7 @@ mod tests {
             None,
             |id| id,
             |c| c.id,
+            TreeFace::Outline,
             tok,
             A11y::new("tree", Role::Tree),
         );
@@ -8542,9 +8643,38 @@ mod tests {
             Some((1, 0.4)),
             |id| id,
             |c| c.id,
+            TreeFace::Outline,
             tok,
             A11y::new("tree", Role::Tree),
         );
+        let compact = tok.with_density(crate::density::Density::named(
+            crate::density::DensityName::Compact,
+        ));
+        let mut files: Element<'_, u64> = tree_view(
+            &tree,
+            Some(2),
+            None,
+            |id| id,
+            |c| c.id,
+            TreeFace::Files,
+            compact,
+            A11y::new("tree", Role::Tree),
+        );
+        draw_once(&mut files);
+        let comfy = tok.with_density(crate::density::Density::named(
+            crate::density::DensityName::Comfortable,
+        ));
+        let mut roomy: Element<'_, u64> = tree_view(
+            &tree,
+            Some(2),
+            None,
+            |id| id,
+            |c| c.id,
+            TreeFace::Outline,
+            comfy,
+            A11y::new("tree", Role::Tree),
+        );
+        draw_once(&mut roomy);
     }
 
     #[test]
@@ -9354,6 +9484,7 @@ mod tests {
             None,
             |_| (),
             |_| (),
+            TreeFace::Outline,
             tok,
             A11y::new("tree", Role::Tree),
         );
@@ -9401,6 +9532,10 @@ mod tests {
             .unwrap();
         assert!(line_src.contains("width(Length::Fill)"));
         assert!(line_src.contains("align_x(start)"));
+        assert!(line_src.contains("tree_twisty"));
+        assert!(!line_src.contains("themed_button"));
+        assert!(line_src.contains("TreeFace::Files"));
+        assert!(line_src.contains("gap(tok)"));
     }
 
     #[test]
@@ -11163,6 +11298,7 @@ mod tests {
             Some((2, 0.4)),
             |id| id,
             |c| c.id,
+            TreeFace::Outline,
             tok,
             A11y::new("tree", Role::Tree),
         );
@@ -11173,6 +11309,7 @@ mod tests {
             Some((2, 1.0)),
             |id| id,
             |c| c.id,
+            TreeFace::Outline,
             tok,
             A11y::new("tree", Role::Tree).with_disabled(true),
         );

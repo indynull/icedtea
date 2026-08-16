@@ -4,6 +4,10 @@
 
 ### Feature
 
+- `tree_view` takes `TreeFace`: Outline is a tight heading tree, Files
+  is an explorer (inset wash, folder and file marks).
+- Constructors take pad and gap from `Tokens.density`. `ControlSize`
+  Default follows that density. `context_card_size` takes `Density`.
 - `Catalog::for_locale` fills English, Vietnamese, Japanese, Chinese,
   Arabic, and Urdu. `direction_for` sets Arabic and Urdu right-to-left.
 - `Tokens` carries type scale, corner policy, and elevation

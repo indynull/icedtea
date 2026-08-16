@@ -1029,6 +1029,14 @@ fn parse_inject_line(line: &str) -> Option<Message> {
             let v = parts.next()?.to_ascii_lowercase();
             Some(Message::ListFace(v == "card" || v == "true"))
         }
+        "tree-face" | "tree_face" => {
+            let v = parts.next()?.to_ascii_lowercase();
+            Some(Message::TreeFace(if v == "files" || v == "file" {
+                widget::TreeFace::Files
+            } else {
+                widget::TreeFace::Outline
+            }))
+        }
         "expand" => Some(Message::Expand(parts.next()? == "true")),
         "acc" => Some(Message::Acc(parts.next()?.parse().ok()?)),
         "dialog" => Some(Message::DialogOpen(parts.next()? == "true")),
@@ -1239,6 +1247,7 @@ enum Message {
     AskLine,
     TableHScroll(f32),
     ListFace(bool),
+    TreeFace(widget::TreeFace),
     FocusName,
     Secret(String),
     RevealSecret,
@@ -1346,6 +1355,7 @@ struct Gallery {
     table: TableModel,
     tree: TreeNode,
     tree_sel: Option<u64>,
+    tree_face: widget::TreeFace,
     tree_anim: Option<(u64, icedtea::iced::Animation<bool>)>,
     /// Full mail seed; filter + page slice into [`Self::list`].
     list_all: VecList,
@@ -1592,6 +1602,7 @@ impl Gallery {
                 ],
             ),
             tree_sel: None,
+            tree_face: widget::TreeFace::Outline,
             tree_anim: None,
             list_all: VecList {
                 items: (0..1_000).map(sample_mail).collect(),
@@ -2006,14 +2017,20 @@ impl Gallery {
             for kid in icedtea::i18n::order(self.direction, [lab, list]) {
                 r = r.push(kid);
             }
-            r
+            let el: Element<'_, Message> = r.into();
+            el
         };
-        column![
-            row![
+        let start = icedtea::i18n::align_start(self.direction);
+        let mut theme_row = icedtea::iced::widget::Row::new()
+            .spacing(8)
+            .align_y(Alignment::Center);
+        for kid in icedtea::i18n::order(
+            self.direction,
+            [
                 widget::meta(
                     self.catalog.t("look.theme"),
                     tok,
-                    named("theme", Role::Status)
+                    named("theme", Role::Status),
                 ),
                 widget::themed_pick_list(
                     self.themes.names(),
@@ -2041,64 +2058,72 @@ impl Gallery {
                     language,
                     Message::Language,
                 ),
-            ]
-            .spacing(8)
-            .align_y(Alignment::Center),
-            row![
-                pick(
-                    self.catalog.t("look.density"),
-                    ["density.compact", "density.default", "density.comfortable"]
-                        .into_iter()
-                        .map(|k| self.catalog.t(k).to_string())
-                        .collect(),
-                    density,
-                    Message::Density,
-                ),
-                pick(
-                    self.catalog.t("look.type"),
-                    ["90%", "100%", "110%", "125%"]
-                        .into_iter()
-                        .map(str::to_string)
-                        .collect(),
-                    scale,
-                    Message::FontScale,
-                ),
-                pick(
-                    self.catalog.t("look.shape"),
-                    [
-                        "shape.desktop",
-                        "shape.tight",
-                        "shape.soft",
-                        "shape.pill",
-                        "shape.material",
-                    ]
+            ],
+        ) {
+            theme_row = theme_row.push(kid);
+        }
+        let mut look_row = icedtea::iced::widget::Row::new()
+            .spacing(16)
+            .align_y(Alignment::Center);
+        let look_picks: [Element<'_, Message>; 5] = [
+            pick(
+                self.catalog.t("look.density"),
+                ["density.compact", "density.default", "density.comfortable"]
                     .into_iter()
                     .map(|k| self.catalog.t(k).to_string())
                     .collect(),
-                    shape,
-                    Message::Shape,
-                ),
-                pick(
-                    self.catalog.t("look.elevation"),
-                    ["elevation.desktop", "elevation.flat"]
-                        .into_iter()
-                        .map(|k| self.catalog.t(k).to_string())
-                        .collect(),
-                    elevation,
-                    Message::Elevation,
-                ),
-                pick(
-                    self.catalog.t("look.direction"),
-                    ["dir.ltr", "dir.rtl"]
-                        .into_iter()
-                        .map(|k| self.catalog.t(k).to_string())
-                        .collect(),
-                    direction,
-                    Message::Direction,
-                ),
-            ]
-            .spacing(16)
-            .align_y(Alignment::Center),
+                density,
+                Message::Density,
+            ),
+            pick(
+                self.catalog.t("look.type"),
+                ["90%", "100%", "110%", "125%"]
+                    .into_iter()
+                    .map(str::to_string)
+                    .collect(),
+                scale,
+                Message::FontScale,
+            ),
+            pick(
+                self.catalog.t("look.shape"),
+                [
+                    "shape.desktop",
+                    "shape.tight",
+                    "shape.soft",
+                    "shape.pill",
+                    "shape.material",
+                ]
+                .into_iter()
+                .map(|k| self.catalog.t(k).to_string())
+                .collect(),
+                shape,
+                Message::Shape,
+            ),
+            pick(
+                self.catalog.t("look.elevation"),
+                ["elevation.desktop", "elevation.flat"]
+                    .into_iter()
+                    .map(|k| self.catalog.t(k).to_string())
+                    .collect(),
+                elevation,
+                Message::Elevation,
+            ),
+            pick(
+                self.catalog.t("look.direction"),
+                ["dir.ltr", "dir.rtl"]
+                    .into_iter()
+                    .map(|k| self.catalog.t(k).to_string())
+                    .collect(),
+                direction,
+                Message::Direction,
+            ),
+        ];
+        for kid in icedtea::i18n::order(self.direction, look_picks) {
+            look_row = look_row.push(kid);
+        }
+        column![
+            container(theme_row).width(Length::Fill).align_x(start),
+            container(look_row).width(Length::Fill).align_x(start),
         ]
         .spacing(8)
         .padding([8, 12])
@@ -3223,6 +3248,7 @@ impl Gallery {
                 self.list_card = card;
                 self.refresh_list_view();
             }
+            Message::TreeFace(face) => self.tree_face = face,
             Message::ListFilter(q) => {
                 self.list_filter = q;
                 self.list_page = 0;
@@ -5258,7 +5284,37 @@ impl Gallery {
                     || self.catalog.t("tree.empty").to_string(),
                     |id| format!("{} {id}", self.catalog.t("tree.selected")),
                 );
+                let face_labels = [
+                    self.catalog.t("tree.outline").to_string(),
+                    self.catalog.t("tree.files").to_string(),
+                ];
+                let face_on = [
+                    self.tree_face == widget::TreeFace::Outline,
+                    self.tree_face == widget::TreeFace::Files,
+                ];
+                let chips: Element<'_, Message> = widget::filter_chips(
+                    &face_labels,
+                    &face_on,
+                    |i| {
+                        Message::TreeFace(if i == 0 {
+                            widget::TreeFace::Outline
+                        } else {
+                            widget::TreeFace::Files
+                        })
+                    },
+                    tok,
+                    named("tree-face", Role::Group),
+                );
+                let mut faces = row![];
+                for kid in icedtea::i18n::order(
+                    self.direction,
+                    [chips, Space::new().width(Length::Fill).into()],
+                ) {
+                    faces = faces.push(kid);
+                }
+                let faces: Element<'_, Message> = faces.into();
                 column![
+                    faces,
                     widget::meta(picked, tok, named("tree-sel", Role::Status)),
                     widget::tree_view(
                         &self.tree,
@@ -5266,11 +5322,12 @@ impl Gallery {
                         self.tree_animating(),
                         Message::Tree,
                         Message::TreeSelect,
+                        self.tree_face,
                         tok,
                         named("tree", Role::Tree),
                     ),
                 ]
-                .spacing(8)
+                .spacing(tok.density.gap())
                 .into()
             }
             "tabs" => column![
@@ -6360,6 +6417,7 @@ impl Gallery {
                         self.tree_animating(),
                         Message::Tree,
                         Message::TreeSelect,
+                        widget::TreeFace::Outline,
                         tok,
                         named("insp-tree", Role::Tree),
                     ),
@@ -6420,6 +6478,7 @@ impl Gallery {
                             self.tree_animating(),
                             Message::Tree,
                             Message::TreeSelect,
+                            widget::TreeFace::Outline,
                             tok,
                             named("ws-outline", Role::Tree),
                         ),
@@ -6469,6 +6528,7 @@ impl Gallery {
                     self.tree_animating(),
                     Message::Tree,
                     Message::TreeSelect,
+                    widget::TreeFace::Outline,
                     tok,
                     named("outline", Role::Tree),
                 ),
@@ -6500,6 +6560,7 @@ impl Gallery {
                         self.tree_animating(),
                         Message::Tree,
                         Message::TreeSelect,
+                        widget::TreeFace::Outline,
                         tok,
                         named("drawer-nav", Role::Tree),
                     ),
@@ -7453,6 +7514,20 @@ mod tests {
             super::parse_inject_line("face card"),
             Some(super::Message::ListFace(true))
         ));
+        assert!(matches!(
+            super::parse_inject_line("tree-face files"),
+            Some(super::Message::TreeFace(icedtea::widget::TreeFace::Files))
+        ));
+        let tree_page = include_str!("main.rs")
+            .split("tree-face")
+            .nth(1)
+            .unwrap()
+            .split("\"tabs\" =>")
+            .next()
+            .unwrap();
+        assert!(tree_page.contains("filter_chips"));
+        assert!(tree_page.contains("i18n::order"));
+        assert!(tree_page.contains("TreeFace::Files"));
         assert!(matches!(
             super::parse_inject_line("md-press"),
             Some(super::Message::MdPointer(
