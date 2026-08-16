@@ -29,6 +29,8 @@
 
 ### Bug fix
 
+- The crate package is source, examples, icons, and the theme catalog
+  (not the gallery tour GIF).
 - Right-to-left chrome uses start/end: rails, splits, tree twisties,
   picks, button groups, inspector, drawer, and command bar.
 - `themed_button`, `context_menu`, catalog nav, list cards, and table

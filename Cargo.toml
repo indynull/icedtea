@@ -24,10 +24,12 @@ readme = "README.md"
 documentation = "https://docs.rs/icedtea"
 keywords = ["gui", "iced", "desktop", "widgets", "theme"]
 categories = ["gui"]
+# Icons and the theme catalog are compiled in. Tour GIFs, stills, and
+# the guide stay in git / GitHub Pages (crates.io cap is 10 MiB).
 include = [
     "src/**",
-    "assets/**",
-    "book/**",
+    "assets/icons/**",
+    "assets/themes/**",
     "examples/**",
     "README.md",
     "LICENSE",
