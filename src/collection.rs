@@ -949,6 +949,7 @@ pub struct Tabs {
     pub titles: Vec<String>,
     pub badges: Vec<String>,
     pub icons: Vec<Option<crate::icon::Icon>>,
+    pub disabled: Vec<bool>,
     pub active: usize,
     pub closable: bool,
 }
@@ -962,6 +963,7 @@ impl Tabs {
             titles,
             badges,
             icons: vec![None; n],
+            disabled: vec![false; n],
             active: 0,
             closable: false,
         }
@@ -981,6 +983,18 @@ impl Tabs {
         self
     }
 
+    /// Freeze one tab so [`crate::widget::tab_bar`] skips its press.
+    pub fn with_disabled(mut self, index: usize) -> Self {
+        if let Some(slot) = self.disabled.get_mut(index) {
+            *slot = true;
+        }
+        self
+    }
+
+    pub fn is_disabled(&self, index: usize) -> bool {
+        self.disabled.get(index).copied().unwrap_or(false)
+    }
+
     pub fn select(&mut self, i: usize) {
         if i < self.titles.len() {
             self.active = i;
@@ -997,6 +1011,9 @@ impl Tabs {
         }
         if i < self.icons.len() {
             self.icons.remove(i);
+        }
+        if i < self.disabled.len() {
+            self.disabled.remove(i);
         }
         if self.active >= self.titles.len() {
             self.active = self.titles.len().saturating_sub(1);
@@ -1276,6 +1293,13 @@ mod tests {
         assert_eq!(tabs.active, 1);
         tabs.closable = false;
         assert!(tabs.close(0).is_none());
+        let mut tabs = Tabs::new(["A", "B", "C"]).with_disabled(1);
+        assert!(tabs.is_disabled(1));
+        assert!(!tabs.is_disabled(0));
+        tabs.closable = true;
+        assert_eq!(tabs.close(0).as_deref(), Some("A"));
+        assert!(tabs.is_disabled(0));
+        assert!(!tabs.is_disabled(1));
         let mut acc = Accordion { open: None };
         acc.toggle(1);
         assert_eq!(acc.open, Some(1));

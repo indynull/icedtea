@@ -6,6 +6,7 @@
 
 - `search_input` and `search_input_clear` take submit and an input id.
   Placeholder is the a11y name.
+- `Tabs::with_disabled` freezes one tab. `tab_bar` skips its press.
 
 ### Bug fix
 

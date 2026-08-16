@@ -126,9 +126,10 @@ Constructor: [`widget::tab_bar`](https://docs.rs/icedtea/latest/icedtea/widget/f
 [icedtea](https://crates.io/crates/icedtea)
 
 `Tabs { closable: false }` is pinned sections. `with_badge` paints a
-count on a tab. `with_icon` paints icon-plus-text. `tab_bar` takes
+count on a tab. `with_icon` paints icon-plus-text. `with_disabled`
+freezes one tab so press is skipped. `tab_bar` takes
 `secondary` for a 1 dp underbar (3 dp when false). When `max_width`
-is set and titles do not fit, extra tabs move into a More list. Select
+is set and titles do not fit, extra enabled tabs move into a More list. Select
 sends the index. See also
 [`pattern::tab_view`](patterns.md#tab-view).
 

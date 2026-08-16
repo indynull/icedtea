@@ -1708,7 +1708,7 @@ impl Gallery {
             pad: String::new(),
             banner_on: true,
             grid_sel: None,
-            pinned: Tabs::new(["Read", "Write"]),
+            pinned: Tabs::new(["Read", "Write", "Soon"]).with_disabled(2),
             status_n: 0,
             swatch: false,
             suggests: vec![

@@ -5739,8 +5739,8 @@ pub fn tab_visible_count(titles: &[String], max_width: f32) -> usize {
 
 /// A tab bar over a body the application paints.
 ///
-/// `Tabs { closable: false }` is pinned sections. Select sends the
-/// index.
+/// `Tabs { closable: false }` is pinned sections. `with_disabled`
+/// freezes one tab. Select sends the index.
 ///
 ///
 /// ```
@@ -5780,12 +5780,20 @@ pub fn tab_bar<'a, M: Clone + 'a>(
     let mut r = Row::new().spacing(0).align_y(Alignment::End);
     for (i, title) in tabs.titles.iter().enumerate().take(visible) {
         let active = i == tabs.active;
+        let tab_off = a11y.disabled || tabs.is_disabled(i);
         let badge = tabs.badges.get(i).filter(|s| !s.is_empty()).cloned();
         let mut label_row = Row::new().spacing(6).align_y(Alignment::Center);
         if let Some(Some(ic)) = tabs.icons.get(i) {
             label_row = label_row.push(icon_svg(*ic, tok, A11y::new(title.clone(), Role::Image)));
         }
-        label_row = label_row.push(text(title.clone()).size(tok.meta()));
+        let title_el = if tab_off {
+            text(title.clone())
+                .size(tok.meta())
+                .color(tok.scheme().on_surface_variant)
+        } else {
+            text(title.clone()).size(tok.meta())
+        };
+        label_row = label_row.push(title_el);
         if let Some(b) = badge {
             label_row = label_row.push(self::badge(
                 b,
@@ -5798,8 +5806,8 @@ pub fn tab_bar<'a, M: Clone + 'a>(
         }
         let mut tab = button(label_row)
             .padding(pad(tok))
-            .style(style::tab_style(tok, active));
-        if !a11y.disabled {
+            .style(style::tab_style(tok, active && !tab_off));
+        if !tab_off {
             tab = tab.on_press(on_select(i));
         }
         // Underbar only under this label: column Shrink → bar Fill of that width.
@@ -5818,7 +5826,7 @@ pub fn tab_bar<'a, M: Clone + 'a>(
                 dismiss_button(
                     on_close(i),
                     tok,
-                    A11y::button(format!("close {title}")).with_disabled(a11y.disabled),
+                    A11y::button(format!("close {title}")).with_disabled(tab_off),
                 )
             ]
             .spacing(2)
@@ -5830,20 +5838,29 @@ pub fn tab_bar<'a, M: Clone + 'a>(
         };
         r = r.push(a11y::attach(
             cell,
-            &A11y::new(title.clone(), Role::Tab).with_checked(active),
+            &A11y::new(title.clone(), Role::Tab)
+                .with_checked(active && !tab_off)
+                .with_disabled(tab_off),
         ));
     }
     if visible < tabs.titles.len() {
         let all = tabs.titles.clone();
-        let hidden: Vec<String> = all[visible..].to_vec();
-        r = r.push(themed_pick_list(
-            hidden,
-            None,
-            tab_overflow_pick(all, on_select),
-            tok,
-            ControlSize::Default,
-            A11y::new("more-tabs", Role::ComboBox).with_disabled(a11y.disabled),
-        ));
+        let hidden: Vec<String> = all[visible..]
+            .iter()
+            .enumerate()
+            .filter(|(j, _)| !tabs.is_disabled(visible + j))
+            .map(|(_, t)| t.clone())
+            .collect();
+        if !hidden.is_empty() {
+            r = r.push(themed_pick_list(
+                hidden,
+                None,
+                tab_overflow_pick(all, on_select),
+                tok,
+                ControlSize::Default,
+                A11y::new("more-tabs", Role::ComboBox).with_disabled(a11y.disabled),
+            ));
+        }
     }
     // Strip sits on app-bar surface; outline hairline under the row.
     let strip = column![
@@ -11286,6 +11303,31 @@ mod tests {
         assert!(src.contains("tok.meta()"));
         assert!(src.contains("tok.body()"));
         assert!(src.contains("size.pad()"));
+    }
+
+    #[test]
+    fn tab_bar_skips_press_on_a_disabled_tab() {
+        let tok = named("dark").tokens;
+        let tabs = Tabs::new(["One", "Two"]).with_disabled(1);
+        let mut el: Element<'_, usize> = tab_bar(
+            &tabs,
+            |i| i,
+            |_| 99,
+            480.0,
+            false,
+            tok,
+            A11y::new("tabs", Role::Tab),
+        );
+        draw_once(&mut el);
+        let src = include_str!("widget.rs")
+            .split("pub fn tab_bar")
+            .nth(1)
+            .unwrap()
+            .split("/// Title on the start edge")
+            .next()
+            .unwrap();
+        assert!(src.contains("is_disabled"));
+        assert!(src.contains("tab_off"));
     }
 
     #[test]
