@@ -519,8 +519,8 @@ DEFAULT_INTERACT: list[dict[str, str]] = [
         "name": "tree-select-leaf",
         # Select a leaf under the open src branch. Do not toggle root closed —
         # that empties the tree for later pages that share the model.
-        "script": "tree-sel 3\n",
-        "expect": "lib.rs leaf selected; folders still open",
+        "script": "tree-face files\ntree-sel 3\n",
+        "expect": "Files face; lib.rs leaf selected; folders still open",
     },
     {
         "match": "item grid",

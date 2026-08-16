@@ -5328,6 +5328,7 @@ impl Gallery {
                     ),
                 ]
                 .spacing(tok.density.gap())
+                .align_x(icedtea::i18n::align_start(self.direction))
                 .into()
             }
             "tabs" => column![
@@ -7527,6 +7528,7 @@ mod tests {
             .unwrap();
         assert!(tree_page.contains("filter_chips"));
         assert!(tree_page.contains("i18n::order"));
+        assert!(tree_page.contains("align_start(self.direction)"));
         assert!(tree_page.contains("TreeFace::Files"));
         assert!(matches!(
             super::parse_inject_line("md-press"),
@@ -8185,5 +8187,20 @@ mod tests {
             .unwrap();
         assert!(nav.contains("Length::Fill"));
         assert!(nav.contains("align_start(tok.direction)"));
+    }
+
+    #[test]
+    fn tree_page_builds_files_face_in_both_directions() {
+        for dir in [icedtea::i18n::Direction::Ltr, icedtea::i18n::Direction::Rtl] {
+            let (mut g, _) = super::Gallery::new(dir);
+            g.direction_locked = true;
+            g.direction = dir;
+            g.apply_look();
+            g.page = "tree";
+            let _ = g.update(super::Message::TreeFace(icedtea::widget::TreeFace::Files));
+            let _ = g.page_view();
+            assert_eq!(g.tree_face, icedtea::widget::TreeFace::Files);
+            assert_eq!(g.tokens.direction, dir);
+        }
     }
 }
