@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Bug fix
+
+- `chip_face` Success and Warning ink is the role color, lifted to 4.5:1
+  on the wash.
+
 ## 0.9.0 — 2026-08-16
 
 ### Feature

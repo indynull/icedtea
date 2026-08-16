@@ -3691,24 +3691,30 @@ pub fn chip_face(
                 radius: r,
             },
         ),
-        Variant::Success => (
-            crate::theme::mix(s.success, s.surface, 0.20),
-            s.on_surface,
-            iced::border::Border {
-                color: Color::TRANSPARENT,
-                width: 0.0,
-                radius: r,
-            },
-        ),
-        Variant::Warning => (
-            crate::theme::mix(s.warning, s.surface, 0.20),
-            s.on_surface,
-            iced::border::Border {
-                color: Color::TRANSPARENT,
-                width: 0.0,
-                radius: r,
-            },
-        ),
+        Variant::Success => {
+            let wash = crate::theme::mix(s.success, s.surface, 0.20);
+            (
+                wash,
+                crate::theme::ink_on(s.success, wash),
+                iced::border::Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: r,
+                },
+            )
+        }
+        Variant::Warning => {
+            let wash = crate::theme::mix(s.warning, s.surface, 0.20);
+            (
+                wash,
+                crate::theme::ink_on(s.warning, wash),
+                iced::border::Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: r,
+                },
+            )
+        }
         Variant::Outlined | Variant::Elevated => (
             Color::TRANSPARENT,
             s.on_surface,
@@ -6700,6 +6706,16 @@ mod tests {
             let (bg, ink, border) = chip_face(tok, v);
             assert_ne!(bg, ink);
             let _ = border.width;
+        }
+        for name in ["dark", "light"] {
+            let t = named(name).tokens;
+            for v in [Variant::Success, Variant::Warning] {
+                let (wash, ink, _) = chip_face(t, v);
+                assert!(
+                    crate::theme::contrast_ratio(ink, wash) >= 4.5,
+                    "{name} {v:?} chip ink on wash"
+                );
+            }
         }
         let _: Element<'_, ()> =
             search_input_clear("q", |_| (), Some(()), tok, role("sc", Role::TextBox));

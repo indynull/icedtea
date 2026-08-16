@@ -196,6 +196,51 @@ pub fn relative_luma(c: Color) -> f32 {
     0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
 }
 
+fn srgb_lin(c: f32) -> f32 {
+    if c <= 0.04045 {
+        c / 12.92
+    } else {
+        ((c + 0.055) / 1.055).powf(2.4)
+    }
+}
+
+fn wcag_luma(c: Color) -> f32 {
+    0.2126 * srgb_lin(c.r) + 0.7152 * srgb_lin(c.g) + 0.0722 * srgb_lin(c.b)
+}
+
+/// WCAG 2 contrast ratio of two sRGB colors.
+pub fn contrast_ratio(a: Color, b: Color) -> f32 {
+    let (l1, l2) = (wcag_luma(a), wcag_luma(b));
+    let (hi, lo) = if l1 > l2 { (l1, l2) } else { (l2, l1) };
+    (hi + 0.05) / (lo + 0.05)
+}
+
+/// Mix `ink` toward black or white until it holds 4.5:1 on `canvas`.
+pub fn ink_on(ink: Color, canvas: Color) -> Color {
+    if contrast_ratio(ink, canvas) >= 4.5 {
+        return ink;
+    }
+    let toward = if relative_luma(canvas) < 0.45 {
+        Color::WHITE
+    } else {
+        Color::BLACK
+    };
+    let mut lo = 0.0f32;
+    let mut hi = 1.0f32;
+    let mut best = toward;
+    for _ in 0..12 {
+        let mid = (lo + hi) * 0.5;
+        let candidate = mix(toward, ink, mid);
+        if contrast_ratio(candidate, canvas) >= 4.5 {
+            best = candidate;
+            hi = mid;
+        } else {
+            lo = mid;
+        }
+    }
+    best
+}
+
 fn mul_a(c: Color, t: f32) -> Color {
     Color { a: c.a * t, ..c }
 }
@@ -324,5 +369,14 @@ mod tests {
         let h = state_hover(s);
         assert_ne!(h, s.surface);
         assert_ne!(state_selected(s), s.surface);
+    }
+
+    #[test]
+    fn ink_on_lifts_a_weak_role_off_its_wash() {
+        let cream = Color::from_rgb8(0xFB, 0xF1, 0xC7);
+        let olive = Color::from_rgb8(0x98, 0x97, 0x1A);
+        assert!(contrast_ratio(olive, cream) < 4.5);
+        assert!(contrast_ratio(ink_on(olive, cream), cream) >= 4.5);
+        assert_eq!(ink_on(Color::BLACK, Color::WHITE), Color::BLACK);
     }
 }
