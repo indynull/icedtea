@@ -46,6 +46,18 @@ Persist stores the same fields on
 `ui.look(tokens)`. `Boot` has the same setters so a window starts
 on that look.
 
+Chrome labels come from
+[`Catalog::for_locale`](https://docs.rs/icedtea/latest/icedtea/i18n/struct.Catalog.html).
+English, Vietnamese, Japanese, Chinese, Arabic, and Urdu are built
+in. Direction is
+[`direction_for`](https://docs.rs/icedtea/latest/icedtea/i18n/fn.direction_for.html)
+on the locale (Arabic and Urdu are right-to-left). `Tokens.direction`
+flips pick-list chevrons, disclosure marks, tree twisties, search
+icons, button leading/trailing icons, list slots, and the scroll rail
+(end side). Menu and toolbar rows take
+that direction and call
+[`order`](https://docs.rs/icedtea/latest/icedtea/i18n/fn.order.html).
+
 Live switch: store a theme name on state and return
 `icedtea::theme::iced_theme(&name, tokens)` from the theme function.
 

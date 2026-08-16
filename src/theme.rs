@@ -79,6 +79,8 @@ pub struct Tokens {
     pub shape: crate::m3::ShapePolicy,
     /// Shadow policy constructors read through [`Self::shadow`].
     pub elevation: crate::m3::ElevationPolicy,
+    /// Start side for chrome and control rows.
+    pub direction: crate::i18n::Direction,
     /// Exact M3 scheme. [`Self::scheme`] returns this without mixing.
     full: crate::m3::Scheme,
 }
@@ -104,6 +106,7 @@ impl From<crate::m3::Scheme> for Tokens {
             font_scale: 1.0,
             shape: crate::m3::ShapePolicy::Desktop,
             elevation: crate::m3::ElevationPolicy::Desktop,
+            direction: crate::i18n::Direction::Ltr,
             full: s,
         }
     }
@@ -173,6 +176,12 @@ impl Tokens {
         self
     }
 
+    /// Same tokens with a text direction.
+    pub fn with_direction(mut self, direction: crate::i18n::Direction) -> Self {
+        self.direction = direction;
+        self
+    }
+
     /// Pixel size for a type role after [`Self::font_scale`].
     pub fn type_px(self, role: crate::typo::TypeRole) -> f32 {
         (role.size() as f32 * self.font_scale).round()
@@ -235,6 +244,7 @@ impl Tokens {
         out.font_scale = self.font_scale;
         out.shape = self.shape;
         out.elevation = self.elevation;
+        out.direction = self.direction;
         out
     }
 
@@ -419,6 +429,7 @@ fn tokens(
         font_scale: 1.0,
         shape: crate::m3::ShapePolicy::Desktop,
         elevation: crate::m3::ElevationPolicy::Desktop,
+        direction: crate::i18n::Direction::Ltr,
         full: crate::m3::scheme_dark(), // replaced by sync
     }
     .sync_full_from_aliases()
@@ -471,6 +482,7 @@ fn high_contrast() -> NamedTheme {
             font_scale: 1.0,
             shape: crate::m3::ShapePolicy::Desktop,
             elevation: crate::m3::ElevationPolicy::Desktop,
+            direction: crate::i18n::Direction::Ltr,
             full: crate::m3::scheme_dark(),
         }
         .sync_full_from_aliases(),
@@ -1120,7 +1132,8 @@ mod tests {
             .with_density(crate::m3::Density::named(crate::m3::DensityName::Compact))
             .with_font_scale(1.25)
             .with_shape(crate::m3::ShapePolicy::Material)
-            .with_elevation(crate::m3::ElevationPolicy::Flat);
+            .with_elevation(crate::m3::ElevationPolicy::Flat)
+            .with_direction(crate::i18n::Direction::Rtl);
         let mid = tok.fade(0.5);
         assert!(mid.reduced_motion);
         assert_eq!(
@@ -1130,6 +1143,7 @@ mod tests {
         assert!((mid.font_scale - 1.25).abs() < f32::EPSILON);
         assert_eq!(mid.shape, crate::m3::ShapePolicy::Material);
         assert_eq!(mid.elevation, crate::m3::ElevationPolicy::Flat);
+        assert_eq!(mid.direction, crate::i18n::Direction::Rtl);
         assert_eq!(mid.body(), 18.0);
         assert_eq!(mid.shadow(crate::m3::Elevation::Level3).blur_radius, 0.0);
         assert_eq!(named("dark").tokens.with_font_scale(0.1).font_scale, 0.75);

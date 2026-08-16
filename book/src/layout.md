@@ -15,6 +15,8 @@ language for boxes and editors. `row_box` / `column_box` take width and
 height. A fill-height column gives leftover space to children that
 themselves fill (a caption above a filling `textarea`).
 `pattern::list_detail` takes the sidebar as that same size.
+`split_view` and `list_detail` take `Direction`: the first pane is
+left-to-right start (the right edge when the locale is Arabic or Urdu).
 
 ```rust,ignore
 use icedtea::layout::{self, column_box, row_box};

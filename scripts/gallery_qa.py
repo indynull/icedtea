@@ -6,6 +6,10 @@
 
 Default Xephyr + metacity. Tour protocol + optional inject scripts.
 Writes shots/, steps.jsonl, timings.json, CAPTURE.md under --out.
+With --locale ar|ur also writes SCORE.md and exits non-zero if a
+Firefox/Microsoft direction beat is broken (see
+.grok/skills/gallery-qa/references/rtl.md). Leftover-English is
+one row, not the bar.
 Does not commit. Does not invent screenshots.
 
   just gallery-qa
@@ -678,6 +682,574 @@ def write_capture_md(
     (out / "CAPTURE.md").write_text("\n".join(lines), encoding="utf-8")
 
 
+RTL_RAIL_PAGES = frozenset({"list", "tree", "log", "feedback"})
+RTL_ALIGN_PAGES = frozenset({"list", "tree", "sections", "tabs-accordion-expander"})
+
+# Painted demo / chrome English that must go through catalog fill.
+# Matched in icedtea-gallery/src/main.rs before the test module.
+LEFTOVER_ENGLISH = (
+    "Reveal the token, then copy it.",
+    "Show, then Copy.",
+    "Suggest on any field. Pick fills the query.",
+    "Enter a valid address.",
+    "We never share your email.",
+    "Labeled value with a shared form gutter. Select, then Copy.",
+    "Primary row opens a submenu flyout.",
+    "Saved notes.txt",
+    "Inspector rows share a form label gutter. Copy posts the first selection.",
+    "Drag or double-click a range. Copy takes that text. Copy all posts the source.",
+    "Drag to select. Language + UI colorway",
+    'Action::new("edit.copy-all", "Copy all"',
+    "Primary action plus a chevron menu. Idle and disabled.",
+    "Name is pinned. Role, Status, and Path follow horizontal scroll.",
+    "A document card with tags, and an empty neighbour.",
+    "Press a filter chip, or dismiss a tag with ×.",
+    "Update available",
+    "Fields in this group stay read-only.",
+    "Last saved just now. Use File",
+    "Edit pane. Tabs above switch Edit and Terminal",
+    "Local drafts and attachments.",
+    "Thanks for the notes. I will follow up after lunch.",
+    'Cell::new("Day")',
+    'Cell::from("Week")',
+    'Cell::from("Month")',
+    'password_input(\n                "Secret"',
+    'secret_field(\n                    "Token"',
+    'themed_text_input(\n                        "Email"',
+    'suggest_field(\n                    "Command"',
+    'Action::new("file.open", "Open"',
+    'Action::new("file.recent", "Recent"',
+    'named("find"',
+    '("Home".into()',
+    '("Gallery".into()',
+    "Last saved just now.",
+    "Overwrite notes.txt?",
+    "Don't save",
+    "Open dialog",
+    "Washes and text-on colors from the active colorway.",
+    "Type a letter, or Enter, Escape, an arrow, or a function key.",
+    "Contain, cover, loading, and error. The application owns the bytes.",
+    "Write the buffer to disk.",
+    "Open the inspector sheet for properties.",
+    "Close a tab with the ×. Selecting another tab swaps this body.",
+    "Type to filter the action table. Pick a row, or choose Go to line for a parameter.",
+    "Move terminal beside explorer",
+    "Select a message",
+    "Received this morning.",
+    "Library sources.",
+    "Crate root.",
+    "Hide files",
+    "Show files",
+    "Editor — resize the window or hide the files rail.",
+    "Filter shortcuts",
+    "Fade and a short slide from progress 0 to 1.",
+    "Reduce motion",
+    "File, Edit, and View live in this window. Open a menu, then Save.",
+    "Accent on",
+    "Accent idle",
+    'format!("{v:?}")',
+    "text on canvas",
+    "primary lighten",
+    "input cursor",
+    "Type a command",
+)
+
+
+def _column_midgray(im, x0: int, x1: int, y0: int, y1: int) -> int:
+    """Count mid-luminance pixels (rail / thumb) in [x0, x1) × [y0, y1)."""
+    px = im.load()
+    n = 0
+    for x in range(x0, x1):
+        for y in range(y0, y1):
+            r, g, b = px[x, y]
+            lum = 0.299 * r + 0.587 * g + 0.114 * b
+            if 48.0 <= lum <= 130.0:
+                n += 1
+    return n
+
+
+def rail_side(path: Path) -> str:
+    """Return left, right, or none for the vertical rail in a window shot."""
+    from PIL import Image
+
+    im = Image.open(path).convert("RGB")
+    w, h = im.size
+    if w < 200 or h < 200:
+        return "none"
+    # Drop the look strip / title and the status bar; drop the RTL nav
+    # column on the right (~320px).
+    y0, y1 = min(170, h // 3), h - 36
+    nav = 340 if w >= 1200 else 0
+    # Drop the card's far edge next to the nav; that hairline is not the rail.
+    edge = 80 if w >= 1200 else 0
+    x_left, x_right = 36, max(37, w - nav - edge)
+    if y1 - y0 < 80 or x_right - x_left < 80:
+        return "none"
+    span = 12
+    best_x = x_left
+    best_n = -1
+    x = x_left
+    while x + span <= x_right:
+        n = _column_midgray(im, x, x + span, y0, y1)
+        if n > best_n:
+            best_n = n
+            best_x = x
+        x += 4
+    if best_n <= 0:
+        return "none"
+    width = x_right - x_left
+    rel = (best_x - x_left) / width
+    if rel < 0.28:
+        return "left"
+    if rel > 0.72:
+        return "right"
+    return "none"
+
+
+def _production_src(path: Path) -> str:
+    """Library or gallery source before the test module."""
+    text = path.read_text(encoding="utf-8")
+    cut = text.find("#[cfg(test)]")
+    return text if cut < 0 else text[:cut]
+
+
+_PHYSICAL_ALIGN = (
+    "Alignment::Left",
+    "Alignment::Right",
+    "Horizontal::Left",
+    "Horizontal::Right",
+)
+
+
+def physical_needles(body: str) -> list[str]:
+    return [n for n in _PHYSICAL_ALIGN if n in body]
+
+
+def physical_align_hits(root: Path) -> list[str]:
+    """Physical left/right in chrome constructors (Firefox start/end)."""
+    hits: list[str] = []
+    paths = [
+        root / "src" / "widget.rs",
+        root / "src" / "pattern.rs",
+        root / "src" / "scroll.rs",
+        *sorted((root / "src" / "layout").glob("*.rs")),
+    ]
+    for path in paths:
+        if not path.is_file():
+            continue
+        for needle in physical_needles(_production_src(path)):
+            hits.append(f"{path.relative_to(root)}:{needle}")
+    return hits
+
+
+def ltr_island_hits(root: Path) -> list[str]:
+    """Code constructors must stay left-to-right (Firefox LTR islands)."""
+    hits: list[str] = []
+    src = _production_src(root / "src" / "widget.rs")
+    for fn, nxt in (
+        ("pub fn code_block", "pub fn hyperlink"),
+        ("pub fn highlighted_code", "fn editor_frame"),
+    ):
+        if fn not in src or nxt not in src:
+            hits.append(f"missing {fn}")
+            continue
+        body = src.split(fn, 1)[1].split(nxt, 1)[0]
+        for needle in ("align_start", "align_end", "i18n::order"):
+            if needle in body:
+                hits.append(f"{fn}:{needle}")
+    return hits
+
+
+def eastern_digit_problems(body: str) -> list[str]:
+    hits: list[str] = []
+    if "Direction::Rtl" not in body:
+        hits.append("clock_digits ignores Direction::Rtl")
+    if "'٠'" not in body or "'٩'" not in body:
+        hits.append("clock_digits missing Eastern Arabic digits")
+    return hits
+
+
+def eastern_digit_hits(root: Path) -> list[str]:
+    """Rtl clocks map Western digits to Eastern Arabic (Firefox ar/ur/fa)."""
+    src = _production_src(root / "src" / "widget.rs")
+    if "fn clock_digits" not in src or "fn time_colon" not in src:
+        return ["missing clock_digits"]
+    body = src.split("fn clock_digits", 1)[1].split("fn time_colon", 1)[0]
+    return eastern_digit_problems(body)
+
+
+def leftover_english_in_gallery(root: Path) -> list[str]:
+    """Return leftover painted English literals still in gallery or library constructors."""
+    src = (root / "icedtea-gallery" / "src" / "main.rs").read_text(encoding="utf-8")
+    product = src.split("fn handled_ids()")[0]
+    hits = [phrase for phrase in LEFTOVER_ENGLISH if phrase in product]
+    lib = (root / "src" / "pattern.rs").read_text(encoding="utf-8")
+    pal = (
+        lib.split("pub fn command_palette_view")[1].split("pub fn status_page")[0]
+        if "pub fn command_palette_view" in lib
+        else ""
+    )
+    tool = (
+        lib.split("pub fn tool_panel")[1].split("pub fn drawer")[0]
+        if "pub fn tool_panel" in lib
+        else ""
+    )
+    if "Type a command" in pal:
+        hits.append("Type a command")
+    if '"Dock"' in tool:
+        hits.append("Dock")
+    cm = (
+        lib.split("pub fn context_menu")[1].split("pub fn inspector")[0]
+        if "pub fn context_menu" in lib
+        else ""
+    )
+    if "text(a.title" in cm:
+        title_only = cm.split("text(a.title")[1].split(")")[0]
+        if "Length::Fill" in title_only:
+            hits.append("context_menu Fill+align text")
+    return hits
+
+
+def _src_row(name: str, title: str, hits: list[str]) -> dict:
+    return {
+        "name": name,
+        "title": title,
+        "score": "ok" if not hits else "broken",
+        "detail": "none" if not hits else "found: " + "; ".join(hits)[:200],
+    }
+
+
+def run_rtl_source_checks(root: Path) -> list[dict]:
+    """Drive Firefox/Microsoft direction checks. One row per beat."""
+    leftover = leftover_english_in_gallery(root)
+    rows: list[dict] = [
+        _src_row(
+            "leftover-src",
+            "leftover English in gallery source",
+            leftover,
+        ),
+        _src_row(
+            "physical-align",
+            "chrome uses start/end (no physical left/right)",
+            physical_align_hits(root),
+        ),
+        _src_row(
+            "ltr-islands",
+            "code stays left-to-right",
+            ltr_island_hits(root),
+        ),
+        _src_row(
+            "digits-eastern",
+            "Arabic/Urdu clocks use Eastern digits",
+            eastern_digit_hits(root),
+        ),
+    ]
+    checks = [
+        (
+            "layout-rails",
+            ["cargo", "test", "-p", "icedtea", "--lib", "rtl_rails"],
+            "list/scroll rails follow direction",
+        ),
+        (
+            "layout-align",
+            ["cargo", "test", "-p", "icedtea", "--lib", "rtl_tree"],
+            "tree start-align and closed mark",
+        ),
+        (
+            "layout-chevron",
+            ["cargo", "test", "-p", "icedtea", "--lib", "rtl_pick"],
+            "pick/disclosure mark on the end",
+        ),
+        (
+            "layout-controls",
+            ["cargo", "test", "-p", "icedtea", "--lib", "rtl_checkbox"],
+            "checkbox and button-group follow direction",
+        ),
+        (
+            "layout-button-face",
+            ["cargo", "test", "-p", "icedtea", "--lib", "rtl_themed_button"],
+            "themed button keeps a right-to-left title",
+        ),
+        (
+            "copy",
+            [
+                "cargo",
+                "test",
+                "-p",
+                "icedtea-gallery",
+                "--bin",
+                "icedtea-gallery",
+                "painted_gallery",
+            ],
+            "gallery leftover-English completeness",
+        ),
+        (
+            "copy-keys",
+            [
+                "cargo",
+                "test",
+                "-p",
+                "icedtea-gallery",
+                "--bin",
+                "icedtea-gallery",
+                "every_locale",
+            ],
+            "six-locale catalog key fill",
+        ),
+    ]
+    for name, cmd, title in checks:
+        r = subprocess.run(
+            cmd,
+            cwd=root,
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+        ok = r.returncode == 0
+        rows.append(
+            {
+                "name": name,
+                "title": title,
+                "score": "ok" if ok else "broken",
+                "detail": title if ok else (r.stderr[-400:] or r.stdout[-400:]),
+            }
+        )
+    return rows
+
+
+def text_mass_side(path: Path) -> str:
+    """Return left, right, or none for light text mass in the mid content band."""
+    from PIL import Image
+
+    im = Image.open(path).convert("RGB")
+    w, h = im.size
+    if w < 200 or h < 200:
+        return "none"
+    px = im.load()
+    y0, y1 = int(h * 0.35), int(h * 0.65)
+    nav = 320 if w >= 1200 else 0
+    x_left, x_right = 48, max(49, w - nav)
+    if y1 - y0 < 40 or x_right - x_left < 80:
+        return "none"
+    third = (x_right - x_left) // 3
+    left_n = right_n = 0
+    for x in range(x_left, x_left + third):
+        for y in range(y0, y1):
+            r, g, b = px[x, y]
+            if 0.299 * r + 0.587 * g + 0.114 * b >= 150.0:
+                left_n += 1
+    for x in range(x_right - third, x_right):
+        for y in range(y0, y1):
+            r, g, b = px[x, y]
+            if 0.299 * r + 0.587 * g + 0.114 * b >= 150.0:
+                right_n += 1
+    if right_n > left_n * 1.15:
+        return "right"
+    if left_n > right_n * 1.15:
+        return "left"
+    return "none"
+
+
+def _button_pads(
+    px, x0: int, x1: int, y0: int, y1: int
+) -> list[tuple[int, int, int, int]]:
+    """Saturated rectangles sized like filled buttons, not 16px checks."""
+
+    def lum(c: tuple[int, int, int]) -> float:
+        return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
+
+    def sat(c: tuple[int, int, int]) -> bool:
+        r, g, b = c
+        mx, mn = max(r, g, b), min(r, g, b)
+        return (mx - mn) >= 50 and 35.0 <= lum(c) <= 190.0
+
+    def pad_pixel(c: tuple[int, int, int]) -> bool:
+        # Light ink sits inside the pad; do not split the rectangle.
+        return sat(c) or lum(c) >= 180.0
+
+    runs_by_y: list[list[tuple[int, int]]] = []
+    for y in range(y0, y1):
+        runs: list[tuple[int, int]] = []
+        x = x0
+        while x < x1:
+            if pad_pixel(px[x, y]):
+                x2 = x + 1
+                while x2 < x1 and pad_pixel(px[x2, y]):
+                    x2 += 1
+                if x2 - x >= 36:
+                    runs.append((x, x2))
+                x = x2
+            else:
+                x += 1
+        runs_by_y.append(runs)
+
+    used = [[False] * len(runs) for runs in runs_by_y]
+    pads: list[tuple[int, int, int, int]] = []
+    for yi, runs in enumerate(runs_by_y):
+        for ri, (xa, xb) in enumerate(runs):
+            if used[yi][ri]:
+                continue
+            top = y0 + yi
+            bot = top + 1
+            left, right = xa, xb
+            used[yi][ri] = True
+            yj = yi + 1
+            while yj < len(runs_by_y):
+                hit: tuple[int, int, int] | None = None
+                for rj, (ca, cb) in enumerate(runs_by_y[yj]):
+                    if used[yj][rj]:
+                        continue
+                    if min(right, cb) - max(left, ca) >= 28:
+                        hit = (rj, ca, cb)
+                        break
+                if hit is None:
+                    break
+                rj, ca, cb = hit
+                used[yj][rj] = True
+                left = min(left, ca)
+                right = max(right, cb)
+                bot += 1
+                yj += 1
+            pw, ph = right - left, bot - top
+            if 36 <= pw <= 220 and 20 <= ph <= 44:
+                pads.append((left, top, pw, ph))
+    return pads
+
+
+def control_faces_have_label_ink(path: Path) -> bool:
+    """True when filled button pads have light ink inside, not beside a checkbox."""
+    from PIL import Image
+
+    im = Image.open(path).convert("RGB")
+    w, h = im.size
+    if w < 200 or h < 200:
+        return False
+    px = im.load()
+    nav = 340 if w >= 1200 else 0
+    x0, x1 = 48, max(49, w - nav)
+    y0, y1 = min(170, h // 3), h - 48
+    if y1 - y0 < 40 or x1 - x0 < 80:
+        return False
+    pads = _button_pads(px, x0, x1, y0, y1)
+    if not pads:
+        return False
+
+    def lum(c: tuple[int, int, int]) -> float:
+        return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
+
+    labeled = 0
+    for left, top, pw, ph in pads:
+        ink = 0
+        inset = 3
+        for x in range(left + inset, left + pw - inset):
+            for y in range(top + inset, top + ph - inset):
+                if lum(px[x, y]) >= 180.0:
+                    ink += 1
+        if ink >= 8:
+            labeled += 1
+    return labeled >= 1 and labeled * 2 >= len(pads)
+
+
+def score_rtl_shots(steps: list[dict], out: Path) -> list[dict]:
+    """Rail on the left; list/tree/sections titles start-align on the right."""
+    rows: list[dict] = []
+    for s in steps:
+        if s.get("kind") != "idle" or s.get("shot") is None:
+            continue
+        page = s.get("page") or ""
+        shot = out / s["shot"]
+        if page in RTL_RAIL_PAGES:
+            if not shot.is_file():
+                rows.append(
+                    {
+                        "name": f"rail-{page}",
+                        "title": f"{page} rail",
+                        "score": "broken",
+                        "detail": f"missing {s['shot']}",
+                    }
+                )
+            else:
+                side = rail_side(shot)
+                rows.append(
+                    {
+                        "name": f"rail-{page}",
+                        "title": f"{page} rail on the end (left)",
+                        "score": "ok" if side == "left" else "broken",
+                        "detail": f"detected {side}",
+                    }
+                )
+        if page == "controls":
+            if not shot.is_file():
+                rows.append(
+                    {
+                        "name": "faces-controls",
+                        "title": "controls faces carry label ink",
+                        "score": "broken",
+                        "detail": f"missing {s['shot']}",
+                    }
+                )
+            else:
+                ink = control_faces_have_label_ink(shot)
+                rows.append(
+                    {
+                        "name": "faces-controls",
+                        "title": "controls faces carry label ink",
+                        "score": "ok" if ink else "broken",
+                        "detail": "label ink on filled pads"
+                        if ink
+                        else "filled pads have no label ink",
+                    }
+                )
+        if page in RTL_ALIGN_PAGES:
+            if not shot.is_file():
+                rows.append(
+                    {
+                        "name": f"align-{page}",
+                        "title": f"{page} start-align (right)",
+                        "score": "broken",
+                        "detail": f"missing {s['shot']}",
+                    }
+                )
+            else:
+                side = text_mass_side(shot)
+                rows.append(
+                    {
+                        "name": f"align-{page}",
+                        "title": f"{page} titles on the start (right)",
+                        "score": "ok" if side == "right" else "broken",
+                        "detail": f"detected {side}",
+                    }
+                )
+    return rows
+
+
+def write_rtl_score(out: Path, rows: list[dict]) -> bool:
+    """Write SCORE.md. Return True when no row is broken."""
+    broken = [r for r in rows if r["score"] == "broken"]
+    lines = [
+        "# Direction gallery QA score",
+        "",
+        "Bar: `.grok/skills/gallery-qa/references/rtl.md`",
+        "(Firefox RTL Guidelines + Microsoft bidirectional / FlowDirection).",
+        "broken = fail the command.",
+        "",
+        "| Check | Score | Detail |",
+        "| --- | --- | --- |",
+    ]
+    for r in rows:
+        detail = (r.get("detail") or "").replace("|", "/").replace("\n", " ")[:160]
+        lines.append(f"| {r['title']} | **{r['score']}** | {detail} |")
+    lines.extend(
+        [
+            "",
+            f"broken: {len(broken)}",
+            "",
+        ]
+    )
+    (out / "SCORE.md").write_text("\n".join(lines), encoding="utf-8")
+    return not broken
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
@@ -719,6 +1291,11 @@ def main() -> int:
         "--book",
         action="store_true",
         help="Write handbook stills under book/src/images/ from idle constructor frames",
+    )
+    ap.add_argument(
+        "--locale",
+        default=None,
+        help="Inject language LANG before shots (ar, ur for right-to-left)",
     )
     args = ap.parse_args()
 
@@ -812,6 +1389,13 @@ def main() -> int:
 
         if not wait_file(ackfile, lambda t: t.strip() == "0", timeout_s=10.0):
             raise SystemExit("gallery did not acknowledge beat 0")
+        if args.locale:
+            print(f"locale {args.locale}", file=sys.stderr)
+            try:
+                inject_script(injectfile, f"language {args.locale}\n")
+            except TimeoutError as exc:
+                raise SystemExit(f"locale inject failed: {exc}") from exc
+            time.sleep(max(0.45, args.settle_ms / 1000.0))
         boot_ms = _now_ms() - t_boot0
 
         # Parse --beats
@@ -974,6 +1558,7 @@ def main() -> int:
             "git": git,
             "out": str(out),
             "client": f"{args.client_w}x{args.client_h}",
+            "locale": args.locale,
         }
         (out / "timings.json").write_text(
             json.dumps(timings, indent=2) + "\n", encoding="utf-8"
@@ -1057,7 +1642,26 @@ def main() -> int:
             file=sys.stderr,
         )
         print(json.dumps({"out": str(out), "timings": timings, "meta": meta}))
-        return 0 if all(s.get("error") is None for s in steps) else 2
+        capture_ok = all(s.get("error") is None for s in steps)
+        locale = (args.locale or "").split("-", 1)[0].casefold()
+        if locale:
+            print(
+                "scoring direction beats (references/rtl.md)"
+                + (
+                    ", rails, start-align, faces"
+                    if locale in {"ar", "ur", "fa", "he"}
+                    else ""
+                ),
+                file=sys.stderr,
+            )
+            score_rows = run_rtl_source_checks(root)
+            if locale in {"ar", "ur", "fa", "he"}:
+                score_rows.extend(score_rtl_shots(steps, out))
+            score_ok = write_rtl_score(out, score_rows)
+            print(f"wrote {out / 'SCORE.md'} ok={score_ok}", file=sys.stderr)
+            if not score_ok:
+                return 3
+        return 0 if capture_ok else 2
     finally:
         cleanup()
 
@@ -1066,9 +1670,90 @@ def _self_check() -> None:
     names = {x["name"] for x in interactions_for_caption("Selectable: drag to copy")}
     if "table-sort" in names:
         raise SystemExit("table: must not match Selectable:")
-    names = {x["name"] for x in interactions_for_caption("Table: frozen leading columns")}
+    names = {
+        x["name"] for x in interactions_for_caption("Table: frozen leading columns")
+    }
     if "table-sort" not in names:
         raise SystemExit("table: must match Table:")
+    from PIL import Image
+
+    tmp = Path(os.environ.get("TMPDIR", "/tmp")) / "icedtea-qa-rail-selfcheck"
+    tmp.mkdir(parents=True, exist_ok=True)
+    left = tmp / "rail-left.png"
+    right = tmp / "rail-right.png"
+    img = Image.new("RGB", (400, 300), (20, 20, 20))
+    for x in range(40, 52):
+        for y in range(80, 260):
+            img.putpixel((x, y), (90, 90, 90))
+    img.save(left)
+    img = Image.new("RGB", (400, 300), (20, 20, 20))
+    for x in range(330, 342):
+        for y in range(80, 260):
+            img.putpixel((x, y), (90, 90, 90))
+    img.save(right)
+    if rail_side(left) != "left":
+        raise SystemExit(f"rail_side left fixture -> {rail_side(left)}")
+    if rail_side(right) != "right":
+        raise SystemExit(f"rail_side right fixture -> {rail_side(right)}")
+    align_r = tmp / "align-right.png"
+    img = Image.new("RGB", (800, 500), (20, 20, 20))
+    for x in range(520, 700):
+        for y in range(180, 320):
+            img.putpixel((x, y), (220, 220, 220))
+    img.save(align_r)
+    if text_mass_side(align_r) != "right":
+        raise SystemExit(f"text_mass_side right fixture -> {text_mass_side(align_r)}")
+    blank = tmp / "faces-blank.png"
+    img = Image.new("RGB", (800, 500), (20, 20, 20))
+    for x in range(80, 180):
+        for y in range(200, 236):
+            img.putpixel((x, y), (50, 90, 200))
+    img.save(blank)
+    if control_faces_have_label_ink(blank):
+        raise SystemExit("control_faces_have_label_ink blank pad should fail")
+    labeled = tmp / "faces-labeled.png"
+    img = Image.new("RGB", (800, 500), (20, 20, 20))
+    for x in range(80, 180):
+        for y in range(200, 236):
+            img.putpixel((x, y), (50, 90, 200))
+    for x in range(100, 160):
+        for y in range(212, 220):
+            img.putpixel((x, y), (240, 240, 245))
+    img.save(labeled)
+    if not control_faces_have_label_ink(labeled):
+        raise SystemExit("control_faces_have_label_ink labeled pad should pass")
+    check = tmp / "faces-checkbox.png"
+    img = Image.new("RGB", (800, 500), (20, 20, 20))
+    for x in range(120, 136):
+        for y in range(210, 226):
+            img.putpixel((x, y), (50, 90, 200))
+    for x in range(124, 132):
+        for y in range(214, 222):
+            img.putpixel((x, y), (240, 240, 245))
+    img.save(check)
+    if control_faces_have_label_ink(check):
+        raise SystemExit("control_faces_have_label_ink checkbox-only should fail")
+    if not physical_needles("align_x(Alignment::Left)"):
+        raise SystemExit("physical_needles must flag Alignment::Left")
+    if physical_needles("align_x(crate::i18n::align_start(tok.direction))"):
+        raise SystemExit("physical_needles false positive on align_start")
+    if not eastern_digit_problems("if dir != Direction::Ltr { western }"):
+        raise SystemExit("eastern_digit_problems must fail without Rtl map")
+    if eastern_digit_problems("Direction::Rtl '٠' '٩'"):
+        raise SystemExit("eastern_digit_problems false positive")
+    root = Path(__file__).resolve().parents[1]
+    hits = leftover_english_in_gallery(root)
+    if hits:
+        raise SystemExit(f"leftover English in gallery source: {hits}")
+    phys = physical_align_hits(root)
+    if phys:
+        raise SystemExit(f"physical left/right in chrome: {phys}")
+    islands = ltr_island_hits(root)
+    if islands:
+        raise SystemExit(f"code LTR island: {islands}")
+    digits = eastern_digit_hits(root)
+    if digits:
+        raise SystemExit(f"Eastern digits: {digits}")
 
 
 if __name__ == "__main__":

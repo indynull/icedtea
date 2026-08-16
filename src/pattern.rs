@@ -232,7 +232,11 @@ pub fn command_bar<'a, M: Clone + 'a>(
             &A11y::button(a.title.clone()).with_disabled(!a.enabled),
         ));
     }
-    crate::a11y::attach(r.into(), &A11y::new("commands", Role::Group))
+    let bar = crate::a11y::attach(r.into(), &A11y::new("commands", Role::Group));
+    container(bar)
+        .width(Length::Fill)
+        .align_x(crate::i18n::align_start(dir))
+        .into()
 }
 
 /// Footer text plus shortcut hints from the same table.
@@ -318,6 +322,7 @@ pub fn status_bar<'a, M: Clone + 'a>(
 /// let on_pick = |_i: usize| ();
 /// let _: icedtea::Element<'_, ()> = pattern::command_palette_view(
 ///     "",
+///     "Type a command",
 ///     &hits,
 ///     0,
 ///     on_query,
@@ -332,6 +337,7 @@ pub fn status_bar<'a, M: Clone + 'a>(
 #[allow(clippy::too_many_arguments)]
 pub fn command_palette_view<'a, M: Clone + 'a>(
     query: &str,
+    placeholder: &str,
     results: &[&Action<M>],
     selected: usize,
     on_query: impl Fn(String) -> M + 'a,
@@ -384,7 +390,7 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
         .into()
     } else {
         themed_text_input(
-            "Type a command",
+            placeholder,
             query,
             on_query,
             None,
@@ -621,6 +627,7 @@ pub fn preferences_page<'a, M: Clone + 'a>(
 ///     widget::label("Detail", tok, A11y::new("Detail", icedtea::a11y::Role::Header)),
 ///     icedtea::layout::fixed(icedtea::layout::LIST_PANE),
 ///     tok,
+///     icedtea::i18n::Direction::Ltr,
 /// );
 /// ```
 pub fn list_detail<'a, M: 'a>(
@@ -628,32 +635,45 @@ pub fn list_detail<'a, M: 'a>(
     detail: Element<'a, M>,
     sidebar: Length,
     tok: Tokens,
+    dir: Direction,
 ) -> Element<'a, M> {
     // List pad clears the panel edge and the rail; detail gets a full 12px inset.
-    let list_pad = iced::Padding {
-        top: 8.0,
-        right: 4.0,
-        bottom: 8.0,
-        left: 8.0,
+    let list_pad = match dir {
+        Direction::Ltr => iced::Padding {
+            top: 8.0,
+            right: 4.0,
+            bottom: 8.0,
+            left: 8.0,
+        },
+        Direction::Rtl => iced::Padding {
+            top: 8.0,
+            right: 8.0,
+            bottom: 8.0,
+            left: 4.0,
+        },
     };
-    let list_pane = container(list)
+    let list_pane: Element<'a, M> = container(list)
         .width(sidebar)
         .height(Length::Fill)
         .padding(list_pad)
         .clip(true)
-        .style(move |_| style::panel(tok));
-    let rule = container(Space::new().width(1).height(Length::Fill))
+        .style(move |_| style::panel(tok))
+        .into();
+    let rule: Element<'a, M> = container(Space::new().width(1).height(Length::Fill))
         .width(1)
         .height(Length::Fill)
-        .style(move |_| style::hairline(tok));
-    let detail_pane = container(detail)
+        .style(move |_| style::hairline(tok))
+        .into();
+    let detail_pane: Element<'a, M> = container(detail)
         .width(Length::Fill)
         .height(Length::Fill)
-        .padding(iced::Padding::from(12));
-    row![list_pane, rule, detail_pane]
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .into()
+        .padding(iced::Padding::from(12))
+        .into();
+    let mut row = Row::new();
+    for child in order(dir, [list_pane, rule, detail_pane]) {
+        row = row.push(child);
+    }
+    row.width(Length::Fill).height(Length::Fill).into()
 }
 
 /// Sidebar beside content, or a stack with Back.
@@ -682,8 +702,10 @@ pub fn list_detail<'a, M: 'a>(
 ///     on_back,
 ///     tok,
 ///     &cat,
+///     icedtea::i18n::Direction::Ltr,
 /// );
 /// ```
+#[allow(clippy::too_many_arguments)]
 pub fn navigation_view<'a, M: Clone + 'a>(
     sidebar: Element<'a, M>,
     content: Element<'a, M>,
@@ -692,9 +714,10 @@ pub fn navigation_view<'a, M: Clone + 'a>(
     on_back: M,
     tok: Tokens,
     cat: &Catalog,
+    dir: Direction,
 ) -> Element<'a, M> {
     if crate::layout::Breakpoint::from_width(width).sidebar_beside() {
-        list_detail(sidebar, content, crate::layout::fixed(260.0), tok)
+        list_detail(sidebar, content, crate::layout::fixed(260.0), tok, dir)
     } else {
         let top = if nav.can_back() {
             themed_button(
@@ -1048,7 +1071,7 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
     ));
     let actions = container(actions)
         .width(Length::Fill)
-        .align_x(Alignment::End);
+        .align_x(crate::i18n::align_end(tok.direction));
     let mut head = Row::new().spacing(8).align_y(Alignment::Center);
     if let Some(ic) = icon {
         head = head.push(crate::widget::icon_svg(
@@ -1210,7 +1233,10 @@ pub fn cascade_menu<'a, M: Clone + 'a>(
     for (i, (act, kids)) in entries.iter().enumerate() {
         let has_sub = kids.as_ref().map(|k| !k.is_empty()).unwrap_or(false);
         let title = if has_sub {
-            format!("{} ▸", act.title)
+            match tok.direction {
+                Direction::Ltr => format!("{} ▸", act.title),
+                Direction::Rtl => format!("◂ {}", act.title),
+            }
         } else {
             act.title.clone()
         };
@@ -1438,10 +1464,13 @@ pub fn context_menu<'a, M: Clone + 'a>(
     let mut col = Column::new().spacing(2).padding(6).width(Length::Fill);
     for a in actions {
         let a11y = A11y::new(a.title.clone(), Role::MenuItem).with_disabled(!a.enabled);
-        let face = text(a.title.clone())
-            .size(tok.body())
-            .width(Length::Fill)
-            .align_x(Alignment::Start);
+        let face = container(
+            text(a.title.clone())
+                .size(tok.body())
+                .color(paint.scheme().on_surface),
+        )
+        .width(Length::Fill)
+        .align_x(crate::i18n::align_start(tok.direction));
         let mut row = button(face)
             .padding(Padding::from([6.0, 10.0]))
             .width(Length::Fill)
@@ -1498,7 +1527,8 @@ pub fn context_menu<'a, M: Clone + 'a>(
 
 /// Master, detail, and a side inspector stay in one row.
 ///
-/// The application owns selection in the list.
+/// The list sits on the start edge. The application owns selection
+/// in the list.
 ///
 ///
 /// ```
@@ -1521,21 +1551,26 @@ pub fn inspector<'a, M: 'a>(
     props: Element<'a, M>,
     tok: Tokens,
 ) -> Element<'a, M> {
-    row![
-        container(list)
-            .width(layout::fixed(200.0))
-            .height(Length::Fill)
-            .style(move |_| style::panel(tok)),
-        container(detail).width(Length::Fill).height(Length::Fill),
-        container(props)
-            .width(layout::fixed(280.0))
-            .height(Length::Fill)
-            .padding(12)
-            .style(move |_| style::panel(tok)),
-    ]
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .into()
+    let list_pane: Element<'a, M> = container(list)
+        .width(layout::fixed(200.0))
+        .height(Length::Fill)
+        .style(move |_| style::panel(tok))
+        .into();
+    let detail_pane: Element<'a, M> = container(detail)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .into();
+    let props_pane: Element<'a, M> = container(props)
+        .width(layout::fixed(280.0))
+        .height(Length::Fill)
+        .padding(12)
+        .style(move |_| style::panel(tok))
+        .into();
+    let mut row = Row::new().width(Length::Fill).height(Length::Fill);
+    for child in order(tok.direction, [list_pane, detail_pane, props_pane]) {
+        row = row.push(child);
+    }
+    row.into()
 }
 
 /// Nested dock tree: splits with a sash, tab groups, and leaf chrome.
@@ -1683,7 +1718,14 @@ where
             let left = paint_dock(first, fw, fh, paint);
             let right = paint_dock(second, sw, sh, paint);
             let on_sash = paint.on_sash;
-            layout::split_view(left, right, st, total, move |ev| on_sash(i, ev))
+            layout::split_view(
+                left,
+                right,
+                st,
+                total,
+                move |ev| on_sash(i, ev),
+                paint.tok.direction,
+            )
         }
     }
 }
@@ -1704,6 +1746,7 @@ where
 ///     "Outline",
 ///     widget::label("files", tok, A11y::new("files", Role::Status)),
 ///     Some(dock),
+///     "Dock",
 ///     tok,
 ///     A11y::new("Outline", Role::Group),
 /// );
@@ -1712,19 +1755,21 @@ pub fn tool_panel<'a, M: Clone + 'a>(
     title: impl Into<String>,
     body: Element<'a, M>,
     on_dock: Option<M>,
+    dock: impl Into<String>,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
     let title = title.into();
+    let dock = dock.into();
     let head = row![
         iced::widget::Space::new().width(Length::Fill),
         themed_button(
-            "Dock",
+            dock.clone(),
             a11y.apply_message(on_dock),
             tok,
             Variant::Ghost,
             Icons::NONE,
-            A11y::button("Dock").with_disabled(a11y.disabled),
+            A11y::button(dock).with_disabled(a11y.disabled),
         ),
     ]
     .spacing(8)
@@ -1772,7 +1817,13 @@ pub fn drawer<'a, M: 'a>(
     if !open && t <= 0.0 {
         content
     } else {
-        list_detail(pane, content, layout::fixed((220.0 * t).max(1.0)), tok)
+        list_detail(
+            pane,
+            content,
+            layout::fixed((220.0 * t).max(1.0)),
+            tok,
+            tok.direction,
+        )
     }
 }
 
@@ -2177,6 +2228,31 @@ mod tests {
             .next()
             .unwrap();
         assert!(!pref_src.contains("A11y::new(query"));
+        let ld_src = src
+            .split("pub fn list_detail")
+            .nth(1)
+            .unwrap()
+            .split("pub fn navigation_view")
+            .next()
+            .unwrap();
+        assert!(ld_src.contains("order(dir"));
+        let insp_src = src
+            .split("pub fn inspector")
+            .nth(1)
+            .unwrap()
+            .split("pub fn workspace")
+            .next()
+            .unwrap();
+        assert!(insp_src.contains("order(tok.direction"));
+        let drawer_src = src
+            .split("pub fn drawer")
+            .nth(1)
+            .unwrap()
+            .split("pub fn cheatsheet")
+            .next()
+            .unwrap();
+        assert!(drawer_src.contains("tok.direction"));
+        assert!(!drawer_src.contains("Direction::Ltr"));
         let tool_src = src
             .split("pub fn tool_panel")
             .nth(1)
@@ -2185,7 +2261,17 @@ mod tests {
             .next()
             .unwrap();
         assert!(!tool_src.contains("label(title.clone()"));
-        assert!(tool_src.contains("\"Dock\""));
+        assert!(!tool_src.contains("\"Dock\""));
+        assert!(tool_src.contains("dock.clone()"));
+        let pal_src = src
+            .split("pub fn command_palette_view")
+            .nth(1)
+            .unwrap()
+            .split("pub fn status_page")
+            .next()
+            .unwrap();
+        assert!(!pal_src.contains("\"Type a command\""));
+        assert!(pal_src.contains("placeholder,"));
         let _: Element<'_, ()> = toolbar(acts.iter().copied(), tok, ltr);
         let _: Element<'_, ()> = toolbar(acts.iter().copied(), tok, rtl);
         let _: Element<'_, ()> = command_bar(table.iter(), tok, rtl);
@@ -2200,6 +2286,7 @@ mod tests {
         assert!(bar_src.contains("tok.body()"));
         assert!(bar_src.contains("on_surface)"));
         assert!(!bar_src.contains("on_surface_variant"));
+        assert!(bar_src.contains("align_start(dir)"));
         let _: Element<'_, ()> = status_bar("ready", None, None, &table, tok, ltr);
         let _: Element<'_, ()> = status_bar("ready", None, None, &table, tok, rtl);
         let _: Element<'_, ()> = status_bar(
@@ -2217,11 +2304,23 @@ mod tests {
         let loc = crate::i18n::Locale::new("ar");
         assert_eq!(loc.direction, Direction::Rtl);
         let res: Vec<&Action<()>> = table.iter().collect();
-        let _: Element<'_, ()> =
-            command_palette_view("", &res, 0, |_| (), |_| (), None, |_| (), None, 1.0, tok);
+        let _: Element<'_, ()> = command_palette_view(
+            "",
+            "Command",
+            &res,
+            0,
+            |_| (),
+            |_| (),
+            None,
+            |_| (),
+            None,
+            1.0,
+            tok,
+        );
         let dead_res: Vec<&Action<()>> = disabled.iter().collect();
         let _: Element<'_, ()> = command_palette_view(
             "q",
+            "Command",
             &dead_res,
             0,
             |_| (),
@@ -2244,14 +2343,18 @@ mod tests {
         let _: Element<'_, ()> = preferences_page(&prefs, "", |_| (), tok, &cat);
         let _: Element<'_, ()> = preferences_page(&prefs, "nope", |_| (), tok, &cat);
         let lab = |s: &str| crate::widget::label::<()>(s, tok, A11y::new(s, Role::Header));
-        let _: Element<'_, ()> = list_detail(lab("l"), lab("d"), crate::layout::fixed(260.0), tok);
-        let _: Element<'_, ()> = list_detail(lab("l"), lab("d"), crate::layout::FILL, tok);
+        let _: Element<'_, ()> =
+            list_detail(lab("l"), lab("d"), crate::layout::fixed(260.0), tok, ltr);
+        let _: Element<'_, ()> = list_detail(lab("l"), lab("d"), crate::layout::FILL, tok, rtl);
         let nav = NavStack::new("home");
         let mut deep = nav.clone();
         deep.push("x");
-        let _: Element<'_, ()> = navigation_view(lab("s"), lab("c"), &nav, 900.0, (), tok, &cat);
-        let _: Element<'_, ()> = navigation_view(lab("s"), lab("c"), &deep, 400.0, (), tok, &cat);
-        let _: Element<'_, ()> = navigation_view(lab("s"), lab("c"), &nav, 400.0, (), tok, &cat);
+        let _: Element<'_, ()> =
+            navigation_view(lab("s"), lab("c"), &nav, 900.0, (), tok, &cat, ltr);
+        let _: Element<'_, ()> =
+            navigation_view(lab("s"), lab("c"), &deep, 400.0, (), tok, &cat, rtl);
+        let _: Element<'_, ()> =
+            navigation_view(lab("s"), lab("c"), &nav, 400.0, (), tok, &cat, ltr);
         let tabs = Tabs::new(["A"]);
         let _: Element<'_, ()> = tab_view(&tabs, lab("b"), |_| (), |_| (), tok);
         let _: Element<'_, ()> = main_window(lab("m"), lab("t"), lab("c"), lab("s"), tok);
@@ -2320,11 +2423,23 @@ mod tests {
         paint(&mut tb);
         let mut sb = status_bar("ready", None, None, &table, tok, ltr);
         paint(&mut sb);
-        let mut pal =
-            command_palette_view("", &res, 0, |_| (), |_| (), None, |_| (), None, 1.0, tok);
+        let mut pal = command_palette_view(
+            "",
+            "Command",
+            &res,
+            0,
+            |_| (),
+            |_| (),
+            None,
+            |_| (),
+            None,
+            1.0,
+            tok,
+        );
         paint(&mut pal);
         let mut many_pal = command_palette_view(
             "c",
+            "Command",
             &many_res,
             0,
             |_| (),
@@ -2343,6 +2458,7 @@ mod tests {
         };
         let mut asked = command_palette_view(
             "",
+            "Command",
             &res,
             0,
             |_| (),
@@ -2386,7 +2502,7 @@ mod tests {
             .split("pub fn inspector")
             .next()
             .unwrap();
-        assert!(cm_src.contains("Alignment::Start"));
+        assert!(cm_src.contains("align_start(tok.direction)"));
         assert!(cm_src.contains("tok.body()"));
         let card = context_card_size(table.iter().count(), vp);
         let row_w = menu_row_width(&mut cm);
@@ -2418,9 +2534,9 @@ mod tests {
             .collect();
         let mut long = context_menu(many, iced::Point::new(8.0, 8.0), vp, (), 1.0, tok);
         paint(&mut long);
-        let mut ld = list_detail(lab("l"), lab("d"), crate::layout::fixed(260.0), tok);
+        let mut ld = list_detail(lab("l"), lab("d"), crate::layout::fixed(260.0), tok, ltr);
         paint(&mut ld);
-        let mut nv = navigation_view(lab("s"), lab("c"), &nav, 900.0, (), tok, &cat);
+        let mut nv = navigation_view(lab("s"), lab("c"), &nav, 900.0, (), tok, &cat, ltr);
         paint(&mut nv);
         let mut tv = tab_view(&tabs, lab("b"), |_| (), |_| (), tok);
         paint(&mut tv);
@@ -2428,8 +2544,19 @@ mod tests {
         paint(&mut mc);
         let mut mc_mid = modal_card(lab("b"), lab("c"), 0.4, tok);
         paint(&mut mc_mid);
-        let mut pal_mid =
-            command_palette_view("", &res, 0, |_| (), |_| (), None, |_| (), None, 0.4, tok);
+        let mut pal_mid = command_palette_view(
+            "",
+            "Command",
+            &res,
+            0,
+            |_| (),
+            |_| (),
+            None,
+            |_| (),
+            None,
+            0.4,
+            tok,
+        );
         paint(&mut pal_mid);
         let body = lab("x");
         let scene = lab("s");
@@ -2476,6 +2603,7 @@ mod tests {
             "Outline",
             lab("b"),
             Some(()),
+            "Dock",
             tok,
             A11y::new("tp", Role::Group),
         );

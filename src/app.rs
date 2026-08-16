@@ -158,7 +158,8 @@ pub fn bootstrap_with_catalog(boot: &Boot, themes: &ThemeCatalog) -> Prepared {
         .with_density(Density::named(boot.density))
         .with_font_scale(boot.font_scale)
         .with_shape(boot.shape)
-        .with_elevation(boot.elevation);
+        .with_elevation(boot.elevation)
+        .with_direction(boot.locale.direction);
     let iced_theme = theme::iced_theme(&named.name, tokens);
     let iced_settings = Settings {
         id: Some(boot.application_id.clone()),

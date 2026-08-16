@@ -42,7 +42,9 @@ Public controls map through `m3::Component`.
 on `Tokens` picks the map:
 
 - **Desktop** — every family is shape **None** (0 dp). This is the default.
-- **Tight / Soft / Pill** — one corner (4 / 12 / full) on every family.
+- **Tight / Soft** — one corner (4 / 12 dp) on every family.
+- **Pill** — buttons and chips are full; cards, menus, fields, and
+  dialogs stay boxes (12 dp); app bars stay flush.
 - **Material** — buttons extra-small, chips small, cards medium,
   dialogs extra-large, app bars flush.
 

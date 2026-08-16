@@ -158,7 +158,16 @@ pub struct SashDrag {
 
 impl SashDrag {
     /// Apply a sash event; returns whether [`SplitState::drag`] ran.
-    pub fn apply(&mut self, state: &mut SplitState, event: SashEvent, total: f32) -> bool {
+    ///
+    /// On a horizontal split in [`crate::i18n::Direction::Rtl`] the first
+    /// pane sits on the right, so a pointer move toward +X shrinks it.
+    pub fn apply(
+        &mut self,
+        state: &mut SplitState,
+        event: SashEvent,
+        total: f32,
+        dir: crate::i18n::Direction,
+    ) -> bool {
         match event {
             SashEvent::Press => {
                 self.pressed = true;
@@ -173,7 +182,11 @@ impl SashDrag {
             SashEvent::Move(pos) => {
                 let dragged = if self.pressed {
                     if let Some(prev) = self.last {
-                        state.drag(pos - prev, total);
+                        let mut delta = pos - prev;
+                        if dir == crate::i18n::Direction::Rtl && state.axis == Axis::Horizontal {
+                            delta = -delta;
+                        }
+                        state.drag(delta, total);
                         true
                     } else {
                         false
@@ -209,14 +222,39 @@ mod tests {
         z.drag(1.0, 0.0);
         let mut drag = SashDrag::default();
         let mut st = SplitState::new(Axis::Horizontal, 0.3);
-        assert!(!drag.apply(&mut st, SashEvent::Press, 200.0));
-        assert!(!drag.apply(&mut st, SashEvent::Move(10.0), 200.0));
+        assert!(!drag.apply(
+            &mut st,
+            SashEvent::Press,
+            200.0,
+            crate::i18n::Direction::Ltr
+        ));
+        assert!(!drag.apply(
+            &mut st,
+            SashEvent::Move(10.0),
+            200.0,
+            crate::i18n::Direction::Ltr
+        ));
         let before = st.ratio;
-        assert!(drag.apply(&mut st, SashEvent::Move(30.0), 200.0));
+        assert!(drag.apply(
+            &mut st,
+            SashEvent::Move(30.0),
+            200.0,
+            crate::i18n::Direction::Ltr
+        ));
         assert!(st.ratio > before);
-        assert!(!drag.apply(&mut st, SashEvent::Release, 200.0));
+        assert!(!drag.apply(
+            &mut st,
+            SashEvent::Release,
+            200.0,
+            crate::i18n::Direction::Ltr
+        ));
         assert!(!drag.pressed);
-        assert!(!drag.apply(&mut st, SashEvent::Move(40.0), 200.0));
+        assert!(!drag.apply(
+            &mut st,
+            SashEvent::Move(40.0),
+            200.0,
+            crate::i18n::Direction::Ltr
+        ));
         assert!(!drag.pressed);
 
         let moved = Event::Mouse(mouse::Event::CursorMoved {
@@ -237,7 +275,12 @@ mod tests {
         let mut drag = SashDrag::default();
         let mut st = SplitState::new(Axis::Horizontal, 0.3);
         let total = 400.0;
-        assert!(!drag.apply(&mut st, SashEvent::Press, total));
+        assert!(!drag.apply(
+            &mut st,
+            SashEvent::Press,
+            total,
+            crate::i18n::Direction::Ltr
+        ));
         let first = Event::Mouse(mouse::Event::CursorMoved {
             position: Point::new(100.0, 8.0),
         });
@@ -246,7 +289,8 @@ mod tests {
             sash_from_window_event(&first)
                 .unwrap()
                 .into_event(Axis::Horizontal),
-            total
+            total,
+            crate::i18n::Direction::Ltr,
         ));
         let before = st.ratio;
         let second = Event::Mouse(mouse::Event::CursorMoved {
@@ -257,7 +301,8 @@ mod tests {
             sash_from_window_event(&second)
                 .unwrap()
                 .into_event(Axis::Horizontal),
-            total
+            total,
+            crate::i18n::Direction::Ltr,
         ));
         assert!(st.ratio > before);
         let window_delta = 180.0 - 100.0;
@@ -267,8 +312,31 @@ mod tests {
             sash_from_window_event(&released)
                 .unwrap()
                 .into_event(Axis::Horizontal),
-            total
+            total,
+            crate::i18n::Direction::Ltr,
         ));
+        let mut rtl = SashDrag::default();
+        let mut rst = SplitState::new(Axis::Horizontal, 0.3);
+        assert!(!rtl.apply(
+            &mut rst,
+            SashEvent::Press,
+            total,
+            crate::i18n::Direction::Rtl
+        ));
+        assert!(!rtl.apply(
+            &mut rst,
+            SashEvent::Move(100.0),
+            total,
+            crate::i18n::Direction::Rtl
+        ));
+        let rtl_before = rst.ratio;
+        assert!(rtl.apply(
+            &mut rst,
+            SashEvent::Move(180.0),
+            total,
+            crate::i18n::Direction::Rtl
+        ));
+        assert!(rst.ratio < rtl_before);
         let _ = listen_sash();
         assert!(sash_listen(
             moved.clone(),

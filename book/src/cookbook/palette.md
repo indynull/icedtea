@@ -49,6 +49,7 @@ impl App {
         let hits = self.palette.results(&self.table);
         pattern::command_palette_view(
             self.palette.query(),
+            "Type a command",
             &hits,
             self.palette.selected(),
             Message::Query,

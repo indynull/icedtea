@@ -84,7 +84,18 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   grip and cannot drive a drag.
 - Chrome rows (menu, toolbar, status, breadcrumb, form) take
   `i18n::Direction` from `Boot` / `Prepared::direction`. Use
-  `i18n::order`.
+  `i18n::order`, `align_start` / `align_end`, and `inline_pad`.
+  Never physical left/right for chrome that mirrors (iced
+  `Alignment::Start` is physical left). Paths, URLs, and code stay
+  left-to-right islands. Flip directional icons, twisties, and
+  progress; keep text, digits, checkmarks, media controls, logos,
+  and size pairs (`1920x1080`) unflipped. Arabic, Urdu, and Persian
+  clocks use Eastern digits; Hebrew uses 123. Bar:
+  `.grok/skills/gallery-qa/references/rtl.md` (Firefox RTL
+  Guidelines + Microsoft bidirectional / FlowDirection).
+- Never Fill+align `text` inside an iced 0.14 `button` (drops
+  right-to-left glyphs). Shrink the title or wrap shrink text in a
+  fill container.
 - Key order: an open modal consumes (even if a field is focused);
   otherwise focused text owns unmodified typing; otherwise
   `key::handle` matches the action table. `ctrl` in a shortcut is the
@@ -287,6 +298,10 @@ exact command and result you ran.
   record. Do not hand-edit those GIF files. Read the stills, not the
   animation. `ICEDTEA_GALLERY_ISOLATED=0` records on the current display
   and must float a tiled window first.
+  Locale proof is `just gallery-qa --locale ar` (and `ur`) with
+  `SCORE.md` free of broken rows against
+  `.grok/skills/gallery-qa/references/rtl.md`. Leftover-English
+  source denylist is not the bar.
 - Continuous integration (`.github/workflows/ci.yml`) runs lint and
   docs on Ubuntu at Rust 1.89. The test job on Linux, macOS, and
   Windows at 1.89 is `cargo llvm-cov --workspace --all-features` and

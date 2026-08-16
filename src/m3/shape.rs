@@ -75,7 +75,8 @@ pub enum ShapePolicy {
     Tight,
     /// Medium (12 dp) on every family.
     Soft,
-    /// Full pill on every family.
+    /// Full pill on buttons and chips. Cards, menus, fields, dialogs,
+    /// and chrome rows stay boxes (medium or flush).
     Pill,
     /// Documented Material map (buttons extra-small, cards medium,
     /// dialogs extra-large, app bars flush).
@@ -94,8 +95,16 @@ impl Component {
             ShapePolicy::Desktop => Shape::None,
             ShapePolicy::Tight => Shape::ExtraSmall,
             ShapePolicy::Soft => Shape::Medium,
-            ShapePolicy::Pill => Shape::Full,
+            ShapePolicy::Pill => self.pill_shape(),
             ShapePolicy::Material => self.material_shape(),
+        }
+    }
+
+    fn pill_shape(self) -> Shape {
+        match self {
+            Self::Button | Self::Chip => Shape::Full,
+            Self::AppBar | Self::Shell | Self::Tab => Shape::None,
+            Self::Field | Self::Checkbox | Self::Card | Self::Menu | Self::Dialog => Shape::Medium,
         }
     }
 
@@ -187,8 +196,23 @@ mod tests {
             assert_eq!(c.shape_for(ShapePolicy::Desktop), Shape::None);
             assert_eq!(c.shape_for(ShapePolicy::Tight), Shape::ExtraSmall);
             assert_eq!(c.shape_for(ShapePolicy::Soft), Shape::Medium);
-            assert_eq!(c.shape_for(ShapePolicy::Pill), Shape::Full);
         }
+        assert_eq!(Component::Button.shape_for(ShapePolicy::Pill), Shape::Full);
+        assert_eq!(Component::Chip.shape_for(ShapePolicy::Pill), Shape::Full);
+        assert_eq!(Component::Card.shape_for(ShapePolicy::Pill), Shape::Medium);
+        assert_eq!(Component::Menu.shape_for(ShapePolicy::Pill), Shape::Medium);
+        assert_eq!(
+            Component::Dialog.shape_for(ShapePolicy::Pill),
+            Shape::Medium
+        );
+        assert_eq!(Component::Field.shape_for(ShapePolicy::Pill), Shape::Medium);
+        assert_eq!(
+            Component::Checkbox.shape_for(ShapePolicy::Pill),
+            Shape::Medium
+        );
+        assert_eq!(Component::AppBar.shape_for(ShapePolicy::Pill), Shape::None);
+        assert_eq!(Component::Shell.shape_for(ShapePolicy::Pill), Shape::None);
+        assert_eq!(Component::Tab.shape_for(ShapePolicy::Pill), Shape::None);
         assert_eq!(
             Component::Button.shape_for(ShapePolicy::Material),
             Shape::ExtraSmall

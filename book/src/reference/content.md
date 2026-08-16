@@ -42,15 +42,16 @@ Platform sans. Empty string is an empty node; still pass `A11y`.
 
 ### Icon
 
-**`icon`** — A chrome SVG from the bundled set.
+**`icon`** — A chrome SVG: a shipped `Icon` or application bytes.
 
 Constructor: [`widget::icon_svg`](https://docs.rs/icedtea/latest/icedtea/widget/fn.icon_svg.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Chrome set only (`Icon::Search`, `Close`, and the rest). Tokens tint
-the fill.
+The seven names stay the shipped set. Pass
+[`Glyph::Bytes`](https://docs.rs/icedtea/latest/icedtea/icon/enum.Glyph.html)
+for an app mark (filled black paths). Tokens tint the fill.
 
 Pass `A11y`.
 

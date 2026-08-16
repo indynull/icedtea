@@ -2,11 +2,14 @@
 
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
+use iced::advanced::widget::operation::{self, Operation};
 use iced::advanced::widget::tree::{self, Tree};
-use iced::advanced::widget::Widget;
+use iced::advanced::widget::{Id, Widget};
 use iced::advanced::{Clipboard, Renderer as _, Shell};
 use iced::mouse;
-use iced::{Background, Color, Element, Event, Length, Rectangle, Size};
+use iced::{Background, Color, Element, Event, Length, Point, Rectangle, Size, Vector};
+
+use crate::i18n::Direction;
 
 use crate::chrome::{SCROLL_HANDLE_MIN, SCROLL_RAIL_WIDTH};
 use crate::collection::{scroll_from_rail, scroller_span};
@@ -422,6 +425,449 @@ impl<'a, Message: 'a> From<ClipLayer<'a, Message>> for Element<'a, Message> {
     }
 }
 
+const RAIL_GAP: f32 = 4.0;
+
+struct ThemedScrollState {
+    scroll: f32,
+    dragging: Option<f32>,
+    pinned_end: bool,
+    last_notified: Option<f32>,
+    content_h: f32,
+    viewport_h: f32,
+}
+
+impl Default for ThemedScrollState {
+    fn default() -> Self {
+        Self {
+            scroll: 0.0,
+            dragging: None,
+            pinned_end: false,
+            last_notified: None,
+            content_h: 0.0,
+            viewport_h: 0.0,
+        }
+    }
+}
+
+impl operation::Scrollable for ThemedScrollState {
+    fn snap_to(&mut self, offset: operation::scrollable::RelativeOffset<Option<f32>>) {
+        if let Some(y) = offset.y {
+            let max = (self.content_h - self.viewport_h).max(0.0);
+            self.scroll = (y.clamp(0.0, 1.0) * max).max(0.0);
+            self.pinned_end = y >= 1.0;
+            self.last_notified = None;
+        }
+    }
+
+    fn scroll_to(&mut self, offset: operation::scrollable::AbsoluteOffset<Option<f32>>) {
+        if let Some(y) = offset.y {
+            self.scroll = y.max(0.0);
+            self.pinned_end = false;
+            self.last_notified = None;
+        }
+    }
+
+    fn scroll_by(
+        &mut self,
+        offset: operation::scrollable::AbsoluteOffset,
+        bounds: Rectangle,
+        content_bounds: Rectangle,
+    ) {
+        let max = (content_bounds.height - bounds.height).max(0.0);
+        self.scroll = (self.scroll + offset.y).clamp(0.0, max);
+        self.pinned_end = false;
+        self.last_notified = None;
+    }
+}
+
+/// Pane plus an explicit end-side rail. iced's `scrollable` always paints
+/// its rail on the physical right; this compose follows [`Tokens::direction`].
+pub struct ThemedScroll<'a, Message> {
+    content: Element<'a, Message>,
+    tok: crate::theme::Tokens,
+    stick: bool,
+    id: Option<Id>,
+    on_scroll: Option<Box<dyn Fn(f32) -> Message + 'a>>,
+}
+
+impl<'a, Message> ThemedScroll<'a, Message> {
+    pub fn new(
+        content: impl Into<Element<'a, Message>>,
+        tok: crate::theme::Tokens,
+        stick: bool,
+        id: Option<Id>,
+        on_scroll: Option<Box<dyn Fn(f32) -> Message + 'a>>,
+    ) -> Self {
+        Self {
+            content: content.into(),
+            tok,
+            stick,
+            id,
+            on_scroll,
+        }
+    }
+
+    fn pane_width(total: f32) -> f32 {
+        (total - SCROLL_RAIL_WIDTH - RAIL_GAP).max(0.0)
+    }
+
+    fn rail_x(rtl: bool, total: f32) -> f32 {
+        if rtl {
+            0.0
+        } else {
+            Self::pane_width(total) + RAIL_GAP
+        }
+    }
+
+    fn pane_x(rtl: bool) -> f32 {
+        if rtl {
+            SCROLL_RAIL_WIDTH + RAIL_GAP
+        } else {
+            0.0
+        }
+    }
+}
+
+impl<'a, Message> Widget<Message, iced::Theme, iced::Renderer> for ThemedScroll<'a, Message>
+where
+    Message: 'a,
+{
+    fn tag(&self) -> tree::Tag {
+        tree::Tag::of::<ThemedScrollState>()
+    }
+
+    fn state(&self) -> tree::State {
+        tree::State::new(ThemedScrollState {
+            pinned_end: self.stick,
+            ..ThemedScrollState::default()
+        })
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.content)]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_ref(&self.content));
+    }
+
+    fn size(&self) -> Size<Length> {
+        Size::new(Length::Fill, Length::Fill)
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        let size = limits.resolve(Length::Fill, Length::Fill, Size::ZERO);
+        let rtl = self.tok.direction == Direction::Rtl;
+        let pane_w = Self::pane_width(size.width);
+        let viewport = size.height;
+        // Min width is the pane so Shrink columns fill it. A zero min
+        // left labels hugging the physical left in RTL.
+        let child_min = Size::new(pane_w, 0.0);
+        let child_max = Size::new(pane_w, f32::INFINITY);
+        let mut child = self.content.as_widget_mut().layout(
+            &mut tree.children[0],
+            renderer,
+            &layout::Limits::new(child_min, child_max),
+        );
+        if child.size().height < viewport {
+            child = self.content.as_widget_mut().layout(
+                &mut tree.children[0],
+                renderer,
+                &layout::Limits::new(child_min, Size::new(pane_w, viewport)),
+            );
+        }
+        let content_h = child.size().height;
+        let max_scroll = (content_h - viewport).max(0.0);
+        let state = tree.state.downcast_mut::<ThemedScrollState>();
+        state.content_h = content_h;
+        state.viewport_h = viewport;
+        if self.stick && state.pinned_end {
+            state.scroll = max_scroll;
+        }
+        state.scroll = state.scroll.clamp(0.0, max_scroll);
+        let child = child.move_to(Point::new(Self::pane_x(rtl), -state.scroll));
+        let rail = layout::Node::new(Size::new(SCROLL_RAIL_WIDTH, viewport))
+            .move_to(Point::new(Self::rail_x(rtl, size.width), 0.0));
+        layout::Node::with_children(size, vec![child, rail])
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &iced::Renderer,
+        operation: &mut dyn Operation,
+    ) {
+        let bounds = layout.bounds();
+        let mut children = layout.children();
+        let content_layout = children.next().unwrap();
+        let scroll = tree.state.downcast_ref::<ThemedScrollState>().scroll;
+        let translation = Vector::new(0.0, -scroll);
+        operation.scrollable(
+            self.id.as_ref(),
+            bounds,
+            content_layout.bounds(),
+            translation,
+            tree.state.downcast_mut::<ThemedScrollState>(),
+        );
+        operation.traverse(&mut |operation| {
+            self.content.as_widget_mut().operate(
+                &mut tree.children[0],
+                content_layout,
+                renderer,
+                operation,
+            );
+        });
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &iced::Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &Rectangle,
+    ) {
+        let bounds = layout.bounds();
+        let mut kids = layout.children();
+        let content_layout = kids.next().unwrap();
+        let rail_layout = kids.next().unwrap();
+        let content_h = content_layout.bounds().height;
+        let view_h = bounds.height;
+        let max_scroll = (content_h - view_h).max(0.0);
+        let state = tree.state.downcast_mut::<ThemedScrollState>();
+        let rail = rail_layout.bounds();
+        let (off, len) = thumb(content_h, view_h, state.scroll, rail.height);
+
+        let mut moved = false;
+        match event {
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+                if let Some(pos) = cursor.position() {
+                    if rail.contains(pos) {
+                        let y = pos.y - rail.y;
+                        if y >= off && y <= off + len {
+                            state.dragging = Some(y - off);
+                        } else {
+                            let thumb_y = (y - len / 2.0).clamp(0.0, (rail.height - len).max(0.0));
+                            state.dragging = Some(y - thumb_y);
+                            state.scroll = scroll_from_rail(
+                                content_h,
+                                view_h,
+                                thumb_y,
+                                rail.height,
+                                SCROLL_HANDLE_MIN,
+                            );
+                            state.pinned_end = false;
+                            moved = true;
+                        }
+                        shell.capture_event();
+                    }
+                }
+            }
+            Event::Mouse(mouse::Event::CursorMoved { .. }) => {
+                if let (Some(grab), Some(pos)) = (state.dragging, cursor.position()) {
+                    let y = pos.y - rail.y;
+                    let thumb_y = (y - grab).clamp(0.0, (rail.height - len).max(0.0));
+                    state.scroll = scroll_from_rail(
+                        content_h,
+                        view_h,
+                        thumb_y,
+                        rail.height,
+                        SCROLL_HANDLE_MIN,
+                    );
+                    state.pinned_end = false;
+                    moved = true;
+                    shell.capture_event();
+                }
+            }
+            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)) => {
+                if state.dragging.take().is_some() {
+                    shell.capture_event();
+                }
+            }
+            Event::Mouse(mouse::Event::WheelScrolled { delta }) => {
+                let over_pane = cursor.position().is_some_and(|p| bounds.contains(p));
+                if over_pane && max_scroll > 0.0 {
+                    let dy = match delta {
+                        mouse::ScrollDelta::Lines { y, .. } => -y * 24.0,
+                        mouse::ScrollDelta::Pixels { y, .. } => -y,
+                    };
+                    let next = (state.scroll + dy).clamp(0.0, max_scroll);
+                    if (next - state.scroll).abs() > f32::EPSILON {
+                        state.scroll = next;
+                        state.pinned_end = self.stick && (max_scroll - next) < 1.0;
+                        moved = true;
+                    }
+                    shell.capture_event();
+                }
+            }
+            _ => {}
+        }
+
+        if moved || state.last_notified != Some(state.scroll) {
+            if let Some(f) = &self.on_scroll {
+                shell.publish(f(state.scroll));
+            }
+            state.last_notified = Some(state.scroll);
+        }
+
+        if !shell.is_event_captured() {
+            self.content.as_widget_mut().update(
+                &mut tree.children[0],
+                event,
+                content_layout,
+                cursor,
+                renderer,
+                clipboard,
+                shell,
+                viewport,
+            );
+        }
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+        renderer: &iced::Renderer,
+    ) -> mouse::Interaction {
+        let state = tree.state.downcast_ref::<ThemedScrollState>();
+        if state.dragging.is_some() {
+            return mouse::Interaction::Grabbing;
+        }
+        let mut kids = layout.children();
+        let content_layout = kids.next().unwrap();
+        let rail = kids.next().unwrap().bounds();
+        if let Some(pos) = cursor.position() {
+            if rail.contains(pos) {
+                let (off, len) = thumb(
+                    content_layout.bounds().height,
+                    layout.bounds().height,
+                    state.scroll,
+                    rail.height,
+                );
+                let y = pos.y - rail.y;
+                return if y >= off && y <= off + len {
+                    mouse::Interaction::Grab
+                } else {
+                    mouse::Interaction::Pointer
+                };
+            }
+        }
+        self.content.as_widget().mouse_interaction(
+            &tree.children[0],
+            content_layout,
+            cursor,
+            viewport,
+            renderer,
+        )
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut iced::Renderer,
+        theme: &iced::Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+    ) {
+        let bounds = layout.bounds();
+        let mut kids = layout.children();
+        let content_layout = kids.next().unwrap();
+        let rail_layout = kids.next().unwrap();
+        let Some(clipped) = bounds.intersection(viewport) else {
+            return;
+        };
+        renderer.with_layer(clipped, |renderer| {
+            self.content.as_widget().draw(
+                &tree.children[0],
+                renderer,
+                theme,
+                style,
+                content_layout,
+                cursor,
+                &clipped,
+            );
+        });
+        let state = tree.state.downcast_ref::<ThemedScrollState>();
+        let rail_bounds = rail_layout.bounds();
+        let scheme = self.tok.scheme();
+        let rail_r = self.tok.radius(crate::m3::shape::Component::Button);
+        renderer.fill_quad(
+            renderer::Quad {
+                bounds: rail_bounds,
+                border: iced::Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: rail_r,
+                },
+                ..renderer::Quad::default()
+            },
+            Background::Color(scheme.surface_container_low),
+        );
+        let (off, len) = thumb(
+            content_layout.bounds().height,
+            bounds.height,
+            state.scroll,
+            rail_bounds.height,
+        );
+        if len > 0.0 {
+            renderer.fill_quad(
+                renderer::Quad {
+                    bounds: Rectangle {
+                        x: rail_bounds.x,
+                        y: rail_bounds.y + off,
+                        width: rail_bounds.width,
+                        height: len,
+                    },
+                    border: iced::Border {
+                        color: Color::TRANSPARENT,
+                        width: 0.0,
+                        radius: rail_r,
+                    },
+                    ..renderer::Quad::default()
+                },
+                Background::Color(scheme.outline),
+            );
+        }
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &iced::Renderer,
+        viewport: &Rectangle,
+        translation: iced::Vector,
+    ) -> Option<iced::advanced::overlay::Element<'b, Message, iced::Theme, iced::Renderer>> {
+        self.content.as_widget_mut().overlay(
+            &mut tree.children[0],
+            layout.children().next().unwrap(),
+            renderer,
+            viewport,
+            translation,
+        )
+    }
+}
+
+impl<'a, Message: 'a> From<ThemedScroll<'a, Message>> for Element<'a, Message> {
+    fn from(value: ThemedScroll<'a, Message>) -> Self {
+        Self::new(value)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -438,6 +884,39 @@ mod tests {
         assert!(body.contains("with_layer"));
         assert!(body.contains("struct ClipLayer"));
         assert!(body.contains("self.content.as_widget().size()"));
+        assert!(body.contains("let child_min = Size::new(pane_w, 0.0)"));
+    }
+
+    #[test]
+    fn themed_scroll_lays_shrink_content_at_pane_width() {
+        use iced::widget::{column, Space};
+
+        let tok = named("dark")
+            .tokens
+            .with_direction(crate::i18n::Direction::Rtl);
+        let child: Element<'_, ()> = column![Space::new().width(40).height(16)].into();
+        let mut scroll = ThemedScroll::new(child, tok, false, None, None);
+        let mut tree = Tree::new(&scroll as &dyn Widget<(), iced::Theme, iced::Renderer>);
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(320.0, 240.0));
+        let node = Widget::<(), iced::Theme, iced::Renderer>::layout(
+            &mut scroll,
+            &mut tree,
+            &renderer,
+            &limits,
+        );
+        let layout = Layout::new(&node);
+        let origin = layout.bounds();
+        let content = layout.children().next().unwrap().bounds();
+        assert!(
+            content.width > origin.width * 0.85,
+            "RTL shrink content must fill the pane, got {} in {}",
+            content.width,
+            origin.width
+        );
     }
 
     #[test]

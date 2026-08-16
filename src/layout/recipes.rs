@@ -370,12 +370,16 @@ pub fn stack_child<'a, M: 'a>(children: Vec<Element<'a, M>>, active: usize) -> E
 
 /// Split view. The sash grip emits [`SashEvent::Press`]; Move/Release come from
 /// [`super::split::listen_sash`] (window-space pointer) while pressed.
+///
+/// On a horizontal split, `first` is the start pane: left in
+/// [`Direction::Ltr`], right in [`Direction::Rtl`].
 pub fn split_view<'a, M: Clone + 'a>(
     first: Element<'a, M>,
     second: Element<'a, M>,
     state: SplitState,
     total: f32,
     on_sash: impl Fn(SashEvent) -> M + 'a,
+    dir: crate::i18n::Direction,
 ) -> Element<'a, M> {
     let (a, sash, b) = split_sizes(state, total);
     let axis = state.axis;
@@ -389,15 +393,22 @@ pub fn split_view<'a, M: Clone + 'a>(
         Axis::Vertical => iced::mouse::Interaction::ResizingVertically,
     });
     match axis {
-        Axis::Horizontal => Row::new()
-            .push(container(first).width(Length::Fixed(a.max(1.0))))
-            .push(grip)
-            .push(
-                container(second)
-                    .width(Length::Fixed(b.max(1.0)))
-                    .width(Length::Fill),
-            )
-            .into(),
+        Axis::Horizontal => {
+            let start = container(first).width(Length::Fixed(a.max(1.0)));
+            let end = container(second)
+                .width(Length::Fixed(b.max(1.0)))
+                .width(Length::Fill);
+            let mut row = Row::new();
+            match dir {
+                crate::i18n::Direction::Ltr => {
+                    row = row.push(start).push(grip).push(end);
+                }
+                crate::i18n::Direction::Rtl => {
+                    row = row.push(end).push(grip).push(start);
+                }
+            }
+            row.into()
+        }
         Axis::Vertical => Column::new()
             .push(container(first).height(Length::Fixed(a.max(1.0))))
             .push(grip)
@@ -566,6 +577,15 @@ mod tests {
             SplitState::new(Axis::Horizontal, 0.3),
             400.0,
             |_| (),
+            crate::i18n::Direction::Ltr,
+        );
+        let _: Element<'_, ()> = split_view(
+            t().into(),
+            t().into(),
+            SplitState::new(Axis::Horizontal, 0.3),
+            400.0,
+            |_| (),
+            crate::i18n::Direction::Rtl,
         );
         let _: Element<'_, ()> = split_view(
             t().into(),
@@ -573,6 +593,7 @@ mod tests {
             SplitState::new(Axis::Vertical, 0.3),
             400.0,
             |_| (),
+            crate::i18n::Direction::Ltr,
         );
         let _: Element<'_, ()> = grid_spanned(
             vec![
@@ -626,6 +647,7 @@ mod tests {
             SplitState::new(Axis::Vertical, 0.3),
             400.0,
             |_| (),
+            crate::i18n::Direction::Ltr,
         );
         paint(&mut sv);
         let mut gs = grid_spanned(vec![], 40.0, 20.0, 4.0);

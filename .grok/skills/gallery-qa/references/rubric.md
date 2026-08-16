@@ -118,7 +118,38 @@ Call out if only inject is green:
 - Hover/pressed faces
 - Text selection drag
 
-## 8. Platform
+## 8. Direction and locale
+
+Bar: `references/rtl.md` (Firefox RTL Guidelines + Microsoft
+bidirectional / FlowDirection). Mixed strings: Unicode UAX #9.
+
+Score on a right-to-left locale beat (`just gallery-qa --locale ar`
+or `ur`). That command writes `SCORE.md` and **exits non-zero** if
+any row is **broken**. Leftover-English greps are one row, not the
+bar. Do not walk languages by eye.
+
+- Window is one direction. Chrome uses start/end (`i18n::order`,
+  `align_start`). Physical `Alignment::Left` / `Right` in constructors
+  is **broken** (`physical-align`).
+- Vertical rail sits on the **end** side: left in RTL, right in LTR.
+  `layout-rails` / `rtl_rails` plus `rail-*` on list, tree, log,
+  feedback idle shots.
+- List, tree, and section titles start-align. `layout-align` /
+  `rtl_tree` plus mid-band text mass (`align-*`, right in RTL).
+- Closed disclosure / pick chevron on the end (`▸` LTR, `◂` RTL).
+  `layout-chevron` / `rtl_pick`. Button groups and checks:
+  `layout-controls` / `rtl_checkbox`.
+- Filled control faces carry label ink. Empty colored pads
+  (Fill+align inside iced `button` drops RTL glyphs) are **broken**.
+  `layout-button-face` / `rtl_themed_button`; `faces-controls`.
+- Arabic/Urdu clocks use Eastern digits (`digits-eastern`). Hebrew
+  keeps 123. Code, paths, and URLs stay left-to-right (`ltr-islands`).
+- Painted chrome is the locale fill. Leftover English on those
+  labels is **broken** (`leftover-src`, `copy`, `copy-keys`).
+- Tab/arrow order and mixed-string islands in live fields: live
+  pass (`manual-pass.md`).
+
+## 9. Platform
 
 | Host | Proves |
 |------|--------|
@@ -130,7 +161,7 @@ Do not claim macOS type quality from Xephyr. When `host_font` / `typo` /
 follow-OS change: host or remote Mac pass required for **SHIP** on those
 paths.
 
-## 9. Performance feel (light check)
+## 10. Performance feel (light check)
 
 - First paint not empty for virtual collections
 - Scrolling large lists stays usable (live); no full-list mount panic

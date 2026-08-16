@@ -4,6 +4,17 @@
 
 ### Feature
 
+- `command_palette_view` takes the query placeholder. `tool_panel`
+  takes the Dock label. The gallery fills both from the locale catalog.
+- `themed_pick_list` takes `ControlSize`. Compact uses tight pad and
+  meta type so a toolbar or HUD can nest a dropdown. Default keeps
+  the field body look.
+- Chrome that takes `Icon` also accepts `Glyph::Bytes` (filled black
+  SVG, token recolor). The seven names stay the shipped set.
+
+- `Catalog::for_locale` fills English, Vietnamese, Japanese, Chinese,
+  Arabic, and Urdu chrome strings. Direction comes from `direction_for`
+  (Arabic and Urdu are right-to-left).
 - `Tokens` carries type scale, corner policy, and elevation policy
   (`with_font_scale`, `with_shape`, `with_elevation`). `Boot` and
   `UiState::look` apply the same fields so an app can persist the look
@@ -30,6 +41,40 @@
 
 ### Bug fix
 
+- `themed_button` keeps a shrink title. Fill-aligned text inside the
+  iced button dropped right-to-left glyphs (empty colored pads).
+- `context_menu` wraps the row title so right-to-left labels paint.
+- `time_picker` uses Eastern Arabic digits when direction is
+  right-to-left. `secret_field` takes Show and Hide labels.
+- `button_group` sits on the start edge.
+- Gallery catalog nav paints right-to-left page titles. Fill-aligned
+  text inside the row button dropped those glyphs.
+- Gallery variant faces, color swatches, and the status title go
+  through catalog fill for all six locales.
+- `themed_scroll` lays content at the pane width so start-aligned
+  rows fill the panel (right when direction is right-to-left).
+- `inspector` and `drawer` put the list on the start edge.
+  Workspace splits follow `Tokens.direction`. `command_bar` sits
+  on the start edge.
+- Menu titles size wide CJK letters at one em so two-character
+  headings (`文件`, `保存`) do not wrap.
+- Checkbox, radio, switch, and icon button-groups put the control
+  on the start edge (right when direction is right-to-left).
+- Tree and list rows fill the pane so titles sit on the start edge
+  (right when direction is right-to-left).
+
+- Horizontal `split_view` and `list_detail` put the first pane on the
+  start side (right when direction is right-to-left). Sash drag follows
+  that side.
+- Pick lists, disclosure rows, tree twisties, search, and button
+  icons follow `Tokens.direction` (chevron and label on the start /
+  end side).
+- Vertical rails sit on the end side. List leading/trailing slots,
+  table frozen columns, and row titles follow `Tokens.direction`.
+  `themed_scroll` composes pane plus rail (iced's scroller cannot
+  move its rail). `on_scroll` is the pixel offset from the start.
+- `ShapePolicy::Pill` pills buttons and chips. Cards, menus, fields,
+  and dialogs stay boxes.
 - `bootstrap` applies `Boot` density, type scale, shape, and elevation
   onto `Prepared.tokens` and iced's default text size.
 - `badge` Primary uses on-primary ink on the primary fill.

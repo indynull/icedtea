@@ -157,7 +157,8 @@ Constructor: [`widget::icon_button`](https://docs.rs/icedtea/latest/icedtea/widg
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
-`Variant` picks the wash. `ControlSize` is the hit box. Disabled drops the press.
+`Variant` picks the wash. `ControlSize` is the hit box. Pass a shipped
+`Icon` or `Glyph::Bytes`. Disabled drops the press.
 
 Pass `A11y`.
 

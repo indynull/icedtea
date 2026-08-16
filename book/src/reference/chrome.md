@@ -230,7 +230,9 @@ Constructor: [`widget::themed_scroll`](https://docs.rs/icedtea/latest/icedtea/wi
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
-Lists and tables use a 24px rail. This constructor is the themed
+Lists and tables use a 24px rail. The rail sits on the end side
+(`Tokens.direction`: right in left-to-right, left in right-to-left).
+This constructor is the themed
 iced scroller for other panes.
 
 Pass `A11y`.

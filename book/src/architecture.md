@@ -19,6 +19,8 @@ A window is a loop you write in Rust:
 [`Boot`](https://docs.rs/icedtea/latest/icedtea/app/struct.Boot.html)
 sets title, application id, theme name, locale, density, type scale,
 shape, elevation, and window kind: application, dialog, or overlay.
+`Catalog::for_locale` fills chrome strings for that locale (English,
+Vietnamese, Japanese, Chinese, Arabic, Urdu).
 [`run!`](https://docs.rs/icedtea/latest/icedtea/macro.run.html) loads
 that and starts iced.
 [`daemon!`](https://docs.rs/icedtea/latest/icedtea/macro.daemon.html)

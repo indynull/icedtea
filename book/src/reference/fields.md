@@ -145,6 +145,8 @@ Constructor: [`widget::themed_pick_list`](https://docs.rs/icedtea/latest/icedtea
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
+`ControlSize` picks the face. Compact uses tight pad and meta type
+so a toolbar can nest a dropdown. Default keeps the field body look.
 Placeholder shows when nothing is selected. Disabled keeps the
 current face.
 

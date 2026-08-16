@@ -49,9 +49,38 @@ pub fn title_fill(tok: Tokens, status: TitleStatus) -> Color {
     }
 }
 
+/// East-Asian wide / fullwidth glyphs occupy about one em.
+fn is_wide(c: char) -> bool {
+    matches!(
+        c,
+        '\u{1100}'..='\u{115F}'
+            | '\u{2E80}'..='\u{303F}'
+            | '\u{3040}'..='\u{30FF}'
+            | '\u{3100}'..='\u{312F}'
+            | '\u{3130}'..='\u{318F}'
+            | '\u{3190}'..='\u{33FF}'
+            | '\u{3400}'..='\u{4DBF}'
+            | '\u{4E00}'..='\u{9FFF}'
+            | '\u{A960}'..='\u{A97F}'
+            | '\u{AC00}'..='\u{D7A3}'
+            | '\u{F900}'..='\u{FAFF}'
+            | '\u{FE10}'..='\u{FE19}'
+            | '\u{FE30}'..='\u{FE6F}'
+            | '\u{FF00}'..='\u{FF60}'
+            | '\u{FFE0}'..='\u{FFE6}'
+            | '\u{20000}'..='\u{2FFFD}'
+            | '\u{30000}'..='\u{3FFFD}'
+    )
+}
+
 /// Approximate advance for a sans label at `size` (logical pixels).
+///
+/// Latin sits near `0.62` em. Wide CJK / kana / hangul sit near one em
+/// so a two-character heading (`文件`, `保存`) does not wrap in the title.
 pub fn text_advance(s: &str, size: f32) -> f32 {
-    s.chars().count() as f32 * size * 0.62
+    s.chars()
+        .map(|c| if is_wide(c) { size } else { size * 0.62 })
+        .sum()
 }
 
 /// Hit-box of a title: text plus padding, not the width of the longest item.
@@ -591,6 +620,17 @@ mod tests {
         assert!(save > file.width);
         assert!(save >= 160.0);
         assert!(text_advance("File", size) < text_advance("Save    ctrl+s", size));
+        let file_cjk = title_extents("文件", pad, size, 18.0);
+        assert!(
+            text_advance("文件", size) >= size * 2.0,
+            "two CJK letters need two em so the title does not wrap"
+        );
+        assert!(
+            text_advance("文件", size) > 2.0 * size * 0.62,
+            "wide glyphs must not use the Latin 0.62 em factor"
+        );
+        assert!(file_cjk.width >= pad.x() + size * 2.0);
+        assert!(text_advance("保存", size) >= size * 2.0);
     }
 
     #[test]

@@ -104,6 +104,17 @@ On every scroller (virtual list **or** `themed_scroll` nav/page):
 
 If bleed occurs: library scissor/layer issue until proven otherwise.
 
+## Direction (Arabic / Urdu)
+
+Use `references/rtl.md`. On a right-to-left session:
+
+- Tab moves from start to end. Left/right arrows follow start.
+- Localizable punctuation (`.`, `:`, `…`, `?`, `!`) sits on the start
+  side of the run.
+- Code, paths, and URLs read left-to-right (semicolon on the right of
+  `padding: 20px`).
+- Media transport, checkmarks, logos, and `1920x1080` stay unflipped.
+
 ## Catalog and copy pass (once per full cut)
 
 Walk the **sidebar order** without opening every page:

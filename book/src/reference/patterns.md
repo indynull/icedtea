@@ -36,7 +36,7 @@ Constructor: [`pattern::list_detail`](https://docs.rs/icedtea/latest/icedtea/pat
 [icedtea](https://crates.io/crates/icedtea)
 
 `sidebar` is `layout::fixed` or `layout::FILL`. Children fill their
-panes.
+panes. Pass `Direction` so the list sits on the start side.
 
 ### Inspector
 
@@ -152,7 +152,9 @@ Constructor: [`pattern::about_page`](https://docs.rs/icedtea/latest/icedtea/patt
 [source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Strings are the application's. Catalog supplies chrome labels.
+Strings are the application's. Catalog supplies chrome labels
+(`Catalog::for_locale`: English, Vietnamese, Japanese, Chinese,
+Arabic, Urdu).
 
 ### Status page
 

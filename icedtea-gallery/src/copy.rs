@@ -1,0 +1,2054 @@
+//! Gallery UI copy. Inserted into [`icedtea::i18n::Catalog`] after
+//! [`icedtea::i18n::Catalog::for_locale`]. Not library API.
+
+use icedtea::i18n::Catalog;
+
+/// Catalog keys filled for every gallery locale.
+#[cfg(test)]
+pub fn keys() -> impl Iterator<Item = &'static str> {
+    ROWS.iter().map(|(k, ..)| *k)
+}
+
+/// Fill gallery keys for `lang` (en, vi, ja, zh, ar, ur).
+pub fn fill(cat: &mut Catalog, lang: &str) {
+    let primary = lang
+        .split(['-', '_'])
+        .next()
+        .unwrap_or("en")
+        .to_ascii_lowercase();
+    if primary == "ar" {
+        for (k, v) in AR {
+            cat.insert(*k, *v);
+        }
+        return;
+    }
+    if primary == "ur" {
+        for (k, v) in UR {
+            cat.insert(*k, *v);
+        }
+        return;
+    }
+    for (k, en, vi, ja, zh) in ROWS {
+        let v = match primary.as_str() {
+            "vi" => vi,
+            "ja" => ja,
+            "zh" => zh,
+            _ => en,
+        };
+        cat.insert(*k, *v);
+    }
+}
+
+/// English / Vietnamese / Japanese / Chinese.
+const ROWS: &[(&str, &str, &str, &str, &str)] = &[
+    // Look strip
+    ("look.theme", "Theme", "Giao diện", "テーマ", "主题"),
+    ("look.language", "Language", "Ngôn ngữ", "言語", "语言"),
+    ("look.density", "Density", "Mật độ", "密度", "密度"),
+    ("look.type", "Type", "Chữ", "文字", "字号"),
+    ("look.shape", "Shape", "Bo góc", "形状", "圆角"),
+    ("look.elevation", "Elevation", "Đổ bóng", "陰影", "阴影"),
+    ("look.direction", "Direction", "Hướng", "方向", "方向"),
+    ("look.dark", "dark colorway", "bảng màu tối", "ダーク配色", "深色配色"),
+    ("look.light", "light colorway", "bảng màu sáng", "ライト配色", "浅色配色"),
+    ("density.compact", "Compact", "Gọn", "コンパクト", "紧凑"),
+    ("density.default", "Default", "Mặc định", "標準", "默认"),
+    ("density.comfortable", "Comfortable", "Rộng", "ゆったり", "宽松"),
+    ("shape.desktop", "Desktop", "Máy tính", "デスクトップ", "桌面"),
+    ("shape.tight", "Tight", "Khít", "タイト", "紧"),
+    ("shape.soft", "Soft", "Mềm", "ソフト", "柔和"),
+    ("shape.pill", "Pill", "Viên", "ピル", "胶囊"),
+    ("shape.material", "Material", "Material", "マテリアル", "Material"),
+    ("elevation.desktop", "Desktop", "Máy tính", "デスクトップ", "桌面"),
+    ("elevation.flat", "Flat", "Phẳng", "フラット", "扁平"),
+    ("dir.ltr", "Left to right", "Trái sang phải", "左から右", "从左到右"),
+    ("dir.rtl", "Right to left", "Phải sang trái", "右から左", "从右到左"),
+    // Groups
+    ("group.Controls", "Controls", "Điều khiển", "コントロール", "控件"),
+    ("group.Fields", "Fields", "Trường", "フィールド", "字段"),
+    ("group.Content", "Content", "Nội dung", "コンテンツ", "内容"),
+    ("group.Collections", "Collections", "Tập hợp", "コレクション", "集合"),
+    ("group.Chrome", "Chrome", "Khung", "クロム", "框架"),
+    ("group.Patterns", "Patterns", "Mẫu", "パターン", "模式"),
+    // Page titles
+    ("page.controls", "Controls", "Điều khiển", "コントロール", "控件"),
+    ("page.fields", "Fields", "Trường", "フィールド", "字段"),
+    ("page.readout", "Readout", "Đọc số", "読み出し", "读数"),
+    ("page.type", "Type", "Chữ", "文字", "文字"),
+    ("page.markdown", "Markdown", "Markdown", "Markdown", "Markdown"),
+    ("page.code", "Code", "Mã", "コード", "代码"),
+    ("page.image", "Image", "Ảnh", "画像", "图像"),
+    ("page.selectable", "Selectable", "Chọn được", "選択可能", "可选"),
+    ("page.list", "List", "Danh sách", "リスト", "列表"),
+    ("page.log", "Log", "Nhật ký", "ログ", "日志"),
+    ("page.grid", "Item grid", "Lưới", "グリッド", "网格"),
+    ("page.table", "Data table", "Bảng", "表", "表格"),
+    ("page.tree", "Tree", "Cây", "ツリー", "树"),
+    ("page.sections", "Sections", "Mục", "セクション", "分区"),
+    ("page.theme", "Theme", "Giao diện", "テーマ", "主题"),
+    ("page.colors", "Colors", "Màu", "色", "颜色"),
+    ("page.keys", "Keys", "Phím", "キー", "快捷键"),
+    ("page.marks", "Marks", "Dấu", "マーク", "标记"),
+    ("page.chrome-rows", "Chrome rows", "Hàng khung", "クロム行", "框架行"),
+    ("page.feedback", "Feedback", "Phản hồi", "フィードバック", "反馈"),
+    ("page.dialogs", "Dialogs", "Hộp thoại", "ダイアログ", "对话框"),
+    ("page.list-detail", "List/detail", "Danh sách/chi tiết", "リスト/詳細", "列表/详情"),
+    ("page.inspector", "Inspector", "Thanh tra", "インスペクタ", "检查器"),
+    ("page.workspace", "Workspace", "Không gian", "ワークスペース", "工作区"),
+    ("page.navigation", "Navigation", "Điều hướng", "ナビ", "导航"),
+    ("page.tab-view", "Tab view", "Thẻ", "タブビュー", "标签页"),
+    ("page.preferences", "Preferences", "Tùy chọn", "設定", "偏好"),
+    ("page.about", "About", "Giới thiệu", "情報", "关于"),
+    ("page.status-page", "Status page", "Trang trạng thái", "状態ページ", "状态页"),
+    ("page.palette", "Command palette", "Bảng lệnh", "コマンドパレット", "命令面板"),
+    ("page.main-window", "Main window", "Cửa sổ chính", "メインウィンドウ", "主窗口"),
+    ("page.motion", "Motion", "Chuyển động", "モーション", "动效"),
+    ("page.expand-motion", "Expand motion", "Mở rộng", "展開モーション", "展开动效"),
+    // Page jobs
+    ("job.controls", "Press a control. The status bar records the message.", "Nhấn một điều khiển. Thanh trạng thái ghi lại thông báo.", "コントロールを押すと、ステータスバーにメッセージが残ります。", "按下控件。状态栏会记下这条消息。"),
+    ("job.fields", "Typed values the application owns. Select-and-copy is on for labeled rows.", "Giá trị gõ do ứng dụng giữ. Hàng có nhãn chọn và sao chép được.", "入力値はアプリケーションが持ちます。ラベル行は選択してコピーできます。", "输入值由应用持有。带标签的行可以选中并复制。"),
+    ("job.readout", "Progress, a ring, and an indeterminate spinner.", "Thanh tiến trình, vòng, và vòng quay chưa xác định.", "進捗、リング、不定のスピナー。", "进度条、圆环和不确定转圈。"),
+    ("job.type", "Labels, icons, links, and a tooltip.", "Nhãn, biểu tượng, liên kết và chú giải.", "ラベル、アイコン、リンク、ツールチップ。", "标签、图标、链接和提示。"),
+    ("job.markdown", "Rendered document. Copy takes the selected range; Copy all posts the source.", "Tài liệu đã vẽ. Sao chép lấy đoạn đã chọn; Sao chép tất cả gửi nguồn.", "描画した文書。コピーは選択範囲、すべてコピーは原文です。", "已绘制的文档。复制取选中范围；全部复制发送原文。"),
+    ("job.code", "Highlighted source. Select a range and copy.", "Mã tô sáng. Chọn một đoạn rồi sao chép.", "色付きのソース。範囲を選んでコピー。", "高亮源码。选一段再复制。"),
+    ("job.image", "The slot keeps its box while loading or on error.", "Ô giữ chỗ khi đang tải hoặc lỗi.", "読み込み中やエラーでも枠は残ります。", "加载中或出错时，槽位仍保持方框。"),
+    ("job.selectable", "Body text the user can drag-select and copy.", "Văn bản kéo chọn và sao chép được.", "ドラッグして選んでコピーできる本文。", "可拖选并复制的正文。"),
+    ("job.list", "Search and Unread/Flagged at the top filter the virtualized list. Pagination pages a large set.", "Tìm và Chưa đọc/Gắn cờ phía trên lọc danh sách ảo. Phân trang cho tập lớn.", "上部の検索と未読/フラグで仮想リストを絞ります。ページ送りは大きな集合用です。", "顶部的搜索和未读/标记会过滤虚拟列表。分页用于大集合。"),
+    ("job.virtual-column", "App-built expand cards; only the viewport slice mounts.", "Thẻ mở do ứng dụng dựng; chỉ lát khung nhìn được gắn.", "アプリが組む展開カード。表示中の切片だけ載ります。", "应用自建的展开卡片；只挂上视口那一段。"),
+    ("job.log", "Virtualized lines for a growing log.", "Dòng ảo cho nhật ký đang dài ra.", "伸びるログ用の仮想行。", "给不断变长的日志用的虚拟行。"),
+    ("job.grid", "Tiles that share a row height.", "Ô cùng chiều cao hàng.", "行の高さを共有するタイル。", "共享行高的格子。"),
+    ("job.table", "Columns stay in layout order. Frozen leading columns stay in view.", "Cột giữ thứ tự bố cục. Cột đầu đóng băng còn trong tầm nhìn.", "列はレイアウト順のまま。先頭の固定列は視界に残ります。", "列保持布局顺序。冻结的前导列留在视野里。"),
+    ("job.tree", "Folders expand in place. Leaves select.", "Thư mục mở tại chỗ. Lá thì chọn.", "フォルダはその場で開きます。葉は選択です。", "文件夹就地展开。叶子用于选择。"),
+    ("job.sections", "Tabs, an accordion, and an expander.", "Thẻ, accordion và bộ mở.", "タブ、アコーディオン、エキスパンダ。", "标签、手风琴和展开器。"),
+    ("job.theme", "Named colorways. The look strip sets language, density, type scale, shape, and elevation.", "Bảng màu có tên. Thanh look đặt ngôn ngữ, mật độ, cỡ chữ, bo góc và đổ bóng.", "名前付き配色。ルック帯で言語、密度、文字サイズ、角、影を切り替えます。", "具名配色。外观条设置语言、密度、字号、圆角和阴影。"),
+    ("job.colors", "Semantic tokens and mixes. These are the paints widgets use.", "Token ngữ nghĩa và pha. Đây là sơn các widget dùng.", "意味トークンと混ぜ。ウィジェットが使う絵の具です。", "语义令牌和混合。控件用的就是这些颜料。"),
+    ("job.keys", "The action table drives shortcuts. The cheatsheet lists them.", "Bảng lệnh điều khiển phím tắt. Bảng tra liệt kê chúng.", "アクション表がショートカットを動かします。チートシートが列挙します。", "动作表驱动快捷键。速查表列出它们。"),
+    ("job.marks", "Cards, chips, badges, and rules.", "Thẻ, chip, huy hiệu và đường kẻ.", "カード、チップ、バッジ、罫線。", "卡片、碎片、徽章和分隔线。"),
+    ("job.chrome-rows", "Menu, toolbar, status, breadcrumb, and the command bar.", "Trình đơn, thanh công cụ, trạng thái, đường dẫn và thanh lệnh.", "メニュー、ツールバー、ステータス、パンくず、コマンドバー。", "菜单、工具栏、状态、面包屑和命令条。"),
+    ("job.feedback", "Toasts, scroll, and a busy overlay on a child.", "Thông báo nhanh, cuộn, và lớp bận trên một con.", "トースト、スクロール、子の上のビジー重ね。", "吐司、滚动，以及盖在子项上的忙碌层。"),
+    ("job.dialogs", "An in-window confirm sheet on a dim backdrop.", "Tờ xác nhận trong cửa sổ trên nền mờ.", "暗い背景の上のウィンドウ内確認シート。", "窗口内确认页，衬在变暗的背景上。"),
+    ("job.list-detail", "A list beside a detail pane. Pick a row; the right side is that row.", "Danh sách cạnh ô chi tiết. Chọn một hàng; bên phải là hàng đó.", "詳細ペインの横のリスト。行を選ぶと右側がその行です。", "列表旁边是详情。点一行，右侧就是那一行。"),
+    ("job.inspector", "Pick a file. The middle is the document. The right column is properties.", "Chọn một tệp. Giữa là tài liệu. Cột phải là thuộc tính.", "ファイルを選ぶ。中央が文書。右列がプロパティ。", "选一个文件。中间是文档。右栏是属性。"),
+    ("job.workspace", "Editor split. Dock pins the outline as a third pane. Drag the sash.", "Tách trình soạn. Dock ghim dàn bài thành ô thứ ba. Kéo thanh chia.", "エディタ分割。ドックはアウトラインを第三ペインに留めます。サッシをドラッグ。", "编辑器分栏。停靠把大纲钉成第三栏。拖动分隔条。"),
+    ("job.navigation", "Places on the left. Narrow windows stack with Back.", "Nơi ở bên trái. Cửa sổ hẹp xếp chồng với Quay lại.", "左が場所。狭い窓は戻る付きのスタック。", "左边是位置。窄窗口用返回叠起来。"),
+    ("job.tab-view", "A tab strip plus the body for the active tab. The application paints that body.", "Dải thẻ cộng thân của thẻ đang mở. Ứng dụng vẽ thân đó.", "タブ帯と、開いているタブの本体。本体はアプリが描きます。", "标签条加上当前标签的正文。正文由应用绘制。"),
+    ("job.preferences", "Searchable settings groups. The application owns the rows; this is the page chrome.", "Nhóm cài đặt tìm được. Ứng dụng giữ các hàng; đây là khung trang.", "検索できる設定グループ。行はアプリのもの。これはページの枠です。", "可搜索的设置组。行归应用；这是页面框架。"),
+    ("job.about", "Name, version, license, credits. Apps put this on Help → About.", "Tên, phiên bản, giấy phép, ghi công. Ứng dụng đặt ở Trợ giúp → Giới thiệu.", "名前、版、ライセンス、クレジット。アプリはヘルプ→情報に置きます。", "名称、版本、许可、致谢。应用放在帮助 → 关于。"),
+    ("job.status-page", "Empty or error pane. Use when a list has no rows, or a host is down.", "Ô trống hoặc lỗi. Dùng khi danh sách không có hàng, hoặc máy chủ tắt.", "空またはエラーのペイン。リストに行がないとき、ホストが落ちたときに。", "空或出错的面板。列表没有行，或主机宕机时用。"),
+    ("job.palette", "Fuzzy find over the action table. Type to filter; pick a row.", "Tìm mờ trên bảng lệnh. Gõ để lọc; chọn một hàng.", "アクション表のあいまい検索。打って絞り、行を選ぶ。", "在动作表上模糊查找。输入以过滤；点一行。"),
+    ("job.main-window", "Menu, toolbar, center, and status docked as one window.", "Trình đơn, thanh công cụ, giữa và trạng thái ghép một cửa sổ.", "メニュー、ツールバー、中央、ステータスを一つの窓にドック。", "菜单、工具栏、中间和状态停成一扇窗。"),
+    ("job.motion", "Open and close. Fade, bounce, pulse, and shake. Reduce motion snaps.", "Mở và đóng. Mờ, nảy, nhịp, rung. Giảm chuyển động thì nhảy cắt.", "開閉。フェード、バウンス、パルス、シェイク。動きを減らすとスナップ。", "开和关。淡入、弹跳、脉冲、抖动。减弱动效会立刻到位。"),
+    ("job.expand-motion", "Height from a peek to the open size. Reduce motion snaps.", "Chiều cao từ hé nhìn đến cỡ mở. Giảm chuyển động thì nhảy cắt.", "覗き見から開いた高さへ。動きを減らすとスナップ。", "高度从一瞥到打开尺寸。减弱动效会立刻到位。"),
+    ("wjob.fallback", "See rustdoc for the call.", "Xem rustdoc cho lời gọi.", "呼び出しは rustdoc を見てください。", "调用见 rustdoc。"),
+    ("wjob.spinner", "Indeterminate work. Eight dots light in turn.", "Việc chưa biết độ dài. Tám chấm lần lượt sáng.", "長さ不明の作業。八つの点が順に灯ります。", "不确定的工作。八个点轮流亮。"),
+    ("wjob.progress-ring", "Determinate fraction as a ring. Same value as the progress bar on this page.", "Phần xác định dạng vòng. Cùng giá trị với thanh tiến trình trên trang.", "確定の割合をリングで。このページの進捗バーと同じ値。", "确定的分数画成环。与本页进度条同一值。"),
+    ("wjob.progress", "Determinate bar. Same fraction as the ring.", "Thanh xác định. Cùng phần với vòng.", "確定バー。リングと同じ割合。", "确定的条。与圆环同一分数。"),
+    ("wjob.busy", "The switch is the busy flag. On, the child dims and eight dots spin.", "Công tắc là cờ bận. Bật thì con mờ và tám chấm quay.", "スイッチがビジー旗。オンで子が暗くなり八点が回る。", "开关就是忙碌旗。打开时子项变暗，八点旋转。"),
+    ("wjob.toast", "Transient notice. The application owns the queue.", "Thông báo thoáng. Ứng dụng giữ hàng đợi.", "一時の知らせ。待ち行列はアプリが持ちます。", "短暂通知。队列归应用。"),
+    ("wjob.scrollbar", "Themed scroller for panes that are not a list or table.", "Thanh cuộn theo chủ đề cho ô không phải danh sách hay bảng.", "リストでも表でもないペイン用の題材付きスクローラ。", "给不是列表或表的窗格用的主题滚动条。"),
+    ("wjob.workspace", "Editor split: files on the left, Edit and Terminal as tabs. Drag the sash.", "Tách soạn: tệp bên trái, Sửa và Thiết bị cuối là thẻ. Kéo thanh chia.", "エディタ分割：左がファイル、編集と端末がタブ。サッシをドラッグ。", "编辑器分栏：左边文件，编辑和终端是标签。拖分隔条。"),
+    ("wjob.drawer", "A side pane that hides. Closed paints the content only.", "Ô bên ẩn được. Đóng thì chỉ vẽ nội dung.", "隠れる横ペイン。閉じると内容だけ描きます。", "会藏起来的侧栏。关上只画内容。"),
+    ("wjob.tool-panel", "Press Dock to pin this outline as a pane on the right of the workspace above.", "Nhấn Ghim để ghim dàn bài thành ô bên phải không gian phía trên.", "ドックを押すと、上のワークスペースの右にこのアウトラインを留めます。", "按停靠，把这份大纲钉到上面工作区的右侧。"),
+    ("wjob.inspector", "Pick a file. Middle is the document. Right is name, kind, and path.", "Chọn tệp. Giữa là tài liệu. Phải là tên, loại, đường dẫn.", "ファイルを選ぶ。中央が文書。右が名前、種類、パス。", "选一个文件。中间是文档。右边是名称、种类和路径。"),
+    ("wjob.list-detail", "Sidebar list plus a filling detail pane.", "Danh sách cạnh plus ô chi tiết phủ đầy.", "サイドバーのリストと、埋まる詳細ペイン。", "侧栏列表加上铺满的详情栏。"),
+    ("wjob.tab-view", "The strip is the constructor. The body below is application content.", "Dải là hàm dựng. Thân bên dưới là nội dung ứng dụng.", "帯がコンストラクタ。下の本体はアプリの中身。", "条子是构造函数。下面的正文是应用内容。"),
+    ("wjob.preferences", "Filter groups by the search field. Rows are title plus key/value text.", "Lọc nhóm bằng ô tìm. Hàng là tiêu đề cộng khóa/giá trị.", "検索欄でグループを絞る。行は題とキー/値。", "用搜索框过滤组。行是标题加键/值。"),
+    ("wjob.about", "Four strings in a group box. The application supplies the copy.", "Bốn chuỗi trong hộp nhóm. Ứng dụng cung cấp lời.", "グループ箱の四つの文字列。文面はアプリが渡します。", "分组框里四段字。文案由应用提供。"),
+    ("wjob.status-page", "Centered title, body, and an optional action.", "Tiêu đề giữa, thân, và hành động tùy chọn.", "中央の題、本文、任意のアクション。", "居中的标题、正文和可选动作。"),
+    ("wjob.palette", "Query field plus hits from the action table. Not a full-page layout.", "Ô truy vấn cộng kết quả từ bảng lệnh. Không phải bố cục cả trang.", "クエリ欄とアクション表の当たり。全ページレイアウトではない。", "查询框加上动作表的命中。不是整页布局。"),
+    ("wjob.navigation", "Wide: sidebar beside content. Narrow: a stack with Back.", "Rộng: thanh bên cạnh nội dung. Hẹp: chồng với Quay lại.", "広い：内容の横にサイドバー。狭い：戻る付きスタック。", "宽：侧栏在内容旁。窄：带返回的栈。"),
+    ("wjob.main-window", "The four regions are arguments. This page is that compose.", "Bốn vùng là đối số. Trang này là phép ghép đó.", "四つの領域が引数。このページがその組み立て。", "四个区域是参数。本页就是那种组合。"),
+    ("wjob.dialogs", "Primary and optional cancel. Native file pickers go through native_dialog.", "Chính và hủy tùy chọn. Chọn tệp gốc đi qua native_dialog.", "主と任意のキャンセル。ネイティブのファイル選びは native_dialog。", "主按钮和可选取消。本地选文件走 native_dialog。"),
+    ("wjob.motion", "Fade and a short slide. The application owns iced::Animation.", "Mờ và trượt ngắn. Ứng dụng giữ iced::Animation.", "フェードと短いスライド。iced::Animation はアプリが持ちます。", "淡入和短滑。iced::Animation 归应用。"),
+    ("wjob.expand-motion", "Height from peek to open. Expander and accordion use this.", "Chiều cao từ hé đến mở. Bộ mở và accordion dùng cái này.", "覗き見から開くまで。エキスパンダとアコーディオンが使います。", "高度从一瞥到打开。展开器和手风琴用这个。"),
+    // Fixtures
+    ("tab.notes", "Notes", "Ghi chú", "メモ", "笔记"),
+    ("tab.guide", "Guide", "Hướng dẫn", "ガイド", "指南"),
+    ("tab.changelog", "Changelog", "Nhật ký đổi", "変更履歴", "更新日志"),
+    ("tab.archive", "Archive", "Lưu trữ", "アーカイブ", "归档"),
+    ("tab.drafts", "Drafts", "Nháp", "下書き", "草稿"),
+    ("tab.read", "Read", "Đọc", "読む", "读"),
+    ("tab.write", "Write", "Ghi", "書く", "写"),
+    ("mail.0", "Quarterly notes for Lisbon and the Berlin office", "Ghi chú quý cho Lisbon và văn phòng Berlin", "リスボンとベルリン事務所の四半期メモ", "里斯本和柏林办事处的季度笔记"),
+    ("mail.1", "Lisbon itinerary", "Lịch trình Lisbon", "リスボン行程", "里斯本行程"),
+    ("mail.2", "Design review", "Xem xét thiết kế", "デザインレビュー", "设计评审"),
+    ("mail.3", "Release checklist for the 0.4 cut", "Danh sách phát hành bản 0.4", "0.4 カットのリリース点検", "0.4 裁剪的发布清单"),
+    ("mail.4", "Team standup", "Họp đứng nhóm", "チーム朝会", "团队站会"),
+    ("mail.5", "Invoice March", "Hóa đơn tháng Ba", "3月の請求", "三月发票"),
+    ("mail.when.0", "This morning", "Sáng nay", "今朝", "今天早上"),
+    ("mail.when.1", "Yesterday", "Hôm qua", "昨日", "昨天"),
+    ("mail.when.2", "Last week", "Tuần trước", "先週", "上周"),
+    ("pref.appearance", "Appearance", "Diện mạo", "外観", "外观"),
+    ("pref.editor", "Editor", "Soạn thảo", "エディタ", "编辑器"),
+    ("pref.files", "Files", "Tệp", "ファイル", "文件"),
+    ("pref.theme", "theme", "giao diện", "テーマ", "主题"),
+    ("pref.density", "density", "mật độ", "密度", "密度"),
+    ("pref.follow-os", "follow OS", "theo hệ điều hành", "OS に従う", "跟随系统"),
+    ("pref.tab-width", "tab width", "rộng tab", "タブ幅", "制表宽度"),
+    ("pref.word-wrap", "word wrap", "xuống dòng", "折り返し", "自动换行"),
+    ("pref.autosave", "autosave", "tự lưu", "自動保存", "自动保存"),
+    ("pref.default-folder", "default folder", "thư mục mặc định", "既定フォルダ", "默认文件夹"),
+    ("pref.on", "on", "bật", "オン", "开"),
+    ("pref.off", "off", "tắt", "オフ", "关"),
+    ("expand.1", "Closed, this card keeps a short face and clips the rest.", "Đóng, thẻ này giữ mặt ngắn và cắt phần còn lại.", "閉じると短い面を残し、残りを切ります。", "关上时，这张卡片只留短脸，其余裁掉。"),
+    ("expand.2", "The header chevron opens the full notes, the figure, and the leftover copy.", "Mũi tên đầu mở hết ghi chú, hình, và lời còn lại.", "見出しの山印でメモ全文、図、残りの文が開きます。", "标题箭头打开全部笔记、图和剩下的文案。"),
+    ("expand.3", "0.8 ships motion tokens, overlay enter, and expand height. Dialogs, side sheets, and the palette fade and slide from a 0–1 progress. The application owns iced::Animation and the clock.", "0.8 có token chuyển động, lớp vào, và chiều cao mở. Hộp thoại, tờ bên và bảng lệnh mờ và trượt theo tiến 0–1. Ứng dụng giữ iced::Animation và đồng hồ.", "0.8 はモーショントークン、オーバーレイ入場、展開高さを出荷。ダイアログ、サイドシート、パレットは 0–1 の進捗でフェードとスライド。iced::Animation と時計はアプリが持ちます。", "0.8 带出动效令牌、叠层进入和展开高度。对话框、侧页和面板按 0–1 进度淡入滑入。iced::Animation 和时钟归应用。"),
+    ("expand.4", "Determinate progress eases to the new fraction. The linear busy bar grows, travels, and shrinks. Reduce motion snaps every duration to 0 ms.", "Tiến trình xác định chạy mượt tới phần mới. Thanh bận thẳng lớn, đi, rồi nhỏ. Giảm chuyển động cắt mọi thời lượng về 0 ms.", "確定進捗は新しい割合へイージング。直線ビジーバーは伸び、渡り、縮む。動きを減らすと全ての時間を 0 ms にスナップ。", "确定进度缓动到新分数。直线忙碌条会变长、移动、再缩短。减弱动效把每段时长都收到 0 毫秒。"),
+    ("expand.cap", "Figure: checker still. The slot keeps this box while the card opens.", "Hình: bàn cờ tĩnh. Ô giữ hộp này khi thẻ mở.", "図：チェッカーの静止画。カードが開いても枠は残る。", "图：棋盘静帧。卡片打开时槽位仍保持这个方框。"),
+    ("expand.5", "Save still lives on the File action. Theme, density, and high-contrast stay on the tokens. Open is the application's; this page toggles it.", "Lưu vẫn nằm trên lệnh Tệp. Giao diện, mật độ và tương phản cao ở token. Mở là của ứng dụng; trang này bật tắt.", "保存はまだファイル操作にあります。テーマ、密度、高コントラストはトークン上。開くはアプリのもの。このページが切り替えます。", "保存仍在文件动作上。主题、密度和高对比在令牌上。打开归应用；本页切换它。"),
+    ("hint.button", "Every named variant, then disabled", "Mọi biến thể có tên, rồi tắt", "名前付きの各面、それから無効", "每种具名变体，然后是禁用"),
+    ("hint.type", "Page title", "Tiêu đề trang", "ページ題", "页标题"),
+    ("hint.meta", "Meta / caption", "Phụ / chú thích", "メタ / キャプション", "元信息 / 说明"),
+    ("hint.recent", "Recent", "Gần đây", "最近", "最近"),
+    ("hint.hover", "Hover", "Đưa chuột", "ホバー", "悬停"),
+    ("hint.save", "Save", "Lưu", "保存", "保存"),
+    ("hint.pinned", "Pinned", "Đã ghim", "ピン留め", "已钉"),
+    ("hint.closable", "Closable", "Đóng được", "閉じられる", "可关闭"),
+    ("hint.no-items", "No items", "Không có mục", "項目なし", "没有项目"),
+    ("hint.install", "Install started", "Đã bắt đầu cài", "インストール開始", "已开始安装"),
+    ("hint.document", "Document", "Tài liệu", "文書", "文档"),
+    ("hint.places", "Places", "Nơi", "場所", "位置"),
+    ("hint.properties", "Properties", "Thuộc tính", "プロパティ", "属性"),
+    ("hint.name", "Name", "Tên", "名前", "名称"),
+    ("nav.mail", "Mail", "Thư", "メール", "邮件"),
+    ("nav.files", "Files", "Tệp", "ファイル", "文件"),
+    ("nav.settings", "Settings", "Cài đặt", "設定", "设置"),
+    ("status.empty-title", "Nothing here", "Chưa có gì", "ここには何もありません", "这里什么都没有"),
+    ("status.empty-body", "Create an item to begin.", "Tạo một mục để bắt đầu.", "項目を作って始めてください。", "先创建一个项目。"),
+    ("status.action", "New", "Mới", "新規", "新建"),
+    ("status.no-sessions", "No sessions", "Không có phiên", "セッションなし", "没有会话"),
+    ("status.host-q", "Is the host running?", "Máy chủ có đang chạy?", "ホストは動いていますか？", "主机在运行吗？"),
+    ("status.retry", "Retry", "Thử lại", "再試行", "重试"),
+    ("status.host-down", "Could not reach the host", "Không tới được máy chủ", "ホストに届きません", "连不上主机"),
+    ("status.host-retry", "Retry shows the error face of the same constructor.", "Thử lại hiện mặt lỗi của cùng hàm dựng.", "再試行は同じコンストラクタのエラー面です。", "重试显示同一构造函数的错误面。"),
+    ("about.blurb", "Widgets and chrome for iced 0.14 desktop applications.", "Widget và khung cho ứng dụng máy tính iced 0.14.", "iced 0.14 デスクトップアプリのウィジェットとクロム。", "iced 0.14 桌面应用的控件与框架。"),
+    ("about.credits", "Credits", "Ghi công", "クレジット", "致谢"),
+    ("dialog.save", "Save", "Lưu", "保存", "保存"),
+    ("dialog.overwrite", "Overwrite?", "Ghi đè?", "上書きしますか？", "覆盖吗？"),
+    ("toast.saved", "Saved notes.txt", "Đã lưu notes.txt", "notes.txt を保存しました", "已保存 notes.txt"),
+    ("table.ready", "ready", "sẵn sàng", "準備", "就绪"),
+    ("table.idle", "idle", "nghỉ", "待機", "空闲"),
+    ("table.library", "Library", "Thư viện", "ライブラリ", "库"),
+    ("table.catalog", "Catalog", "Mục lục", "カタログ", "目录"),
+    ("table.widget", "Widget", "Widget", "ウィジェット", "控件"),
+    ("table.app", "App", "Ứng dụng", "アプリ", "应用"),
+    ("search.placeholder", "Search", "Tìm kiếm", "検索", "搜索"),
+    ("expand.6", "Accordion is many headers. This is one card. Both paint through motion::expand so the height interpolates instead of jumping.", "Accordion là nhiều tiêu đề. Đây là một thẻ. Cả hai vẽ qua motion::expand nên chiều cao nội suy, không nhảy.", "アコーディオンは多数の見出し。これは一枚。どちらも motion::expand で高さが補間されます。", "手风琴是许多标题。这是一张卡片。两者都经 motion::expand 绘制，高度插值而不是跳变。"),
+    ("expand.7", "When the notes are this long, the peek is still two body lines. Open has to grow past the figure and the trailing paragraphs.", "Khi ghi chú dài thế này, hé nhìn vẫn là hai dòng thân. Mở phải lớn hơn hình và các đoạn cuối.", "メモがこの長さでも覗き見は本文二行。開くと図と末尾の段落を超えて伸びます。", "笔记这么长时，一瞥仍是两行正文。打开必须长过图和后面的段落。"),
+    ("list.all", "All", "Tất cả", "すべて", "全部"),
+    ("list.unread", "Unread", "Chưa đọc", "未読", "未读"),
+    ("list.flagged", "Flagged", "Gắn cờ", "フラグ", "已标记"),
+    ("list.oneline", "One line", "Một dòng", "一行", "一行"),
+    ("list.cards", "Cards", "Thẻ", "カード", "卡片"),
+    ("list.empty", "No messages match", "Không thư nào khớp", "一致するメッセージなし", "没有匹配的邮件"),
+    ("list.range", "{start}–{end} of {total} (page {page})", "{start}–{end} / {total} (trang {page})", "{start}–{end} / {total}（{page} ページ）", "{start}–{end} / {total}（第 {page} 页）"),
+    ("toast.action", "Toast", "Thông báo", "トースト", "吐司"),
+    ("busy.flag", "Busy", "Bận", "ビジー", "忙碌"),
+    ("busy.body", "The overlay dims this card. Eight dots spin while work runs.", "Lớp phủ làm mờ thẻ này. Tám chấm quay khi việc chạy.", "重ねがこのカードを暗くします。作業中は八点が回ります。", "叠层会把这张卡片变暗。工作时八点旋转。"),
+    ("sm.hint", "Sections with titles and hairline dividers.", "Mục có tiêu đề và đường kẻ tóc.", "題と髪線の区切りがあるセクション。", "带标题和发丝分隔线的分区。"),
+    ("export", "Export…", "Xuất…", "書き出し…", "导出…"),
+    ("hit.inbox", "Inbox", "Hộp thư", "受信", "收件箱"),
+    ("hit.sent", "Sent", "Đã gửi", "送信済み", "已发送"),
+    ("hit.drafts", "Drafts", "Nháp", "下書き", "草稿"),
+    ("hit.archive", "Archive", "Lưu trữ", "アーカイブ", "归档"),
+    ("field.focus", "Focus field", "Lấy tiêu điểm", "欄にフォーカス", "聚焦字段"),
+    ("field.focus-hint", "Enter submits. Focus field moves into the name.", "Enter gửi. Lấy tiêu điểm chuyển vào tên.", "Enter で送信。フォーカス欄は名前へ移ります。", "回车提交。聚焦字段移到名称。"),
+    ("field.support-hint", "Supporting copy and error ink under a field.", "Lời phụ và mực lỗi dưới một trường.", "欄の下の補足文とエラーインク。", "字段下的辅助文案和错误墨。"),
+    ("date.appointment", "Appointment", "Cuộc hẹn", "予定", "约会"),
+    ("state.disabled", "Disabled", "Tắt", "無効", "禁用"),
+    ("time.24h", "24-hour", "24 giờ", "24時間", "24 小时"),
+    ("time.12h", "12-hour", "12 giờ", "12時間", "12 小时"),
+    ("time.seconds", "With seconds", "Có giây", "秒つき", "带秒"),
+    ("time.step-hint", "Click a field to step. AM / PM flips the half-day.", "Nhấn một ô để bước. AM / PM đảo nửa ngày.", "欄をクリックして進む。AM / PM で半日を切り替え。", "点字段步进。上午/下午切换半天。"),
+    ("ss.title", "Inspector", "Thanh tra", "インスペクタ", "检查器"),
+    ("host.search-view", "Search view", "Ô tìm", "検索ビュー", "搜索视图"),
+    ("host.text-input", "Text input", "Ô chữ", "テキスト入力", "文本输入"),
+    ("host.field-support", "Field support", "Hỗ trợ trường", "欄の補足", "字段辅助"),
+    ("host.password", "Password", "Mật khẩu", "パスワード", "密码"),
+    ("host.secret", "Secret field", "Trường bí mật", "秘密欄", "密文字段"),
+    ("host.value-field", "Value field", "Trường giá trị", "値欄", "值字段"),
+    ("host.textarea", "Text area", "Vùng chữ", "テキスト領域", "文本区"),
+    ("host.search", "Search", "Tìm kiếm", "検索", "搜索"),
+    ("host.suggest", "Suggest", "Gợi ý", "提案", "建议"),
+    ("host.select", "Select", "Chọn", "選択", "选择"),
+    ("host.number", "Number", "Số", "数値", "数字"),
+    ("host.date", "Date", "Ngày", "日付", "日期"),
+    ("host.time", "Time", "Giờ", "時刻", "时间"),
+    ("host.virtual-column", "Virtual column", "Cột ảo", "仮想列", "虚拟列"),
+    ("host.list", "List", "Danh sách", "リスト", "列表"),
+    ("host.pagination", "Pagination", "Phân trang", "ページ送り", "分页"),
+    ("host.accordion", "Accordion", "Accordion", "アコーディオン", "手风琴"),
+    ("host.expander", "Expander", "Bộ mở", "エキスパンダ", "展开器"),
+    ("host.tabs", "Tabs", "Thẻ", "タブ", "标签"),
+    ("host.command-bar", "Command bar", "Thanh lệnh", "コマンドバー", "命令条"),
+    ("host.context-menu", "Context menu", "Trình đơn ngữ cảnh", "コンテキストメニュー", "上下文菜单"),
+    ("host.sectioned-menu", "Sectioned menu", "Trình đơn theo mục", "区画メニュー", "分区菜单"),
+    ("host.cascade-menu", "Cascade menu", "Trình đơn tầng", "カスケードメニュー", "级联菜单"),
+    ("host.breadcrumb", "Breadcrumb", "Đường dẫn", "パンくず", "面包屑"),
+    ("host.menu", "Menu", "Trình đơn", "メニュー", "菜单"),
+    ("host.toolbar", "Toolbar", "Thanh công cụ", "ツールバー", "工具栏"),
+    ("host.status-bar", "Status bar", "Thanh trạng thái", "ステータスバー", "状态栏"),
+    ("host.busy", "Busy overlay", "Lớp bận", "ビジー重ね", "忙碌层"),
+    ("host.toast", "Toast", "Thông báo nhanh", "トースト", "吐司"),
+    ("host.scrollbar", "Scrollbar", "Thanh cuộn", "スクロールバー", "滚动条"),
+    ("host.button", "Button", "Nút", "ボタン", "按钮"),
+    ("host.toggle-icon-button", "Toggle icon button", "Nút biểu tượng gạt", "トグルアイコンボタン", "切换图标按钮"),
+    ("host.slider", "Slider", "Thanh trượt", "スライダー", "滑块"),
+    ("host.button-group", "Button group", "Nhóm nút", "ボタングループ", "按钮组"),
+    ("host.checkbox", "Checkbox", "Ô chọn", "チェックボックス", "复选框"),
+    ("host.radio", "Radio", "Chọn một", "ラジオ", "单选"),
+    ("host.switch", "Switch", "Công tắc", "スイッチ", "开关"),
+    ("host.range-slider", "Range slider", "Thanh khoảng", "範囲スライダー", "范围滑块"),
+    ("host.segmented-button", "Segmented button", "Nút phân đoạn", "セグメントボタン", "分段按钮"),
+    ("host.icon-button", "Icon button", "Nút biểu tượng", "アイコンボタン", "图标按钮"),
+    ("host.checkbox-indeterminate", "Indeterminate checkbox", "Ô chọn chưa rõ", "不定チェックボックス", "不定复选框"),
+    ("host.split-button", "Split button", "Nút tách", "分割ボタン", "拆分按钮"),
+    ("host.toggle-button", "Toggle button", "Nút gạt", "トグルボタン", "切换按钮"),
+    ("host.progress", "Progress", "Tiến trình", "進捗", "进度"),
+    ("host.progress-ring", "Progress ring", "Vòng tiến trình", "進捗リング", "进度环"),
+    ("host.spinner", "Spinner", "Vòng quay", "スピナー", "转圈"),
+    ("host.label", "Label", "Nhãn", "ラベル", "标签"),
+    ("host.icon", "Icon", "Biểu tượng", "アイコン", "图标"),
+    ("host.tooltip", "Tooltip", "Chú giải", "ツールチップ", "提示"),
+    ("host.rich-tooltip", "Rich tooltip", "Chú giải giàu", "リッチツールチップ", "富提示"),
+    ("host.link", "Hyperlink", "Liên kết", "ハイパーリンク", "超链接"),
+    ("host.markdown", "Markdown", "Markdown", "Markdown", "Markdown"),
+    ("host.code", "Code", "Mã", "コード", "代码"),
+    ("host.image", "Image", "Ảnh", "画像", "图像"),
+    ("host.selectable", "Selectable", "Chọn được", "選択可能", "可选"),
+    ("host.log", "Log", "Nhật ký", "ログ", "日志"),
+    ("host.grid", "Item grid", "Lưới", "グリッド", "网格"),
+    ("host.table", "Data table", "Bảng", "表", "表格"),
+    ("host.tree", "Tree", "Cây", "ツリー", "树"),
+    ("host.theme", "Theme", "Giao diện", "テーマ", "主题"),
+    ("host.colors", "Colors", "Màu", "色", "颜色"),
+    ("host.keys", "Keys", "Phím", "キー", "快捷键"),
+    ("host.cheatsheet", "Cheatsheet", "Bảng phím", "チートシート", "速查表"),
+    ("host.filter-chips", "Filter chips", "Chip lọc", "フィルタチップ", "过滤芯片"),
+    ("host.chip", "Chip", "Chip", "チップ", "芯片"),
+    ("host.badge", "Badge", "Huy hiệu", "バッジ", "徽章"),
+    ("host.card", "Card", "Thẻ", "カード", "卡片"),
+    ("host.rule", "Rule", "Đường kẻ", "罫", "分隔线"),
+    ("host.wrap", "Wrap", "Gói", "折り返し", "折行"),
+    ("host.banner", "Banner", "Băng", "バナー", "横幅"),
+    ("host.side-sheet", "Side sheet", "Tờ bên", "サイドシート", "侧页"),
+    ("host.dialogs", "Dialogs", "Hộp thoại", "ダイアログ", "对话框"),
+    ("host.list-detail", "List/detail", "Danh sách/chi tiết", "リスト/詳細", "列表/详情"),
+    ("host.inspector", "Inspector", "Thanh tra", "インスペクタ", "检查器"),
+    ("host.drawer", "Drawer", "Ngăn kéo", "ドロワー", "抽屉"),
+    ("host.workspace", "Workspace", "Không gian", "ワークスペース", "工作区"),
+    ("host.tool-panel", "Tool panel", "Bảng công cụ", "ツールパネル", "工具面板"),
+    ("host.nav-rail", "Navigation rail", "Ray điều hướng", "ナビレール", "导航轨"),
+    ("host.navigation", "Navigation view", "Xem điều hướng", "ナビビュー", "导航视图"),
+    ("host.tab-view", "Tab view", "Xem thẻ", "タブビュー", "标签页"),
+    ("host.preferences", "Preferences", "Tùy chọn", "設定", "偏好"),
+    ("host.about", "About", "Giới thiệu", "情報", "关于"),
+    ("host.status-page", "Status page", "Trang trạng thái", "状態ページ", "状态页"),
+    ("host.palette", "Command palette", "Bảng lệnh", "コマンドパレット", "命令面板"),
+    ("host.main-window", "Main window", "Cửa sổ chính", "メインウィンドウ", "主窗口"),
+    ("host.motion", "Motion", "Chuyển động", "モーション", "动效"),
+    ("host.expand-motion", "Expand motion", "Mở rộng", "展開モーション", "展开动效"),
+    ("dialog.open-ellipsis", "Open…", "Mở…", "開く…", "打开…"),
+    ("dialog.save-ellipsis", "Save…", "Lưu…", "保存…", "保存…"),
+    ("dialog.folder", "Folder…", "Thư mục…", "フォルダ…", "文件夹…"),
+    ("dialog.open", "Open dialog", "Mở hộp thoại", "ダイアログを開く", "打开对话框"),
+    ("dialog.last-saved", "Last saved just now.", "Vừa lưu xong.", "たった今保存しました。", "刚刚保存。"),
+    ("dialog.overwrite-notes", "Overwrite notes.txt?", "Ghi đè notes.txt?", "notes.txt を上書きしますか？", "覆盖 notes.txt？"),
+    ("dialog.dont-save", "Don't save", "Không lưu", "保存しない", "不保存"),
+    ("colors.hint", "Washes and text-on colors from the active colorway.", "Màu rửa và chữ-trên từ bảng màu đang dùng.", "使用中の配色のウォッシュと文字色。", "当前配色的洗色和字色。"),
+    ("keys.type", "Type a key", "Gõ một phím", "キーを打つ", "按一个键"),
+    ("keys.hint", "Type a letter, or Enter, Escape, an arrow, or a function key.", "Gõ một chữ, hoặc Enter, Escape, mũi tên, hoặc phím chức năng.", "文字、Enter、Escape、矢印、またはファンクションキー。", "按一个字母，或回车、Esc、方向键、功能键。"),
+    ("img.hint", "Contain, cover, loading, and error. The application owns the bytes.", "Contain, cover, đang tải, và lỗi. Ứng dụng giữ các byte.", "Contain、cover、読み込み中、エラー。バイトはアプリが持つ。", "包含、覆盖、加载和错误。字节由应用持有。"),
+    ("img.contain", "Contain", "Chứa", "収める", "包含"),
+    ("img.cover", "Cover", "Phủ", "覆う", "覆盖"),
+    ("img.loading", "Loading", "Đang tải", "読み込み中", "加载中"),
+    ("img.missing", "Missing", "Thiếu", "欠け", "缺失"),
+    ("tip.title", "Tip", "Mẹo", "ヒント", "提示"),
+    ("tip.write", "Write the buffer to disk.", "Ghi bộ đệm ra đĩa.", "バッファをディスクに書く。", "把缓冲区写到磁盘。"),
+    ("tip.learn", "Learn more", "Tìm hiểu thêm", "詳しく", "了解更多"),
+    ("sheet.hint", "Open the inspector sheet for properties.", "Mở tờ thanh tra cho thuộc tính.", "プロパティのインスペクタシートを開く。", "打开检查器页看属性。"),
+    ("sheet.open", "Open sheet", "Mở tờ", "シートを開く", "打开页"),
+    ("sheet.close", "Close sheet", "Đóng tờ", "シートを閉じる", "关闭页"),
+    ("tab.close-hint", "Close a tab with the ×. Selecting another tab swaps this body.", "Đóng thẻ bằng ×. Chọn thẻ khác đổi thân này.", "× でタブを閉じる。別のタブでこの本体が入れ替わる。", "用 × 关标签。选另一个标签会换这段正文。"),
+    ("pal.hint", "Type to filter the action table. Pick a row, or choose Go to line for a parameter.", "Gõ để lọc bảng lệnh. Chọn một hàng, hoặc Đi tới dòng cho một tham số.", "打ってアクション表を絞る。行を選ぶか、行へ移動で引数。", "输入以过滤动作表。选一行，或选转到行来填参数。"),
+    ("ws.move-btn", "Move terminal beside explorer", "Chuyển dòng lệnh cạnh thám hiểm", "端末をエクスプローラの横へ", "把终端移到资源管理器旁"),
+    ("detail.pick", "Select a message", "Chọn một thư", "メッセージを選ぶ", "选择一封邮件"),
+    ("detail.when", "Received this morning.", "Nhận sáng nay.", "今朝届いた。", "今早收到。"),
+    ("insp.folder", "Folder", "Thư mục", "フォルダ", "文件夹"),
+    ("insp.kind-rust", "Rust", "Rust", "Rust", "Rust"),
+    ("insp.kind-md", "Markdown", "Markdown", "Markdown", "Markdown"),
+    ("insp.root", "Crate root.", "Gốc crate.", "クレートの根。", "crate 根。"),
+    ("insp.sources", "Library sources.", "Mã thư viện.", "ライブラリのソース。", "库源码。"),
+    ("insp.icons", "Icons and the tour GIF.", "Biểu tượng và GIF tour.", "アイコンとツアー GIF。", "图标和导览 GIF。"),
+    ("insp.guide", "Widgets and chrome for iced.", "Widget và khung cho iced.", "iced のウィジェットとクロム。", "iced 的部件和框架。"),
+    ("insp.kind", "Kind", "Loại", "種類", "种类"),
+    ("drawer.hide", "Hide files", "Ẩn tệp", "ファイルを隠す", "隐藏文件"),
+    ("drawer.show", "Show files", "Hiện tệp", "ファイルを表示", "显示文件"),
+    ("drawer.hint", "Editor — resize the window or hide the files rail.", "Trình soạn — đổi cỡ cửa sổ hoặc ẩn thanh tệp.", "編集 — 窓の大きさかファイル欄を隠す。", "编辑器 — 改窗口大小或隐藏文件栏。"),
+    ("cheat.filter", "Filter shortcuts", "Lọc phím tắt", "ショートカットを絞る", "过滤快捷键"),
+    ("motion.sheet", "Sheet", "Tờ", "シート", "页"),
+    ("motion.fade-slide", "Fade and a short slide from progress 0 to 1.", "Mờ và trượt ngắn từ 0 tới 1.", "0 から 1 へフェードと短いスライド。", "从 0 到 1 淡入并短滑。"),
+    ("motion.reduce", "Reduce motion", "Giảm chuyển động", "動きを減らす", "减少动效"),
+    ("motion.close", "Close overlay", "Đóng lớp", "オーバーレイを閉じる", "关闭叠层"),
+    ("motion.open", "Open overlay", "Mở lớp", "オーバーレイを開く", "打开叠层"),
+    ("motion.fade", "Fade", "Mờ", "フェード", "淡入"),
+    ("motion.fade-out", "Fade out", "Mờ tắt", "フェードアウト", "淡出"),
+    ("motion.fade-in", "Fade in", "Mờ lên", "フェードイン", "淡入"),
+    ("motion.fade-body", "Slide::None. Tokens::fade.", "Slide::None. Tokens::fade.", "Slide::None. Tokens::fade.", "Slide::None. Tokens::fade."),
+    ("motion.bounce", "Bounce", "Nảy", "バウンス", "弹跳"),
+    ("motion.bounce-out", "Bounce out", "Nảy ra", "バウンスアウト", "弹出"),
+    ("motion.bounce-in", "Bounce in", "Nảy vào", "バウンスイン", "弹入"),
+    ("motion.bounce-body", "bounce_out hops as it lands.", "bounce_out nhảy khi đáp.", "bounce_out は着地で跳ねる。", "bounce_out 落地时跳。"),
+    ("motion.pulse", "Pulse", "Nhịp", "パルス", "脉冲"),
+    ("motion.pulse-body", "Loops opacity. Reduced motion holds rest.", "Lặp độ mờ. Giảm chuyển động giữ yên.", "不透明度をループ。動き減では静止。", "循环透明度。减少动效时停在静止。"),
+    ("motion.shake", "Shake", "Lắc", "シェイク", "抖动"),
+    ("motion.shake-body", "Decaying wiggle, then rest.", "Rung giảm rồi nghỉ.", "減衰して揺れて止まる。", "衰减晃动后停下。"),
+    ("expand.collapse", "Collapse", "Thu", "折りたたむ", "收起"),
+    ("expand.open", "Expand", "Mở", "展開", "展开"),
+    ("win.hint", "File, Edit, and View live in this window. Open a menu, then Save.", "Tệp, Sửa và Xem ở cửa sổ này. Mở trình đơn rồi Lưu.", "ファイル、編集、表示はこの窓。メニューを開いて保存。", "文件、编辑和查看在这个窗口。打开菜单再保存。"),
+    ("variant.primary", "Primary", "Chính", "プライマリ", "主要"),
+    ("variant.quiet", "Quiet", "Êm", "クワイエット", "安静"),
+    ("variant.danger", "Danger", "Nguy hiểm", "危険", "危险"),
+    ("variant.ghost", "Ghost", "Ma", "ゴースト", "幽灵"),
+    ("variant.chip", "Chip", "Mảnh", "チップ", "碎片"),
+    ("variant.success", "Success", "Thành công", "成功", "成功"),
+    ("variant.warning", "Warning", "Cảnh báo", "警告", "警告"),
+    ("variant.outlined", "Outlined", "Viền", "アウトライン", "描边"),
+    ("variant.elevated", "Elevated", "Nổi", "エレベート", "抬升"),
+    ("slider.now", "now", "nay", "今", "现在"),
+    ("slider.vol", "vol", "âm", "音", "音量"),
+    ("prog.min", "1 min", "1 phút", "1 分", "1 分钟"),
+    ("note.accent-on", "Accent on", "Nhấn bật", "アクセントオン", "强调开"),
+    ("note.accent-idle", "Accent idle", "Nhấn nghỉ", "アクセント待機", "强调闲"),
+    ("color.hover", "hover", "hover", "ホバー", "悬停"),
+    ("color.pressed", "pressed", "pressed", "押下", "按下"),
+    ("color.chip", "chip", "chip", "チップ", "碎片"),
+    ("color.selection", "selection", "chọn", "選択", "选中"),
+    ("color.text-canvas", "text on canvas", "chữ trên canvas", "キャンバス上の文字", "画布上的字"),
+    ("color.text-surface", "text on surface", "chữ trên mặt", "面上の文字", "表面上的字"),
+    ("color.text-panel", "text on panel", "chữ trên tấm", "パネル上の文字", "面板上的字"),
+    ("color.text-primary", "text on primary", "chữ trên chính", "プライマリ上の文字", "主要上的字"),
+    ("color.scrollbar", "scrollbar", "thanh cuộn", "スクロールバー", "滚动条"),
+    ("color.cursor", "input cursor", "con trỏ", "入力カーソル", "输入光标"),
+    ("color.sel", "input selection", "chọn trong ô", "入力選択", "输入选中"),
+    ("color.link", "link", "liên kết", "リンク", "链接"),
+    ("color.focus", "focus", "tiêu điểm", "フォーカス", "焦点"),
+    ("color.lighten", "primary lighten", "chính nhạt", "プライマリ明", "主要变浅"),
+    ("color.darken", "primary darken", "chính đậm", "プライマリ暗", "主要变深"),
+    ("pal.placeholder", "Type a command", "Gõ một lệnh", "コマンドを入力", "输入命令"),
+    ("dock", "Dock", "Gắn", "ドッキング", "停靠"),
+    ("show", "Show", "Hiện", "表示", "显示"),
+    ("hide", "Hide", "Ẩn", "隠す", "隐藏"),
+    ("cascade.hint", "Primary row opens a submenu flyout.", "Hàng chính mở trình đơn con.", "主行がサブメニューを開きます。", "主行打开子菜单。"),
+    ("status.ready", "ready", "sẵn sàng", "準備", "就绪"),
+    ("status.socket", "socket down", "ổ cắm tắt", "ソケット停止", "套接字断开"),
+    ("status.hints", "Tab fields  ·  Esc", "Tab trường  ·  Esc", "Tab 欄  ·  Esc", "Tab 字段  ·  Esc"),
+    ("field.email-error", "Enter a valid address.", "Nhập một địa chỉ hợp lệ.", "正しい住所を入力してください。", "请输入有效地址。"),
+    ("field.email-hint", "We never share your email.", "Chúng tôi không chia sẻ email của bạn.", "メールは共有しません。", "我们不会分享你的邮箱。"),
+    ("field.secret", "Secret", "Bí mật", "秘密", "密文"),
+    ("field.secret-hint", "Reveal the token, then copy it.", "Hiện mã rồi sao chép.", "トークンを表示してからコピー。", "先显示令牌再复制。"),
+    ("field.token", "Token", "Mã", "トークン", "令牌"),
+    ("field.secret-note", "Show, then Copy.", "Hiện rồi Sao chép.", "表示してからコピー。", "先显示再复制。"),
+    ("field.value-hint", "Labeled value with a shared form gutter. Select, then Copy.", "Giá trị có nhãn dùng rãnh form chung. Chọn rồi Sao chép.", "共通のフォーム溝を持つラベル付き値。選んでコピー。", "带标签的值，共用表单槽。先选再复制。"),
+    ("field.path", "Path", "Đường dẫn", "パス", "路径"),
+    ("field.id", "Id", "Id", "Id", "标识"),
+    ("field.email", "Email", "Email", "メール", "邮箱"),
+    ("field.suggest-hint", "Suggest on any field. Pick fills the query.", "Gợi ý trên mọi trường. Chọn sẽ điền truy vấn.", "どの欄でも提案。選ぶと検索に入ります。", "任意字段可建议。选择会填入查询。"),
+    ("field.command", "Command", "Lệnh", "コマンド", "命令"),
+    ("recent", "Recent", "Gần đây", "最近", "最近"),
+    ("crumb.home", "Home", "Trang chủ", "ホーム", "主页"),
+    ("crumb.gallery", "Gallery", "Gallery", "ギャラリー", "画廊"),
+    ("vc.hint", "Expand cards via virtual_column (viewport mount).", "Thẻ mở qua virtual_column (gắn khung nhìn).", "virtual_column で展開カード（表示中だけ載る）。", "用 virtual_column 展开卡片（只挂视口）。"),
+    ("vc.open", "Open face. Only this slice is mounted.", "Mặt mở. Chỉ lát này được gắn.", "開いた面。この切片だけ載ります。", "打开的脸。只挂上这一段。"),
+    ("acc.files", "Files", "Tệp", "ファイル", "文件"),
+    ("acc.appear", "Appearance", "Diện mạo", "外観", "外观"),
+    ("acc.advanced", "Advanced", "Nâng cao", "詳細", "高级"),
+    ("acc.body.files", "New, Open, Save live in the File menu.", "Mới, Mở, Lưu nằm trong trình đơn Tệp.", "新規、開く、保存はファイルメニューにあります。", "新建、打开、保存在文件菜单里。"),
+    ("acc.body.appear", "Light, dark, and high-contrast from the theme row.", "Sáng, tối và tương phản cao từ hàng giao diện.", "ライト、ダーク、高コントラストはテーマ行から。", "浅色、深色和高对比来自主题行。"),
+    ("acc.body.adv", "Command palette from View.", "Bảng lệnh từ menu Xem.", "コマンドパレットは表示メニューから。", "命令面板在查看菜单。"),
+    ("expand.title", "Release notes", "Ghi chú phát hành", "リリースノート", "发行说明"),
+    ("ctx.hint", "A short menu at the pointer. Right-click the page for a live one.", "Trình đơn ngắn tại con trỏ. Nhấp phải trang để mở một cái thật.", "ポインタ位置の短いメニュー。ページを右クリックすると本物が開きます。", "指针处的短菜单。右键页面打开真正的一个。"),
+    ("scroll.0", "Booted the gallery window", "Đã mở cửa sổ gallery", "ギャラリー窓を起動した", "已启动画廊窗口"),
+    ("scroll.1", "Loaded the catalog", "Đã tải mục lục", "カタログを読み込んだ", "已加载目录"),
+    ("scroll.2", "Applied the dark colorway", "Đã áp bảng màu tối", "ダーク配色を適用した", "已应用深色配色"),
+    ("scroll.3", "Opened notes.txt", "Đã mở notes.txt", "notes.txt を開いた", "已打开 notes.txt"),
+    ("scroll.4", "Saved notes.txt", "Đã lưu notes.txt", "notes.txt を保存した", "已保存 notes.txt"),
+    ("scroll.5", "Installed the available update", "Đã cài bản cập nhật", "利用可能な更新を入れた", "已安装可用更新"),
+    ("scroll.6", "Copied the secret field", "Đã sao chép trường bí mật", "秘密欄をコピーした", "已复制密文字段"),
+    ("scroll.7", "Hid the command palette", "Đã ẩn bảng lệnh", "コマンドパレットを隠した", "已隐藏命令面板"),
+    ("scroll.8", "Restored the previous split", "Đã khôi phục tách trước", "前の分割に戻した", "已恢复先前的分栏"),
+    ("scroll.9", "Jumped to the Files heading", "Đã nhảy tới tiêu đề Tệp", "ファイル見出しへ跳んだ", "已跳到文件标题"),
+    ("scroll.10", "Closed the save sheet", "Đã đóng tờ lưu", "保存シートを閉じた", "已关闭保存页"),
+    ("scroll.11", "Ready for the next command", "Sẵn sàng lệnh tiếp", "次のコマンドの用意", "准备好下一条命令"),
+    ("go.line", "Go to line", "Tới dòng", "行へ移動", "转到行"),
+    ("note.new-file", "New file", "Tệp mới", "新しいファイル", "新文件"),
+    ("note.nothing-undo", "Nothing to undo", "Không có gì để hoàn tác", "取り消すものはない", "没有可撤销的"),
+    ("note.nothing-redo", "Nothing to redo", "Không có gì để làm lại", "やり直すものはない", "没有可重做的"),
+    ("tree.entry", "entry", "mục", "項目", "条目"),
+    ("tree.empty", "assets is an empty folder.", "assets là thư mục trống.", "assets は空のフォルダです。", "assets 是空文件夹。"),
+    ("tree.selected", "Selected", "Đã chọn", "選択", "已选"),
+    ("callout.watch", "Watch this", "Xem cái này", "これを見て", "看这个"),
+    ("paste", "Paste", "Dán", "貼り付け", "粘贴"),
+    ("cut", "Cut", "Cắt", "切り取り", "剪切"),
+    ("copy", "Copy", "Sao chép", "コピー", "复制"),
+    ("copy-all", "Copy all", "Sao chép tất cả", "すべてコピー", "全部复制"),
+    ("code.hint", "Drag to select. Language + UI colorway {theme}. Highlighter: {hl}.", "Kéo để chọn. Ngôn ngữ + bảng màu {theme}. Tô: {hl}.", "ドラッグして選ぶ。言語と配色 {theme}。色付け: {hl}。", "拖选。语言和配色 {theme}。高亮: {hl}。"),
+    ("md.hint", "Drag or double-click a range. Copy takes that text. Copy all posts the source.", "Kéo hoặc nhấp đúp một đoạn. Sao chép lấy chữ đó. Sao chép tất cả gửi nguồn.", "ドラッグまたはダブルクリックで範囲。コピーはその文。すべてコピーは原文。", "拖选或双击一段。复制取那段文字。全部复制发送原文。"),
+    ("md.showing", "Showing {title}", "Đang xem {title}", "{title} を表示", "正在显示 {title}"),
+    ("select.hint", "Inspector rows share a form label gutter. Copy posts the first selection.", "Hàng thanh tra dùng rãnh nhãn chung. Sao chép gửi lựa chọn đầu.", "インスペクタ行は共通のラベル溝。コピーは最初の選択。", "检查器行共用表单标签槽。复制发送第一段选中。"),
+    ("field.host", "Host", "Máy chủ", "ホスト", "主机"),
+    ("field.clock", "Clock", "Đồng hồ", "時計", "时钟"),
+    ("print", "Print", "In", "印刷", "打印"),
+    ("share", "Share", "Chia sẻ", "共有", "分享"),
+    ("find", "Find", "Tìm", "検索", "查找"),
+    ("more", "More", "Thêm", "その他", "更多"),
+    ("save-as", "Save As…", "Lưu thành…", "名前を付けて保存…", "另存为…"),
+    ("cal.day", "Day", "Ngày", "日", "日"),
+    ("cal.week", "Week", "Tuần", "週", "周"),
+    ("cal.month", "Month", "Tháng", "月", "月"),
+    ("table.name", "Name", "Tên", "名前", "名称"),
+    ("table.role", "Role", "Vai", "役割", "角色"),
+    ("table.status", "Status", "Trạng thái", "状態", "状态"),
+    ("table.path", "Path", "Đường", "パス", "路径"),
+    ("table.pin-hint", "Name is pinned. Role, Status, and Path follow horizontal scroll.", "Tên ghim. Vai, Trạng thái và Đường theo cuộn ngang.", "名前は固定。役割・状態・パスは横スクロール。", "名称冻结。角色、状态和路径随横向滚动。"),
+    ("ws.explorer", "Explorer", "Thám hiểm", "エクスプローラ", "资源管理器"),
+    ("ws.edit", "Edit", "Sửa", "編集", "编辑"),
+    ("ws.terminal", "Terminal", "Dòng lệnh", "端末", "终端"),
+    ("ws.outline", "Outline", "Dàn ý", "アウトライン", "大纲"),
+    ("ws.undocked", "Outline undocked", "Dàn ý tách", "アウトラインを外した", "大纲已卸下"),
+    ("ws.docked", "Outline docked on the start side", "Dàn ý neo phía bắt đầu", "アウトラインを開始側に置いた", "大纲停在起始侧"),
+    ("ws.moved", "Terminal moved beside Explorer", "Dòng lệnh cạnh Thám hiểm", "端末をエクスプローラの横へ", "终端移到资源管理器旁"),
+    ("ws.hint", "Edit pane. Tabs above switch Edit and Terminal. Drag the sash to resize.", "Ô sửa. Thẻ trên đổi Sửa và Dòng lệnh. Kéo thanh để đổi cỡ.", "編集面。上のタブで編集と端末。サッシをドラッグして大きさ。", "编辑格。上方标签切换编辑和终端。拖动分割条改大小。"),
+    ("nav.inbox", "Inbox", "Hộp thư", "受信", "收件箱"),
+    ("nav.calendar", "Calendar", "Lịch", "暦", "日历"),
+    ("nav.photos", "Photos", "Ảnh", "写真", "照片"),
+    ("nav.music", "Music", "Nhạc", "音楽", "音乐"),
+    ("nav.chat", "Chat", "Trò chuyện", "チャット", "聊天"),
+    ("nav.maps", "Maps", "Bản đồ", "地図", "地图"),
+    ("nav.notes", "Notes", "Ghi chú", "メモ", "笔记"),
+    ("nav.terminal", "Terminal", "Dòng lệnh", "端末", "终端"),
+    ("nav.help", "Help", "Trợ giúp", "ヘルプ", "帮助"),
+    ("grid.pick", "Pick a tile", "Chọn một ô", "タイルを選ぶ", "选一块"),
+    ("grid.opened", "Opened {name}", "Đã mở {name}", "{name} を開いた", "已打开 {name}"),
+    ("hint.split", "Primary action plus a chevron menu. Idle and disabled.", "Hành động chính kèm trình đơn chevron. Nghỉ và tắt.", "主動作とシェブロンメニュー。待機と無効。", "主操作加chevron菜单。空闲和禁用。"),
+    ("hint.toggle", "Pressed (checked), idle, and disabled.", "Nhấn (chọn), nghỉ, và tắt.", "押下（オン）、待機、無効。", "按下（选中）、空闲和禁用。"),
+    ("hint.check", "Checked, idle, and disabled.", "Đã chọn, nghỉ, và tắt.", "オン、待機、無効。", "选中、空闲和禁用。"),
+    ("hint.radio", "One choice in a set. Selected, idle, and disabled.", "Một lựa chọn trong nhóm. Đã chọn, nghỉ, và tắt.", "集合の一つ。選択、待機、無効。", "一组里选一个。已选、空闲和禁用。"),
+    ("hint.switch", "On, off, and disabled.", "Bật, tắt, và vô hiệu.", "オン、オフ、無効。", "开、关和禁用。"),
+    ("hint.card", "A document card with tags, and an empty neighbour.", "Thẻ tài liệu có nhãn, và hàng xóm trống.", "タグ付き文書カードと空の隣。", "带标签的文档卡片，旁边一张空的。"),
+    ("hint.chip", "Press a filter chip, or dismiss a tag with ×.", "Nhấn chip lọc, hoặc bỏ nhãn bằng ×.", "フィルタチップを押すか、×でタグを外す。", "按过滤芯片，或用 × 去掉标签。"),
+    ("hint.icon", "Chrome set plus an app mark (filled black SVG, token ink).", "Bộ khung cộng dấu ứng dụng (SVG đen đặc, mực token).", "クロム一式とアプリ印（黒塗り SVG、トークンインク）。", "框架套装加应用标记（实心黑 SVG，令牌墨）。"),
+    ("face.light", "Light", "Sáng", "ライト", "浅色"),
+    ("face.dark", "Dark", "Tối", "ダーク", "深色"),
+    ("face.bold", "Bold", "Đậm", "太字", "粗体"),
+    ("face.italic", "Italic", "Nghiêng", "斜体", "斜体"),
+    ("face.strike", "Strike", "Gạch", "取消線", "删除线"),
+    ("check.accept", "Accept", "Chấp nhận", "承認", "接受"),
+    ("check.optional", "Optional", "Tùy chọn", "任意", "可选"),
+    ("check.locked", "Locked", "Khóa", "ロック", "锁定"),
+    ("radio.a", "Option A", "Lựa chọn A", "選択肢 A", "选项 A"),
+    ("radio.b", "Option B", "Lựa chọn B", "選択肢 B", "选项 B"),
+    ("switch.notify", "Notify", "Báo", "通知", "通知"),
+    ("switch.sounds", "Sounds", "Âm thanh", "音", "声音"),
+    ("prog.full", "Full", "Đầy", "満杯", "满"),
+    ("prog.working", "working", "đang làm", "作業中", "工作中"),
+    ("card.saved", "saved", "đã lưu", "保存済", "已保存"),
+    ("card.markdown", "markdown", "markdown", "マークダウン", "标记"),
+    ("card.local", "local", "cục bộ", "ローカル", "本地"),
+    ("card.last-saved", "Last saved just now. Use File → Save to write again.", "Vừa lưu. Dùng Tệp → Lưu để ghi lại.", "たった今保存。ファイル→保存でもう一度。", "刚刚保存。用文件 → 保存再写一次。"),
+    ("card.empty", "Empty card", "Thẻ trống", "空のカード", "空卡片"),
+    ("filter.attachments", "Attachments", "Đính kèm", "添付", "附件"),
+    ("banner.update", "Update available", "Có bản cập nhật", "更新あり", "有可用更新"),
+    ("banner.install", "Install", "Cài", "入れる", "安装"),
+    ("group.identity", "Identity", "Danh tính", "身元", "身份"),
+    ("group.remember", "Remember", "Nhớ", "覚える", "记住"),
+    ("group.disabled", "Disabled group", "Nhóm tắt", "無効グループ", "禁用组"),
+    ("group.readonly", "Fields in this group stay read-only.", "Trường trong nhóm này chỉ đọc.", "このグループの欄は読み取り専用。", "这组里的字段保持只读。"),
+    ("chip.add-note", "Add note", "Thêm ghi chú", "メモを追加", "添加笔记"),
+    ("chip.suggest", "Suggest", "Gợi ý", "提案", "建议"),
+    ("chip.input", "Input", "Nhập", "入力", "输入"),
+    ("note.copied", "Copied", "Đã chép", "コピーした", "已复制"),
+    ("note.pasted", "Pasted", "Đã dán", "貼り付けた", "已粘贴"),
+    ("note.clipboard-empty", "Clipboard empty", "Bảng nhớ trống", "クリップボードは空", "剪贴板空"),
+    ("note.selected-all", "Selected all", "Đã chọn hết", "すべて選択した", "已全选"),
+    ("note.save-cancelled", "Save cancelled", "Hủy lưu", "保存を取り消した", "已取消保存"),
+    ("note.discarded", "Discarded notes.txt", "Đã bỏ notes.txt", "notes.txt を捨てた", "已丢弃 notes.txt"),
+    ("note.copied-secret", "Copied secret.", "Đã chép bí mật.", "秘密をコピーした。", "已复制密文。"),
+    ("note.dismissed-local", "Dismissed local", "Đã bỏ cục bộ", "ローカルを外した", "已去掉本地"),
+    ("chip.rust", "Rust", "Rust", "Rust", "Rust"),
+    ("chip.iced", "iced", "iced", "iced", "iced"),
+    ("chip.desktop", "desktop", "máy tính", "デスクトップ", "桌面"),
+    ("nav.files-blurb", "Local drafts and attachments.", "Nháp cục bộ và đính kèm.", "ローカルの下書きと添付。", "本地草稿和附件。"),
+    ("nav.files-body", "notes.txt is the open document.", "notes.txt là tài liệu đang mở.", "notes.txt が開いている文書です。", "notes.txt 是打开的文档。"),
+    ("nav.settings-blurb", "Appearance and density.", "Diện mạo và mật độ.", "外観と密度。", "外观和密度。"),
+    ("nav.settings-body", "Theme follows the gallery colorway row.", "Giao diện theo hàng bảng màu gallery.", "テーマはギャラリー配色行に従う。", "主题跟随画廊配色行。"),
+    ("nav.mail-blurb", "Inbox, drafts, and sent.", "Hộp thư, nháp, và đã gửi.", "受信、下書き、送信済み。", "收件箱、草稿和已发送。"),
+    ("nav.mail-body", "Quarterly notes arrived this morning.", "Ghi chú quý đến sáng nay.", "四半期メモが今朝届いた。", "季度笔记今早到了。"),
+    ("tab.guide-body", "Install the crate, then start a window with run!. Chrome, actions, and theme come from icedtea.", "Cài crate, rồi mở cửa sổ bằng run!. Khung, hành động và giao diện đến từ icedtea.", "crate を入れ、run! で窓を開く。クロム、アクション、テーマは icedtea。", "安装 crate，再用 run! 开窗。框架、动作和主题来自 icedtea。"),
+    ("tab.changelog-body", "0.2 is the first library cut on crates.io.", "0.2 là bản thư viện đầu trên crates.io.", "0.2 が crates.io の最初のライブラリ切り。", "0.2 是 crates.io 上的第一刀库。"),
+    ("tab.notes-body", "Draft the weekly recap in this tab. File / Edit / View stay in the window chrome.", "Soạn tóm tắt tuần trong thẻ này. Tệp / Sửa / Xem ở khung cửa sổ.", "週次まとめをこのタブで。ファイル/編集/表示は窓クロム。", "在这个标签起草周报。文件/编辑/查看留在窗口框架。"),
+    ("detail.body", "Thanks for the notes. I will follow up after lunch.", "Cảm ơn ghi chú. Tôi sẽ theo sau bữa trưa.", "メモありがとう。昼食のあと続きます。", "谢谢这些笔记。午饭后我再跟。"),
+];
+
+const AR: &[(&str, &str)] = &[
+    ("look.theme", "السمة"),
+    ("look.language", "اللغة"),
+    ("look.density", "الكثافة"),
+    ("look.type", "الحرف"),
+    ("look.shape", "الشكل"),
+    ("look.elevation", "الظل"),
+    ("look.direction", "الاتجاه"),
+    ("look.dark", "تلوين داكن"),
+    ("look.light", "تلوين فاتح"),
+    ("density.compact", "مضغوط"),
+    ("density.default", "افتراضي"),
+    ("density.comfortable", "مريح"),
+    ("shape.desktop", "سطح المكتب"),
+    ("shape.tight", "ضيق"),
+    ("shape.soft", "ناعم"),
+    ("shape.pill", "حبة"),
+    ("shape.material", "Material"),
+    ("elevation.desktop", "سطح المكتب"),
+    ("elevation.flat", "مسطح"),
+    ("dir.ltr", "من اليسار إلى اليمين"),
+    ("dir.rtl", "من اليمين إلى اليسار"),
+    ("group.Controls", "عناصر التحكم"),
+    ("group.Fields", "الحقول"),
+    ("group.Content", "المحتوى"),
+    ("group.Collections", "المجموعات"),
+    ("group.Chrome", "الإطار"),
+    ("group.Patterns", "الأنماط"),
+    ("page.controls", "عناصر التحكم"),
+    ("page.fields", "الحقول"),
+    ("page.readout", "القراءة"),
+    ("page.type", "الحرف"),
+    ("page.markdown", "Markdown"),
+    ("page.code", "الرمز"),
+    ("page.image", "صورة"),
+    ("page.selectable", "قابل للتحديد"),
+    ("page.list", "قائمة"),
+    ("page.log", "سجل"),
+    ("page.grid", "شبكة"),
+    ("page.table", "جدول بيانات"),
+    ("page.tree", "شجرة"),
+    ("page.sections", "أقسام"),
+    ("page.theme", "السمة"),
+    ("page.colors", "الألوان"),
+    ("page.keys", "المفاتيح"),
+    ("page.marks", "علامات"),
+    ("page.chrome-rows", "صفوف الإطار"),
+    ("page.feedback", "ملاحظات"),
+    ("page.dialogs", "حوارات"),
+    ("page.list-detail", "قائمة/تفاصيل"),
+    ("page.inspector", "المفتش"),
+    ("page.workspace", "مساحة العمل"),
+    ("page.navigation", "التنقل"),
+    ("page.tab-view", "عرض الألسنة"),
+    ("page.preferences", "تفضيلات"),
+    ("page.about", "حول"),
+    ("page.status-page", "صفحة الحالة"),
+    ("page.palette", "لوحة الأوامر"),
+    ("page.main-window", "النافذة الرئيسية"),
+    ("page.motion", "الحركة"),
+    ("page.expand-motion", "حركة التوسيع"),
+    ("job.controls", "اضغط عنصر تحكم. يسجّل شريط الحالة الرسالة."),
+    ("job.fields", "قيم يكتبها التطبيق. التحديد والنسخ يعملان على الصفوف المعنونة."),
+    ("job.readout", "تقدّم، حلقة، ودوّار غير محدد."),
+    ("job.type", "تسميات وأيقونات وروابط وتلميح."),
+    ("job.markdown", "مستند مرسوم. النسخ يأخذ النطاق المحدد؛ نسخ الكل يرسل المصدر."),
+    ("job.code", "مصدر ملوّن. حدد نطاقاً وانسخ."),
+    ("job.image", "الخانة تبقي صندوقها أثناء التحميل أو عند الخطأ."),
+    ("job.selectable", "نص يمكن سحبه للتحديد والنسخ."),
+    ("job.list", "البحث وغير المقروء/المعلّم في الأعلى يصفيان القائمة الظاهرية. الترقيم لصفحات المجموعة الكبيرة."),
+    ("job.virtual-column", "بطاقات توسيع يبنيها التطبيق؛ تُركَّب شريحة المنظر فقط."),
+    ("job.log", "أسطر ظاهرية لسجل ينمو."),
+    ("job.grid", "بلاطات تشترك في ارتفاع الصف."),
+    ("job.table", "الأعمدة تبقى بترتيب التخطيط. الأعمدة الأمامية المجمّدة تبقى ظاهرة."),
+    ("job.tree", "المجلدات تتوسع في مكانها. الأوراق تُختار."),
+    ("job.sections", "ألسنة وأكورديون وموسّع."),
+    ("job.theme", "تلوينات مسماة. شريط المظهر يضبط اللغة والكثافة وحجم الحرف والشكل والظل."),
+    ("job.colors", "رموز دلالية ومزج. هذه أصباغ العناصر."),
+    ("job.keys", "جدول الإجراءات يقود الاختصارات. ورقة الغش تسردها."),
+    ("job.marks", "بطاقات ورقائق وشارات وخطوط."),
+    ("job.chrome-rows", "قائمة وشريط أدوات وحالة ومسار وشريط أوامر."),
+    ("job.feedback", "تنبيهات وتمرير وطبقة مشغول فوق ابن."),
+    ("job.dialogs", "ورقة تأكيد داخل النافذة على خلفية معتمة."),
+    ("job.list-detail", "قائمة بجانب لوحة تفاصيل. اختر صفاً؛ اليمين هو ذلك الصف."),
+    ("job.inspector", "اختر ملفاً. الوسط هو المستند. العمود الأيمن خصائص."),
+    ("job.workspace", "انقسام المحرر. الإرساء يثبّت المخطط كلوحة ثالثة. اسحب الفاصل."),
+    ("job.navigation", "أماكن على اليسار. النوافذ الضيقة تتراكم مع رجوع."),
+    ("job.tab-view", "شريط ألسنة وجسم اللسان النشط. التطبيق يرسم ذلك الجسم."),
+    ("job.preferences", "مجموعات إعدادات قابلة للبحث. التطبيق يملك الصفوف؛ هذا إطار الصفحة."),
+    ("job.about", "الاسم والإصدار والرخصة والإشادات. التطبيقات تضعها في مساعدة ← حول."),
+    ("job.status-page", "لوحة فارغة أو خطأ. عندما لا صفوف في القائمة أو المضيف متوقف."),
+    ("job.palette", "بحث تقريبي على جدول الإجراءات. اكتب للتصفية؛ اختر صفاً."),
+    ("job.main-window", "قائمة وشريط أدوات ووسط وحالة مرساة كنافذة واحدة."),
+    ("job.motion", "فتح وإغلاق. تلاشٍ وارتداد ونبض وهز. تقليل الحركة يقطع."),
+    ("job.expand-motion", "الارتفاع من لمحة إلى الحجم المفتوح. تقليل الحركة يقطع."),
+    ("wjob.fallback", "انظر rustdoc للاستدعاء."),
+    ("wjob.spinner", "عمل غير محدد. ثماني نقاط تضيء بالدور."),
+    ("wjob.progress-ring", "كسر محدد كحلقة. نفس قيمة شريط التقدم في هذه الصفحة."),
+    ("wjob.progress", "شريط محدد. نفس كسر الحلقة."),
+    ("wjob.busy", "المفتاح علم المشغول. عند التشغيل يخفت الابن وتدور ثماني نقاط."),
+    ("wjob.toast", "إشعار عابر. التطبيق يملك الطابور."),
+    ("wjob.scrollbar", "ممرّر مُوسَم للأجزاء التي ليست قائمة أو جدولاً."),
+    ("wjob.workspace", "انقسام المحرر: ملفات يساراً، تحرير وطرفية كألسنة. اسحب الفاصل."),
+    ("wjob.drawer", "لوحة جانبية تختفي. عند الإغلاق يُرسم المحتوى فقط."),
+    ("wjob.tool-panel", "اضغط إرساء لتثبيت هذا المخطط كلوحة يمين مساحة العمل أعلاه."),
+    ("wjob.inspector", "اختر ملفاً. الوسط المستند. اليمين الاسم والنوع والمسار."),
+    ("wjob.list-detail", "قائمة شريط جانبي مع لوحة تفاصيل تملأ."),
+    ("wjob.tab-view", "الشريط هو المنشئ. الجسم أدناه محتوى التطبيق."),
+    ("wjob.preferences", "صفِّ المجموعات بحقل البحث. الصفوف عنوان ثم مفتاح/قيمة."),
+    ("wjob.about", "أربع سلاسل في صندوق مجموعة. التطبيق يورد النص."),
+    ("wjob.status-page", "عنوان ووسط وجسم وإجراء اختياري."),
+    ("wjob.palette", "حقل استعلام وإصابات من جدول الإجراءات. ليس تخطيط صفحة كاملة."),
+    ("wjob.navigation", "عريض: شريط بجانب المحتوى. ضيق: ركام مع رجوع."),
+    ("wjob.main-window", "المناطق الأربع وسائط. هذه الصفحة ذلك التركيب."),
+    ("wjob.dialogs", "أساسي وإلغاء اختياري. منتقي الملفات الأصلي عبر native_dialog."),
+    ("wjob.motion", "تلاشٍ وانزلاق قصير. التطبيق يملك iced::Animation."),
+    ("wjob.expand-motion", "الارتفاع من لمحة إلى فتح. الموسّع والأكورديون يستعملان هذا."),
+    ("tab.notes", "ملاحظات"),
+    ("tab.guide", "دليل"),
+    ("tab.changelog", "سجل التغيير"),
+    ("tab.archive", "أرشيف"),
+    ("tab.drafts", "مسودات"),
+    ("tab.read", "قراءة"),
+    ("tab.write", "كتابة"),
+    ("mail.0", "ملاحظات ربعية للشبونة ومكتب برلين"),
+    ("mail.1", "برنامج لشبونة"),
+    ("mail.2", "مراجعة التصميم"),
+    ("mail.3", "قائمة إصدار القطع 0.4"),
+    ("mail.4", "وقوف الفريق"),
+    ("mail.5", "فاتورة آذار"),
+    ("mail.when.0", "هذا الصباح"),
+    ("mail.when.1", "أمس"),
+    ("mail.when.2", "الأسبوع الماضي"),
+    ("pref.appearance", "المظهر"),
+    ("pref.editor", "المحرر"),
+    ("pref.files", "الملفات"),
+    ("pref.theme", "السمة"),
+    ("pref.density", "الكثافة"),
+    ("pref.follow-os", "اتبع النظام"),
+    ("pref.tab-width", "عرض الجدولة"),
+    ("pref.word-wrap", "التفاف الكلمات"),
+    ("pref.autosave", "حفظ تلقائي"),
+    ("pref.default-folder", "المجلد الافتراضي"),
+    ("pref.on", "تشغيل"),
+    ("pref.off", "إيقاف"),
+    ("expand.1", "مغلقة، تبقي هذه البطاقة وجهاً قصيراً وتقص الباقي."),
+    ("expand.2", "سهم الرأس يفتح الملاحظات الكاملة والشكل والنص الباقي."),
+    ("expand.3", "0.8 يشحن رموز حركة ودخول الطبقة وارتفاع التوسيع. الحوارات والأوراق الجانبية واللوحة تتلاشى وتنزلق من تقدم 0–1. التطبيق يملك iced::Animation والساعة."),
+    ("expand.4", "التقدم المحدد يلين إلى الكسر الجديد. شريط المشغول الخطي ينمو ويسير وينكمش. تقليل الحركة يقطع كل مدة إلى 0 ملث."),
+    ("expand.cap", "شكل: رقعة ثابتة. الخانة تبقي هذا الصندوق بينما تفتح البطاقة."),
+    ("expand.5", "الحفظ ما زال على إجراء الملف. السمة والكثافة والتباين العالي على الرموز. الفتح للتطبيق؛ هذه الصفحة تبدّله."),
+    ("hint.button", "كل وجه مسمى، ثم معطّل"),
+    ("hint.type", "عنوان الصفحة"),
+    ("hint.meta", "وصف / تعليق"),
+    ("hint.recent", "حديث"),
+    ("hint.hover", "تحويم"),
+    ("hint.save", "حفظ"),
+    ("hint.pinned", "مثبّت"),
+    ("hint.closable", "قابل للإغلاق"),
+    ("hint.no-items", "لا عناصر"),
+    ("hint.install", "بدأ التثبيت"),
+    ("hint.document", "مستند"),
+    ("hint.places", "أماكن"),
+    ("hint.properties", "خصائص"),
+    ("hint.name", "الاسم"),
+    ("nav.mail", "بريد"),
+    ("nav.files", "ملفات"),
+    ("nav.settings", "إعدادات"),
+    ("status.empty-title", "لا شيء هنا"),
+    ("status.empty-body", "أنشئ عنصراً للبدء."),
+    ("status.action", "جديد"),
+    ("status.no-sessions", "لا جلسات"),
+    ("status.host-q", "هل المضيف يعمل؟"),
+    ("status.retry", "أعد المحاولة"),
+    ("status.host-down", "تعذر الوصول إلى المضيف"),
+    ("status.host-retry", "إعادة المحاولة تظهر وجه الخطأ لنفس المنشئ."),
+    ("about.blurb", "عناصر وإطار لتطبيقات سطح المكتب iced 0.14."),
+    ("about.credits", "إشادات"),
+    ("dialog.save", "حفظ"),
+    ("dialog.overwrite", "استبدال؟"),
+    ("toast.saved", "حُفظ notes.txt"),
+    ("table.ready", "جاهز"),
+    ("table.idle", "خامل"),
+    ("table.library", "مكتبة"),
+    ("table.catalog", "فهرس"),
+    ("table.widget", "عنصر"),
+    ("table.app", "تطبيق"),
+    ("search.placeholder", "بحث"),
+    ("expand.6", "الأكورديون عناوين كثيرة. هذه بطاقة واحدة. كلاهما يُرسم عبر motion::expand فيتدرج الارتفاع بدل القفز."),
+    ("expand.7", "عندما تطول الملاحظات هكذا تبقى اللمحة سطرين. الفتح يجب أن يكبر بعد الشكل والفقرات الأخيرة."),
+    ("list.all", "الكل"),
+    ("list.unread", "غير مقروء"),
+    ("list.flagged", "معلّم"),
+    ("list.oneline", "سطر واحد"),
+    ("list.cards", "بطاقات"),
+    ("list.empty", "لا رسائل مطابقة"),
+    ("list.range", "{start}–{end} من {total} (صفحة {page})"),
+    ("toast.action", "تنبيه"),
+    ("busy.flag", "مشغول"),
+    ("busy.body", "الطبقة تخفت هذه البطاقة. ثماني نقاط تدور أثناء العمل."),
+    ("sm.hint", "أقسام بعناوين وخطوط شعر."),
+    ("export", "تصدير…"),
+    ("hit.inbox", "وارد"),
+    ("hit.sent", "مرسل"),
+    ("hit.drafts", "مسودات"),
+    ("hit.archive", "أرشيف"),
+    ("field.focus", "ركّز الحقل"),
+    ("field.focus-hint", "Enter يرسل. التركيز ينتقل إلى الاسم."),
+    ("field.support-hint", "نص داعم وحبر خطأ تحت الحقل."),
+    ("date.appointment", "موعد"),
+    ("state.disabled", "معطّل"),
+    ("time.24h", "24 ساعة"),
+    ("time.12h", "12 ساعة"),
+    ("time.seconds", "مع الثواني"),
+    ("time.step-hint", "انقر حقلاً للخطوة. ص/م يقلب نصف اليوم."),
+    ("ss.title", "المفتش"),
+    ("host.search-view", "عرض البحث"),
+    ("host.text-input", "إدخال نص"),
+    ("host.field-support", "دعم الحقل"),
+    ("host.password", "كلمة السر"),
+    ("host.secret", "حقل سري"),
+    ("host.value-field", "حقل قيمة"),
+    ("host.textarea", "منطقة نص"),
+    ("host.search", "بحث"),
+    ("host.suggest", "اقتراح"),
+    ("host.select", "اختيار"),
+    ("host.number", "رقم"),
+    ("host.date", "تاريخ"),
+    ("host.time", "وقت"),
+    ("host.virtual-column", "عمود ظاهري"),
+    ("host.list", "قائمة"),
+    ("host.pagination", "ترقيم"),
+    ("host.accordion", "أكورديون"),
+    ("host.expander", "موسّع"),
+    ("host.tabs", "ألسنة"),
+    ("host.command-bar", "شريط أوامر"),
+    ("host.context-menu", "قائمة سياق"),
+    ("host.sectioned-menu", "قائمة أقسام"),
+    ("host.cascade-menu", "قائمة متفرعة"),
+    ("host.breadcrumb", "مسار"),
+    ("host.menu", "قائمة"),
+    ("host.toolbar", "شريط أدوات"),
+    ("host.status-bar", "شريط حالة"),
+    ("host.busy", "طبقة مشغول"),
+    ("host.toast", "تنبيه"),
+    ("host.scrollbar", "شريط تمرير"),
+    ("host.button", "زر"),
+    ("host.toggle-icon-button", "زر أيقونة تبديل"),
+    ("host.slider", "شريط انزلاق"),
+    ("host.button-group", "مجموعة أزرار"),
+    ("host.checkbox", "مربع اختيار"),
+    ("host.radio", "اختيار واحد"),
+    ("host.switch", "مفتاح"),
+    ("host.range-slider", "شريط مدى"),
+    ("host.segmented-button", "زر مقسّم"),
+    ("host.icon-button", "زر أيقونة"),
+    ("host.checkbox-indeterminate", "مربع اختيار غير محدد"),
+    ("host.split-button", "زر منقسم"),
+    ("host.toggle-button", "زر تبديل"),
+    ("host.progress", "تقدم"),
+    ("host.progress-ring", "حلقة تقدم"),
+    ("host.spinner", "دوّار"),
+    ("host.label", "تسمية"),
+    ("host.icon", "أيقونة"),
+    ("host.tooltip", "تلميح"),
+    ("host.rich-tooltip", "تلميح غني"),
+    ("host.link", "رابط"),
+    ("host.markdown", "ماركداون"),
+    ("host.code", "شفرة"),
+    ("host.image", "صورة"),
+    ("host.selectable", "قابل للتحديد"),
+    ("host.log", "سجل"),
+    ("host.grid", "شبكة"),
+    ("host.table", "جدول"),
+    ("host.tree", "شجرة"),
+    ("host.theme", "سمة"),
+    ("host.colors", "ألوان"),
+    ("host.keys", "مفاتيح"),
+    ("host.cheatsheet", "ورقة اختصارات"),
+    ("host.filter-chips", "شرائح تصفية"),
+    ("host.chip", "شريحة"),
+    ("host.badge", "شارة"),
+    ("host.card", "بطاقة"),
+    ("host.rule", "قاعدة"),
+    ("host.wrap", "طي"),
+    ("host.banner", "لافتة"),
+    ("host.side-sheet", "ورقة جانبية"),
+    ("host.dialogs", "حوارات"),
+    ("host.list-detail", "قائمة/تفاصيل"),
+    ("host.inspector", "المفتش"),
+    ("host.drawer", "درج"),
+    ("host.workspace", "مساحة العمل"),
+    ("host.tool-panel", "لوحة أدوات"),
+    ("host.nav-rail", "سكة تنقل"),
+    ("host.navigation", "عرض تنقل"),
+    ("host.tab-view", "عرض ألسنة"),
+    ("host.preferences", "تفضيلات"),
+    ("host.about", "حول"),
+    ("host.status-page", "صفحة حالة"),
+    ("host.palette", "لوحة أوامر"),
+    ("host.main-window", "النافذة الرئيسية"),
+    ("host.motion", "حركة"),
+    ("host.expand-motion", "حركة توسيع"),
+    ("dialog.open-ellipsis", "فتح…"),
+    ("dialog.save-ellipsis", "حفظ…"),
+    ("dialog.folder", "مجلد…"),
+    ("dialog.open", "افتح الحوار"),
+    ("dialog.last-saved", "حُفظ للتو."),
+    ("dialog.overwrite-notes", "استبدال notes.txt؟"),
+    ("dialog.dont-save", "لا تحفظ"),
+    ("colors.hint", "غسلات وألوان النص من التلوينة النشطة."),
+    ("keys.type", "اكتب مفتاحاً"),
+    ("keys.hint", "اكتب حرفاً، أو Enter أو Escape أو سهماً أو مفتاح وظيفة."),
+    ("img.hint", "احتواء وتغطية وتحميل وخطأ. التطبيق يملك البايتات."),
+    ("img.contain", "احتواء"),
+    ("img.cover", "تغطية"),
+    ("img.loading", "تحميل"),
+    ("img.missing", "مفقود"),
+    ("tip.title", "تلميح"),
+    ("tip.write", "اكتب المخزن إلى القرص."),
+    ("tip.learn", "اعرف المزيد"),
+    ("sheet.hint", "افتح ورقة المفتش للخصائص."),
+    ("sheet.open", "افتح الورقة"),
+    ("sheet.close", "أغلق الورقة"),
+    ("tab.close-hint", "أغلق لساناً بـ ×. اختيار لسان آخر يبدل هذا المتن."),
+    ("pal.hint", "اكتب لتصفية جدول الإجراءات. اختر صفاً، أو اذهب إلى سطر لوسيط."),
+    ("ws.move-btn", "انقل الطرفية بجانب المستكشف"),
+    ("detail.pick", "اختر رسالة"),
+    ("detail.when", "وصلت هذا الصباح."),
+    ("insp.folder", "مجلد"),
+    ("insp.kind-rust", "Rust"),
+    ("insp.kind-md", "Markdown"),
+    ("insp.root", "جذر الصندوق."),
+    ("insp.sources", "مصادر المكتبة."),
+    ("insp.icons", "أيقونات وGIF الجولة."),
+    ("insp.guide", "ودجات وإطار لـ iced."),
+    ("insp.kind", "النوع"),
+    ("drawer.hide", "إخفاء الملفات"),
+    ("drawer.show", "إظهار الملفات"),
+    ("drawer.hint", "المحرر — غيّر حجم النافذة أو أخف سكة الملفات."),
+    ("cheat.filter", "صفِّ الاختصارات"),
+    ("motion.sheet", "ورقة"),
+    ("motion.fade-slide", "تلاشٍ وانزلاق قصير من 0 إلى 1."),
+    ("motion.reduce", "تقليل الحركة"),
+    ("motion.close", "أغلق الطبقة"),
+    ("motion.open", "افتح الطبقة"),
+    ("motion.fade", "تلاشٍ"),
+    ("motion.fade-out", "اختفِ"),
+    ("motion.fade-in", "اظهر"),
+    ("motion.fade-body", "Slide::None. Tokens::fade."),
+    ("motion.bounce", "ارتداد"),
+    ("motion.bounce-out", "ارتدِ خارجاً"),
+    ("motion.bounce-in", "ارتدِ داخلاً"),
+    ("motion.bounce-body", "bounce_out يقفز عند الهبوط."),
+    ("motion.pulse", "نبض"),
+    ("motion.pulse-body", "يلف الشفافية. تقليل الحركة يثبت السكون."),
+    ("motion.shake", "اهتزاز"),
+    ("motion.shake-body", "تذبذب يخفت ثم يستقر."),
+    ("expand.collapse", "اطوِ"),
+    ("expand.open", "وسِّع"),
+    ("win.hint", "ملف وتحرير وعرض في هذه النافذة. افتح قائمة ثم احفظ."),
+    ("variant.primary", "أساسي"),
+    ("variant.quiet", "هادئ"),
+    ("variant.danger", "خطر"),
+    ("variant.ghost", "شبح"),
+    ("variant.chip", "شريحة"),
+    ("variant.success", "نجاح"),
+    ("variant.warning", "تحذير"),
+    ("variant.outlined", "محدد"),
+    ("variant.elevated", "مرتفع"),
+    ("slider.now", "الآن"),
+    ("slider.vol", "صوت"),
+    ("prog.min", "دقيقة"),
+    ("note.accent-on", "اللكنة شغالة"),
+    ("note.accent-idle", "اللكنة خاملة"),
+    ("color.hover", "تحويم"),
+    ("color.pressed", "ضغط"),
+    ("color.chip", "شريحة"),
+    ("color.selection", "تحديد"),
+    ("color.text-canvas", "نص على اللوحة"),
+    ("color.text-surface", "نص على السطح"),
+    ("color.text-panel", "نص على اللوح"),
+    ("color.text-primary", "نص على الأساسي"),
+    ("color.scrollbar", "شريط التمرير"),
+    ("color.cursor", "مؤشر الإدخال"),
+    ("color.sel", "تحديد الإدخال"),
+    ("color.link", "رابط"),
+    ("color.focus", "تركيز"),
+    ("color.lighten", "تفتيح الأساسي"),
+    ("color.darken", "تغميق الأساسي"),
+    ("pal.placeholder", "اكتب أمراً"),
+    ("dock", "إرساء"),
+    ("show", "إظهار"),
+    ("hide", "إخفاء"),
+    ("cascade.hint", "الصف الأساسي يفتح قائمة فرعية."),
+    ("status.ready", "جاهز"),
+    ("status.socket", "المقبس متوقف"),
+    ("status.hints", "حقول Tab  ·  Esc"),
+    ("field.email-error", "أدخل عنواناً صالحاً."),
+    ("field.email-hint", "لا نشارك بريدك."),
+    ("field.secret", "سر"),
+    ("field.secret-hint", "اكشِف الرمز ثم انسخه."),
+    ("field.token", "رمز"),
+    ("field.secret-note", "أظهر ثم انسخ."),
+    ("field.value-hint", "قيمة معنونة بحافة نموذج مشتركة. حدّد ثم انسخ."),
+    ("field.path", "مسار"),
+    ("field.id", "المعرّف"),
+    ("field.email", "البريد"),
+    ("field.suggest-hint", "اقترح على أي حقل. الاختيار يملأ الاستعلام."),
+    ("field.command", "أمر"),
+    ("recent", "حديث"),
+    ("crumb.home", "الرئيسية"),
+    ("crumb.gallery", "المعرض"),
+    ("vc.hint", "بطاقات توسيع عبر virtual_column (تركيب المنظر)."),
+    ("vc.open", "الوجه المفتوح. هذه الشريحة فقط مركّبة."),
+    ("acc.files", "ملفات"),
+    ("acc.appear", "المظهر"),
+    ("acc.advanced", "متقدم"),
+    ("acc.body.files", "جديد وفتح وحفظ في قائمة الملف."),
+    ("acc.body.appear", "فاتح وداكن وتباين عالٍ من صف السمة."),
+    ("acc.body.adv", "لوحة الأوامر من عرض."),
+    ("expand.title", "ملاحظات الإصدار"),
+    ("ctx.hint", "قائمة قصيرة عند المؤشر. انقر يميناً على الصفحة لقائمة حية."),
+    ("scroll.0", "شُغّلت نافذة المعرض"),
+    ("scroll.1", "حُمّل الفهرس"),
+    ("scroll.2", "طُبّقت التلوينة الداكنة"),
+    ("scroll.3", "فُتح notes.txt"),
+    ("scroll.4", "حُفظ notes.txt"),
+    ("scroll.5", "ثُبّت التحديث المتاح"),
+    ("scroll.6", "نُسخ الحقل السري"),
+    ("scroll.7", "أُخفيت لوحة الأوامر"),
+    ("scroll.8", "أُعيد التقسيم السابق"),
+    ("scroll.9", "قُفز إلى عنوان الملفات"),
+    ("scroll.10", "أُغلقت ورقة الحفظ"),
+    ("scroll.11", "جاهز للأمر التالي"),
+    ("go.line", "إلى السطر"),
+    ("note.new-file", "ملف جديد"),
+    ("note.nothing-undo", "لا شيء للتراجع"),
+    ("note.nothing-redo", "لا شيء للإعادة"),
+    ("tree.entry", "مدخل"),
+    ("tree.empty", "assets مجلد فارغ."),
+    ("tree.selected", "محدد"),
+    ("callout.watch", "انظر هذا"),
+    ("paste", "لصق"),
+    ("cut", "قص"),
+    ("copy", "نسخ"),
+    ("copy-all", "نسخ الكل"),
+    ("code.hint", "اسحب للتحديد. اللغة وجدول الألوان {theme}. الملوّن: {hl}."),
+    ("md.hint", "اسحب أو انقر نقراً مزدوجاً نطاقاً. النسخ يأخذ ذلك النص. نسخ الكل يرسل المصدر."),
+    ("md.showing", "عرض {title}"),
+    ("select.hint", "صفوف المفتش تشترك في حافة تسمية. النسخ يرسل أول تحديد."),
+    ("field.host", "المضيف"),
+    ("field.clock", "الساعة"),
+    ("print", "طباعة"),
+    ("share", "مشاركة"),
+    ("find", "إيجاد"),
+    ("more", "المزيد"),
+    ("save-as", "حفظ باسم…"),
+    ("cal.day", "يوم"),
+    ("cal.week", "أسبوع"),
+    ("cal.month", "شهر"),
+    ("table.name", "الاسم"),
+    ("table.role", "الدور"),
+    ("table.status", "الحالة"),
+    ("table.path", "المسار"),
+    ("table.pin-hint", "الاسم مثبت. الدور والحالة والمسار تتبع التمرير الأفقي."),
+    ("ws.explorer", "المستكشف"),
+    ("ws.edit", "تحرير"),
+    ("ws.terminal", "طرفية"),
+    ("ws.outline", "مخطط"),
+    ("ws.undocked", "فُصل المخطط"),
+    ("ws.docked", "رُسّي المخطط على جانب البداية"),
+    ("ws.moved", "نُقلت الطرفية بجانب المستكشف"),
+    ("ws.hint", "لوحة التحرير. الألسنة فوق تبدّل التحرير والطرفية. اسحب الشريط لتغيير الحجم."),
+    ("nav.inbox", "وارد"),
+    ("nav.calendar", "تقويم"),
+    ("nav.photos", "صور"),
+    ("nav.music", "موسيقى"),
+    ("nav.chat", "دردشة"),
+    ("nav.maps", "خرائط"),
+    ("nav.notes", "ملاحظات"),
+    ("nav.terminal", "طرفية"),
+    ("nav.help", "مساعدة"),
+    ("grid.pick", "اختر بلاطة"),
+    ("grid.opened", "فُتح {name}"),
+    ("hint.split", "إجراء أساسي مع قائمة شيفرون. خامل ومعطّل."),
+    ("hint.toggle", "مضغوط (محدد) وخامل ومعطّل."),
+    ("hint.check", "محدد وخامل ومعطّل."),
+    ("hint.radio", "خيار واحد في مجموعة. محدد وخامل ومعطّل."),
+    ("hint.switch", "تشغيل وإيقاف ومعطّل."),
+    ("hint.card", "بطاقة مستند بوسوم، وجارة فارغة."),
+    ("hint.chip", "اضغط شريحة تصفية أو أزل وسماً بـ ×."),
+    ("hint.icon", "مجموعة الإطار وعلامة تطبيق (SVG أسود مملوء، حبر الرمز)."),
+    ("face.light", "فاتح"),
+    ("face.dark", "داكن"),
+    ("face.bold", "عريض"),
+    ("face.italic", "مائل"),
+    ("face.strike", "يتوسطه خط"),
+    ("check.accept", "قبول"),
+    ("check.optional", "اختياري"),
+    ("check.locked", "مقفل"),
+    ("radio.a", "خيار أ"),
+    ("radio.b", "خيار ب"),
+    ("switch.notify", "تنبيه"),
+    ("switch.sounds", "أصوات"),
+    ("prog.full", "ممتلئ"),
+    ("prog.working", "يعمل"),
+    ("card.saved", "محفوظ"),
+    ("card.markdown", "ماركداون"),
+    ("card.local", "محلي"),
+    ("card.last-saved", "حُفظ للتو. استخدم ملف ← حفظ للكتابة مجدداً."),
+    ("card.empty", "بطاقة فارغة"),
+    ("filter.attachments", "مرفقات"),
+    ("banner.update", "تحديث متاح"),
+    ("banner.install", "تثبيت"),
+    ("group.identity", "هوية"),
+    ("group.remember", "تذكّر"),
+    ("group.disabled", "مجموعة معطّلة"),
+    ("group.readonly", "الحقول في هذه المجموعة للقراءة فقط."),
+    ("chip.add-note", "أضف ملاحظة"),
+    ("chip.suggest", "اقترح"),
+    ("chip.input", "إدخال"),
+    ("note.copied", "نُسخ"),
+    ("note.pasted", "لُصق"),
+    ("note.clipboard-empty", "الحافظة فارغة"),
+    ("note.selected-all", "حُدد الكل"),
+    ("note.save-cancelled", "أُلغي الحفظ"),
+    ("note.discarded", "أُهمل notes.txt"),
+    ("note.copied-secret", "نُسخ السر."),
+    ("note.dismissed-local", "أُزيل المحلي"),
+    ("chip.rust", "Rust"),
+    ("chip.iced", "iced"),
+    ("chip.desktop", "سطح المكتب"),
+    ("nav.files-blurb", "مسودات محلية ومرفقات."),
+    ("nav.files-body", "notes.txt هو المستند المفتوح."),
+    ("nav.settings-blurb", "المظهر والكثافة."),
+    ("nav.settings-body", "السمة تتبع صف تلوينة المعرض."),
+    ("nav.mail-blurb", "وارد ومسودات ومرسل."),
+    ("nav.mail-body", "وصلت ملاحظات الربع هذا الصباح."),
+    ("tab.guide-body", "ثبّت الصندوق ثم افتح نافذة بـ run!. الإطار والإجراءات والسمة من icedtea."),
+    ("tab.changelog-body", "0.2 أول قطع مكتبة على crates.io."),
+    ("tab.notes-body", "اكتب ملخص الأسبوع في هذا اللسان. ملف / تحرير / عرض في إطار النافذة."),
+    ("detail.body", "شكراً على الملاحظات. سأتابع بعد الغداء."),
+];
+
+const UR: &[(&str, &str)] = &[
+    ("look.theme", "تھیم"),
+    ("look.language", "زبان"),
+    ("look.density", "کثافت"),
+    ("look.type", "حرف"),
+    ("look.shape", "شکل"),
+    ("look.elevation", "سایہ"),
+    ("look.direction", "سمت"),
+    ("look.dark", "گہرا رنگ سیٹ"),
+    ("look.light", "ہلکا رنگ سیٹ"),
+    ("density.compact", "سکڑا"),
+    ("density.default", "طے شدہ"),
+    ("density.comfortable", "کشادہ"),
+    ("shape.desktop", "ڈیسک ٹاپ"),
+    ("shape.tight", "تنگ"),
+    ("shape.soft", "نرم"),
+    ("shape.pill", "گولی"),
+    ("shape.material", "Material"),
+    ("elevation.desktop", "ڈیسک ٹاپ"),
+    ("elevation.flat", "ہموار"),
+    ("dir.ltr", "بائیں سے دائیں"),
+    ("dir.rtl", "دائیں سے بائیں"),
+    ("group.Controls", "کنٹرولز"),
+    ("group.Fields", "خانے"),
+    ("group.Content", "مواد"),
+    ("group.Collections", "مجموعے"),
+    ("group.Chrome", "چوکھٹا"),
+    ("group.Patterns", "نمونے"),
+    ("page.controls", "کنٹرولز"),
+    ("page.fields", "خانے"),
+    ("page.readout", "قراءت"),
+    ("page.type", "حرف"),
+    ("page.markdown", "Markdown"),
+    ("page.code", "کوڈ"),
+    ("page.image", "تصویر"),
+    ("page.selectable", "منتخب ہونے والا"),
+    ("page.list", "فہرست"),
+    ("page.log", "لاگ"),
+    ("page.grid", "جالی"),
+    ("page.table", "جدول"),
+    ("page.tree", "درخت"),
+    ("page.sections", "حصے"),
+    ("page.theme", "تھیم"),
+    ("page.colors", "رنگ"),
+    ("page.keys", "چابیاں"),
+    ("page.marks", "نشانات"),
+    ("page.chrome-rows", "چوکھٹے کی قطاریں"),
+    ("page.feedback", "تاثرات"),
+    ("page.dialogs", "مکالمے"),
+    ("page.list-detail", "فہرست/تفصیل"),
+    ("page.inspector", "معائنہ کار"),
+    ("page.workspace", "کام کی جگہ"),
+    ("page.navigation", "رہنمائی"),
+    ("page.tab-view", "ٹیب منظر"),
+    ("page.preferences", "ترجیحات"),
+    ("page.about", "تعارف"),
+    ("page.status-page", "حالت کا صفحہ"),
+    ("page.palette", "کمانڈ پیلیٹ"),
+    ("page.main-window", "مرکزی کھڑکی"),
+    ("page.motion", "حرکت"),
+    ("page.expand-motion", "پھیلاؤ کی حرکت"),
+    ("job.controls", "ایک کنٹرول دبائیں۔ اسٹیٹس بار پیغام لکھتا ہے۔"),
+    ("job.fields", "لکھے ہوئے قدروں کا مالک اطلاق ہے۔ لیبل والی قطاریں منتخب اور نقل ہو سکتی ہیں۔"),
+    ("job.readout", "پیش رفت، حلقہ، اور غیر معین گھماؤ۔"),
+    ("job.type", "لیبل، شبیہیں، روابط اور اشارہ۔"),
+    ("job.markdown", "کھینچا ہوا دستاویز۔ نقل منتخب حد لیتی ہے؛ سب نقل ماخذ بھیجتی ہے۔"),
+    ("job.code", "رنگین ماخذ۔ حد منتخب کر کے نقل کریں۔"),
+    ("job.image", "خانہ لوڈ یا غلطی پر بھی ڈبہ رکھتا ہے۔"),
+    ("job.selectable", "متن جسے گھسیٹ کر منتخب اور نقل کیا جا سکتا ہے۔"),
+    ("job.list", "اوپر تلاش اور ان پڑھا/نشان مجازی فہرست چھانتے ہیں۔ بڑے مجموعے کے لیے صفحہ بندی۔"),
+    ("job.virtual-column", "اطلاق کی بنی ہوئی پھیلتی کارڈز؛ صرف منظر کا ٹکڑا لگتا ہے۔"),
+    ("job.log", "بڑھتے لاگ کے مجازی سطر۔"),
+    ("job.grid", "ٹائلیں جو قطار کی اونچائی بانٹتی ہیں۔"),
+    ("job.table", "کالم ترتیب میں رہتے ہیں۔ منجمد آگے والے کالم نظر میں رہتے ہیں۔"),
+    ("job.tree", "پوشے وہیں پھیلتے ہیں۔ پتے منتخب ہوتے ہیں۔"),
+    ("job.sections", "ٹیب، ایکارڈین اور پھیلانے والا۔"),
+    ("job.theme", "نام زد رنگ سیٹ۔ شکل کی پٹی زبان، کثافت، حرف سائز، شکل اور سایہ بدلتی ہے۔"),
+    ("job.colors", "معنوی ٹوکن اور ملانا۔ ویجٹ یہی رنگ استعمال کرتے ہیں۔"),
+    ("job.keys", "ایکشن جدول شارٹ کٹ چلاتا ہے۔ چیٹ شیٹ انہیں فہرست کرتی ہے۔"),
+    ("job.marks", "کارڈ، چپ، بیج اور لکیریں۔"),
+    ("job.chrome-rows", "مینو، ٹول بار، حالت، بریڈ کرمب اور کمانڈ بار۔"),
+    ("job.feedback", "ٹوسٹ، اسکرول، اور بچے پر مصروف تہہ۔"),
+    ("job.dialogs", "مدھم پس منظر پر کھڑکی کے اندر تصدیق کی شیٹ۔"),
+    ("job.list-detail", "تفصیل کے پاس فہرست۔ قطار چنیں؛ دایاں وہی قطار ہے۔"),
+    ("job.inspector", "فائل چنیں۔ درمیان دستاویز ہے۔ دایاں کالم خصوصیات۔"),
+    ("job.workspace", "ایڈیٹر تقسیم۔ ڈاک خاکہ تیسری پٹی بناتا ہے۔ پٹی گھسیٹیں۔"),
+    ("job.navigation", "بائیں جگہیں۔ تنگ کھڑکیاں واپسی کے ساتھ تہہ۔"),
+    ("job.tab-view", "ٹیب پٹی اور کھلے ٹیب کا جسم۔ اطلاق وہ جسم کھینچتا ہے۔"),
+    ("job.preferences", "تلاش کے قابل ترتیبی گروہ۔ قطاریں اطلاق کی ہیں؛ یہ صفحے کا چوکھٹا ہے۔"),
+    ("job.about", "نام، نسخہ، اجازت، کریڈٹ۔ اطلاق اسے مدد ← تعارف پر رکھتے ہیں۔"),
+    ("job.status-page", "خالی یا غلطی کی پٹی۔ جب فہرست میں قطاریں نہ ہوں یا میزبان بند ہو۔"),
+    ("job.palette", "ایکشن جدول پر دھندلی تلاش۔ چھانٹنے کے لیے لکھیں؛ قطار چنیں۔"),
+    ("job.main-window", "مینو، ٹول بار، درمیان اور حالت ایک کھڑکی میں۔"),
+    ("job.motion", "کھولنا اور بند۔ مدھم، اچھال، نبض، ہلا۔ حرکت کم ہو تو کٹ جاتا ہے۔"),
+    ("job.expand-motion", "جھلک سے کھلی اونچائی۔ حرکت کم ہو تو کٹ جاتا ہے۔"),
+    ("wjob.fallback", "کال کے لیے rustdoc دیکھیں۔"),
+    ("wjob.spinner", "غیر معین کام۔ آٹھ نقطے باری باری روشن۔"),
+    ("wjob.progress-ring", "مقررہ کسر حلقے میں۔ اسی صفحے کی پیش رفت بار کی قدر۔"),
+    ("wjob.progress", "مقررہ بار۔ حلقے کی وہی کسر۔"),
+    ("wjob.busy", "سوئچ مصروف جھنڈا ہے۔ آن پر بچہ مدھم اور آٹھ نقطے گھومتے ہیں۔"),
+    ("wjob.toast", "عارضی اطلاع۔ قطار اطلاق کی ہے۔"),
+    ("wjob.scrollbar", "فہرست یا جدول نہ ہونے والی پٹیوں کے لیے تھیم والا اسکرولر۔"),
+    ("wjob.workspace", "ایڈیٹر تقسیم: بائیں فائلیں، ترمیم اور ٹرمینل ٹیب۔ پٹی گھسیٹیں۔"),
+    ("wjob.drawer", "چھپنے والی سائیڈ پٹی۔ بند پر صرف مواد کھینچا جاتا ہے۔"),
+    ("wjob.tool-panel", "ڈاک دبا کر اس خاکے کو اوپر کام کی جگہ کی دائیں پٹی بنائیں۔"),
+    ("wjob.inspector", "فائل چنیں۔ درمیان دستاویز۔ دایاں نام، قسم، راستہ۔"),
+    ("wjob.list-detail", "سائیڈ بار فہرست اور بھرنے والی تفصیل۔"),
+    ("wjob.tab-view", "پٹی کنسٹرکٹر ہے۔ نیچے جسم اطلاق کا مواد ہے۔"),
+    ("wjob.preferences", "تلاش خانے سے گروہ چھانٹیں۔ قطاریں عنوان پھر کلید/قدر۔"),
+    ("wjob.about", "گروہ ڈبے میں چار زنجیریں۔ متن اطلاق دیتا ہے۔"),
+    ("wjob.status-page", "درمیان عنوان، جسم، اور اختیاری عمل۔"),
+    ("wjob.palette", "استفسار خانہ اور ایکشن جدول کی ضربیں۔ پورا صفحہ لے آؤٹ نہیں۔"),
+    ("wjob.navigation", "چوڑا: مواد کے پاس سائیڈ بار۔ تنگ: واپسی والی تہہ۔"),
+    ("wjob.main-window", "چار علاقے دلیلیں ہیں۔ یہ صفحہ وہ ترکیب ہے۔"),
+    ("wjob.dialogs", "بنیادی اور اختیاری منسوخ۔ دیسی فائل چننے والا native_dialog سے۔"),
+    ("wjob.motion", "مدھم اور چھوٹی سلائیڈ۔ iced::Animation اطلاق کا ہے۔"),
+    ("wjob.expand-motion", "جھلک سے کھلنے تک اونچائی۔ پھیلانے والا اور ایکارڈین یہ استعمال کرتے ہیں۔"),
+    ("tab.notes", "نوٹس"),
+    ("tab.guide", "رہنما"),
+    ("tab.changelog", "تبدیلی نامہ"),
+    ("tab.archive", "آرکائیو"),
+    ("tab.drafts", "مسودے"),
+    ("tab.read", "پڑھیں"),
+    ("tab.write", "لکھیں"),
+    ("mail.0", "لسبن اور برلن دفتر کے سہ ماہی نوٹس"),
+    ("mail.1", "لسبن کا سفرنامہ"),
+    ("mail.2", "ڈیزائن جائزہ"),
+    ("mail.3", "0.4 کٹ کی ریلیز فہرست"),
+    ("mail.4", "ٹیم اسٹینڈ اپ"),
+    ("mail.5", "مارچ کا بل"),
+    ("mail.when.0", "آج صبح"),
+    ("mail.when.1", "کل"),
+    ("mail.when.2", "گزشتہ ہفتہ"),
+    ("pref.appearance", "حلیہ"),
+    ("pref.editor", "ایڈیٹر"),
+    ("pref.files", "فائلیں"),
+    ("pref.theme", "تھیم"),
+    ("pref.density", "کثافت"),
+    ("pref.follow-os", "نظام کی پیروی"),
+    ("pref.tab-width", "ٹیب چوڑائی"),
+    ("pref.word-wrap", "لفظ لپیٹ"),
+    ("pref.autosave", "خود محفوظ"),
+    ("pref.default-folder", "طے شدہ پوشہ"),
+    ("pref.on", "چالو"),
+    ("pref.off", "بند"),
+    ("expand.1", "بند ہونے پر یہ کارڈ چھوٹا چہرہ رکھتا ہے اور باقی کاٹتا ہے۔"),
+    ("expand.2", "سر کا تیر پورا نوٹ، شکل اور باقی عبارت کھولتا ہے۔"),
+    ("expand.3", "0.8 حرکت ٹوکن، اوورلے داخلہ اور پھیلاؤ کی اونچائی بھیجتا ہے۔ مکالمے، سائیڈ شیٹ اور پیلیٹ 0–1 پیش رفت سے مدھم اور سرکتے ہیں۔ iced::Animation اور گھڑی اطلاق کی ہیں۔"),
+    ("expand.4", "مقررہ پیش رفت نئی کسر تک نرم ہوتی ہے۔ سیدھی مصروف بار بڑھتی، چلتی، سکڑتی ہے۔ حرکت کم ہر مدت کو 0 ms پر کاٹتی ہے۔"),
+    ("expand.cap", "شکل: ساکن بورڈ۔ کارڈ کھلتے خانہ یہ ڈبہ رکھتا ہے۔"),
+    ("expand.5", "محفوظ اب بھی فائل عمل پر ہے۔ تھیم، کثافت اور اونچا تضاد ٹوکن پر ہیں۔ کھولنا اطلاق کا ہے؛ یہ صفحہ اسے بدلتا ہے۔"),
+    ("hint.button", "ہر نام زد روپ، پھر معطل"),
+    ("hint.type", "صفحے کا عنوان"),
+    ("hint.meta", "میٹا / شرح"),
+    ("hint.recent", "حالیہ"),
+    ("hint.hover", "ہوور"),
+    ("hint.save", "محفوظ کریں"),
+    ("hint.pinned", "پن"),
+    ("hint.closable", "بند ہو سکتا"),
+    ("hint.no-items", "کوئی شے نہیں"),
+    ("hint.install", "تنصیب شروع"),
+    ("hint.document", "دستاویز"),
+    ("hint.places", "جگہیں"),
+    ("hint.properties", "خصوصیات"),
+    ("hint.name", "نام"),
+    ("nav.mail", "ڈاک"),
+    ("nav.files", "فائلیں"),
+    ("nav.settings", "ترتیبات"),
+    ("status.empty-title", "یہاں کچھ نہیں"),
+    ("status.empty-body", "شروع کرنے کے لیے ایک شے بنائیں۔"),
+    ("status.action", "نیا"),
+    ("status.no-sessions", "کوئی نشست نہیں"),
+    ("status.host-q", "کیا میزبان چل رہا ہے؟"),
+    ("status.retry", "دوبارہ کوشش"),
+    ("status.host-down", "میزبان تک نہیں پہنچ سکے"),
+    ("status.host-retry", "دوبارہ کوشش اسی کنسٹرکٹر کا غلطی چہرہ دکھاتی ہے۔"),
+    ("about.blurb", "iced 0.14 ڈیسک ٹاپ اطلاقیوں کے ویجٹ اور چوکھٹا۔"),
+    ("about.credits", "کریڈٹ"),
+    ("dialog.save", "محفوظ کریں"),
+    ("dialog.overwrite", "اوپر لکھیں؟"),
+    ("toast.saved", "notes.txt محفوظ ہو گیا"),
+    ("table.ready", "تیار"),
+    ("table.idle", "فارغ"),
+    ("table.library", "لائبریری"),
+    ("table.catalog", "فہرست"),
+    ("table.widget", "ویجٹ"),
+    ("table.app", "اطلاق"),
+    ("search.placeholder", "تلاش"),
+    ("expand.6", "ایکارڈین بہت سے عنوان ہیں۔ یہ ایک کارڈ ہے۔ دونوں motion::expand سے کھینچے جاتے ہیں تاکہ اونچائی کودے نہیں، پھسلے۔"),
+    ("expand.7", "نوٹس اتنے لمبے ہوں تو جھلک پھر بھی دو سطریں ہیں۔ کھلنا شکل اور آخری پیراگراف سے آگے بڑھنا چاہیے۔"),
+    ("list.all", "سب"),
+    ("list.unread", "ناخواندہ"),
+    ("list.flagged", "نشان زد"),
+    ("list.oneline", "ایک سطر"),
+    ("list.cards", "کارڈز"),
+    ("list.empty", "کوئی پیغام نہیں ملا"),
+    ("list.range", "{start}–{end} از {total} (صفحہ {page})"),
+    ("toast.action", "اطلاع"),
+    ("busy.flag", "مصروف"),
+    ("busy.body", "تہہ اس کارڈ کو مدھم کرتی ہے۔ کام چلتے آٹھ نقطے گھومتے ہیں۔"),
+    ("sm.hint", "عنوانوں اور بال کی لکیروں والے حصے۔"),
+    ("export", "برآمد…"),
+    ("hit.inbox", "ان باکس"),
+    ("hit.sent", "بھیجا"),
+    ("hit.drafts", "مسودے"),
+    ("hit.archive", "آرکائیو"),
+    ("field.focus", "خانہ فوکس کریں"),
+    ("field.focus-hint", "Enter بھیجتا ہے۔ فوکس نام پر جاتا ہے۔"),
+    ("field.support-hint", "خانے کے نیچے معاون متن اور غلطی کی روشنائی۔"),
+    ("date.appointment", "ملاقات"),
+    ("state.disabled", "بند"),
+    ("time.24h", "24 گھنٹے"),
+    ("time.12h", "12 گھنٹے"),
+    ("time.seconds", "سیکنڈ کے ساتھ"),
+    ("time.step-hint", "قدم کے لیے خانہ دبائیں۔ AM / PM آدھا دن بدلتا ہے۔"),
+    ("ss.title", "معائنہ کار"),
+    ("host.search-view", "تلاش منظر"),
+    ("host.text-input", "متن خانہ"),
+    ("host.field-support", "خانہ معاونت"),
+    ("host.password", "پاس ورڈ"),
+    ("host.secret", "خفیہ خانہ"),
+    ("host.value-field", "قدر خانہ"),
+    ("host.textarea", "متن علاقہ"),
+    ("host.search", "تلاش"),
+    ("host.suggest", "تجویز"),
+    ("host.select", "چنیں"),
+    ("host.number", "عدد"),
+    ("host.date", "تاریخ"),
+    ("host.time", "وقت"),
+    ("host.virtual-column", "مجازی ستون"),
+    ("host.list", "فہرست"),
+    ("host.pagination", "صفحات"),
+    ("host.accordion", "ایکارڈین"),
+    ("host.expander", "پھیلانے والا"),
+    ("host.tabs", "ٹیب"),
+    ("host.command-bar", "کمانڈ بار"),
+    ("host.context-menu", "سیاق مینو"),
+    ("host.sectioned-menu", "حصہ وار مینو"),
+    ("host.cascade-menu", "قطار مینو"),
+    ("host.breadcrumb", "راستہ"),
+    ("host.menu", "مینو"),
+    ("host.toolbar", "ٹول بار"),
+    ("host.status-bar", "حالت بار"),
+    ("host.busy", "مصروف تہہ"),
+    ("host.toast", "اطلاع"),
+    ("host.scrollbar", "اسکرول بار"),
+    ("host.button", "بٹن"),
+    ("host.toggle-icon-button", "ٹوگل آئیکن بٹن"),
+    ("host.slider", "سلائیڈر"),
+    ("host.button-group", "بٹن گروہ"),
+    ("host.checkbox", "نشان خانہ"),
+    ("host.radio", "ریڈیو"),
+    ("host.switch", "سوئچ"),
+    ("host.range-slider", "حد سلائیڈر"),
+    ("host.segmented-button", "حصہ دار بٹن"),
+    ("host.icon-button", "آئیکن بٹن"),
+    ("host.checkbox-indeterminate", "غیر معین نشان خانہ"),
+    ("host.split-button", "تقسیم بٹن"),
+    ("host.toggle-button", "ٹوگل بٹن"),
+    ("host.progress", "پیشرفت"),
+    ("host.progress-ring", "پیشرفت حلقہ"),
+    ("host.spinner", "گھومنے والا"),
+    ("host.label", "لیبل"),
+    ("host.icon", "آئیکن"),
+    ("host.tooltip", "اشارہ"),
+    ("host.rich-tooltip", "بھرپور اشارہ"),
+    ("host.link", "ربط"),
+    ("host.markdown", "مارک ڈاؤن"),
+    ("host.code", "کوڈ"),
+    ("host.image", "تصویر"),
+    ("host.selectable", "منتخب ہو سکتا"),
+    ("host.log", "لاگ"),
+    ("host.grid", "جالی"),
+    ("host.table", "جدول"),
+    ("host.tree", "درخت"),
+    ("host.theme", "تھیم"),
+    ("host.colors", "رنگ"),
+    ("host.keys", "چابیاں"),
+    ("host.cheatsheet", "چابیاں کی فہرست"),
+    ("host.filter-chips", "فلٹر چپس"),
+    ("host.chip", "چپ"),
+    ("host.badge", "بیج"),
+    ("host.card", "کارڈ"),
+    ("host.rule", "لکیر"),
+    ("host.wrap", "لپیٹ"),
+    ("host.banner", "بینر"),
+    ("host.side-sheet", "بغلی ورق"),
+    ("host.dialogs", "مکالمے"),
+    ("host.list-detail", "فہرست/تفصیل"),
+    ("host.inspector", "معائنہ کار"),
+    ("host.drawer", "دراز"),
+    ("host.workspace", "کام کی جگہ"),
+    ("host.tool-panel", "اوزار پٹی"),
+    ("host.nav-rail", "رہنما ریل"),
+    ("host.navigation", "رہنما منظر"),
+    ("host.tab-view", "ٹیب منظر"),
+    ("host.preferences", "ترجیحات"),
+    ("host.about", "تعارف"),
+    ("host.status-page", "حالت صفحہ"),
+    ("host.palette", "کمانڈ پیلیٹ"),
+    ("host.main-window", "مرکزی کھڑکی"),
+    ("host.motion", "حرکت"),
+    ("host.expand-motion", "پھیلاؤ حرکت"),
+    ("dialog.open-ellipsis", "کھولیں…"),
+    ("dialog.save-ellipsis", "محفوظ…"),
+    ("dialog.folder", "پوشہ…"),
+    ("dialog.open", "مکالمہ کھولیں"),
+    ("dialog.last-saved", "ابھی محفوظ ہوا۔"),
+    ("dialog.overwrite-notes", "notes.txt اوپر لکھیں؟"),
+    ("dialog.dont-save", "محفوظ نہ کریں"),
+    ("colors.hint", "فعال رنگ سے دھلے اور متن رنگ۔"),
+    ("keys.type", "ایک کلید دبائیں"),
+    ("keys.hint", "ایک حرف، Enter، Escape، تیر، یا فنکشن کلید دبائیں۔"),
+    ("img.hint", "سما، ڈھانپ، لوڈ، اور غلطی۔ بائٹس اطلاق کے ہیں۔"),
+    ("img.contain", "سما"),
+    ("img.cover", "ڈھانپ"),
+    ("img.loading", "لوڈ ہو رہا"),
+    ("img.missing", "غائب"),
+    ("tip.title", "اشارہ"),
+    ("tip.write", "بفر قرص پر لکھیں۔"),
+    ("tip.learn", "مزید جانیں"),
+    ("sheet.hint", "خصوصیات کے لیے معائنہ ورق کھولیں۔"),
+    ("sheet.open", "ورق کھولیں"),
+    ("sheet.close", "ورق بند کریں"),
+    ("tab.close-hint", "× سے ٹیب بند کریں۔ دوسرا ٹیب یہ متن بدلتا ہے۔"),
+    ("pal.hint", "عمل جدول چھاننے کے لیے لکھیں۔ قطار چنیں، یا پیرامیٹر کے لیے سطر پر جائیں۔"),
+    ("ws.move-btn", "ٹرمنل دریافت کار کے پاس لے جائیں"),
+    ("detail.pick", "ایک پیغام چنیں"),
+    ("detail.when", "آج صبح ملا۔"),
+    ("insp.folder", "پوشہ"),
+    ("insp.kind-rust", "Rust"),
+    ("insp.kind-md", "Markdown"),
+    ("insp.root", "کریٹ جڑ۔"),
+    ("insp.sources", "لائبریری ماخذ۔"),
+    ("insp.icons", "آئیکن اور دورہ GIF۔"),
+    ("insp.guide", "iced کے لیے وجٹس اور فریم۔"),
+    ("insp.kind", "قسم"),
+    ("drawer.hide", "فائلیں چھپائیں"),
+    ("drawer.show", "فائلیں دکھائیں"),
+    ("drawer.hint", "ترمیم — کھڑکی کا سائز بدلیں یا فائل پٹی چھپائیں۔"),
+    ("cheat.filter", "شارٹ کٹ چھانٹیں"),
+    ("motion.sheet", "ورق"),
+    ("motion.fade-slide", "مدھم اور چھوٹی پھسل 0 سے 1۔"),
+    ("motion.reduce", "حرکت کم کریں"),
+    ("motion.close", "تہ بند کریں"),
+    ("motion.open", "تہ کھولیں"),
+    ("motion.fade", "مدھم"),
+    ("motion.fade-out", "مدھم ہو کر جائیں"),
+    ("motion.fade-in", "مدھم ہو کر آئیں"),
+    ("motion.fade-body", "Slide::None. Tokens::fade."),
+    ("motion.bounce", "اچھال"),
+    ("motion.bounce-out", "باہر اچھال"),
+    ("motion.bounce-in", "اندر اچھال"),
+    ("motion.bounce-body", "bounce_out اترتے ہوئے اچھلتی ہے۔"),
+    ("motion.pulse", "دھڑکن"),
+    ("motion.pulse-body", "شفافیت دہراتی ہے۔ کم حرکت آرام رکھتی ہے۔"),
+    ("motion.shake", "ہلانا"),
+    ("motion.shake-body", "گھٹتی لرزش، پھر آرام۔"),
+    ("expand.collapse", "سمیٹیں"),
+    ("expand.open", "پھیلائیں"),
+    ("win.hint", "فائل، ترمیم اور منظر اس کھڑکی میں ہیں۔ مینو کھولیں، پھر محفوظ کریں۔"),
+    ("variant.primary", "بنیادی"),
+    ("variant.quiet", "خاموش"),
+    ("variant.danger", "خطرہ"),
+    ("variant.ghost", "شبح"),
+    ("variant.chip", "چپ"),
+    ("variant.success", "کامیابی"),
+    ("variant.warning", "انتباہ"),
+    ("variant.outlined", "بارڈر"),
+    ("variant.elevated", "ابھرا"),
+    ("slider.now", "اب"),
+    ("slider.vol", "آواز"),
+    ("prog.min", "1 منٹ"),
+    ("note.accent-on", "زور آن"),
+    ("note.accent-idle", "زور بیکار"),
+    ("color.hover", "ہوور"),
+    ("color.pressed", "دباؤ"),
+    ("color.chip", "چپ"),
+    ("color.selection", "چنائش"),
+    ("color.text-canvas", "کینوس پر متن"),
+    ("color.text-surface", "سطح پر متن"),
+    ("color.text-panel", "پینل پر متن"),
+    ("color.text-primary", "بنیادی پر متن"),
+    ("color.scrollbar", "اسکرول بار"),
+    ("color.cursor", "ان پٹ کرسر"),
+    ("color.sel", "ان پٹ چنائش"),
+    ("color.link", "ربط"),
+    ("color.focus", "فوکس"),
+    ("color.lighten", "بنیادی ہلکا"),
+    ("color.darken", "بنیادی گہرا"),
+    ("pal.placeholder", "ایک حکم لکھیں"),
+    ("dock", "ڈاک"),
+    ("show", "دکھائیں"),
+    ("hide", "چھپائیں"),
+    ("cascade.hint", "بنیادی قطار ذیلی مینو کھولتی ہے۔"),
+    ("status.ready", "تیار"),
+    ("status.socket", "ساکٹ بند"),
+    ("status.hints", "Tab خانے  ·  Esc"),
+    ("field.email-error", "درست پتہ لکھیں۔"),
+    ("field.email-hint", "ہم آپ کا ای میل نہیں بانٹتے۔"),
+    ("field.secret", "راز"),
+    ("field.secret-hint", "ٹوکن دکھائیں پھر نقل کریں۔"),
+    ("field.token", "ٹوکن"),
+    ("field.secret-note", "دکھائیں، پھر نقل۔"),
+    ("field.value-hint", "لیبل والی قدر مشترک فارم گٹر کے ساتھ۔ منتخب کریں پھر نقل۔"),
+    ("field.path", "راستہ"),
+    ("field.id", "شناخت"),
+    ("field.email", "ای میل"),
+    ("field.suggest-hint", "کسی بھی خانے پر تجویز۔ چننے سے استفسار بھرتا ہے۔"),
+    ("field.command", "کمانڈ"),
+    ("recent", "حالیہ"),
+    ("crumb.home", "گھر"),
+    ("crumb.gallery", "گیلری"),
+    ("vc.hint", "virtual_column سے پھیلتے کارڈ (صرف منظر لدا ہے)۔"),
+    ("vc.open", "کھلا چہرہ۔ صرف یہ ٹکڑا لدا ہے۔"),
+    ("acc.files", "فائلیں"),
+    ("acc.appear", "شکل"),
+    ("acc.advanced", "اعلیٰ"),
+    ("acc.body.files", "نیا، کھولیں، محفوظ فائل مینو میں ہیں۔"),
+    ("acc.body.appear", "ہلکا، گہرا اور اونچا تضاد تھیم قطار سے۔"),
+    ("acc.body.adv", "کمانڈ پیلیٹ منظر سے۔"),
+    ("expand.title", "اجرائی نوٹس"),
+    ("ctx.hint", "اشارے پر چھوٹا مینو۔ زندہ کے لیے صفحے پر دایاں کلک۔"),
+    ("scroll.0", "گیلری کھڑکی چل پڑی"),
+    ("scroll.1", "فہرست لوڈ ہوئی"),
+    ("scroll.2", "گہرا رنگ سیٹ لگایا"),
+    ("scroll.3", "notes.txt کھلا"),
+    ("scroll.4", "notes.txt محفوظ ہوا"),
+    ("scroll.5", "دستیاب تازہ کاری نصب ہوئی"),
+    ("scroll.6", "خفیہ خانہ نقل ہوا"),
+    ("scroll.7", "کمانڈ پیلیٹ چھپا"),
+    ("scroll.8", "پچھلی تقسیم بحال"),
+    ("scroll.9", "فائلوں کے عنوان پر گئے"),
+    ("scroll.10", "محفوظ شیٹ بند"),
+    ("scroll.11", "اگلے حکم کے لیے تیار"),
+    ("go.line", "سطر پر جائیں"),
+    ("note.new-file", "نئی فائل"),
+    ("note.nothing-undo", "کالعدم کرنے کو کچھ نہیں"),
+    ("note.nothing-redo", "دہرانے کو کچھ نہیں"),
+    ("tree.entry", "اندراج"),
+    ("tree.empty", "assets خالی پوشہ ہے۔"),
+    ("tree.selected", "منتخب"),
+    ("callout.watch", "یہ دیکھو"),
+    ("paste", "چسپاں"),
+    ("cut", "کاٹیں"),
+    ("copy", "نقل"),
+    ("copy-all", "سب نقل"),
+    ("code.hint", "منتخب کرنے کے لیے گھسیٹیں۔ زبان اور رنگ {theme}۔ نمایاں: {hl}۔"),
+    ("md.hint", "گھسیٹیں یا دو بار دبائیں۔ نقل وہ متن لیتی ہے۔ سب نقل ماخذ بھیجتی ہے۔"),
+    ("md.showing", "{title} دکھایا جا رہا ہے"),
+    ("select.hint", "معائنہ قطاروں کا مشترکہ لیبل گٹر ہے۔ نقل پہلی چنائش بھیجتی ہے۔"),
+    ("field.host", "میزبان"),
+    ("field.clock", "گھڑی"),
+    ("print", "چھاپیں"),
+    ("share", "بانٹیں"),
+    ("find", "ڈھونڈیں"),
+    ("more", "مزید"),
+    ("save-as", "بطور محفوظ…"),
+    ("cal.day", "دن"),
+    ("cal.week", "ہفتہ"),
+    ("cal.month", "مہینہ"),
+    ("table.name", "نام"),
+    ("table.role", "کردار"),
+    ("table.status", "حالت"),
+    ("table.path", "راستہ"),
+    ("table.pin-hint", "نام جما ہوا ہے۔ کردار، حالت اور راستہ افقی اسکرول کے ساتھ ہیں۔"),
+    ("ws.explorer", "دریافت کار"),
+    ("ws.edit", "ترمیم"),
+    ("ws.terminal", "ٹرمنل"),
+    ("ws.outline", "خاکہ"),
+    ("ws.undocked", "خاکہ الگ ہوا"),
+    ("ws.docked", "خاکہ آغاز جانب لگا"),
+    ("ws.moved", "ٹرمنل دریافت کار کے پاس گیا"),
+    ("ws.hint", "ترمیم خانہ۔ اوپر والے ٹیب ترمیم اور ٹرمنل بدلتے ہیں۔ سائز کے لیے پٹی گھسیٹیں۔"),
+    ("nav.inbox", "ان باکس"),
+    ("nav.calendar", "کیلنڈر"),
+    ("nav.photos", "تصاویر"),
+    ("nav.music", "موسیقی"),
+    ("nav.chat", "بات چیت"),
+    ("nav.maps", "نقشے"),
+    ("nav.notes", "نوٹس"),
+    ("nav.terminal", "ٹرمنل"),
+    ("nav.help", "مدد"),
+    ("grid.pick", "ٹائل چنیں"),
+    ("grid.opened", "{name} کھلا"),
+    ("hint.split", "اصل عمل اور شیوران مینو۔ فارغ اور بند۔"),
+    ("hint.toggle", "دبا (منتخب)، فارغ، اور بند۔"),
+    ("hint.check", "منتخب، فارغ، اور بند۔"),
+    ("hint.radio", "سیٹ میں ایک انتخاب۔ منتخب، فارغ، اور بند۔"),
+    ("hint.switch", "چالو، بند، اور غیر فعال۔"),
+    ("hint.card", "ٹیگ والا دستاویز کارڈ، اور خالی پڑوسی۔"),
+    ("hint.chip", "فلٹر چپ دبائیں، یا × سے ٹیگ ہٹائیں۔"),
+    ("hint.icon", "کروم سیٹ اور ایپ نشان (بھرا کالا SVG، ٹوکن روشنائی)۔"),
+    ("face.light", "ہلکا"),
+    ("face.dark", "گہرا"),
+    ("face.bold", "موٹا"),
+    ("face.italic", "ترچھا"),
+    ("face.strike", "کاٹا"),
+    ("check.accept", "قبول"),
+    ("check.optional", "اختیاری"),
+    ("check.locked", "مقفل"),
+    ("radio.a", "اختیار ا"),
+    ("radio.b", "اختیار ب"),
+    ("switch.notify", "اطلاع"),
+    ("switch.sounds", "آوازیں"),
+    ("prog.full", "بھرا"),
+    ("prog.working", "کام ہو رہا"),
+    ("card.saved", "محفوظ"),
+    ("card.markdown", "مارک ڈاؤن"),
+    ("card.local", "مقامی"),
+    ("card.last-saved", "ابھی محفوظ ہوا۔ پھر لکھنے کے لیے فائل ← محفوظ۔"),
+    ("card.empty", "خالی کارڈ"),
+    ("filter.attachments", "منسلکات"),
+    ("banner.update", "تازہ کاری دستیاب"),
+    ("banner.install", "نصب"),
+    ("group.identity", "شناخت"),
+    ("group.remember", "یاد رکھیں"),
+    ("group.disabled", "بند گروہ"),
+    ("group.readonly", "اس گروہ کے خانے صرف پڑھنے کے ہیں۔"),
+    ("chip.add-note", "نوٹ شامل"),
+    ("chip.suggest", "تجویز"),
+    ("chip.input", "اندراج"),
+    ("note.copied", "نقل ہوا"),
+    ("note.pasted", "چسپاں ہوا"),
+    ("note.clipboard-empty", "کلپ بورڈ خالی"),
+    ("note.selected-all", "سب منتخب"),
+    ("note.save-cancelled", "محفوظ منسوخ"),
+    ("note.discarded", "notes.txt چھوڑ دیا"),
+    ("note.copied-secret", "راز نقل ہوا۔"),
+    ("note.dismissed-local", "مقامی ہٹایا"),
+    ("chip.rust", "Rust"),
+    ("chip.iced", "iced"),
+    ("chip.desktop", "ڈیسک ٹاپ"),
+    ("nav.files-blurb", "مقامی مسودے اور منسلکات۔"),
+    ("nav.files-body", "notes.txt کھلا دستاویز ہے۔"),
+    ("nav.settings-blurb", "حلیہ اور کثافت۔"),
+    ("nav.settings-body", "تھیم گیلری رنگ قطار کی پیروی کرتا ہے۔"),
+    ("nav.mail-blurb", "ان باکس، مسودے، بھیجا۔"),
+    ("nav.mail-body", "سہ ماہی نوٹس آج صبح آئے۔"),
+    ("tab.guide-body", "کریٹ نصب کریں، پھر run! سے کھڑکی کھولیں۔ فریم، اعمال اور تھیم icedtea سے۔"),
+    ("tab.changelog-body", "0.2 crates.io پر پہلی لائبریری کٹ ہے۔"),
+    ("tab.notes-body", "اس ٹیب میں ہفتہ وار خلاصہ لکھیں۔ فائل / ترمیم / منظر کھڑکی کے فریم میں رہتے ہیں۔"),
+    ("detail.body", "نوٹس کا شکریہ۔ دوپہر کے کھانے کے بعد فالو کروں گا۔"),
+];
+
+pub fn markdown(lang: &str) -> &'static str {
+    let primary = lang
+        .split(['-', '_'])
+        .next()
+        .unwrap_or("en")
+        .to_ascii_lowercase();
+    match primary.as_str() {
+        "vi" => MARKDOWN_VI,
+        "ja" => MARKDOWN_JA,
+        "zh" => MARKDOWN_ZH,
+        "ar" => MARKDOWN_AR,
+        "ur" => MARKDOWN_UR,
+        _ => crate::samples::MARKDOWN,
+    }
+}
+
+const MARKDOWN_VI: &str = r#"# Markdown
+
+Một điều khiển tài liệu, không phải một dòng giả. Tiêu đề, nhấn mạnh, danh sách,
+trích dẫn, bảng, đường kẻ, việc, liên kết, và mã rào.
+
+## Tiêu đề
+
+### Cấp 3
+#### Cấp 4
+##### Cấp 5
+###### Cấp 6
+
+## Trong dòng
+
+Đoạn với **đậm**, *nghiêng*, ***cả hai***, `mã trong dòng`, và một
+[liên kết](https://example.com).
+
+~~Gạch ngang nếu bộ phân tích giữ nó.~~
+
+## Danh sách
+
+- Không thứ tự một
+- Không thứ tự hai
+  - Lồng
+- Không thứ tự ba
+
+1. Có thứ tự một
+2. Có thứ tự hai
+3. Có thứ tự ba
+
+- [ ] Việc chưa xong
+- [x] Việc đã xong
+
+## Trích
+
+> Trích đoạn với **nhấn mạnh** và `mã`.
+>
+> Đoạn thứ hai trong trích.
+
+## Bảng
+
+| Tên | Vai | Sẵn |
+| --- | --- | --- |
+| Danh sách | tập hợp | có |
+| Bảng | tập hợp | có |
+| Cây | tập hợp | có |
+
+## Ảnh
+
+![Logo](pixel.png)
+
+## Đường kẻ
+
+---
+
+## Mã rào
+
+```rust
+fn main() {
+    println!("hello from a fence");
+}
+```
+
+Đoạn kết sau hàng rào.
+"#;
+
+const MARKDOWN_JA: &str = r#"# Markdown
+
+一行のstubsではなく、文書コントロールです。見出し、強調、リスト、
+引用、表、罫線、タスク、リンク、フェンス付きコード。
+
+## 見出し
+
+### 第3水準
+#### 第4水準
+##### 第5水準
+###### 第6水準
+
+## インライン
+
+**太字**、*斜体*、***両方***、`インラインコード`、そして
+[リンク](https://example.com) のある段落。
+
+~~パーサが残すなら取り消し線。~~
+
+## リスト
+
+- 順不同の一
+- 順不同の二
+  - 入れ子
+- 順不同の三
+
+1. 番号付きの一
+2. 番号付きの二
+3. 番号付きの三
+
+- [ ] 未完了の作業
+- [x] 完了した作業
+
+## 引用
+
+> **強調** と `コード` のある引用。
+>
+> 引用の第二段落。
+
+## 表
+
+| 名前 | 役割 | 準備 |
+| --- | --- | --- |
+| リスト | コレクション | はい |
+| 表 | コレクション | はい |
+| ツリー | コレクション | はい |
+
+## 画像
+
+![Logo](pixel.png)
+
+## 罫線
+
+---
+
+## フェンス付きコード
+
+```rust
+fn main() {
+    println!("hello from a fence");
+}
+```
+
+フェンスの後の結びの段落。
+"#;
+
+const MARKDOWN_ZH: &str = r#"# Markdown
+
+这是文档控件，不是一行占位。标题、强调、列表、
+引用、表格、分隔线、任务、链接和围栏代码。
+
+## 标题
+
+### 三级
+#### 四级
+##### 五级
+###### 六级
+
+## 行内
+
+带 **粗体**、*斜体*、***两者***、`行内代码` 和
+[链接](https://example.com) 的段落。
+
+~~如果解析器保留，这是删除线。~~
+
+## 列表
+
+- 无序其一
+- 无序其二
+  - 嵌套
+- 无序其三
+
+1. 有序其一
+2. 有序其二
+3. 有序其三
+
+- [ ] 未完成任务
+- [x] 已完成任务
+
+## 引用
+
+> 带 **强调** 和 `代码` 的引用。
+>
+> 引用里的第二段。
+
+## 表格
+
+| 名称 | 角色 | 就绪 |
+| --- | --- | --- |
+| 列表 | 集合 | 是 |
+| 表格 | 集合 | 是 |
+| 树 | 集合 | 是 |
+
+## 图像
+
+![Logo](pixel.png)
+
+## 分隔线
+
+---
+
+## 围栏代码
+
+```rust
+fn main() {
+    println!("hello from a fence");
+}
+```
+
+围栏之后的收束段。
+"#;
+
+const MARKDOWN_AR: &str = r#"# Markdown
+
+عنصر مستند، لا سطر واحد. عناوين وتأكيد وقوائم
+واقتباسات وجداول وخطوط ومهام وروابط ورمز مسيّج.
+
+## عناوين
+
+### المستوى 3
+#### المستوى 4
+##### المستوى 5
+###### المستوى 6
+
+## في السطر
+
+فقرة فيها **عريض** و*مائل* و***كلاهما*** و`رمز داخلي` و
+[رابط](https://example.com).
+
+~~شطب إن أبقاه المحلل.~~
+
+## قوائم
+
+- غير مرتب واحد
+- غير مرتب اثنان
+  - متداخل
+- غير مرتب ثلاثة
+
+1. مرتب واحد
+2. مرتب اثنان
+3. مرتب ثلاثة
+
+- [ ] مهمة غير منجزة
+- [x] مهمة منجزة
+
+## اقتباس
+
+> اقتباس فيه **تأكيد** و`رمز`.
+>
+> الفقرة الثانية في الاقتباس.
+
+## جدول
+
+| الاسم | الدور | جاهز |
+| --- | --- | --- |
+| قائمة | مجموعة | نعم |
+| جدول | مجموعة | نعم |
+| شجرة | مجموعة | نعم |
+
+## صورة
+
+![Logo](pixel.png)
+
+## خط
+
+---
+
+## رمز مسيّج
+
+```rust
+fn main() {
+    println!("hello from a fence");
+}
+```
+
+فقرة ختامية بعد السياج.
+"#;
+
+const MARKDOWN_UR: &str = r#"# Markdown
+
+دستاویز کنٹرول، ایک سطر نہیں۔ سرخیاں، زور، فہرستیں،
+اقتباس، جدول، لکیریں، کام، روابط اور باڑ والا کوڈ۔
+
+## سرخیاں
+
+### سطح 3
+#### سطح 4
+##### سطح 5
+###### سطح 6
+
+## سطر میں
+
+پیراگراف **موٹا**، *ترچھا*، ***دونوں***، `ان لائن کوڈ`، اور
+[ربط](https://example.com) کے ساتھ۔
+
+~~کاٹا ہوا اگر تجزیہ کار رکھے۔~~
+
+## فہرستیں
+
+- بے ترتیب ایک
+- بے ترتیب دو
+  - اندرونی
+- بے ترتیب تین
+
+1. مرتب ایک
+2. مرتب دو
+3. مرتب تین
+
+- [ ] ادھورا کام
+- [x] مکمل کام
+
+## اقتباس
+
+> **زور** اور `کوڈ` والا اقتباس۔
+>
+> اقتباس کا دوسرا پیراگراف۔
+
+## جدول
+
+| نام | کردار | تیار |
+| --- | --- | --- |
+| فہرست | مجموعہ | ہاں |
+| جدول | مجموعہ | ہاں |
+| درخت | مجموعہ | ہاں |
+
+## تصویر
+
+![Logo](pixel.png)
+
+## لکیر
+
+---
+
+## باڑ والا کوڈ
+
+```rust
+fn main() {
+    println!("hello from a fence");
+}
+```
+
+باڑ کے بعد آخری پیراگراف۔
+"#;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use icedtea::i18n::{Catalog, Locale};
+    use std::collections::BTreeSet;
+
+    fn table_keys<'a>(rows: &'a [(&'a str, &'a str)]) -> BTreeSet<&'a str> {
+        rows.iter().map(|(k, _)| *k).collect()
+    }
+
+    #[test]
+    fn every_locale_fills_the_same_gallery_keys() {
+        let want: BTreeSet<&str> = keys().collect();
+        assert_eq!(table_keys(AR), want);
+        assert_eq!(table_keys(UR), want);
+        for lang in ["en", "vi", "ja", "zh", "ar", "ur"] {
+            let mut cat = Catalog::for_locale(&Locale::new(lang));
+            fill(&mut cat, lang);
+            for key in &want {
+                let v = cat.t(key);
+                assert!(!v.is_empty(), "{lang} {key} empty");
+                assert_ne!(v, *key, "{lang} {key} missing fill");
+            }
+        }
+    }
+}

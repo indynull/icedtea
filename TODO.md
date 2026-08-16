@@ -5,6 +5,11 @@
 ## Consider
 
 - Plugin surfaces and extension host chrome.
+- `segmented_button` takes `ControlSize` for in-pane exclusive choice
+  (Prompt / Assistant). `tab_bar` stays the pane strip (overflow, close,
+  underbar).
+- `markdown_view` page vs inset type map: inset uses title for H1 and
+  meta for body. `font_scale` stays the user scale.
 
 ## Discard
 
@@ -26,3 +31,5 @@ Non-goals:
 - Bottom sheets (mobile).
 - Loading indicator as M3 Expressive shape-morph.
 - Floating toolbar as a pill / expressive float.
+- Compact `tab_bar` as a second size. In-pane exclusive tabs are
+  `segmented_button`.

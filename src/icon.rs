@@ -78,11 +78,44 @@ impl Icon {
     }
 }
 
-/// Optional leading and trailing chrome icons on a labeled control.
+/// A chrome glyph: a shipped [`Icon`] or application SVG bytes.
+///
+/// Bytes are filled black paths (`fill="#000"`). [`crate::widget::icon_svg`]
+/// recolors them with token ink. The seven [`Icon`] names stay the
+/// shipped set.
+///
+/// ```
+/// use icedtea::icon::{Glyph, Icon};
+/// assert_eq!(Glyph::from(Icon::Search).bytes(), Icon::Search.bytes());
+/// let mark = br##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="#000"><path d="M8 1 15 8 8 15 1 8z"/></svg>"##;
+/// assert!(Glyph::Bytes(mark).bytes().starts_with(b"<svg"));
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Glyph {
+    Named(Icon),
+    Bytes(&'static [u8]),
+}
+
+impl From<Icon> for Glyph {
+    fn from(icon: Icon) -> Self {
+        Self::Named(icon)
+    }
+}
+
+impl Glyph {
+    pub fn bytes(self) -> &'static [u8] {
+        match self {
+            Self::Named(icon) => icon.bytes(),
+            Self::Bytes(bytes) => bytes,
+        }
+    }
+}
+
+/// Optional leading and trailing chrome glyphs on a labeled control.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Icons {
-    pub leading: Option<Icon>,
-    pub trailing: Option<Icon>,
+    pub leading: Option<Glyph>,
+    pub trailing: Option<Glyph>,
 }
 
 impl Icons {
@@ -91,24 +124,24 @@ impl Icons {
         trailing: None,
     };
 
-    pub fn leading(icon: Icon) -> Self {
+    pub fn leading(icon: impl Into<Glyph>) -> Self {
         Self {
-            leading: Some(icon),
+            leading: Some(icon.into()),
             trailing: None,
         }
     }
 
-    pub fn trailing(icon: Icon) -> Self {
+    pub fn trailing(icon: impl Into<Glyph>) -> Self {
         Self {
             leading: None,
-            trailing: Some(icon),
+            trailing: Some(icon.into()),
         }
     }
 
-    pub fn both(leading: Icon, trailing: Icon) -> Self {
+    pub fn both(leading: impl Into<Glyph>, trailing: impl Into<Glyph>) -> Self {
         Self {
-            leading: Some(leading),
-            trailing: Some(trailing),
+            leading: Some(leading.into()),
+            trailing: Some(trailing.into()),
         }
     }
 }
@@ -128,10 +161,17 @@ mod tests {
             assert_eq!(icon.bytes(), s.as_bytes());
         }
         assert!(Icon::from_slug("nope").is_none());
-        assert_eq!(Icons::trailing(Icon::Close).trailing, Some(Icon::Close));
+        assert_eq!(
+            Icons::trailing(Icon::Close).trailing,
+            Some(Glyph::Named(Icon::Close))
+        );
         assert_eq!(
             Icons::both(Icon::Search, Icon::Menu).leading,
-            Some(Icon::Search)
+            Some(Glyph::Named(Icon::Search))
         );
+        let mark: &'static [u8] = br##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="#000"><path d="M8 1 15 8 8 15 1 8z"/></svg>"##;
+        assert_eq!(Glyph::Bytes(mark).bytes(), mark);
+        assert_eq!(Glyph::from(Icon::Check).bytes(), Icon::Check.bytes());
+        assert_eq!(Icon::ALL.len(), 7);
     }
 }

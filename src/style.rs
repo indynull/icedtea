@@ -975,6 +975,18 @@ mod tests {
             component_radius(material, crate::m3::shape::Component::Card)
         );
         assert!(card(material, false).border.radius.top_left > 0.0);
+        let pill = tok.with_shape(crate::m3::ShapePolicy::Pill);
+        assert_eq!(
+            card(pill, false).border.radius.top_left,
+            crate::m3::Shape::Medium.dp()
+        );
+        assert!(card(pill, false).border.radius.top_left < 20.0);
+        assert_eq!(
+            crate::m3::shape::Component::Button
+                .shape_for(crate::m3::ShapePolicy::Pill)
+                .dp(),
+            crate::m3::Shape::Full.dp()
+        );
         let flat = tok.with_elevation(crate::m3::ElevationPolicy::Flat);
         assert_eq!(raised_card(flat).shadow.blur_radius, 0.0);
         assert_eq!(dialog_sheet_face(flat).shadow.blur_radius, 0.0);

@@ -4,7 +4,8 @@ description: >
   Catch and fix icedtea gallery and constructor defects before release:
   capture shots, inspect with vision, live-pass when needed, fix library
   or demos, re-verify. Use for gallery QA, pixel polish, "is the gallery
-  broken", or pre-release polish.
+  broken", locale or right-to-left scoring, leftover English, empty
+  control pads, or pre-release polish.
 metadata:
   short-description: "Find and fix icedtea gallery bugs"
 ---
@@ -22,11 +23,13 @@ clip, dead overflow, empty first paint, or stub demos from the gallery.
 
 **Capture:** `scripts/gallery_qa.py` via `just gallery-qa`.  
 **Score:** `references/rubric.md`.  
+**Direction:** `references/rtl.md` (Firefox + Microsoft).  
 **Live walk:** `references/manual-pass.md`.
 
 ```bash
 just gallery-qa --interact                   # full tour + inject
 just gallery-qa --interact --beats 0,8       # iterate a fix
+just gallery-qa --locale ar --beats 8,9,12,19,20  # RTL; SCORE.md vs references/rtl.md
 just gallery-qa --backend host --interact    # fonts / OS chrome
 just gallery-gif                             # after layout, nav clip, or public chrome
 ```
@@ -92,6 +95,7 @@ unless they ask for a written audit.
 | `--release` | Snappier paint |
 | `--no-build` | Binary already current |
 | `--settle-ms` | Slow GPU |
+| `--locale ar` | Arabic/Urdu; `SCORE.md` fails on any `references/rtl.md` beat (not leftover-English only) |
 
 Inject table: `DEFAULT_INTERACT` in `scripts/gallery_qa.py`. After-inject
 state must be **visible on screen**. A match is a **token**, not a
@@ -111,6 +115,7 @@ Only if a second grab is still the previous page is the gallery stuck.
 ## Related
 
 - `references/rubric.md` — what counts as broken/ugly  
+- `references/rtl.md` — Firefox + Microsoft direction beats  
 - `references/manual-pass.md` — pointer / live protocol  
 - `scripts/gallery_qa.py` — capture harness  
 - `AGENTS.md` — library contract  

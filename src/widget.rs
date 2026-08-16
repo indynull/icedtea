@@ -40,9 +40,8 @@ use iced::widget::{
 };
 use iced::{keyboard, Alignment, Background, Color, Element, Event, Length, Padding, Radians};
 
-use crate::chrome::SCROLL_RAIL_WIDTH;
 use crate::host_canvas::{ArcRing, SpinnerDots};
-use crate::scroll::{ClipLayer, ScrollRail};
+use crate::scroll::{ClipLayer, ScrollRail, ThemedScroll};
 
 use crate::a11y::{self, A11y, Role};
 use crate::collection::{
@@ -50,7 +49,7 @@ use crate::collection::{
     ItemClick, ListModel, RowFace, RowHeights, Selection, Tabs, TreeNode, VisibleWindow,
 };
 use crate::i18n::Direction;
-use crate::icon::{Icon, Icons};
+use crate::icon::{Glyph, Icon, Icons};
 use crate::style;
 use crate::theme::Tokens;
 use crate::toast::{Toast, ToastKind};
@@ -80,17 +79,55 @@ fn control_height(tok: Tokens) -> f32 {
     line + p.top + p.bottom
 }
 
+/// Control on the start edge, label after it (box then text in LTR).
+fn labeled_control<'a, M: 'a>(
+    control: Element<'a, M>,
+    name: String,
+    tok: Tokens,
+    muted: bool,
+) -> Element<'a, M> {
+    let ink = if muted {
+        tok.scheme().on_surface_variant
+    } else {
+        tok.scheme().on_surface
+    };
+    let label: Element<'a, M> = text(name).size(tok.body()).color(ink).into();
+    let mut r = Row::new().spacing(8).align_y(Alignment::Center);
+    for kid in crate::i18n::order(tok.direction, [control, label]) {
+        r = r.push(kid);
+    }
+    container(r)
+        .width(Length::Fill)
+        .align_x(crate::i18n::align_start(tok.direction))
+        .into()
+}
+
 /// Label plus optional leading/trailing icons.
 fn icon_label<'a, M: 'a>(title: String, icons: Icons, tok: Tokens) -> Element<'a, M> {
-    let mut r = Row::new().spacing(8).align_y(Alignment::Center);
+    let mut kids: Vec<Element<'a, M>> = Vec::new();
     if let Some(ic) = icons.leading {
-        r = r.push(icon_svg(ic, tok, A11y::new(title.clone(), Role::Image)));
+        kids.push(icon_svg(ic, tok, A11y::new(title.clone(), Role::Image)));
     }
-    r = r.push(text(title.clone()).size(tok.body()));
+    kids.push(text(title.clone()).size(tok.body()).into());
     if let Some(ic) = icons.trailing {
-        r = r.push(icon_svg(ic, tok, A11y::new(title, Role::Image)));
+        kids.push(icon_svg(ic, tok, A11y::new(title, Role::Image)));
+    }
+    let mut r = Row::new().spacing(8).align_y(Alignment::Center);
+    for kid in crate::i18n::order(tok.direction, kids) {
+        r = r.push(kid);
     }
     r.into()
+}
+
+fn closed_disclosure(tok: Tokens) -> &'static str {
+    match tok.direction {
+        Direction::Ltr => "▸",
+        Direction::Rtl => "◂",
+    }
+}
+
+fn pick_chevron<'a, M: 'a>(tok: Tokens) -> Element<'a, M> {
+    icon_svg(Icon::Chevron, tok, A11y::new("open", Role::Image))
 }
 
 /// Step for a continuous [`themed_slider`] range (~100 positions).
@@ -134,24 +171,27 @@ pub fn icon_style(tok: Tokens) -> impl Fn(&iced::Theme, svg::Status) -> svg::Sty
     }
 }
 
-/// Paint a bundled chrome icon.
+/// Paint a chrome glyph.
 ///
-/// Chrome set only (`Icon::Search`, `Close`, and the rest). Icons ship as
-/// black fills; tokens recolor non-transparent pixels (works on Linux,
-/// macOS Metal, and Windows).
+/// Pass a shipped [`Icon`] or [`Glyph::Bytes`] (filled black SVG). Tokens
+/// recolor non-transparent pixels (Linux, macOS Metal, and Windows).
+/// The seven names stay the shipped set.
 ///
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
-/// use icedtea::icon::Icon;
+/// use icedtea::icon::{Glyph, Icon};
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let _: icedtea::Element<'_, ()> =
 ///     widget::icon_svg(Icon::Search, tok, A11y::new("search", Role::Image));
+/// let mark = br##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="#000"><path d="M8 1 15 8 8 15 1 8z"/></svg>"##;
+/// let _: icedtea::Element<'_, ()> =
+///     widget::icon_svg(Glyph::Bytes(mark), tok, A11y::new("app", Role::Image));
 /// ```
-pub fn icon_svg<'a, M: 'a>(icon: Icon, tok: Tokens, a11y: A11y) -> Element<'a, M> {
-    let handle = svg::Handle::from_memory(icon.bytes());
+pub fn icon_svg<'a, M: 'a>(glyph: impl Into<Glyph>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
+    let handle = svg::Handle::from_memory(glyph.into().bytes());
     a11y::attach(
         svg(handle)
             .width(16.0)
@@ -191,13 +231,15 @@ pub fn label<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Elemen
 pub fn display_line<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
     let s = a11y.apply_name(s);
     a11y::attach(
-        text(s)
-            .size(tok.meta())
-            .color(tok.scheme().on_surface_variant)
-            .font(typo::UI)
-            .width(Length::Fill)
-            .align_x(Alignment::End)
-            .into(),
+        container(
+            text(s)
+                .size(tok.meta())
+                .color(tok.scheme().on_surface_variant)
+                .font(typo::UI),
+        )
+        .width(Length::Fill)
+        .align_x(crate::i18n::align_end(tok.direction))
+        .into(),
         &a11y,
     )
 }
@@ -356,12 +398,17 @@ pub fn themed_button_sized<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let label = a11y.apply_name(title);
+    // Shrink the title. Fill+align on `text` inside iced `button`
+    // drops right-to-left glyphs (empty colored pads).
     let face: Element<'a, M> = if icons == Icons::NONE {
-        text(label)
-            .size(tok.body())
-            .width(Length::Fill)
-            .align_x(Alignment::Center)
-            .into()
+        let title_el = text(label).size(tok.body());
+        match width {
+            Length::Fill | Length::FillPortion(_) => container(title_el)
+                .width(Length::Fill)
+                .align_x(Alignment::Center)
+                .into(),
+            _ => title_el.into(),
+        }
     } else {
         icon_label(label, icons, tok)
     };
@@ -504,13 +551,11 @@ pub fn themed_checkbox<'a, M: Clone + 'a>(
     let a11y = a11y.merge_checked(checked);
     let name = a11y.apply_name(label_s);
     let is_on = a11y.apply_checked(checked);
-    let mut c = checkbox(is_on)
-        .label(name)
-        .style(style::checkbox_style(tok));
+    let mut c = checkbox(is_on).style(style::checkbox_style(tok));
     if !a11y.disabled {
         c = c.on_toggle(msg);
     }
-    a11y::attach(c.into(), &a11y)
+    a11y::attach(labeled_control(c.into(), name, tok, a11y.disabled), &a11y)
 }
 
 /// Three-state checkbox value (M3 indeterminate for “partial”).
@@ -728,14 +773,9 @@ pub fn checkbox_indeterminate<'a, M: Clone + 'a>(
             .center_x(16)
             .center_y(16)
             .style(move |_| indeterminate_box_face(tok));
-            let row = row![
-                box_face,
-                text(name.clone()).size(tok.body()).color(s.on_surface)
-            ]
-            .spacing(8)
-            .align_y(Alignment::Center);
+            let row = labeled_control(box_face.into(), name.clone(), tok, a11y.disabled);
             if a11y.disabled {
-                return a11y::attach(row.into(), &a11y);
+                return a11y::attach(row, &a11y);
             }
             let next = state.toggle();
             a11y::attach(mouse_area(row).on_press(msg(next)).into(), &a11y)
@@ -780,17 +820,18 @@ pub fn segmented_button<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let cells: Vec<Cell> = cells.into_iter().map(Into::into).collect();
+    let cells: Vec<(usize, Cell)> = cells.into_iter().map(Into::into).enumerate().collect();
+    let cells = crate::i18n::order(tok.direction, cells);
     let mut r = Row::new().spacing(0).align_y(Alignment::Center);
-    for (i, cell) in cells.iter().enumerate() {
-        let on = i == selected;
+    for (i, cell) in cells.iter() {
+        let on = *i == selected;
         let icons = cell.icon.map(Icons::leading).unwrap_or(Icons::NONE);
         let face = themed_button_sized(
             cell.label.clone(),
             if a11y.disabled {
                 None
             } else {
-                Some(on_select(i))
+                Some(on_select(*i))
             },
             tok,
             if on { Variant::Primary } else { Variant::Quiet },
@@ -830,10 +871,11 @@ pub fn button_group<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let cells: Vec<Cell> = cells.into_iter().map(Into::into).collect();
+    let cells: Vec<(usize, Cell)> = cells.into_iter().map(Into::into).enumerate().collect();
+    let cells = crate::i18n::order(tok.direction, cells);
     let mut r = Row::new().spacing(0).align_y(Alignment::Center);
-    for (i, cell) in cells.iter().enumerate() {
-        if i > 0 {
+    for (n, (i, cell)) in cells.iter().enumerate() {
+        if n > 0 {
             r = r.push(
                 container(Space::new().width(1).height(control_height(tok))).style(move |_| {
                     style::fill(tok.scheme().outline_variant, tok.scheme().on_surface)
@@ -846,7 +888,7 @@ pub fn button_group<'a, M: Clone + 'a>(
             if a11y.disabled {
                 None
             } else {
-                Some(on_press(i))
+                Some(on_press(*i))
             },
             tok,
             Variant::Quiet,
@@ -859,6 +901,8 @@ pub fn button_group<'a, M: Clone + 'a>(
     }
     a11y::attach(
         container(r)
+            .width(Length::Fill)
+            .align_x(crate::i18n::align_start(tok.direction))
             .style(move |_| {
                 let s = tok.scheme();
                 let mut st = style::fill(Color::TRANSPARENT, s.on_surface);
@@ -896,7 +940,7 @@ pub fn button_group<'a, M: Clone + 'a>(
 /// );
 /// ```
 pub fn icon_button<'a, M: Clone + 'a>(
-    icon: Icon,
+    icon: impl Into<Glyph>,
     msg: Option<M>,
     tok: Tokens,
     variant: Variant,
@@ -938,7 +982,7 @@ pub fn icon_button<'a, M: Clone + 'a>(
 /// );
 /// ```
 pub fn icon_button_toggle<'a, M: Clone + 'a>(
-    icon: Icon,
+    icon: impl Into<Glyph>,
     pressed: bool,
     msg: M,
     tok: Tokens,
@@ -991,11 +1035,11 @@ pub fn themed_switch<'a, M: Clone + 'a>(
     let a11y = a11y.merge_toggled(on).merge_checked(on);
     let name = a11y.apply_name(label_s);
     let on = a11y.apply_toggled(on);
-    let mut t = toggler(on).label(name).style(style::switch_style(tok));
+    let mut t = toggler(on).style(style::switch_style(tok));
     if !a11y.disabled {
         t = t.on_toggle(msg);
     }
-    a11y::attach(t.into(), &a11y)
+    a11y::attach(labeled_control(t.into(), name, tok, a11y.disabled), &a11y)
 }
 
 /// Pick one value from a small set.
@@ -1034,28 +1078,23 @@ where
     let name = a11y.apply_name(label_s);
     if a11y.disabled {
         let on = a11y.apply_checked(selected == Some(value));
-        return a11y::attach(
-            row![
-                container(Space::new().width(8).height(8))
-                    .width(16)
-                    .height(16)
-                    .center_x(16)
-                    .center_y(16)
-                    .style(move |_| radio_idle_face(tok, on)),
-                text(name.clone())
-                    .size(tok.body())
-                    .color(tok.scheme().on_surface_variant),
-            ]
-            .spacing(8)
-            .align_y(Alignment::Center)
-            .into(),
-            &a11y,
-        );
+        let mark = container(Space::new().width(8).height(8))
+            .width(16)
+            .height(16)
+            .center_x(16)
+            .center_y(16)
+            .style(move |_| radio_idle_face(tok, on));
+        return a11y::attach(labeled_control(mark.into(), name, tok, true), &a11y);
     }
     a11y::attach(
-        radio(name, value, selected, msg)
-            .style(style::radio_style(tok))
-            .into(),
+        labeled_control(
+            radio(String::new(), value, selected, msg)
+                .style(style::radio_style(tok))
+                .into(),
+            name,
+            tok,
+            false,
+        ),
         &a11y,
     )
 }
@@ -1950,6 +1989,8 @@ pub fn password_input<'a, M: Clone + 'a>(
 ///     on_input,
 ///     false,
 ///     on_toggle,
+///     "Show",
+///     "Hide",
 ///     &copy,
 ///     tok,
 ///     Direction::Ltr,
@@ -1963,12 +2004,14 @@ pub fn secret_field<'a, M: Clone + 'a>(
     on_input: impl Fn(String) -> M + 'a,
     revealed: bool,
     on_toggle: M,
+    show: &str,
+    hide: &str,
     copy: &crate::action::Action<M>,
     tok: Tokens,
     dir: Direction,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let toggle_title = if revealed { "Hide" } else { "Show" };
+    let toggle_title = if revealed { hide } else { show };
     let field = password_input(
         placeholder,
         value,
@@ -2348,21 +2391,26 @@ pub fn search_input_clear<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let mut r = row![
-        icon_svg(Icon::Search, tok, A11y::new("search", Role::Image)),
-        themed_text_input(
-            "Search",
-            value,
-            on_input,
-            None,
-            FieldOpts::NONE,
-            tok,
-            a11y.child(Role::TextBox),
-            None,
-        ),
-    ]
-    .spacing(8)
-    .align_y(Alignment::Center);
+    let search_ic: Element<'a, M> = icon_svg(Icon::Search, tok, A11y::new("search", Role::Image));
+    let placeholder = if a11y.name.is_empty() {
+        "Search".to_string()
+    } else {
+        a11y.name.clone()
+    };
+    let field: Element<'a, M> = themed_text_input(
+        &placeholder,
+        value,
+        on_input,
+        None,
+        FieldOpts::NONE,
+        tok,
+        a11y.child(Role::TextBox),
+        None,
+    );
+    let mut r = Row::new().spacing(8).align_y(Alignment::Center);
+    for kid in crate::i18n::order(tok.direction, [search_ic, field]) {
+        r = r.push(kid);
+    }
     if !value.is_empty() {
         if let Some(clear) = on_clear {
             r = r.push(icon_button(
@@ -2427,10 +2475,13 @@ pub fn search_view<'a, M: Clone + 'a>(
         for (i, hit) in hits.iter().enumerate() {
             let hit_a11y = A11y::button(hit.clone()).with_disabled(a11y.disabled);
             let mut b = button(
-                text(hit_a11y.apply_name(hit.clone()))
-                    .size(tok.body())
-                    .width(Length::Fill)
-                    .align_x(Alignment::Start),
+                container(
+                    text(hit_a11y.apply_name(hit.clone()))
+                        .size(tok.body())
+                        .color(tok.scheme().on_surface),
+                )
+                .width(Length::Fill)
+                .align_x(crate::i18n::align_start(tok.direction)),
             )
             .padding(pad(tok))
             .width(Length::Fill)
@@ -2454,14 +2505,17 @@ pub fn search_view<'a, M: Clone + 'a>(
 
 /// Pick one string from a list.
 ///
-/// Placeholder shows when nothing is selected. Wheel over the control
-/// moves the selection. Disabled keeps the current face.
+/// `size` is [`ControlSize`]. Compact uses tight pad and meta type so a
+/// toolbar or HUD can nest a dropdown. Default keeps the field body
+/// look. Placeholder shows when nothing is selected. Wheel over the
+/// control moves the selection. Disabled keeps the current face.
 ///
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
 /// use icedtea::theme;
 /// use icedtea::widget;
+/// use icedtea::widget::ControlSize;
 /// let tok = theme::named("dark").tokens;
 /// let opts = ["nord", "dark"];
 /// let on_select = |name| name;
@@ -2470,6 +2524,7 @@ pub fn search_view<'a, M: Clone + 'a>(
 ///     Some("nord"),
 ///     on_select,
 ///     tok,
+///     ControlSize::Default,
 ///     A11y::new("theme", Role::ComboBox),
 /// );
 /// ```
@@ -2478,11 +2533,23 @@ pub fn themed_pick_list<'a, T, M: Clone + 'a>(
     selected: Option<T>,
     on_select: impl Fn(T) -> M + 'a,
     tok: Tokens,
+    size: ControlSize,
     a11y: A11y,
 ) -> Element<'a, M>
 where
     T: ToString + PartialEq + Clone + 'a,
 {
+    let (face_pad, type_px) = match size {
+        ControlSize::Compact => {
+            let p = f32::from(size.pad());
+            (Padding::from([p, p + 4.0]), tok.meta())
+        }
+        ControlSize::Default => (pad(tok), tok.body()),
+        ControlSize::Comfortable => {
+            let p = f32::from(size.pad());
+            (Padding::from([p, p + 4.0]), tok.body())
+        }
+    };
     if a11y.disabled {
         let _ = on_select;
         let shown = selected
@@ -2492,10 +2559,10 @@ where
         return a11y::attach(
             container(
                 text(shown)
-                    .size(tok.body())
+                    .size(type_px)
                     .color(tok.scheme().on_surface_variant),
             )
-            .padding(pad(tok))
+            .padding(face_pad)
             .style(move |_| style::panel(tok))
             .into(),
             &a11y,
@@ -2509,11 +2576,18 @@ where
         move |t| on_select(t)
     };
     let picker = pick_list(options, selected, on_pick)
+        .handle(pick_list::Handle::None)
         .style(style::picker_style(tok))
-        .padding(pad(tok))
-        .text_size(tok.body());
+        .padding(face_pad)
+        .text_size(type_px);
+    let picker: Element<'a, M> = picker.into();
+    let mut face = Row::new().spacing(4).align_y(Alignment::Center);
+    for kid in crate::i18n::order(tok.direction, [picker, pick_chevron(tok)]) {
+        face = face.push(kid);
+    }
+    let picker: Element<'a, M> = face.into();
     let el: Element<'a, M> = if opts.is_empty() {
-        picker.into()
+        picker
     } else {
         mouse_area(picker)
             .on_scroll(move |delta| {
@@ -2762,6 +2836,32 @@ impl TimeValue {
     }
 }
 
+/// Arabic/Urdu/Persian clocks use Eastern digits; Hebrew uses 123.
+/// `Direction::Rtl` maps to Eastern.
+fn clock_digits(n: impl Into<u32>, dir: Direction) -> String {
+    let n = n.into();
+    let western = format!("{n:02}");
+    if dir != Direction::Rtl {
+        return western;
+    }
+    western
+        .chars()
+        .map(|c| match c {
+            '0' => '٠',
+            '1' => '١',
+            '2' => '٢',
+            '3' => '٣',
+            '4' => '٤',
+            '5' => '٥',
+            '6' => '٦',
+            '7' => '٧',
+            '8' => '٨',
+            '9' => '٩',
+            other => other,
+        })
+        .collect()
+}
+
 fn time_colon<'a, M: 'a>(tok: Tokens) -> Element<'a, M> {
     container(
         text(":")
@@ -2808,9 +2908,9 @@ pub fn time_picker<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let v = value.clamp();
     let hour = if clock.hour12 {
-        format!("{:02}", v.hour12())
+        clock_digits(v.hour12(), tok.direction)
     } else {
-        format!("{:02}", v.hour)
+        clock_digits(v.hour, tok.direction)
     };
     let mut row = Row::new().spacing(4).align_y(Alignment::Center);
     row = row.push(themed_button(
@@ -2823,7 +2923,7 @@ pub fn time_picker<'a, M: Clone + 'a>(
     ));
     row = row.push(time_colon(tok));
     row = row.push(themed_button(
-        format!("{:02}", v.minute),
+        clock_digits(v.minute, tok.direction),
         a11y.apply_message(Some(on_field(TimeField::Minute))),
         tok,
         Variant::Quiet,
@@ -2833,7 +2933,7 @@ pub fn time_picker<'a, M: Clone + 'a>(
     if clock.seconds {
         row = row.push(time_colon(tok));
         row = row.push(themed_button(
-            format!("{:02}", v.second),
+            clock_digits(v.second, tok.direction),
             a11y.apply_message(Some(on_field(TimeField::Second))),
             tok,
             Variant::Quiet,
@@ -2851,7 +2951,13 @@ pub fn time_picker<'a, M: Clone + 'a>(
             A11y::button("period").with_disabled(a11y.disabled),
         ));
     }
-    a11y::attach(row.into(), &a11y)
+    a11y::attach(
+        container(row)
+            .width(Length::Fill)
+            .align_x(crate::i18n::align_start(tok.direction))
+            .into(),
+        &a11y,
+    )
 }
 
 /// Parsed markdown the application owns. Parse in `update` (or a `Task`);
@@ -4006,7 +4112,8 @@ fn toast_style(
 /// A themed scroller with a usable handle.
 ///
 /// `stick` pins to the end. `scroll_id` is for `scroll_to`. `on_scroll`
-/// sees iced's viewport when the offset moves.
+/// receives the pixel offset from the start when the offset moves.
+/// The rail sits on the end side (`Tokens.direction`).
 ///
 ///
 /// ```
@@ -4032,29 +4139,13 @@ pub fn themed_scroll<'a, M, F>(
 ) -> Element<'a, M>
 where
     M: 'a,
-    F: Fn(iced::widget::scrollable::Viewport) -> M + 'a,
+    F: Fn(f32) -> M + 'a,
 {
-    let mut s = scrollable(child)
-        .height(Length::Fill)
-        .direction(ScrollDir::Vertical(
-            Scrollbar::new()
-                .width(SCROLL_RAIL_WIDTH)
-                .scroller_width(SCROLL_RAIL_WIDTH),
-        ))
-        .style(style::scroll_style(tok));
-    if stick {
-        s = s.anchor_bottom();
-    }
-    if let Some(id) = scroll_id {
-        s = s.id(id);
-    }
-    if let Some(f) = on_scroll {
-        s = s.on_scroll(f);
-    }
-    // iced's scrollable only scissors when a rail is active. Empty-fit
-    // and some text paths still paint translated rows over sibling
-    // chrome (sticky search). ClipLayer is the same scissor lists use.
-    a11y::attach(ClipLayer::new(s).into(), &a11y)
+    let boxed = on_scroll.map(|f| Box::new(f) as Box<dyn Fn(f32) -> M + 'a>);
+    a11y::attach(
+        ThemedScroll::new(child, tok, stick, scroll_id, boxed).into(),
+        &a11y,
+    )
 }
 
 /// Append-only lines. Sticks to the end. `window` virtualizes long logs.
@@ -4115,12 +4206,14 @@ pub fn log_view<'a, M: Clone + 'a>(
         for i in win.range() {
             let line = lines.get(i).map(String::as_str).unwrap_or("");
             col = col.push(
-                container(
-                    text(line.to_string())
-                        .size(tok.meta())
-                        .color(tok.scheme().on_surface)
-                        .font(typo::MONO),
-                )
+                container(start_label(
+                    line.to_string(),
+                    tok.meta(),
+                    tok.scheme().on_surface,
+                    typo::MONO,
+                    iced::widget::text::Wrapping::None,
+                    tok.direction,
+                ))
                 .width(Length::Fill)
                 .height(h)
                 .padding([2, 8])
@@ -4136,17 +4229,7 @@ pub fn log_view<'a, M: Clone + 'a>(
         a11y,
         true,
         scroll_id,
-        Some(move |vp: iced::widget::scrollable::Viewport| {
-            on_scroll(window_after_scroll(
-                prev,
-                vp.absolute_offset_reversed().y,
-                vp.bounds().height,
-                h,
-                n,
-                overscan,
-                None,
-            ))
-        }),
+        Some(move |y: f32| on_scroll(window_after_scroll(prev, y, viewport, h, n, overscan, None))),
     )
 }
 
@@ -4225,14 +4308,15 @@ where
             let max_s = (content - viewport).max(0.0);
             emit((scroll + scroll_delta_pixels(delta, step)).clamp(0.0, max_s))
         });
-        row![
-            pane,
-            Element::from(ScrollRail::new(content, viewport, scroll, emit, tok)),
-        ]
-        .spacing(4)
-        .width(crate::layout::FILL)
-        .height(crate::layout::FILL)
-        .into()
+        let rail = Element::from(ScrollRail::new(content, viewport, scroll, emit, tok));
+        let mut strip = Row::new()
+            .spacing(4)
+            .width(crate::layout::FILL)
+            .height(crate::layout::FILL);
+        for kid in crate::i18n::order(tok.direction, [pane.into(), rail]) {
+            strip = strip.push(kid);
+        }
+        strip.into()
     })
     .into()
 }
@@ -4323,6 +4407,28 @@ fn row_slot_el<'a, M: Clone + 'a>(
     }
 }
 
+/// Shrink text inside a fill pad. Fill+align on `text` drops
+/// right-to-left glyphs (empty list cards).
+fn start_label<'a, M: 'a>(
+    s: impl Into<String>,
+    size: f32,
+    color: iced::Color,
+    font: iced::Font,
+    wrapping: iced::widget::text::Wrapping,
+    dir: Direction,
+) -> Element<'a, M> {
+    container(
+        text(s.into())
+            .size(size)
+            .color(color)
+            .font(font)
+            .wrapping(wrapping),
+    )
+    .width(Length::Fill)
+    .align_x(crate::i18n::align_start(dir))
+    .into()
+}
+
 fn two_line_row<'a, M: 'a>(
     title: &str,
     meta_s: Option<&str>,
@@ -4344,13 +4450,16 @@ fn two_line_row<'a, M: 'a>(
     } else {
         iced::widget::text::Wrapping::None
     };
+    let (pad_l, pad_r) = crate::i18n::inline_pad(tok.direction, 8.0, 12.0);
     let on = tok.scheme().on_surface;
-    let mut col = column![text(title)
-        .size(tok.body())
-        .color(on)
-        .font(typo::UI)
-        .width(Length::Fill)
-        .wrapping(wrapping)]
+    let mut col = column![start_label(
+        title,
+        tok.body(),
+        on,
+        typo::UI,
+        wrapping,
+        tok.direction,
+    )]
     .spacing(2)
     .width(Length::Fill);
     if let Some(m) = meta_s.filter(|s| !s.is_empty()) {
@@ -4359,22 +4468,23 @@ fn two_line_row<'a, M: 'a>(
         } else {
             ellipsize_line(m, 32)
         };
-        col = col.push(
-            text(meta_t)
-                .size(tok.meta())
-                .color(meta_color)
-                .width(Length::Fill)
-                .wrapping(wrapping),
-        );
+        col = col.push(start_label(
+            meta_t,
+            tok.meta(),
+            meta_color,
+            typo::UI,
+            wrapping,
+            tok.direction,
+        ));
     }
     container(col)
         .width(Length::Fill)
         .height(row_h)
         .padding(Padding {
             top: 8.0,
-            right: 12.0,
+            right: pad_r,
             bottom: 8.0,
-            left: 8.0,
+            left: pad_l,
         })
         .clip(true)
         .style(move |_| style::list_row(tok, selected))
@@ -4391,21 +4501,26 @@ fn card_row<'a, M: 'a>(
     tok: Tokens,
 ) -> Element<'a, M> {
     let on = tok.scheme().on_surface;
-    let mut col = column![text(title.to_string())
-        .size(tok.body())
-        .color(on)
-        .font(if selected { typo::UI_BOLD } else { typo::UI })
-        .width(Length::Fill)
-        .wrapping(iced::widget::text::Wrapping::Word)]
+    let (pad_l, pad_r) = crate::i18n::inline_pad(tok.direction, 12.0, 12.0);
+    let mut col = column![start_label(
+        title.to_string(),
+        tok.body(),
+        on,
+        if selected { typo::UI_BOLD } else { typo::UI },
+        iced::widget::text::Wrapping::Word,
+        tok.direction,
+    )]
     .spacing(2)
     .width(Length::Fill);
     if let Some(m) = meta_s.filter(|s| !s.is_empty()) {
-        col = col.push(
-            text(m.to_string())
-                .size(tok.meta())
-                .color(meta_color)
-                .width(Length::Fill),
-        );
+        col = col.push(start_label(
+            m.to_string(),
+            tok.meta(),
+            meta_color,
+            typo::UI,
+            iced::widget::text::Wrapping::None,
+            tok.direction,
+        ));
     }
     if let Some(v) = meter {
         col = col.push(
@@ -4419,9 +4534,9 @@ fn card_row<'a, M: 'a>(
         .height(row_h)
         .padding(Padding {
             top: 8.0,
-            right: 12.0,
+            right: pad_r,
             bottom: 8.0,
-            left: 12.0,
+            left: pad_l,
         })
         .clip(true)
         .style(move |_| style::card(tok, selected))
@@ -4906,14 +5021,21 @@ where
                                 })
                             })
                         };
-                        let row: Element<'a, M> = row![
-                            row_slot_el(model.leading(i), i, on_check, tok, disabled),
-                            body,
-                            row_slot_el(model.trailing(i), i, on_check, tok, disabled),
-                        ]
-                        .spacing(4)
-                        .align_y(Alignment::Center)
-                        .into();
+                        let mut line = Row::new()
+                            .spacing(4)
+                            .align_y(Alignment::Center)
+                            .width(Length::Fill);
+                        for kid in crate::i18n::order(
+                            tok.direction,
+                            [
+                                row_slot_el(model.leading(i), i, on_check, tok, disabled),
+                                body,
+                                row_slot_el(model.trailing(i), i, on_check, tok, disabled),
+                            ],
+                        ) {
+                            line = line.push(kid);
+                        }
+                        let row: Element<'a, M> = line.into();
                         col = col.push(a11y::attach(
                             row,
                             &A11y::new(name, Role::ListItem)
@@ -5143,19 +5265,25 @@ where
             .width(col_w(c)),
         );
     }
+    let (h_pad_l, h_pad_r) = crate::i18n::inline_pad(tok.direction, -h_scroll, 0.0);
     let rest_head = mouse_area(
         container(rest_head)
             .width(Length::Fill)
             .padding(Padding {
                 top: 0.0,
-                right: 0.0,
+                right: h_pad_r,
                 bottom: 0.0,
-                left: -h_scroll,
+                left: h_pad_l,
             })
             .clip(true),
     )
     .on_scroll(move |delta| on_h_scroll((h_scroll + scroll_delta_x(delta)).max(0.0)));
-    let header = row![pin_head, rest_head].width(crate::layout::FILL);
+    let mut header = Row::new().width(crate::layout::FILL);
+    let pin_head: Element<'a, M> = pin_head.into();
+    let rest_head: Element<'a, M> = rest_head.into();
+    for kid in crate::i18n::order(tok.direction, [pin_head, rest_head]) {
+        header = header.push(kid);
+    }
     a11y::attach(
         column![
             header,
@@ -5179,11 +5307,18 @@ where
                             let w = col_w(c);
                             let cell_style = style::table_cell(tok, selected, focused, stripe);
                             let ink = cell_style.text_color.unwrap_or(tok.scheme().on_surface);
-                            let face = container(text(value.clone()).size(tok.body()).color(ink))
-                                .width(w)
-                                .height(h)
-                                .padding([8, 8])
-                                .style(move |_| cell_style);
+                            let face = container(start_label(
+                                value.clone(),
+                                tok.body(),
+                                ink,
+                                typo::UI,
+                                iced::widget::text::Wrapping::None,
+                                tok.direction,
+                            ))
+                            .width(w)
+                            .height(h)
+                            .padding([8, 8])
+                            .style(move |_| cell_style);
                             let cell: Element<'a, M> = if disabled {
                                 face.into()
                             } else {
@@ -5233,12 +5368,18 @@ where
                             .width(Length::Fill)
                             .padding(Padding {
                                 top: 0.0,
-                                right: 0.0,
+                                right: h_pad_r,
                                 bottom: 0.0,
-                                left: -h_scroll,
+                                left: h_pad_l,
                             })
                             .clip(true);
-                        body = body.push(row![pin_line, rest_line].width(crate::layout::FILL));
+                        let pin_line: Element<'a, M> = pin_line.into();
+                        let rest_line: Element<'a, M> = rest_line.into();
+                        let mut line = Row::new().width(crate::layout::FILL);
+                        for kid in crate::i18n::order(tok.direction, [pin_line, rest_line]) {
+                            line = line.push(kid);
+                        }
+                        body = body.push(line);
                     }
                     body
                 },
@@ -5297,7 +5438,10 @@ pub fn tree_view<'a, M: Clone + 'a>(
     let closing = animating.map(|(id, _)| id);
     let progress = animating.map(|(_, p)| p).unwrap_or(1.0);
     let anim_id = animating.map(|(id, _)| id);
-    let mut col = Column::new().spacing(2);
+    let mut col = Column::new()
+        .spacing(2)
+        .width(Length::Fill)
+        .align_x(crate::i18n::align_start(tok.direction));
     let mut branch: Vec<Element<'a, M>> = Vec::new();
     let mut wrap_depth: Option<u32> = None;
     for (depth, id, label_s, expanded, has_children) in root.flatten_during(closing) {
@@ -5354,11 +5498,16 @@ fn tree_line<'a, M: Clone + 'a>(
     a11y: &A11y,
 ) -> Element<'a, M> {
     let is_sel = selected == Some(id);
-    let mut line = Row::new().spacing(4).align_y(Alignment::Center);
-    line = line.push(Space::new().width(Length::Fixed(depth as f32 * 16.0)));
-    if has_children {
-        let mark = if expanded { "▾" } else { "▸" };
-        line = line.push(themed_button(
+    let indent: Element<'a, M> = Space::new()
+        .width(Length::Fixed(depth as f32 * 16.0))
+        .into();
+    let twisty: Element<'a, M> = if has_children {
+        let mark = if expanded {
+            "▾"
+        } else {
+            closed_disclosure(tok)
+        };
+        themed_button(
             mark,
             a11y.apply_message(Some(on_toggle(id))),
             tok,
@@ -5367,16 +5516,21 @@ fn tree_line<'a, M: Clone + 'a>(
             A11y::button(format!("toggle {label_s}"))
                 .with_checked(expanded)
                 .with_disabled(a11y.disabled),
-        ));
+        )
     } else {
-        line = line.push(Space::new().width(28.0));
-    }
-    let title = container(label(
+        Space::new().width(28.0).into()
+    };
+    let start = crate::i18n::align_start(tok.direction);
+    let title = container(start_label(
         label_s.clone(),
-        tok,
-        A11y::new(label_s.clone(), Role::Tree).with_checked(is_sel),
+        tok.body(),
+        tok.scheme().on_surface,
+        typo::UI,
+        iced::widget::text::Wrapping::None,
+        tok.direction,
     ))
     .width(Length::Fill)
+    .align_x(start)
     .padding([6, 8]);
     let title: Element<'a, M> = if is_sel {
         title.style(move |_| style::list_row(tok, true)).into()
@@ -5394,10 +5548,15 @@ fn tree_line<'a, M: Clone + 'a>(
             })
         })
     };
-    line = line.push(a11y::attach(
-        pick,
-        &A11y::new(label_s, Role::Tree).with_checked(is_sel),
-    ));
+    let pick: Element<'a, M> =
+        a11y::attach(pick, &A11y::new(label_s, Role::Tree).with_checked(is_sel));
+    let mut line = Row::new()
+        .spacing(4)
+        .align_y(Alignment::Center)
+        .width(Length::Fill);
+    for kid in crate::i18n::order(tok.direction, [indent, twisty, pick]) {
+        line = line.push(kid);
+    }
     line.into()
 }
 
@@ -5567,6 +5726,7 @@ pub fn tab_bar<'a, M: Clone + 'a>(
             None,
             tab_overflow_pick(all, on_select),
             tok,
+            ControlSize::Default,
             A11y::new("more-tabs", Role::ComboBox).with_disabled(a11y.disabled),
         ));
     }
@@ -5598,18 +5758,24 @@ fn disclosure_header<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let title = title.into();
     // Unicode disclosure triangles (tree_view / Finder / VS Code style).
-    let mark = if open { "▾" } else { "▸" };
+    let mark = if open { "▾" } else { closed_disclosure(tok) };
     let s = tok.scheme();
-    let face = row![
-        text(title.clone())
-            .size(tok.body())
-            .color(s.on_surface)
-            .width(Length::Fill),
-        text(mark).size(tok.body()).color(s.on_surface_variant),
-    ]
-    .spacing(8)
-    .align_y(Alignment::Center)
-    .width(Length::Fill);
+    let title_el: Element<'a, M> =
+        container(text(title.clone()).size(tok.body()).color(s.on_surface))
+            .width(Length::Fill)
+            .align_x(crate::i18n::align_start(tok.direction))
+            .into();
+    let mark_el: Element<'a, M> = text(mark)
+        .size(tok.body())
+        .color(s.on_surface_variant)
+        .into();
+    let mut face = Row::new()
+        .spacing(8)
+        .align_y(Alignment::Center)
+        .width(Length::Fill);
+    for kid in crate::i18n::order(tok.direction, [title_el, mark_el]) {
+        face = face.push(kid);
+    }
     let mut b = button(face)
         .padding(inset)
         .width(Length::Fill)
@@ -6610,6 +6776,8 @@ mod tests {
             |_| (),
             false,
             (),
+            "Show",
+            "Hide",
             &copy,
             tok,
             Direction::Ltr,
@@ -6623,6 +6791,8 @@ mod tests {
             |_| (),
             true,
             (),
+            "Show",
+            "Hide",
             &dead,
             tok,
             Direction::Rtl,
@@ -6765,6 +6935,7 @@ mod tests {
             Some("a".into()),
             |_| (),
             tok,
+            ControlSize::Default,
             role("a", Role::ComboBox),
         );
         let pick_src = include_str!("widget.rs")
@@ -6774,7 +6945,9 @@ mod tests {
             .split("pub fn date_picker")
             .next()
             .unwrap();
-        assert!(pick_src.contains("text_size(tok.body())"));
+        assert!(pick_src.contains("tok.meta()"));
+        assert!(pick_src.contains("tok.body()"));
+        assert!(pick_src.contains("text_size(type_px)"));
         let _: Element<'_, ()> = date_picker(
             DateValue {
                 year: 2024,
@@ -7321,8 +7494,8 @@ mod tests {
             .next()
             .unwrap();
         assert!(
-            scroll_src.contains("ClipLayer::new"),
-            "themed_scroll must scissor so nav rows cannot paint through sticky search"
+            scroll_src.contains("ThemedScroll::new"),
+            "themed_scroll must compose pane plus rail so the rail can sit on the end side"
         );
         assert!(crate::layout::stick_to_end(80.0, 100.0, 20.0, 4.0));
         let input_src = src
@@ -8251,6 +8424,8 @@ mod tests {
             |_| (),
             false,
             (),
+            "Show",
+            "Hide",
             &copy,
             tok,
             Direction::Ltr,
@@ -9061,6 +9236,416 @@ mod tests {
         for child in layout.children() {
             walk_bounds(child, out);
         }
+    }
+
+    fn rail_box(boxes: &[iced::Rectangle]) -> iced::Rectangle {
+        let rail_w = crate::chrome::SCROLL_RAIL_WIDTH;
+        *boxes
+            .iter()
+            .find(|b| (b.width - rail_w).abs() < 0.6 && b.height > 20.0)
+            .expect("rail")
+    }
+
+    #[test]
+    fn rtl_rails_sit_on_the_left_of_list_and_scroll() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+
+        let tok = named("dark")
+            .tokens
+            .with_direction(crate::i18n::Direction::Rtl);
+        let row_h = 20.0;
+        let viewport = 200.0;
+        let list = VecList {
+            items: (0..80)
+                .map(|i| {
+                    crate::collection::ListRow::new(format!("r{i}"))
+                        .with_leading(crate::collection::RowSlot::Check(false))
+                })
+                .collect(),
+        };
+        let window = crate::collection::visible_window(0.0, viewport, row_h, 80, 4, None);
+        let mut el: Element<'_, VisibleWindow> = list_view(
+            &list,
+            &Sel::Single(0),
+            |_| window,
+            tok,
+            window,
+            row_h,
+            4,
+            |w| w,
+            "Empty",
+            |_| tok.muted,
+            None,
+            RowFace::FLUSH,
+            |_| window,
+            A11y::new("list", Role::List),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(320.0, viewport));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let origin = layout.bounds();
+        let mut boxes = Vec::new();
+        walk_bounds(layout, &mut boxes);
+        let rb = rail_box(&boxes);
+        assert!(
+            rb.x - origin.x < 8.0,
+            "RTL list rail must sit on the left, got x={}",
+            rb.x - origin.x
+        );
+        let checks: Vec<_> = boxes
+            .iter()
+            .filter(|b| (b.width - 16.0).abs() < 0.6 && (b.height - 16.0).abs() < 0.6)
+            .collect();
+        assert!(
+            checks.iter().any(|b| b.x + b.width > origin.x + 200.0),
+            "RTL list leading check must sit on the start (right) side"
+        );
+
+        let mut scroller: Element<'_, f32> = themed_scroll(
+            iced::widget::column![
+                label("a", tok, A11y::new("a", Role::Status)),
+                Space::new().height(800.0),
+            ]
+            .into(),
+            tok,
+            A11y::new("scroll", Role::Group),
+            false,
+            None,
+            None::<fn(_) -> f32>,
+        );
+        let mut st = Tree::new(scroller.as_widget());
+        let sn = scroller.as_widget_mut().layout(&mut st, &renderer, &limits);
+        let sl = Layout::new(&sn);
+        let so = sl.bounds();
+        let mut sb = Vec::new();
+        walk_bounds(sl, &mut sb);
+        let srail = rail_box(&sb);
+        assert!(
+            srail.x - so.x < 8.0,
+            "RTL themed_scroll rail must sit on the left, got x={}",
+            srail.x - so.x
+        );
+    }
+
+    #[test]
+    fn rtl_tree_indent_and_closed_mark_follow_direction() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+
+        let tok = named("dark")
+            .tokens
+            .with_direction(crate::i18n::Direction::Rtl);
+        let root = crate::collection::TreeNode::branch(
+            1,
+            "src",
+            vec![crate::collection::TreeNode::leaf(2, "lib.rs")],
+        );
+        let mut el: Element<'_, ()> = tree_view(
+            &root,
+            None,
+            None,
+            |_| (),
+            |_| (),
+            tok,
+            A11y::new("tree", Role::Tree),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(320.0, 240.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let origin = layout.bounds();
+        let mut boxes = Vec::new();
+        walk_bounds(layout, &mut boxes);
+        let rb = rail_box(&boxes);
+        assert!(
+            rb.x - origin.x < 8.0,
+            "RTL tree rail must sit on the left, got x={}",
+            rb.x - origin.x
+        );
+        assert_eq!(closed_disclosure(tok), "◂");
+        let ltr = named("dark").tokens;
+        assert_eq!(closed_disclosure(ltr), "▸");
+        let titles: Vec<_> = boxes
+            .iter()
+            .filter(|b| b.height > 10.0 && b.height < 40.0 && b.width > origin.width * 0.4)
+            .collect();
+        assert!(
+            origin.width > 200.0,
+            "RTL tree row must fill the pane, got width={}",
+            origin.width
+        );
+        assert!(
+            titles
+                .iter()
+                .any(|b| b.x + b.width > origin.x + origin.width * 0.7),
+            "RTL tree title must fill toward the start (right) side"
+        );
+        let line_src = include_str!("widget.rs")
+            .split("fn tree_line")
+            .nth(1)
+            .unwrap()
+            .split("fn tree_push_branch")
+            .next()
+            .unwrap();
+        assert!(line_src.contains("width(Length::Fill)"));
+        assert!(line_src.contains("align_x(start)"));
+    }
+
+    #[test]
+    fn rtl_themed_button_keeps_label_extent() {
+        use iced::advanced::layout::Limits;
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+
+        let face = include_str!("widget.rs")
+            .split("pub fn themed_button_sized")
+            .nth(1)
+            .unwrap()
+            .split("pub fn split_button")
+            .next()
+            .unwrap();
+        assert!(
+            !face.contains(".width(Length::Fill)\n            .align_x(Alignment::Center)"),
+            "Fill+align on button text drops right-to-left titles"
+        );
+        let tok = named("dark")
+            .tokens
+            .with_direction(crate::i18n::Direction::Rtl);
+        let title = "کنٹرولز";
+        let mut el: Element<'_, ()> = themed_button(
+            title,
+            Some(()),
+            tok,
+            Variant::Primary,
+            Icons::NONE,
+            A11y::button(title),
+        );
+        let mut empty: Element<'_, ()> = themed_button(
+            "",
+            Some(()),
+            tok,
+            Variant::Primary,
+            Icons::NONE,
+            A11y::button("pad"),
+        );
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(240.0, 80.0));
+        let mut tree = Tree::new(el.as_widget());
+        let labeled = el
+            .as_widget_mut()
+            .layout(&mut tree, &renderer, &limits)
+            .size();
+        let mut empty_tree = Tree::new(empty.as_widget());
+        let pad = empty
+            .as_widget_mut()
+            .layout(&mut empty_tree, &renderer, &limits)
+            .size();
+        assert!(
+            labeled.width > pad.width + 8.0,
+            "RTL themed_button must keep title extent, labeled={} pad={}",
+            labeled.width,
+            pad.width
+        );
+        let card_src = include_str!("widget.rs")
+            .split("fn card_row")
+            .nth(1)
+            .unwrap()
+            .split("/// A virtualized column")
+            .next()
+            .unwrap();
+        assert!(
+            card_src.contains("start_label"),
+            "card_row must wrap shrink text so RTL titles paint"
+        );
+        assert!(
+            !card_src.contains(".width(Length::Fill)\n            .align_x(start)"),
+            "Fill+align on list card text drops right-to-left titles"
+        );
+        let flush_src = include_str!("widget.rs")
+            .split("fn two_line_row")
+            .nth(1)
+            .unwrap()
+            .split("fn card_row")
+            .next()
+            .unwrap();
+        assert!(flush_src.contains("start_label"));
+        assert_eq!(clock_digits(9u32, crate::i18n::Direction::Rtl), "٠٩");
+        assert_eq!(clock_digits(30u32, crate::i18n::Direction::Ltr), "30");
+        let time_src = include_str!("widget.rs")
+            .split("pub fn time_picker")
+            .nth(1)
+            .unwrap()
+            .split("pub fn parse")
+            .next()
+            .unwrap();
+        assert!(time_src.contains("clock_digits"));
+        let secret_src = include_str!("widget.rs")
+            .split("pub fn secret_field")
+            .nth(1)
+            .unwrap()
+            .split("pub fn value_field")
+            .next()
+            .unwrap();
+        assert!(!secret_src.contains("\"Show\""));
+        assert!(secret_src.contains("if revealed { hide } else { show }"));
+    }
+
+    #[test]
+    fn rtl_pick_list_and_disclosure_put_the_mark_on_the_end() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+
+        let tok = named("dark")
+            .tokens
+            .with_direction(crate::i18n::Direction::Rtl);
+        let opts = ["a", "b"];
+        let mut pick: Element<'_, &str> = themed_pick_list(
+            opts,
+            Some("a"),
+            |s| s,
+            tok,
+            ControlSize::Default,
+            A11y::new("theme", Role::ComboBox),
+        );
+        let mut tree = Tree::new(pick.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(240.0, 48.0));
+        let node = pick.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let origin = layout.bounds();
+        let mut boxes = Vec::new();
+        walk_bounds(layout, &mut boxes);
+        let icons: Vec<_> = boxes
+            .iter()
+            .filter(|b| (b.width - 16.0).abs() < 0.6 && (b.height - 16.0).abs() < 0.6)
+            .collect();
+        assert!(
+            icons.iter().any(|b| b.x - origin.x < origin.width / 2.0),
+            "RTL pick chevron must sit on the end (left) side"
+        );
+        assert_eq!(closed_disclosure(tok), "◂");
+
+        let titles = ["Files".into()];
+        let body = label("body", tok, A11y::new("body", Role::Status));
+        let mut acc: Element<'_, usize> = accordion_view(
+            &titles,
+            vec![body],
+            &crate::collection::Accordion { open: None },
+            0.0,
+            |i| i,
+            tok,
+            A11y::new("acc", Role::Group),
+        );
+        let mut at = Tree::new(acc.as_widget());
+        let an = acc.as_widget_mut().layout(&mut at, &renderer, &limits);
+        let al = Layout::new(&an);
+        let ao = al.bounds();
+        let mut ab = Vec::new();
+        walk_bounds(al, &mut ab);
+        let marks: Vec<_> = ab
+            .iter()
+            .filter(|b| b.height > 8.0 && b.height < 28.0 && b.width > 6.0 && b.width < 28.0)
+            .collect();
+        assert!(
+            marks.iter().any(|b| b.x - ao.x < ao.width / 2.0),
+            "RTL disclosure mark must sit on the end (left) side"
+        );
+    }
+
+    #[test]
+    fn rtl_checkbox_and_button_group_follow_direction() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+
+        let tok = named("dark")
+            .tokens
+            .with_direction(crate::i18n::Direction::Rtl);
+        let mut box_el: Element<'_, bool> = themed_checkbox(
+            "Accept",
+            true,
+            |on| on,
+            tok,
+            A11y::new("Accept", Role::Checkbox).with_checked(true),
+        );
+        let mut tree = Tree::new(box_el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(320.0, 48.0));
+        let node = box_el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let origin = layout.bounds();
+        let mut boxes = Vec::new();
+        walk_bounds(layout, &mut boxes);
+        let marks: Vec<_> = boxes
+            .iter()
+            .filter(|b| (b.width - 16.0).abs() < 6.0 && (b.height - 16.0).abs() < 6.0)
+            .collect();
+        assert!(
+            origin.width > 200.0,
+            "RTL checkbox row must fill, got {}",
+            origin.width
+        );
+        assert!(
+            marks
+                .iter()
+                .any(|b| b.x + b.width > origin.x + origin.width * 0.5),
+            "RTL checkbox mark must sit on the start (right) side"
+        );
+
+        let mut group: Element<'_, usize> = button_group(
+            [
+                Cell::new("Cut").with_icon(Icon::Close),
+                Cell::from("Copy"),
+                Cell::from("Paste"),
+            ],
+            |i| i,
+            tok,
+            A11y::new("edit", Role::Group),
+        );
+        let mut gt = Tree::new(group.as_widget());
+        let gn = group.as_widget_mut().layout(&mut gt, &renderer, &limits);
+        let gl = Layout::new(&gn);
+        let go = gl.bounds();
+        let mut gb = Vec::new();
+        walk_bounds(gl, &mut gb);
+        let icons: Vec<_> = gb
+            .iter()
+            .filter(|b| (b.width - 16.0).abs() < 0.6 && (b.height - 16.0).abs() < 0.6)
+            .collect();
+        assert!(
+            icons.iter().any(|b| b.x + b.width > go.x + go.width * 0.5),
+            "RTL button-group leading icon sits on the start (right) of the first action"
+        );
+        let group_src = include_str!("widget.rs")
+            .split("pub fn button_group")
+            .nth(1)
+            .unwrap()
+            .split("pub fn icon_button")
+            .next()
+            .unwrap();
+        assert!(group_src.contains("align_start(tok.direction)"));
     }
 
     #[test]
@@ -9903,6 +10488,7 @@ mod tests {
             Some("a".into()),
             |_| 2u8,
             tok,
+            ControlSize::Default,
             A11y::new("pick", Role::ComboBox).with_disabled(true),
         );
         for el in [&mut slider_el, &mut pick_el] {
@@ -10056,9 +10642,68 @@ mod tests {
             .next()
             .unwrap();
         assert!(head.contains("Length::Fill"));
-        // Closed ▸ / open ▾ (not a 180°-rotated SVG that reads as ^).
+        // Closed ▸ / ◂ / open ▾ (not a 180°-rotated SVG that reads as ^).
         assert!(head.contains("▾"));
-        assert!(head.contains("▸"));
+        assert!(head.contains("closed_disclosure"));
+        assert!(head.contains("align_start"));
+        assert_eq!(closed_disclosure(tok), "▸");
+    }
+
+    #[test]
+    fn rtl_disclosure_title_sits_on_the_start_edge() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+
+        let tok = named("dark")
+            .tokens
+            .with_direction(crate::i18n::Direction::Rtl);
+        let titles = ["Files".to_string(), "Appearance".to_string()];
+        let bodies = vec![
+            label("a", tok, A11y::new("a", Role::Status)),
+            label("b", tok, A11y::new("b", Role::Status)),
+        ];
+        let acc = crate::collection::Accordion { open: Some(0) };
+        let mut el: Element<'_, usize> = accordion_view(
+            &titles,
+            bodies,
+            &acc,
+            1.0,
+            |i| i,
+            tok,
+            A11y::new("acc", Role::Group),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(320.0, 240.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let origin = layout.bounds();
+        let mut boxes = Vec::new();
+        walk_bounds(layout, &mut boxes);
+        let marks: Vec<_> = boxes
+            .iter()
+            .filter(|b| b.width < 24.0 && b.height < 28.0 && b.width > 4.0)
+            .collect();
+        assert!(
+            marks.iter().any(|b| b.x - origin.x < origin.width / 2.0),
+            "RTL disclosure mark must sit on the end (left)"
+        );
+        let src = include_str!("widget.rs");
+        let head = src
+            .split("fn disclosure_header")
+            .nth(1)
+            .unwrap()
+            .split("pub fn accordion_view")
+            .next()
+            .unwrap();
+        assert!(
+            head.contains("align_start(tok.direction)"),
+            "disclosure title must start-align so RTL text sits on the right"
+        );
     }
 
     #[test]
@@ -10334,6 +10979,7 @@ mod tests {
             Some("beta".into()),
             |s| s,
             tok,
+            ControlSize::Default,
             A11y::new("p", Role::ComboBox),
         );
         let next = pump_wheel(
@@ -10349,8 +10995,14 @@ mod tests {
         let cmd = pump_pick_command_wheel(&mut pick, -1.0);
         assert!(!cmd.is_empty());
         let empty: &[String] = &[];
-        let _: Element<'_, String> =
-            themed_pick_list(empty, None, |s| s, tok, A11y::new("empty", Role::ComboBox));
+        let _: Element<'_, String> = themed_pick_list(
+            empty,
+            None,
+            |s| s,
+            tok,
+            ControlSize::Default,
+            A11y::new("empty", Role::ComboBox),
+        );
     }
 
     fn pump_pick_command_wheel(el: &mut Element<'_, String>, y: f32) -> Vec<String> {
@@ -10400,6 +11052,95 @@ mod tests {
             );
         }
         messages
+    }
+
+    fn pick_layout_height(size: ControlSize) -> f32 {
+        use iced::advanced::layout::Limits;
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+        let tok = named("dark").tokens;
+        let opts = ["nord", "dark"];
+        let mut el: Element<'_, &str> = themed_pick_list(
+            opts,
+            Some("nord"),
+            |s| s,
+            tok,
+            size,
+            A11y::new("theme", Role::ComboBox),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(240.0, 80.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        node.size().height
+    }
+
+    #[test]
+    fn themed_pick_list_compact_uses_meta_and_tight_pad() {
+        let tok = named("dark").tokens;
+        assert!(tok.meta() < tok.body());
+        let compact = pick_layout_height(ControlSize::Compact);
+        let default = pick_layout_height(ControlSize::Default);
+        assert!(
+            compact < default,
+            "Compact pick ({compact}) must be shorter than Default ({default})"
+        );
+        let src = include_str!("widget.rs")
+            .split("pub fn themed_pick_list")
+            .nth(1)
+            .unwrap()
+            .split("pub fn date_picker")
+            .next()
+            .unwrap();
+        assert!(src.contains("ControlSize::Compact"));
+        assert!(src.contains("tok.meta()"));
+        assert!(src.contains("tok.body()"));
+        assert!(src.contains("size.pad()"));
+    }
+
+    #[test]
+    fn icon_svg_app_bytes_recolor_from_tokens() {
+        let tok = named("dark").tokens;
+        let mark: &'static [u8] = br##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="#000"><path d="M8 1 15 8 8 15 1 8z"/></svg>"##;
+        assert!(std::str::from_utf8(mark).unwrap().contains("fill=\"#000\""));
+        let style = icon_style(tok)(&iced::Theme::Dark, svg::Status::Idle);
+        assert_eq!(style.color, Some(tok.scheme().on_surface));
+        let named_ink = icon_style(tok)(&iced::Theme::Light, svg::Status::Idle);
+        let app: Element<'_, ()> = icon_svg(Glyph::Bytes(mark), tok, A11y::new("app", Role::Image));
+        let bundled: Element<'_, ()> =
+            icon_svg(Icon::Search, tok, A11y::new("search", Role::Image));
+        let _ = (app, bundled, named_ink);
+        let src = include_str!("widget.rs")
+            .split("pub fn icon_svg")
+            .nth(1)
+            .unwrap()
+            .split("pub fn label")
+            .next()
+            .unwrap();
+        assert!(src.contains("glyph.into().bytes()"));
+        assert!(src.contains("icon_style(tok)"));
+        let btn: Element<'_, ()> = icon_button(
+            Glyph::Bytes(mark),
+            Some(()),
+            tok,
+            Variant::Ghost,
+            ControlSize::Default,
+            A11y::button("app"),
+        );
+        let chip: Element<'_, ()> = chip(
+            "App",
+            Some(()),
+            None,
+            tok,
+            Variant::Quiet,
+            ChipKind::Assist,
+            Icons::leading(Glyph::Bytes(mark)),
+            A11y::button("App"),
+        );
+        let _ = (btn, chip);
     }
 
     #[test]
