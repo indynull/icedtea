@@ -1,113 +1,43 @@
 # Changelog
 
-## Unreleased
+## 0.9.0 — 2026-08-16
 
 ### Feature
 
-- `command_palette_view` takes the query placeholder. `tool_panel`
-  takes the Dock label. The gallery fills both from the locale catalog.
-- `themed_pick_list` takes `ControlSize`. Compact uses tight pad and
-  meta type so a toolbar or HUD can nest a dropdown. Default keeps
-  the field body look.
-- Chrome that takes `Icon` also accepts `Glyph::Bytes` (filled black
-  SVG, token recolor). The seven names stay the shipped set.
-
 - `Catalog::for_locale` fills English, Vietnamese, Japanese, Chinese,
-  Arabic, and Urdu chrome strings. Direction comes from `direction_for`
-  (Arabic and Urdu are right-to-left).
-- `Tokens` carries type scale, corner policy, and elevation policy
+  Arabic, and Urdu. `direction_for` sets Arabic and Urdu right-to-left.
+- `Tokens` carries type scale, corner policy, and elevation
   (`with_font_scale`, `with_shape`, `with_elevation`). `Boot` and
-  `UiState::look` apply the same fields so an app can persist the look
-  the gallery strip demonstrates.
+  `UiState::look` apply the same fields.
 - `A11y` keeps hint, selected, toggled, expanded, live, required, and
-  error next to name, role, value, disabled, and checked. Constructors
-  fill unset fields from their arguments. iced 0.14 still publishes
-  only the widget id.
-- List, table, grid, and tree row presses are `ItemClick` (button and
-  modifiers). Right-click no longer equals left-click select.
+  error next to name, role, value, disabled, and checked.
+- List, table, grid, and tree row presses are `ItemClick`.
   `Selection::apply_item_click` is the desktop rule. `listen_cursor`
-  Context fires on right-click even when an editor captured the press.
-- Flush list titles wrap on a tall row; `list_detail` uses
-  `layout::LIST_PANE` (360px). Short flush rows still ellipsize on a
-  word boundary.
-- `markdown_select_all` / `MarkdownSpan::all` select every block.
-- Markdown pointer moves carry X and Y so a same-line drag is a
-  real range. A double-click selects the word. Copy is that span;
-  Copy all is the source.
-- `MarkdownSpan::fully_covers` is the cross-block wash. A partial
-  in-block range does not paint the whole item.
-- Accessibility names the record, keyboard order, and the iced 0.14
-  AccessKit limit.
+  Context fires on right-click when an editor captured the press.
+- Markdown drag-select uses X and Y. `markdown_select_all` selects
+  every block. Copy is the span; Copy all is the source.
+- `command_palette_view` takes the query placeholder. `tool_panel`
+  takes the Dock label.
+- `themed_pick_list` takes `ControlSize`. Compact uses tight pad and
+  meta type.
+- Chrome that takes `Icon` also accepts `Glyph::Bytes` (filled black
+  SVG, token recolor).
 
 ### Bug fix
 
-- `themed_button` keeps a shrink title. Fill-aligned text inside the
-  iced button dropped right-to-left glyphs (empty colored pads).
-- `context_menu` wraps the row title so right-to-left labels paint.
+- Right-to-left chrome uses start/end: rails, splits, tree twisties,
+  picks, button groups, inspector, drawer, and command bar.
+- `themed_button`, `context_menu`, catalog nav, list cards, and table
+  cells keep right-to-left titles (shrink text inside a fill pad).
 - `time_picker` uses Eastern Arabic digits when direction is
   right-to-left. `secret_field` takes Show and Hide labels.
-- `button_group` sits on the start edge.
-- Gallery catalog nav paints right-to-left page titles. Fill-aligned
-  text inside the row button dropped those glyphs.
-- Gallery variant faces, color swatches, and the status title go
-  through catalog fill for all six locales.
-- `themed_scroll` lays content at the pane width so start-aligned
-  rows fill the panel (right when direction is right-to-left).
-- `inspector` and `drawer` put the list on the start edge.
-  Workspace splits follow `Tokens.direction`. `command_bar` sits
-  on the start edge.
-- Menu titles size wide CJK letters at one em so two-character
-  headings (`文件`, `保存`) do not wrap.
-- Checkbox, radio, switch, and icon button-groups put the control
-  on the start edge (right when direction is right-to-left).
-- Tree and list rows fill the pane so titles sit on the start edge
-  (right when direction is right-to-left).
-
-- Horizontal `split_view` and `list_detail` put the first pane on the
-  start side (right when direction is right-to-left). Sash drag follows
-  that side.
-- Pick lists, disclosure rows, tree twisties, search, and button
-  icons follow `Tokens.direction` (chevron and label on the start /
-  end side).
-- Vertical rails sit on the end side. List leading/trailing slots,
-  table frozen columns, and row titles follow `Tokens.direction`.
-  `themed_scroll` composes pane plus rail (iced's scroller cannot
-  move its rail). `on_scroll` is the pixel offset from the start.
-- `ShapePolicy::Pill` pills buttons and chips. Cards, menus, fields,
-  and dialogs stay boxes.
-- `bootstrap` applies `Boot` density, type scale, shape, and elevation
-  onto `Prepared.tokens` and iced's default text size.
-- `badge` Primary uses on-primary ink on the primary fill.
-- Disabled button ink uses a 68% mute so filled, Ghost, and Outlined
-  labels read on dark. Filled faces also raise the fill to 22%.
-- `command_bar` labels use on-surface body ink.
-- `themed_pick_list` uses the body type size (14), same as fields.
-- `dim_backdrop` rest opacity is 50% so a dialog sheet sits on a
-  visible wash.
-- `motion::overlay` hit-tests the slid child so a press lands on the
-  painted face, not the dismiss layer behind it.
-- `context_menu` captures pointer moves on the dismiss layer so a
-  move toward the menu does not reach the page underneath.
-- Context menu rows fill the card so the press target is the whole
-  row, not only the label. Labels start-align at body size.
-- The overlay no longer captures clicks on the placement spacers, so
-  a miss reaches the dismiss surface.
 - `themed_scroll` scissors through `ClipLayer` so rows cannot paint
-  through sticky search or other chrome above the pane.
-- Gallery catalog nav omits rows above the scroll offset so section
-  titles cannot show through the sticky Search field.
+  through sticky Search.
 - `markdown_view` paints the live `MarkdownSpan` on one document tree.
-  Drag-select and Copy use that range (not a remounted block wash).
-  A double-click selects the word under the caret.
-- `cheatsheet` insets shortcut labels so they do not sit under the
-  scroll rail.
-- Gallery status note clears when the catalog page changes.
-- The Controls page packs the button group, checks, and radios beside
-  buttons so those hosts sit on the first screen.
-- Idle `item_grid` tiles use the outlined face so a cell reads before
-  it is selected.
-- The Fields page packs number, date, and time beside text so those
-  hosts sit on the first screen.
+- `dim_backdrop` rest opacity is 50%. Disabled button ink uses a 68%
+  mute.
+- `motion::overlay` hit-tests the slid child. `context_menu` captures
+  pointer moves on the dismiss layer.
 
 ### Chore
 
