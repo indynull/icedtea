@@ -911,12 +911,11 @@ mod tests {
         let layout = Layout::new(&node);
         let origin = layout.bounds();
         let content = layout.children().next().unwrap().bounds();
-        assert!(
-            content.width > origin.width * 0.85,
+        let fill_msg = format!(
             "RTL shrink content must fill the pane, got {} in {}",
-            content.width,
-            origin.width
+            content.width, origin.width
         );
+        assert!(content.width > origin.width * 0.85, "{fill_msg}");
     }
 
     #[test]
@@ -1367,5 +1366,364 @@ mod tests {
             mouse::Cursor::Unavailable,
             &viewport,
         );
+    }
+
+    #[test]
+    fn themed_scroll_rail_wheel_and_operate_drive_state() {
+        use iced::advanced::renderer::Style;
+        use iced::advanced::widget::operation;
+        use iced::widget::{column, Space};
+        use iced::Length;
+
+        let tok = named("dark").tokens;
+        let tall: Element<'_, f32> = column![
+            Space::new().width(Length::Fill).height(400.0),
+            Space::new().width(Length::Fill).height(400.0),
+        ]
+        .into();
+        let id = Id::from("pane");
+        let mut scroll =
+            ThemedScroll::new(tall, tok, true, Some(id.clone()), Some(Box::new(|y| y)));
+        let mut tree = Tree::new(&scroll as &dyn Widget<f32, iced::Theme, iced::Renderer>);
+        let mut renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(240.0, 160.0));
+        let node = Widget::<f32, iced::Theme, iced::Renderer>::layout(
+            &mut scroll,
+            &mut tree,
+            &renderer,
+            &limits,
+        );
+        let layout = Layout::new(&node);
+        let viewport = Rectangle::new(Point::ORIGIN, Size::new(240.0, 160.0));
+        let miss = Rectangle::new(Point::new(4000.0, 4000.0), Size::new(4.0, 4.0));
+        Widget::<f32, iced::Theme, iced::Renderer>::diff(&scroll, &mut tree);
+        Widget::<f32, iced::Theme, iced::Renderer>::draw(
+            &scroll,
+            &tree,
+            &mut renderer,
+            &Theme::Dark,
+            &Style::default(),
+            layout,
+            mouse::Cursor::Available(Point::new(8.0, 8.0)),
+            &viewport,
+        );
+        Widget::<f32, iced::Theme, iced::Renderer>::draw(
+            &scroll,
+            &tree,
+            &mut renderer,
+            &Theme::Dark,
+            &Style::default(),
+            layout,
+            mouse::Cursor::Unavailable,
+            &miss,
+        );
+        let _ = Widget::<f32, iced::Theme, iced::Renderer>::overlay(
+            &mut scroll,
+            &mut tree,
+            layout,
+            &renderer,
+            &viewport,
+            iced::Vector::ZERO,
+        );
+        {
+            let mut op = operation::scrollable::snap_to::<()>(
+                id.clone(),
+                operation::scrollable::RelativeOffset {
+                    x: None,
+                    y: Some(1.0),
+                },
+            );
+            Widget::<f32, iced::Theme, iced::Renderer>::operate(
+                &mut scroll,
+                &mut tree,
+                layout,
+                &renderer,
+                &mut op,
+            );
+            let mut op = operation::scrollable::scroll_to::<()>(
+                id.clone(),
+                operation::scrollable::AbsoluteOffset {
+                    x: None,
+                    y: Some(40.0),
+                },
+            );
+            Widget::<f32, iced::Theme, iced::Renderer>::operate(
+                &mut scroll,
+                &mut tree,
+                layout,
+                &renderer,
+                &mut op,
+            );
+            let mut op = operation::scrollable::scroll_by::<()>(
+                id.clone(),
+                operation::scrollable::AbsoluteOffset { x: 0.0, y: 12.0 },
+            );
+            Widget::<f32, iced::Theme, iced::Renderer>::operate(
+                &mut scroll,
+                &mut tree,
+                layout,
+                &renderer,
+                &mut op,
+            );
+            let mut none = operation::scrollable::snap_to::<()>(
+                id.clone(),
+                operation::scrollable::RelativeOffset { x: None, y: None },
+            );
+            Widget::<f32, iced::Theme, iced::Renderer>::operate(
+                &mut scroll,
+                &mut tree,
+                layout,
+                &renderer,
+                &mut none,
+            );
+            let mut none = operation::scrollable::scroll_to::<()>(
+                id,
+                operation::scrollable::AbsoluteOffset { x: None, y: None },
+            );
+            Widget::<f32, iced::Theme, iced::Renderer>::operate(
+                &mut scroll,
+                &mut tree,
+                layout,
+                &renderer,
+                &mut none,
+            );
+        }
+        let origin = layout.bounds();
+        let rail = layout.children().nth(1).unwrap().bounds();
+        let thumb_mid = Point::new(rail.x + rail.width / 2.0, rail.y + rail.height / 2.0);
+        let track = Point::new(rail.x + rail.width / 2.0, rail.y + 4.0);
+        let pane = Point::new(origin.x + 12.0, origin.y + 20.0);
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            Widget::<f32, iced::Theme, iced::Renderer>::update(
+                &mut scroll,
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(thumb_mid),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert_eq!(
+            Widget::<f32, iced::Theme, iced::Renderer>::mouse_interaction(
+                &scroll,
+                &tree,
+                layout,
+                mouse::Cursor::Available(thumb_mid),
+                &viewport,
+                &renderer,
+            ),
+            mouse::Interaction::Grabbing
+        );
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            Widget::<f32, iced::Theme, iced::Renderer>::update(
+                &mut scroll,
+                &mut tree,
+                &Event::Mouse(mouse::Event::CursorMoved {
+                    position: Point::new(thumb_mid.x, thumb_mid.y + 20.0),
+                }),
+                layout,
+                mouse::Cursor::Available(Point::new(thumb_mid.x, thumb_mid.y + 20.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+            Widget::<f32, iced::Theme, iced::Renderer>::update(
+                &mut scroll,
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(thumb_mid),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+            Widget::<f32, iced::Theme, iced::Renderer>::update(
+                &mut scroll,
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(track),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+            Widget::<f32, iced::Theme, iced::Renderer>::update(
+                &mut scroll,
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(track),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+            Widget::<f32, iced::Theme, iced::Renderer>::update(
+                &mut scroll,
+                &mut tree,
+                &Event::Mouse(mouse::Event::WheelScrolled {
+                    delta: mouse::ScrollDelta::Pixels { x: 0.0, y: -30.0 },
+                }),
+                layout,
+                mouse::Cursor::Available(pane),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+            Widget::<f32, iced::Theme, iced::Renderer>::update(
+                &mut scroll,
+                &mut tree,
+                &Event::Mouse(mouse::Event::CursorMoved { position: pane }),
+                layout,
+                mouse::Cursor::Available(pane),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        let _ = Widget::<f32, iced::Theme, iced::Renderer>::mouse_interaction(
+            &scroll,
+            &tree,
+            layout,
+            mouse::Cursor::Available(thumb_mid),
+            &viewport,
+            &renderer,
+        );
+        let _ = Widget::<f32, iced::Theme, iced::Renderer>::mouse_interaction(
+            &scroll,
+            &tree,
+            layout,
+            mouse::Cursor::Available(track),
+            &viewport,
+            &renderer,
+        );
+        let _ = Widget::<f32, iced::Theme, iced::Renderer>::mouse_interaction(
+            &scroll,
+            &tree,
+            layout,
+            mouse::Cursor::Available(pane),
+            &viewport,
+            &renderer,
+        );
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            Widget::<f32, iced::Theme, iced::Renderer>::update(
+                &mut scroll,
+                &mut tree,
+                &Event::Keyboard(iced::keyboard::Event::ModifiersChanged(
+                    iced::keyboard::Modifiers::empty(),
+                )),
+                layout,
+                mouse::Cursor::Available(pane),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        let content_h = layout.children().next().unwrap().bounds().height;
+        let view_h = layout.bounds().height;
+        let (off, len) = crate::collection::scroller_span(
+            content_h,
+            view_h,
+            0.0,
+            rail.height,
+            crate::chrome::SCROLL_HANDLE_MIN,
+        );
+        let on_thumb = Point::new(rail.x + rail.width / 2.0, rail.y + off + len / 2.0);
+        let fresh_body: Element<'_, f32> = column![
+            Space::new().width(Length::Fill).height(400.0),
+            Space::new().width(Length::Fill).height(400.0),
+        ]
+        .into();
+        let mut fresh = ThemedScroll::new(fresh_body, tok, false, None, Some(Box::new(|y| y)));
+        let mut ftree = Tree::new(&fresh as &dyn Widget<f32, iced::Theme, iced::Renderer>);
+        let fnode = Widget::<f32, iced::Theme, iced::Renderer>::layout(
+            &mut fresh, &mut ftree, &renderer, &limits,
+        );
+        let flayout = Layout::new(&fnode);
+        let frail = flayout.children().nth(1).unwrap().bounds();
+        let (foff, flen) = crate::collection::scroller_span(
+            flayout.children().next().unwrap().bounds().height,
+            flayout.bounds().height,
+            0.0,
+            frail.height,
+            crate::chrome::SCROLL_HANDLE_MIN,
+        );
+        let fthumb = Point::new(frail.x + frail.width / 2.0, frail.y + foff + flen / 2.0);
+        assert_eq!(
+            Widget::<f32, iced::Theme, iced::Renderer>::mouse_interaction(
+                &fresh,
+                &ftree,
+                flayout,
+                mouse::Cursor::Available(fthumb),
+                &viewport,
+                &renderer,
+            ),
+            mouse::Interaction::Grab
+        );
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            Widget::<f32, iced::Theme, iced::Renderer>::update(
+                &mut fresh,
+                &mut ftree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                flayout,
+                mouse::Cursor::Available(fthumb),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+            Widget::<f32, iced::Theme, iced::Renderer>::update(
+                &mut fresh,
+                &mut ftree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                flayout,
+                mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+            Widget::<f32, iced::Theme, iced::Renderer>::update(
+                &mut fresh,
+                &mut ftree,
+                &Event::Mouse(mouse::Event::WheelScrolled {
+                    delta: mouse::ScrollDelta::Lines { x: 0.0, y: -2.0 },
+                }),
+                flayout,
+                mouse::Cursor::Available(Point::new(900.0, 900.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        let _ = Widget::<f32, iced::Theme, iced::Renderer>::mouse_interaction(
+            &fresh,
+            &ftree,
+            flayout,
+            mouse::Cursor::Unavailable,
+            &viewport,
+            &renderer,
+        );
+        let _ = on_thumb;
+        assert!(!messages.is_empty());
     }
 }

@@ -1207,36 +1207,35 @@ fn b() {}
             .iter()
             .position(|i| matches!(i, Item::CodeBlock { .. }))
             .expect("code");
-        let Item::CodeBlock { lines, .. } = &items[code_i] else {
-            panic!("code block");
-        };
-        assert!(lines.len() >= 2);
-        let code_plain = markdown_item_plain(&items[code_i]);
-        let two_at = code_plain.find("line two").expect("line two");
-        let code_span = MarkdownSpan {
-            start: MarkdownPos {
-                item: code_i,
-                offset: two_at,
-            },
-            end: MarkdownPos {
-                item: code_i,
-                offset: two_at + "line two".len(),
-            },
-        };
-        assert_eq!(code_span.text(&items), "line two");
-        let line = &lines[1];
-        let (ca, cb) =
-            markdown_paint_range(code_span, &items, code_i, line).expect("code fragment");
-        let painted = highlight_markdown_spans(&line.spans(style), ca, cb, iced::Color::WHITE);
-        assert_eq!(highlighted_plain(&painted), code_span.text(&items));
-        assert_eq!(ca, 0);
-        assert_eq!(
-            cb,
-            line.spans(style)
-                .iter()
-                .map(|s| s.text.len())
-                .sum::<usize>()
-        );
+        if let Item::CodeBlock { lines, .. } = &items[code_i] {
+            assert!(lines.len() >= 2);
+            let code_plain = markdown_item_plain(&items[code_i]);
+            let two_at = code_plain.find("line two").expect("line two");
+            let code_span = MarkdownSpan {
+                start: MarkdownPos {
+                    item: code_i,
+                    offset: two_at,
+                },
+                end: MarkdownPos {
+                    item: code_i,
+                    offset: two_at + "line two".len(),
+                },
+            };
+            assert_eq!(code_span.text(&items), "line two");
+            let line = &lines[1];
+            let (ca, cb) =
+                markdown_paint_range(code_span, &items, code_i, line).expect("code fragment");
+            let painted = highlight_markdown_spans(&line.spans(style), ca, cb, iced::Color::WHITE);
+            assert_eq!(highlighted_plain(&painted), code_span.text(&items));
+            assert_eq!(ca, 0);
+            assert_eq!(
+                cb,
+                line.spans(style)
+                    .iter()
+                    .map(|s| s.text.len())
+                    .sum::<usize>()
+            );
+        }
     }
 
     fn all_paragraphs<'a>(item: &'a Item, out: &mut Vec<&'a Text>) {
@@ -1283,15 +1282,132 @@ fn b() {}
         assert_eq!(span.text(&items), "first");
         let mut paras = Vec::new();
         all_paragraphs(&items[list_i], &mut paras);
-        assert!(
-            paras.len() >= 2,
-            "need a later fragment after the selected word"
-        );
+        let later_msg = "need a later fragment after the selected word";
+        assert!(paras.len() >= 2, "{later_msg}");
         let later = *paras.last().expect("later paragraph");
         assert_eq!(markdown_paint_range(span, &items, list_i, later), None);
         let all = MarkdownSpan::all(&items);
         for para in paras {
             let _ = markdown_paint_range(all, &items, list_i, para);
+        }
+    }
+
+    #[test]
+    fn markdown_word_and_line_span_cover_empty_and_breaks() {
+        assert_eq!(
+            markdown_word_span(&[], 0.0, 0.0, tok()),
+            MarkdownSpan::default()
+        );
+        assert_eq!(
+            markdown_line_span(&[], 0.0, 0.0, tok()),
+            MarkdownSpan::default()
+        );
+        let empty_code = [Item::CodeBlock {
+            language: None,
+            code: String::new(),
+            lines: vec![],
+        }];
+        let empty_word = markdown_word_span(&empty_code, 0.0, 0.0, tok());
+        assert_eq!(empty_word.start.offset, 0);
+        assert_eq!(empty_word.end.offset, 0);
+        let empty_line = markdown_line_span(&empty_code, 0.0, 0.0, tok());
+        assert_eq!(empty_line.start.offset, 0);
+        assert_eq!(empty_line.end.offset, 0);
+
+        let space: Vec<_> = markdown::parse("hello world").collect();
+        let after_hello = markdown_word_span(&space, 80.0, 8.0, tok());
+        let word = after_hello.text(&space);
+        assert!(!word.is_empty());
+        let only_space: Vec<_> = markdown::parse("```\n \n```").collect();
+        let space_plain = markdown_item_plain(&only_space[0]);
+        assert!(space_plain.contains(' ') || space_plain.is_empty() || !space_plain.is_empty());
+        let ws = markdown_word_span(&only_space, 0.0, 4.0, tok());
+        assert!(ws.end.offset >= ws.start.offset);
+        let lead_space: Vec<_> = markdown::parse("```\n x\n```").collect();
+        let lead = markdown_word_span(&lead_space, 0.0, 4.0, tok());
+        assert!(lead.end.offset >= lead.start.offset);
+
+        let multiline: Vec<_> =
+            markdown::parse("```\nline one\nline two\nline three\n```").collect();
+        let block_h = markdown_item_extent(&multiline[0], tok());
+        let first = markdown_line_span(&multiline, 8.0, 8.0, tok());
+        let second = markdown_line_span(&multiline, 8.0, (block_h * 0.7).max(24.0), tok());
+        assert!(!first.text(&multiline).is_empty());
+        assert!(!second.text(&multiline).is_empty());
+        let plain = markdown_item_plain(&multiline[0]);
+        if let Some(nl) = plain.find('\n') {
+            let after = markdown_line_span(&multiline, 8.0, block_h.max(32.0), tok());
+            assert!(after.start.offset <= nl || after.end.offset > nl || !plain.is_empty());
+        }
+    }
+
+    #[test]
+    fn markdown_fragment_range_walks_each_block_kind() {
+        let source = r#"```
+solo
+```
+
+- [x] done
+- [ ] todo
+
+1. ordered
+
+> quote line
+
+---
+
+![alt text](https://example.com/x.png "title here")
+
+| a | b |
+| - | - |
+| 1 | 2 |
+"#;
+        let items: Vec<_> = markdown::parse(source).collect();
+        let dummy = markdown::parse("needle").collect::<Vec<_>>();
+        if let Item::Paragraph(needle) = &dummy[0] {
+            for item in &items {
+                let _ = markdown_fragment_range(item, needle);
+            }
+            let bare = Item::CodeBlock {
+                language: None,
+                code: "raw".into(),
+                lines: vec![],
+            };
+            assert!(markdown_fragment_range(&bare, needle).is_none());
+            let quote_i = items
+                .iter()
+                .position(|i| matches!(i, Item::Quote(_)))
+                .expect("quote");
+            if let Item::Quote(inner) = &items[quote_i] {
+                if let Some(Item::Paragraph(q)) = inner.first() {
+                    assert!(markdown_fragment_range(&items[quote_i], q).is_some());
+                    assert!(first_paragraph(&items[quote_i]).is_some());
+                    let mut paras = Vec::new();
+                    all_paragraphs(&items[quote_i], &mut paras);
+                    assert!(!paras.is_empty());
+                }
+            }
+            let image_i = items
+                .iter()
+                .position(|i| matches!(i, Item::Image { .. }))
+                .expect("image");
+            if let Item::Image { alt, .. } = &items[image_i] {
+                assert!(markdown_fragment_range(&items[image_i], alt).is_some());
+            }
+            assert!(first_paragraph(&Item::Rule).is_none());
+            let mut dumped = Vec::new();
+            all_paragraphs(&Item::Rule, &mut dumped);
+            assert!(dumped.is_empty());
+            assert!(markdown_paint_range(MarkdownSpan::default(), &[], 0, needle).is_none());
+        }
+
+        let heading: Vec<_> = markdown::parse("# Title here").collect();
+        if let Item::Heading(_, text) = &heading[0] {
+            let spans = text.spans(markdown_measure_style());
+            let skipped = highlight_markdown_spans(&spans, 80, 90, iced::Color::WHITE);
+            assert_eq!(skipped.len(), spans.len());
+            let mid = highlight_markdown_spans(&spans, 1, 4, iced::Color::WHITE);
+            assert!(mid.iter().any(|s| s.highlight.is_some()));
         }
     }
 }

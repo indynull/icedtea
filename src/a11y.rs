@@ -499,6 +499,17 @@ mod tests {
         let live = A11y::new("toast", Role::Status).merge_live(Live::Polite);
         assert_eq!(live.live, Live::Polite);
         assert_eq!(live.apply_live(Live::Off), Live::Polite);
+        assert_eq!(
+            A11y::new("toast", Role::Status).apply_live(Live::Assertive),
+            Live::Assertive
+        );
+        let bare = A11y::new("n", Role::TextBox);
+        assert_eq!(
+            bare.apply_error(Some("need a value")).as_deref(),
+            Some("need a value")
+        );
+        assert!(bare.apply_error(Some("")).is_none());
+        assert!(bare.apply_error(None).is_none());
         assert!(A11y::new("c", Role::Checkbox)
             .merge_checked(true)
             .apply_checked(false));

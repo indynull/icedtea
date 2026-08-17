@@ -348,16 +348,14 @@ mod tests {
             let s = crate::theme::named(name).tokens.scheme();
             let (bg, fg) = face(s.primary, s.on_primary, s.surface, ControlState::Disabled);
             let canvas = relative_luma(s.surface);
-            assert!(
-                (relative_luma(fg) - canvas).abs() > 0.15,
-                "{name}: disabled ink {fg:?} vanishes on {canvas}"
-            );
+            let msg = format!("{name}: disabled ink {fg:?} vanishes on {canvas}");
+            assert!((relative_luma(fg) - canvas).abs() > 0.15, "{msg}");
             assert_ne!(bg, s.surface, "{name}: disabled fill equals canvas");
             let danger = face(s.error, s.on_error, s.surface, ControlState::Disabled);
-            assert!(
-                (relative_luma(danger.1) - canvas).abs() > 0.15,
-                "{name}: disabled danger ink vanishes"
-            );
+            let danger_msg = format!("{name}: disabled danger ink vanishes");
+            let danger_ok = (relative_luma(danger.1) - canvas).abs() > 0.15;
+            assert!(danger_ok);
+            let _ = danger_msg.len();
         }
     }
 
@@ -378,5 +376,12 @@ mod tests {
         assert!(contrast_ratio(olive, cream) < 4.5);
         assert!(contrast_ratio(ink_on(olive, cream), cream) >= 4.5);
         assert_eq!(ink_on(Color::BLACK, Color::WHITE), Color::BLACK);
+        let charcoal = Color::from_rgb8(0x12, 0x12, 0x12);
+        let dusk = Color::from_rgb8(0x3A, 0x3A, 0x3A);
+        assert!(relative_luma(charcoal) < 0.45);
+        assert!(contrast_ratio(dusk, charcoal) < 4.5);
+        let lifted = ink_on(dusk, charcoal);
+        assert!(contrast_ratio(lifted, charcoal) >= 4.5);
+        assert!(relative_luma(lifted) > relative_luma(dusk));
     }
 }

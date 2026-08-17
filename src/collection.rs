@@ -1200,6 +1200,14 @@ mod tests {
         let mut sel = Selection::None;
         assert!(!sel.contains(0));
         assert!(sel.primary().is_none());
+        sel.apply_item_click(ItemClick {
+            id: 4,
+            button: ItemButton::Primary,
+            modifiers: iced::keyboard::Modifiers::CTRL,
+        });
+        assert!(sel.contains(4));
+        assert_eq!(sel.primary(), Some(4));
+        sel = Selection::None;
         sel.select_single(2);
         assert!(sel.contains(2));
         assert_eq!(sel.primary(), Some(2));

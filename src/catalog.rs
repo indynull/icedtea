@@ -880,6 +880,11 @@ mod tests {
             "A11y"
         ));
         assert_eq!(constructor("wrap"), Some(("layout", "wrap")));
+        assert!(module_src("no-such-module").is_none());
+        assert!(!fn_params_mention("fn other() {}", "missing", "A11y"));
+        assert!(!fn_params_mention("pub fn bare", "bare", "A11y"));
+        assert!(!fn_params_mention("pub fn foo<T>", "foo", "A11y"));
+        assert!(!fn_params_mention("pub fn open(( leftover", "open", "A11y"));
     }
 
     #[test]

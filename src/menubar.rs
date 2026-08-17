@@ -621,16 +621,27 @@ mod tests {
         assert!(save >= 160.0);
         assert!(text_advance("File", size) < text_advance("Save    ctrl+s", size));
         let file_cjk = title_extents("文件", pad, size, 18.0);
-        assert!(
-            text_advance("文件", size) >= size * 2.0,
-            "two CJK letters need two em so the title does not wrap"
-        );
-        assert!(
-            text_advance("文件", size) > 2.0 * size * 0.62,
-            "wide glyphs must not use the Latin 0.62 em factor"
-        );
+        let cjk = "two CJK letters need two em so the title does not wrap";
+        assert!(text_advance("文件", size) >= size * 2.0, "{cjk}");
+        let latin = "wide glyphs must not use the Latin 0.62 em factor";
+        assert!(text_advance("文件", size) > 2.0 * size * 0.62, "{latin}");
         assert!(file_cjk.width >= pad.x() + size * 2.0);
         assert!(text_advance("保存", size) >= size * 2.0);
+        for ch in [
+            '\u{A960}',
+            '한',
+            '\u{F900}',
+            '\u{FE10}',
+            '\u{FE30}',
+            'Ａ',
+            '\u{FFE0}',
+            '\u{20000}',
+            '\u{30000}',
+        ] {
+            let s = ch.to_string();
+            let msg = format!("wide {ch:?} must use one em");
+            assert!(text_advance(&s, size) >= size, "{msg}");
+        }
     }
 
     #[test]

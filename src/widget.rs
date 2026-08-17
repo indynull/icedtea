@@ -2939,21 +2939,10 @@ fn clock_digits(n: impl Into<u32>, dir: Direction) -> String {
     if dir != Direction::Rtl {
         return western;
     }
+    const EASTERN: [char; 10] = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
     western
-        .chars()
-        .map(|c| match c {
-            '0' => '٠',
-            '1' => '١',
-            '2' => '٢',
-            '3' => '٣',
-            '4' => '٤',
-            '5' => '٥',
-            '6' => '٦',
-            '7' => '٧',
-            '8' => '٨',
-            '9' => '٩',
-            other => other,
-        })
+        .bytes()
+        .map(|b| EASTERN[(b - b'0') as usize])
         .collect()
 }
 
@@ -6797,9 +6786,9 @@ mod tests {
             let t = named(name).tokens;
             for v in [Variant::Success, Variant::Warning] {
                 let (wash, ink, _) = chip_face(t, v);
-                assert!(
+                must(
                     crate::m3::color::contrast_ratio(ink, wash) >= 4.5,
-                    "{name} {v:?} chip ink on wash"
+                    format!("{name} {v:?} chip ink on wash"),
                 );
             }
         }
@@ -7235,6 +7224,25 @@ mod tests {
             crate::layout::FILL,
             true,
             role("code", Role::Group),
+        );
+        let _: Element<'_, ()> = highlighted_code(
+            &code,
+            "rs",
+            |_| (),
+            tok,
+            "dark",
+            crate::layout::FILL,
+            false,
+            role("code", Role::Group),
+        );
+        let _: Element<'_, ()> = search_input_clear(
+            "q",
+            |_| (),
+            None,
+            None,
+            tok,
+            A11y::new("", Role::TextBox),
+            None,
         );
         let _: Element<'_, ()> = tooltip_wrap(
             label("x", tok, role("x", Role::Header)),
@@ -7710,9 +7718,9 @@ mod tests {
             .split("pub fn log_view")
             .next()
             .unwrap();
-        assert!(
+        must(
             scroll_src.contains("ThemedScroll::new"),
-            "themed_scroll must compose pane plus rail so the rail can sit on the end side"
+            "themed_scroll must compose pane plus rail so the rail can sit on the end side",
         );
         assert!(crate::layout::stick_to_end(80.0, 100.0, 20.0, 4.0));
         let input_src = src
@@ -7794,8 +7802,9 @@ mod tests {
         let none: [MdHeading; 0] = [];
         let _: Element<'_, ()> =
             markdown_outline(&none, None, |_| (), tok, role("outline-empty", Role::List));
-        assert!(
-            outlined.item_offset(heads[1].index, tok) > outlined.item_offset(heads[0].index, tok)
+        must(
+            outlined.item_offset(heads[1].index, tok) > outlined.item_offset(heads[0].index, tok),
+            "later heading sits below the first",
         );
         assert_eq!(outlined.item_offset(0, tok), 0.0);
         assert!(
@@ -8755,9 +8764,9 @@ mod tests {
         let max = iced::Size::new(400.0, 80.0);
         let hs = layout_size(&mut search, max).height;
         let hp = layout_size(&mut pick, max).height;
-        assert!(
+        must(
             (hs - hp).abs() <= 1.0,
-            "search {hs} must match pick {hp} under compact density"
+            format!("search {hs} must match pick {hp} under compact density"),
         );
     }
 
@@ -9158,9 +9167,9 @@ mod tests {
                 &viewport,
             );
         }
-        assert!(
+        must(
             first.contains(&crate::select::MarkdownPointer::Press),
-            "press must reach on_pointer after paint-side capture, got {first:?}"
+            format!("press must reach on_pointer after paint-side capture, got {first:?}"),
         );
         assert!(first
             .iter()
@@ -9179,9 +9188,9 @@ mod tests {
                 &viewport,
             );
         }
-        assert!(
+        must(
             second.contains(&crate::select::MarkdownPointer::Double),
-            "double-click must reach on_pointer, got {second:?}"
+            format!("double-click must reach on_pointer, got {second:?}"),
         );
         let mut st = crate::select::MarkdownSelect::default();
         for ev in first.iter().chain(second.iter()) {
@@ -9220,9 +9229,9 @@ mod tests {
                 &viewport,
             );
         }
-        assert!(
+        must(
             !miss.contains(&crate::select::MarkdownPointer::Press),
-            "a miss must not post Press, got {miss:?}"
+            format!("a miss must not post Press, got {miss:?}"),
         );
         let mut moved = Vec::new();
         {
@@ -9586,18 +9595,20 @@ mod tests {
         let mut boxes = Vec::new();
         walk_bounds(layout, &mut boxes);
         let rb = rail_box(&boxes);
-        assert!(
+        must(
             rb.x - origin.x < 8.0,
-            "RTL list rail must sit on the left, got x={}",
-            rb.x - origin.x
+            format!(
+                "RTL list rail must sit on the left, got x={}",
+                rb.x - origin.x
+            ),
         );
         let checks: Vec<_> = boxes
             .iter()
             .filter(|b| (b.width - 16.0).abs() < 0.6 && (b.height - 16.0).abs() < 0.6)
             .collect();
-        assert!(
+        must(
             checks.iter().any(|b| b.x + b.width > origin.x + 200.0),
-            "RTL list leading check must sit on the start (right) side"
+            "RTL list leading check must sit on the start (right) side",
         );
 
         let mut scroller: Element<'_, f32> = themed_scroll(
@@ -9619,10 +9630,12 @@ mod tests {
         let mut sb = Vec::new();
         walk_bounds(sl, &mut sb);
         let srail = rail_box(&sb);
-        assert!(
+        must(
             srail.x - so.x < 8.0,
-            "RTL themed_scroll rail must sit on the left, got x={}",
-            srail.x - so.x
+            format!(
+                "RTL themed_scroll rail must sit on the left, got x={}",
+                srail.x - so.x
+            ),
         );
     }
 
@@ -9662,10 +9675,12 @@ mod tests {
         let mut boxes = Vec::new();
         walk_bounds(layout, &mut boxes);
         let rb = rail_box(&boxes);
-        assert!(
+        must(
             rb.x - origin.x < 8.0,
-            "RTL tree rail must sit on the left, got x={}",
-            rb.x - origin.x
+            format!(
+                "RTL tree rail must sit on the left, got x={}",
+                rb.x - origin.x
+            ),
         );
         assert_eq!(closed_disclosure(tok), "◂");
         let ltr = named("dark").tokens;
@@ -9674,16 +9689,18 @@ mod tests {
             .iter()
             .filter(|b| b.height > 10.0 && b.height < 40.0 && b.width > origin.width * 0.4)
             .collect();
-        assert!(
+        must(
             origin.width > 200.0,
-            "RTL tree row must fill the pane, got width={}",
-            origin.width
+            format!(
+                "RTL tree row must fill the pane, got width={}",
+                origin.width
+            ),
         );
-        assert!(
+        must(
             titles
                 .iter()
                 .any(|b| b.x + b.width > origin.x + origin.width * 0.7),
-            "RTL tree title must fill toward the start (right) side"
+            "RTL tree title must fill toward the start (right) side",
         );
         let line_src = include_str!("widget.rs")
             .split("fn tree_line")
@@ -9713,9 +9730,9 @@ mod tests {
             .split("pub fn split_button")
             .next()
             .unwrap();
-        assert!(
+        must(
             !face.contains(".width(Length::Fill)\n            .align_x(Alignment::Center)"),
-            "Fill+align on button text drops right-to-left titles"
+            "Fill+align on button text drops right-to-left titles",
         );
         let tok = named("dark")
             .tokens
@@ -9752,11 +9769,12 @@ mod tests {
             .as_widget_mut()
             .layout(&mut empty_tree, &renderer, &limits)
             .size();
-        assert!(
+        must(
             labeled.width > pad.width + 8.0,
-            "RTL themed_button must keep title extent, labeled={} pad={}",
-            labeled.width,
-            pad.width
+            format!(
+                "RTL themed_button must keep title extent, labeled={} pad={}",
+                labeled.width, pad.width
+            ),
         );
         let card_src = include_str!("widget.rs")
             .split("fn card_row")
@@ -9765,13 +9783,13 @@ mod tests {
             .split("/// A virtualized column")
             .next()
             .unwrap();
-        assert!(
+        must(
             card_src.contains("start_label"),
-            "card_row must wrap shrink text so RTL titles paint"
+            "card_row must wrap shrink text so RTL titles paint",
         );
-        assert!(
+        must(
             !card_src.contains(".width(Length::Fill)\n            .align_x(start)"),
-            "Fill+align on list card text drops right-to-left titles"
+            "Fill+align on list card text drops right-to-left titles",
         );
         let flush_src = include_str!("widget.rs")
             .split("fn two_line_row")
@@ -9783,6 +9801,11 @@ mod tests {
         assert!(flush_src.contains("start_label"));
         assert_eq!(clock_digits(9u32, crate::i18n::Direction::Rtl), "٠٩");
         assert_eq!(clock_digits(30u32, crate::i18n::Direction::Ltr), "30");
+        assert_eq!(clock_digits(12u32, crate::i18n::Direction::Rtl), "١٢");
+        assert_eq!(clock_digits(34u32, crate::i18n::Direction::Rtl), "٣٤");
+        assert_eq!(clock_digits(56u32, crate::i18n::Direction::Rtl), "٥٦");
+        assert_eq!(clock_digits(78u32, crate::i18n::Direction::Rtl), "٧٨");
+        assert_eq!(clock_digits(0u32, crate::i18n::Direction::Rtl), "٠٠");
         let time_src = include_str!("widget.rs")
             .split("pub fn time_picker")
             .nth(1)
@@ -9835,9 +9858,9 @@ mod tests {
             .iter()
             .filter(|b| (b.width - 16.0).abs() < 0.6 && (b.height - 16.0).abs() < 0.6)
             .collect();
-        assert!(
+        must(
             icons.iter().any(|b| b.x - origin.x < origin.width / 2.0),
-            "RTL pick chevron must sit on the end (left) side"
+            "RTL pick chevron must sit on the end (left) side",
         );
         assert_eq!(closed_disclosure(tok), "◂");
 
@@ -9862,9 +9885,9 @@ mod tests {
             .iter()
             .filter(|b| b.height > 8.0 && b.height < 28.0 && b.width > 6.0 && b.width < 28.0)
             .collect();
-        assert!(
+        must(
             marks.iter().any(|b| b.x - ao.x < ao.width / 2.0),
-            "RTL disclosure mark must sit on the end (left) side"
+            "RTL disclosure mark must sit on the end (left) side",
         );
     }
 
@@ -9899,16 +9922,15 @@ mod tests {
             .iter()
             .filter(|b| (b.width - 16.0).abs() < 6.0 && (b.height - 16.0).abs() < 6.0)
             .collect();
-        assert!(
+        must(
             origin.width > 200.0,
-            "RTL checkbox row must fill, got {}",
-            origin.width
+            format!("RTL checkbox row must fill, got {}", origin.width),
         );
-        assert!(
+        must(
             marks
                 .iter()
                 .any(|b| b.x + b.width > origin.x + origin.width * 0.5),
-            "RTL checkbox mark must sit on the start (right) side"
+            "RTL checkbox mark must sit on the start (right) side",
         );
 
         let mut group: Element<'_, usize> = button_group(
@@ -9931,9 +9953,9 @@ mod tests {
             .iter()
             .filter(|b| (b.width - 16.0).abs() < 0.6 && (b.height - 16.0).abs() < 0.6)
             .collect();
-        assert!(
+        must(
             icons.iter().any(|b| b.x + b.width > go.x + go.width * 0.5),
-            "RTL button-group leading icon sits on the start (right) of the first action"
+            "RTL button-group leading icon sits on the start (right) of the first action",
         );
         let group_src = include_str!("widget.rs")
             .split("pub fn button_group")
@@ -10533,6 +10555,8 @@ mod tests {
         assert!(flush.chars().count() <= 26);
         assert!(!flush.contains("Berlin"));
         assert!(flush.ends_with("for…") || flush.ends_with("notes…"));
+        assert_eq!(ellipsize_line("abcdefghijklmnop", 8), "abcdefg…");
+        assert_eq!(ellipsize_line(" abcdefgh", 6), " abcd…");
     }
 
     #[test]
@@ -10985,9 +11009,9 @@ mod tests {
             .iter()
             .filter(|b| b.width < 24.0 && b.height < 28.0 && b.width > 4.0)
             .collect();
-        assert!(
+        must(
             marks.iter().any(|b| b.x - origin.x < origin.width / 2.0),
-            "RTL disclosure mark must sit on the end (left)"
+            "RTL disclosure mark must sit on the end (left)",
         );
         let src = include_str!("widget.rs");
         let head = src
@@ -10997,9 +11021,9 @@ mod tests {
             .split("pub fn accordion_view")
             .next()
             .unwrap();
-        assert!(
+        must(
             head.contains("align_start(tok.direction)"),
-            "disclosure title must start-align so RTL text sits on the right"
+            "disclosure title must start-align so RTL text sits on the right",
         );
     }
 
@@ -11381,9 +11405,16 @@ mod tests {
         assert!(tok.meta() < tok.body());
         let compact = pick_layout_height(ControlSize::Compact);
         let default = pick_layout_height(ControlSize::Default);
-        assert!(
+        let comfortable = pick_layout_height(ControlSize::Comfortable);
+        must(
             compact < default,
-            "Compact pick ({compact}) must be shorter than Default ({default})"
+            format!("Compact pick ({compact}) must be shorter than Default ({default})"),
+        );
+        must(
+            comfortable >= default,
+            format!(
+                "Comfortable pick ({comfortable}) must not be shorter than Default ({default})"
+            ),
         );
         let src = include_str!("widget.rs")
             .split("pub fn themed_pick_list")
@@ -11425,9 +11456,9 @@ mod tests {
     fn segmented_button_compact_is_shorter_than_default() {
         let compact = segmented_layout_height(ControlSize::Compact);
         let default = segmented_layout_height(ControlSize::Default);
-        assert!(
+        must(
             compact < default,
-            "Compact segmented ({compact}) must be shorter than Default ({default})"
+            format!("Compact segmented ({compact}) must be shorter than Default ({default})"),
         );
     }
 
@@ -11479,13 +11510,13 @@ mod tests {
         let extra = 3.0 + 1.0;
         let meta_h = type_line(tok.meta()) + p.top + p.bottom + extra;
         let body_h = type_line(tok.body()) + p.top + p.bottom + extra;
-        assert!(
+        must(
             (h - meta_h).abs() < (h - body_h).abs(),
-            "tab_bar {h} must match meta {meta_h} closer than body {body_h}"
+            format!("tab_bar {h} must match meta {meta_h} closer than body {body_h}"),
         );
-        assert!(
+        must(
             (h - meta_h).abs() <= 2.0,
-            "tab_bar {h} must be within 2px of meta face {meta_h}"
+            format!("tab_bar {h} must be within 2px of meta face {meta_h}"),
         );
     }
 
@@ -11514,17 +11545,17 @@ mod tests {
         let meta_small = type_line(tok.meta()) + 4.0;
         let meta_large = type_line(tok.meta()) + 8.0;
         let body_large = type_line(tok.body()) + 8.0;
-        assert!(
+        must(
             (hs - meta_small).abs() <= 2.0,
-            "Small badge {hs} must match meta {meta_small}"
+            format!("Small badge {hs} must match meta {meta_small}"),
         );
-        assert!(
+        must(
             (hl - meta_large).abs() <= 2.0,
-            "Large badge {hl} must match meta {meta_large}"
+            format!("Large badge {hl} must match meta {meta_large}"),
         );
-        assert!(
+        must(
             (hl - meta_large).abs() < (hl - body_large).abs(),
-            "Large badge {hl} must not match body {body_large}"
+            format!("Large badge {hl} must not match body {body_large}"),
         );
     }
 
@@ -11646,5 +11677,468 @@ mod tests {
         };
         let mut tv: Element<'_, ()> = toast_view(&toast, (), tok, A11y::new("mid", Role::Status));
         draw_once(&mut tv);
+    }
+
+    fn press_messages<M: Clone>(
+        el: &mut Element<'_, M>,
+        at: iced::Point,
+        button: iced::mouse::Button,
+        viewport: iced::Size,
+    ) -> Vec<M> {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Event, Font, Pixels, Rectangle};
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(iced::Size::ZERO, viewport);
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let vp = Rectangle::new(iced::Point::ORIGIN, viewport);
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(iced::mouse::Event::ButtonPressed(button)),
+                layout,
+                iced::mouse::Cursor::Available(at),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+        }
+        messages
+    }
+
+    fn drive_tree<M: Clone>(el: &mut Element<'_, M>, viewport: iced::Size) {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::renderer::Style;
+        use iced::advanced::widget::operation::focusable;
+        use iced::advanced::widget::Tree;
+        use iced::{Event, Font, Pixels, Point, Rectangle, Theme};
+        let mut tree = Tree::new(el.as_widget());
+        let mut renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(iced::Size::ZERO, viewport);
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let vp = Rectangle::new(Point::ORIGIN, viewport);
+        let miss = Rectangle::new(Point::new(4000.0, 4000.0), iced::Size::new(4.0, 4.0));
+        el.as_widget_mut().diff(&mut tree);
+        let _ = el.as_widget().mouse_interaction(
+            &tree,
+            layout,
+            iced::mouse::Cursor::Available(Point::new(8.0, 8.0)),
+            &vp,
+            &renderer,
+        );
+        el.as_widget().draw(
+            &tree,
+            &mut renderer,
+            &Theme::Dark,
+            &Style::default(),
+            layout,
+            iced::mouse::Cursor::Available(Point::new(8.0, 8.0)),
+            &vp,
+        );
+        el.as_widget().draw(
+            &tree,
+            &mut renderer,
+            &Theme::Dark,
+            &Style::default(),
+            layout,
+            iced::mouse::Cursor::Unavailable,
+            &miss,
+        );
+        let mut op = focusable::unfocus::<()>();
+        el.as_widget_mut()
+            .operate(&mut tree, layout, &renderer, &mut op);
+        let _ = el
+            .as_widget_mut()
+            .overlay(&mut tree, layout, &renderer, &vp, iced::Vector::ZERO);
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::<M>::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(keyboard::key::Named::Shift),
+                    modified_key: keyboard::Key::Named(keyboard::key::Named::Shift),
+                    physical_key: keyboard::key::Physical::Unidentified(
+                        keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: keyboard::Location::Standard,
+                    modifiers: keyboard::Modifiers::SHIFT,
+                    text: None,
+                    repeat: false,
+                }),
+                layout,
+                iced::mouse::Cursor::Available(Point::new(8.0, 8.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Keyboard(keyboard::Event::KeyReleased {
+                    key: keyboard::Key::Named(keyboard::key::Named::Shift),
+                    modified_key: keyboard::Key::Named(keyboard::key::Named::Shift),
+                    physical_key: keyboard::key::Physical::Unidentified(
+                        keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: keyboard::Location::Standard,
+                    modifiers: keyboard::Modifiers::empty(),
+                }),
+                layout,
+                iced::mouse::Cursor::Available(Point::new(8.0, 8.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+        }
+        let _ = messages;
+    }
+
+    #[test]
+    fn item_press_left_middle_and_miss_and_tree() {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Event, Font, Pixels, Point, Rectangle, Size};
+        let tok = named("dark").tokens;
+        let face = label("row", tok, A11y::new("row", Role::ListItem));
+        let mut el: Element<'_, ItemClick> = item_press(face, |button, modifiers| ItemClick {
+            id: 1,
+            button,
+            modifiers,
+        });
+        drive_tree(&mut el, Size::new(200.0, 40.0));
+        let left = press_messages(
+            &mut el,
+            Point::new(8.0, 8.0),
+            iced::mouse::Button::Left,
+            Size::new(200.0, 40.0),
+        );
+        assert_eq!(left[0].button, ItemButton::Primary);
+        let mid = press_messages(
+            &mut el,
+            Point::new(8.0, 8.0),
+            iced::mouse::Button::Middle,
+            Size::new(200.0, 40.0),
+        );
+        assert!(mid.is_empty());
+        let away = press_messages(
+            &mut el,
+            Point::new(900.0, 900.0),
+            iced::mouse::Button::Left,
+            Size::new(200.0, 40.0),
+        );
+        assert!(away.is_empty());
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(200.0, 40.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let viewport = Rectangle::new(Point::ORIGIN, Size::new(200.0, 40.0));
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)),
+                layout,
+                iced::mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(messages.is_empty());
+        let mut cap: Element<'_, ()> =
+            capture_press(label("pad", tok, A11y::new("pad", Role::Group)));
+        drive_tree(&mut cap, Size::new(80.0, 40.0));
+    }
+
+    #[test]
+    fn markdown_view_forwards_operate_and_link_passthrough() {
+        let tok = named("dark").tokens;
+        let items: Vec<_> =
+            markdown::parse("# Title\n\nSee [docs](https://example.com).").collect();
+        let mut el: Element<'_, crate::select::MarkdownPointer> = markdown_view(
+            &items,
+            None,
+            |ev| ev,
+            tok,
+            |_| crate::select::MarkdownPointer::Release,
+            A11y::new("md", Role::Group),
+        );
+        drive_tree(&mut el, iced::Size::new(400.0, 240.0));
+        let url = String::from("https://example.com");
+        assert_eq!(
+            <MarkdownPaint as iced::widget::markdown::Viewer<markdown::Uri>>::on_link_click(
+                url.clone()
+            ),
+            url
+        );
+    }
+
+    #[test]
+    fn list_grid_table_and_tree_emit_item_click() {
+        let tok = named("dark").tokens;
+        let list = VecList {
+            items: vec![
+                crate::collection::ListRow::new("Alpha")
+                    .with_leading(crate::collection::RowSlot::Check(true)),
+                crate::collection::ListRow::new("Beta"),
+            ],
+        };
+        let window = VisibleWindow::new(80.0);
+        let unused_click = || ItemClick {
+            id: 99,
+            button: ItemButton::Primary,
+            modifiers: keyboard::Modifiers::empty(),
+        };
+        let _ = unused_click();
+        let mut list_el: Element<'_, ItemClick> = list_view(
+            &list,
+            &Sel::None,
+            |c| c,
+            tok,
+            window,
+            24.0,
+            0,
+            |_| unused_click(),
+            "Empty",
+            |_| tok.muted,
+            None,
+            RowFace::FLUSH,
+            |_| unused_click(),
+            A11y::new("list", Role::List),
+        );
+        let list_msgs = press_messages(
+            &mut list_el,
+            iced::Point::new(40.0, 12.0),
+            iced::mouse::Button::Left,
+            iced::Size::new(320.0, 80.0),
+        );
+        let _ = press_messages(
+            &mut list_el,
+            iced::Point::new(10.0, 12.0),
+            iced::mouse::Button::Left,
+            iced::Size::new(320.0, 80.0),
+        );
+        {
+            use iced::advanced::clipboard;
+            use iced::advanced::layout::{Layout, Limits};
+            use iced::advanced::widget::Tree;
+            use iced::{Event, Font, Pixels, Rectangle};
+            let mut tree = Tree::new(list_el.as_widget());
+            let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+                Font::DEFAULT,
+                Pixels::from(16u32),
+            ));
+            let limits = Limits::new(iced::Size::ZERO, iced::Size::new(320.0, 80.0));
+            let node = list_el
+                .as_widget_mut()
+                .layout(&mut tree, &renderer, &limits);
+            let layout = Layout::new(&node);
+            let vp = Rectangle::new(iced::Point::ORIGIN, iced::Size::new(320.0, 80.0));
+            let mut clipboard = clipboard::Null;
+            let mut messages = Vec::new();
+            {
+                let mut shell = iced::advanced::Shell::new(&mut messages);
+                list_el.as_widget_mut().update(
+                    &mut tree,
+                    &Event::Mouse(iced::mouse::Event::WheelScrolled {
+                        delta: iced::mouse::ScrollDelta::Lines { x: 0.0, y: -3.0 },
+                    }),
+                    layout,
+                    iced::mouse::Cursor::Available(iced::Point::new(40.0, 20.0)),
+                    &renderer,
+                    &mut clipboard,
+                    &mut shell,
+                    &vp,
+                );
+            }
+            let _ = messages;
+        }
+        must(
+            list_msgs.iter().any(|c| c.id < 99),
+            format!("list row press must emit ItemClick, got {list_msgs:?}"),
+        );
+
+        let labels = vec!["Inbox".into(), "Mail".into()];
+        let mut grid: Element<'_, ItemClick> =
+            item_grid(&labels, |c| c, Some(0), tok, A11y::new("grid", Role::List));
+        let grid_msgs = press_messages(
+            &mut grid,
+            iced::Point::new(40.0, 20.0),
+            iced::mouse::Button::Left,
+            iced::Size::new(300.0, 160.0),
+        );
+        must(
+            !grid_msgs.is_empty(),
+            format!("grid tile press must emit ItemClick, got {grid_msgs:?}"),
+        );
+
+        let table = TableModel {
+            headers: vec!["A".into(), "B".into()],
+            rows: vec![vec!["1".into(), "2".into()]],
+            sort_col: None,
+            sort_asc: true,
+            checks: vec![true],
+        };
+        let cols = crate::collection::ColumnLayout::new(vec![80.0, 80.0]);
+        let table_unused = || {
+            (
+                ItemClick {
+                    id: 0,
+                    button: ItemButton::Primary,
+                    modifiers: keyboard::Modifiers::empty(),
+                },
+                0usize,
+            )
+        };
+        let on_sort = |_: usize| table_unused();
+        let on_scroll = |_: VisibleWindow| table_unused();
+        let on_h_scroll = |_: f32| table_unused();
+        let on_check = |_: usize| table_unused();
+        let _ = (
+            on_sort(0),
+            on_scroll(VisibleWindow::new(80.0)),
+            on_h_scroll(0.0),
+            on_check(0),
+        );
+        let mut table_el: Element<'_, (ItemClick, usize)> = data_table(
+            &table,
+            &Sel::None,
+            None,
+            &cols,
+            false,
+            VisibleWindow::new(80.0),
+            24.0,
+            0,
+            |click, c| (click, c),
+            on_sort,
+            on_scroll,
+            on_h_scroll,
+            on_check,
+            tok,
+            A11y::new("table", Role::Table),
+        );
+        let table_msgs = press_messages(
+            &mut table_el,
+            iced::Point::new(80.0, 44.0),
+            iced::mouse::Button::Left,
+            iced::Size::new(240.0, 80.0),
+        );
+        let _ = press_messages(
+            &mut table_el,
+            iced::Point::new(24.0, 10.0),
+            iced::mouse::Button::Left,
+            iced::Size::new(240.0, 80.0),
+        );
+        let _ = press_messages(
+            &mut table_el,
+            iced::Point::new(10.0, 40.0),
+            iced::mouse::Button::Left,
+            iced::Size::new(240.0, 80.0),
+        );
+        {
+            use iced::advanced::clipboard;
+            use iced::advanced::layout::{Layout, Limits};
+            use iced::advanced::widget::Tree;
+            use iced::{Event, Font, Pixels, Rectangle};
+            let mut tree = Tree::new(table_el.as_widget());
+            let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+                Font::DEFAULT,
+                Pixels::from(16u32),
+            ));
+            let limits = Limits::new(iced::Size::ZERO, iced::Size::new(240.0, 80.0));
+            let node = table_el
+                .as_widget_mut()
+                .layout(&mut tree, &renderer, &limits);
+            let layout = Layout::new(&node);
+            let vp = Rectangle::new(iced::Point::ORIGIN, iced::Size::new(240.0, 80.0));
+            let mut clipboard = clipboard::Null;
+            let mut messages = Vec::new();
+            {
+                let mut shell = iced::advanced::Shell::new(&mut messages);
+                table_el.as_widget_mut().update(
+                    &mut tree,
+                    &Event::Mouse(iced::mouse::Event::WheelScrolled {
+                        delta: iced::mouse::ScrollDelta::Lines { x: -2.0, y: -2.0 },
+                    }),
+                    layout,
+                    iced::mouse::Cursor::Available(iced::Point::new(80.0, 12.0)),
+                    &renderer,
+                    &mut clipboard,
+                    &mut shell,
+                    &vp,
+                );
+                table_el.as_widget_mut().update(
+                    &mut tree,
+                    &Event::Mouse(iced::mouse::Event::WheelScrolled {
+                        delta: iced::mouse::ScrollDelta::Lines { x: 0.0, y: -3.0 },
+                    }),
+                    layout,
+                    iced::mouse::Cursor::Available(iced::Point::new(40.0, 48.0)),
+                    &renderer,
+                    &mut clipboard,
+                    &mut shell,
+                    &vp,
+                );
+            }
+            let _ = messages;
+        }
+        must(
+            table_msgs
+                .iter()
+                .any(|(c, _)| c.button == ItemButton::Primary),
+            format!("table cell press must emit ItemClick, got {table_msgs:?}"),
+        );
+
+        let root = TreeNode::branch(1, "root", vec![TreeNode::leaf(2, "child")]);
+        let mut tree_el: Element<'_, ItemClick<u64>> = tree_view(
+            &root,
+            Some(1),
+            None,
+            |_| ItemClick {
+                id: 0,
+                button: ItemButton::Primary,
+                modifiers: keyboard::Modifiers::empty(),
+            },
+            |c| c,
+            TreeFace::Files,
+            tok,
+            A11y::new("tree", Role::Tree),
+        );
+        let tree_msgs = press_messages(
+            &mut tree_el,
+            iced::Point::new(48.0, 10.0),
+            iced::mouse::Button::Left,
+            iced::Size::new(240.0, 80.0),
+        );
+        must(
+            tree_msgs.iter().any(|c| c.id == 1 || c.id == 2),
+            format!("tree label press must emit ItemClick, got {tree_msgs:?}"),
+        );
     }
 }

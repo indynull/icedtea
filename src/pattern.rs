@@ -2566,10 +2566,8 @@ mod tests {
         assert!(cm_src.contains("tok.body()"));
         let card = context_card_size(table.iter().count(), vp, tok.density);
         let row_w = menu_row_width(&mut cm);
-        assert!(
-            row_w + 1.0 >= card.width - 16.0,
-            "menu row {row_w} should fill the {card:?} card"
-        );
+        let row_msg = format!("menu row {row_w} should fill the {card:?} card");
+        assert!(row_w + 1.0 >= card.width - 16.0, "{row_msg}");
         let mut edge = context_menu(
             table.iter().cloned(),
             iced::Point::new(800.0, 500.0),
@@ -2853,13 +2851,9 @@ mod tests {
                 &viewport,
             );
         }
-        assert!(
-            on_row.contains(&Msg::Save),
-            "row press should run the action, got {on_row:?}"
-        );
-        assert!(
-            !on_row.iter().all(|m| *m == Msg::Dismiss),
-            "row press must not be dismiss-only, got {on_row:?}"
-        );
+        let save_msg = format!("row press should run the action, got {on_row:?}");
+        assert!(on_row.contains(&Msg::Save), "{save_msg}");
+        let dismiss_msg = format!("row press must not be dismiss-only, got {on_row:?}");
+        assert!(!on_row.iter().all(|m| *m == Msg::Dismiss), "{dismiss_msg}");
     }
 }

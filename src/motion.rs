@@ -928,10 +928,8 @@ mod tests {
             );
             captured = shell.is_event_captured();
         }
-        assert!(
-            !captured,
-            "a press on the placement spacer must reach the dismiss surface"
-        );
+        let spacer_msg = "a press on the placement spacer must reach the dismiss surface";
+        assert!(!captured, "{spacer_msg}");
         assert!(messages.is_empty(), "spacer press must not run the row");
     }
 

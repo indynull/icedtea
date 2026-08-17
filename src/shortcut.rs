@@ -8,9 +8,12 @@ use iced::keyboard::{key::Named, Key, Modifiers};
 
 /// Command on macOS, Control on Linux and Windows.
 pub fn primary() -> Modifiers {
-    if cfg!(target_os = "macos") {
+    #[cfg(target_os = "macos")]
+    {
         Modifiers::LOGO
-    } else {
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
         Modifiers::CTRL
     }
 }
@@ -176,11 +179,10 @@ mod tests {
 
     #[test]
     fn primary_is_the_host_accelerator() {
-        if cfg!(target_os = "macos") {
-            assert_eq!(primary(), Modifiers::LOGO);
-        } else {
-            assert_eq!(primary(), Modifiers::CTRL);
-        }
+        #[cfg(target_os = "macos")]
+        assert_eq!(primary(), Modifiers::LOGO);
+        #[cfg(not(target_os = "macos"))]
+        assert_eq!(primary(), Modifiers::CTRL);
     }
 
     #[test]
