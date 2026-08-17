@@ -34,6 +34,7 @@
   width).
 - `accordion_view` start-aligns the open body so right-to-left
   copy sits on the start edge.
+- `tree_view` paints the selected wash across the full row.
 
 ## 0.10.0 — 2026-08-16
 

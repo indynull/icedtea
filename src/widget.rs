@@ -664,9 +664,10 @@ pub enum CardFace {
 
 /// How each tree row is painted.
 ///
-/// [`Self::Outline`] is a tight heading tree: full-width selection, no
-/// folder marks. [`Self::Files`] is an explorer: inset wash, folder and
-/// file marks from `dir`. Density still scales pad and indent.
+/// [`Self::Outline`] is a tight heading tree: no folder marks.
+/// [`Self::Files`] is an explorer: folder and file marks from `dir`.
+/// Both paint the selected wash across the full row. Density still
+/// scales pad and indent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TreeFace {
     #[default]
@@ -5582,9 +5583,11 @@ where
 /// Heading or file tree. The disclosure control emits `on_toggle`; the
 /// row label emits `on_select`. `selected` is the app-owned id.
 ///
-/// [`TreeFace::Outline`] is a tight heading tree (full-width wash, no
-/// marks). [`TreeFace::Files`] is an explorer (inset wash, folder and
-/// file marks from `dir`). Density scales pad, gap, and indent.
+/// [`TreeFace::Outline`] is a tight heading tree (no marks).
+/// [`TreeFace::Files`] is an explorer (folder and file marks from
+/// `dir`). Both paint the selected wash across the full row (indent
+/// through trailing slot). The twisty stays its own press. Density
+/// scales pad, gap, and indent.
 /// The application owns expand state. Leaf rows have no twisty.
 /// `animating` is the branch that is opening or closing and its 0–1
 /// height progress. `None` paints the committed tree.
@@ -5759,29 +5762,10 @@ fn tree_line<'a, M: Clone + 'a>(
     .width(Length::Fill)
     .align_x(start)
     .padding([v / 2.0, v]);
-    let title: Element<'a, M> = if is_sel {
-        title.style(move |_| style::list_row(tok, true)).into()
-    } else {
-        title.into()
-    };
-    let title: Element<'a, M> = if face == TreeFace::Files {
-        let (pad_l, pad_r) = crate::i18n::inline_pad(tok.direction, 0.0, v / 2.0);
-        container(title)
-            .width(Length::Fill)
-            .padding(Padding {
-                top: 0.0,
-                right: pad_r,
-                bottom: 0.0,
-                left: pad_l,
-            })
-            .into()
-    } else {
-        title
-    };
     let pick: Element<'a, M> = if a11y.disabled {
-        title
+        title.into()
     } else {
-        item_press(title, move |button, modifiers| {
+        item_press(title.into(), move |button, modifiers| {
             on_select(ItemClick {
                 id,
                 button,
@@ -5817,7 +5801,10 @@ fn tree_line<'a, M: Clone + 'a>(
     for kid in crate::i18n::order(tok.direction, kids) {
         line = line.push(kid);
     }
-    line.into()
+    container(line)
+        .width(Length::Fill)
+        .style(move |_| style::list_row(tok, is_sel))
+        .into()
 }
 
 fn tree_push_branch<'a, M: Clone + 'a>(
@@ -9144,6 +9131,7 @@ mod tests {
             .unwrap();
         assert!(line_src.contains("RowSlot::Empty"));
         assert!(line_src.contains("row_slot_face"));
+        assert!(line_src.contains("style::list_row(tok, is_sel)"));
     }
 
     #[test]
