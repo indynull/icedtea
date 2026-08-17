@@ -483,9 +483,15 @@ DEFAULT_INTERACT: list[dict[str, str]] = [
     },
     {
         "match": "fields:",
-        "name": "search-view-filter",
-        "script": "query in\n",
-        "expect": "search view hits filter to Inbox",
+        "name": "search-submit",
+        "script": "query icedtea\nsearch-go\n",
+        "expect": "search field submitted icedtea; status shows Submitted",
+    },
+    {
+        "match": "code:",
+        "name": "code-wrap-off",
+        "script": "code-wrap false\n",
+        "expect": "wrap off; long source line stays on one row",
     },
     {
         "match": "navigation stack",

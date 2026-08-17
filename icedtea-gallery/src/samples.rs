@@ -86,7 +86,7 @@ pub const CODE_LANGS: &[CodeLang] = &[
     CodeLang {
         name: "Rust",
         syntax: "rs",
-        source: "fn greet(name: &str) -> String {\n    format!(\"hello, {name}\")\n}\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n    #[test]\n    fn greets() {\n        assert_eq!(greet(\"icedtea\"), \"hello, icedtea\");\n    }\n}\n",
+        source: "fn greet(name: &str) -> String {\n    format!(\"hello, {name}\")\n}\n\nconst LONG: &str = \"wrap-off keeps this entire assignment on one row: alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron\";\n\n#[cfg(test)]\nmod tests {\n    use super::*;\n    #[test]\n    fn greets() {\n        assert_eq!(greet(\"icedtea\"), \"hello, icedtea\");\n    }\n}\n",
     },
     CodeLang {
         name: "Python",

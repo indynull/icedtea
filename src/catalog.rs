@@ -46,7 +46,8 @@ pub const ENTRIES: &[Entry] = &[
     Entry { id: "checkbox-indeterminate", title: "Indeterminate checkbox", group: "Controls", page: "controls" },
     Entry { id: "split-button", title: "Split button", group: "Controls", page: "controls" },
     Entry { id: "toggle-button", title: "Toggle button", group: "Controls", page: "controls" },
-    // Search view first so docked hits are above the fold on Fields.
+    // Search first so Enter submit status is on the first screenful.
+    Entry { id: "search", title: "Search", group: "Fields", page: "fields" },
     Entry { id: "search-view", title: "Search view", group: "Fields", page: "fields" },
     Entry { id: "text-input", title: "Text input", group: "Fields", page: "fields" },
     Entry { id: "field-support", title: "Field support", group: "Fields", page: "fields" },
@@ -54,7 +55,6 @@ pub const ENTRIES: &[Entry] = &[
     Entry { id: "secret", title: "Secret field", group: "Fields", page: "fields" },
     Entry { id: "value-field", title: "Value field", group: "Fields", page: "fields" },
     Entry { id: "textarea", title: "Text area", group: "Fields", page: "fields" },
-    Entry { id: "search", title: "Search", group: "Fields", page: "fields" },
     Entry { id: "suggest", title: "Suggest", group: "Fields", page: "fields" },
     Entry { id: "select", title: "Select", group: "Fields", page: "fields" },
     Entry { id: "number", title: "Number", group: "Fields", page: "fields" },

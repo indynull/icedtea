@@ -846,6 +846,14 @@ fn tour_len() -> usize {
 
 fn extras_after(page: &str) -> &'static [TourBeat] {
     match page {
+        "code" => &[TourBeat {
+            page: "code",
+            theme: "dark",
+            appearance: Appearance::Dark,
+            caption: "Code: wrap off",
+            act: "code-wrap false\n",
+            hold_ms: 120,
+        }],
         "motion" => &[
             TourBeat {
                 page: "motion",
@@ -885,7 +893,7 @@ fn extras_after(page: &str) -> &'static [TourBeat] {
 }
 
 fn extra_beat_count() -> usize {
-    extras_after("motion").len() + extras_after("expand-motion").len()
+    extras_after("code").len() + extras_after("motion").len() + extras_after("expand-motion").len()
 }
 
 fn theme_page_index() -> usize {
@@ -1083,6 +1091,8 @@ fn parse_inject_line(line: &str) -> Option<Message> {
         "sort" => Some(Message::Sort(parts.next()?.parse().ok()?)),
         "group" => Some(Message::GroupPress(parts.next()?.parse().ok()?)),
         "query" => Some(Message::Query(parts.next()?.to_string())),
+        "search-go" | "search_go" => Some(Message::SearchGo),
+        "code-wrap" | "code_wrap" => Some(Message::CodeWrap(parts.next()? == "true")),
         "pick" => Some(Message::SearchPick(parts.next()?.parse().ok()?)),
         "rail" => Some(Message::Rail(parts.next()?.parse().ok()?)),
         _ => None,
@@ -7256,12 +7266,17 @@ mod tests {
     fn tour_log_and_grid_are_distinct_beats() {
         let pages = icedtea::catalog::pages();
         let log_i = pages.iter().position(|p| *p == "log").unwrap();
-        let grid_i = pages.iter().position(|p| *p == "grid").unwrap();
         assert!(log_i < super::theme_page_index());
-        assert_eq!(super::tour_beat(log_i).page, "log");
-        assert!(super::tour_beat(log_i).caption.starts_with("Log:"));
-        assert_eq!(super::tour_beat(grid_i).page, "grid");
-        assert!(super::tour_beat(grid_i).caption.starts_with("Item grid:"));
+        let log = (0..super::tour_len())
+            .map(super::tour_beat)
+            .find(|b| b.page == "log")
+            .expect("log tour beat");
+        assert!(log.caption.starts_with("Log:"));
+        let grid = (0..super::tour_len())
+            .map(super::tour_beat)
+            .find(|b| b.page == "grid")
+            .expect("grid tour beat");
+        assert!(grid.caption.starts_with("Item grid:"));
     }
 
     #[test]
@@ -7290,7 +7305,9 @@ mod tests {
         let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
         g.apply_tour_beat(&super::tour_beat(0));
         assert_eq!(g.page, pages[0]);
-        let light_at = super::theme_page_index() + 1;
+        let light_at = (0..super::tour_len())
+            .position(|i| super::tour_beat(i).caption.starts_with("Light:"))
+            .expect("light tour beat");
         for _ in 0..light_at {
             let _ = g.update(super::Message::Tour);
         }
@@ -7619,6 +7636,14 @@ mod tests {
             Some(super::Message::Query(q)) if q == "in"
         ));
         assert!(matches!(
+            super::parse_inject_line("search-go"),
+            Some(super::Message::SearchGo)
+        ));
+        assert!(matches!(
+            super::parse_inject_line("code-wrap false"),
+            Some(super::Message::CodeWrap(false))
+        ));
+        assert!(matches!(
             super::parse_inject_line("pick 0"),
             Some(super::Message::SearchPick(0))
         ));
@@ -7664,7 +7689,9 @@ mod tests {
             "list 2",
             "expand true",
             "group 1",
-            "query in",
+            "query icedtea",
+            "search-go",
+            "code-wrap false",
             "pick 0",
             "rail 1",
         ] {
@@ -7676,7 +7703,9 @@ mod tests {
         assert!(g.on);
         assert_eq!(g.list_sel.primary(), Some(2));
         assert!(g.expander_open);
-        assert_eq!(g.query, "in");
+        assert_eq!(g.query, "icedtea");
+        assert_eq!(g.search_sent, "icedtea");
+        assert!(!g.code_wrap);
         assert_eq!(g.rail, 1);
         assert_eq!(g.note, "Rail 1");
     }
