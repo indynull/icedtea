@@ -3751,7 +3751,7 @@ pub fn chip_face(
             let wash = crate::theme::mix(s.success, s.surface, 0.20);
             (
                 wash,
-                crate::theme::ink_on(s.success, wash),
+                crate::m3::color::ink_on(s.success, wash),
                 iced::border::Border {
                     color: Color::TRANSPARENT,
                     width: 0.0,
@@ -3763,7 +3763,7 @@ pub fn chip_face(
             let wash = crate::theme::mix(s.warning, s.surface, 0.20);
             (
                 wash,
-                crate::theme::ink_on(s.warning, wash),
+                crate::m3::color::ink_on(s.warning, wash),
                 iced::border::Border {
                     color: Color::TRANSPARENT,
                     width: 0.0,
@@ -6792,7 +6792,7 @@ mod tests {
             for v in [Variant::Success, Variant::Warning] {
                 let (wash, ink, _) = chip_face(t, v);
                 assert!(
-                    crate::theme::contrast_ratio(ink, wash) >= 4.5,
+                    crate::m3::color::contrast_ratio(ink, wash) >= 4.5,
                     "{name} {v:?} chip ink on wash"
                 );
             }

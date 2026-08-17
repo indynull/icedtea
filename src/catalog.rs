@@ -36,11 +36,12 @@ pub const ENTRIES: &[Entry] = &[
     Entry { id: "toggle-icon-button", title: "Toggle icon button", group: "Controls", page: "controls" },
     Entry { id: "slider", title: "Slider", group: "Controls", page: "controls" },
     Entry { id: "button-group", title: "Button group", group: "Controls", page: "controls" },
+    // Compact vs Default must sit above the fold; the rest of Controls is tall.
+    Entry { id: "segmented-button", title: "Segmented button", group: "Controls", page: "controls" },
     Entry { id: "checkbox", title: "Checkbox", group: "Controls", page: "controls" },
     Entry { id: "radio", title: "Radio", group: "Controls", page: "controls" },
     Entry { id: "switch", title: "Switch", group: "Controls", page: "controls" },
     Entry { id: "range-slider", title: "Range slider", group: "Controls", page: "controls" },
-    Entry { id: "segmented-button", title: "Segmented button", group: "Controls", page: "controls" },
     Entry { id: "icon-button", title: "Icon button", group: "Controls", page: "controls" },
     Entry { id: "checkbox-indeterminate", title: "Indeterminate checkbox", group: "Controls", page: "controls" },
     Entry { id: "split-button", title: "Split button", group: "Controls", page: "controls" },

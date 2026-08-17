@@ -27,8 +27,6 @@ use iced::Color;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-pub use crate::m3::color::{contrast_ratio, ink_on};
-
 /// Semantic colors used by every styled widget.
 ///
 /// Fields map to Material Design 3 roles (see [`crate::m3::Scheme`]):

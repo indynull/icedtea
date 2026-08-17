@@ -1866,9 +1866,10 @@ impl Gallery {
             self.tabs.titles[3] = cat.t("tab.archive").to_string();
             self.tabs.titles[4] = cat.t("tab.drafts").to_string();
         }
-        if self.pinned.titles.len() >= 2 {
+        if self.pinned.titles.len() >= 3 {
             self.pinned.titles[0] = cat.t("tab.read").to_string();
             self.pinned.titles[1] = cat.t("tab.write").to_string();
+            self.pinned.titles[2] = cat.t("tab.soon").to_string();
         }
         self.prefs = vec![
             PrefGroup {
@@ -5640,6 +5641,22 @@ impl Gallery {
                     Variant::Primary,
                     BadgeSize::Large,
                     named("New", Role::Status),
+                ),
+                widget::badge(
+                    self.catalog.t("variant.success"),
+                    None,
+                    tok,
+                    Variant::Success,
+                    BadgeSize::Large,
+                    named("ok", Role::Status),
+                ),
+                widget::badge(
+                    self.catalog.t("variant.warning"),
+                    None,
+                    tok,
+                    Variant::Warning,
+                    BadgeSize::Large,
+                    named("warn", Role::Status),
                 ),
                 widget::badge(
                     "3",
