@@ -830,12 +830,14 @@ mod tests {
         ] {
             let st = button_style(tok, v)(&theme, button::Status::Disabled);
             let ink = relative_luma(st.text_color);
-            if let Some(Background::Color(c)) = st.background {
-                let fill = relative_luma(c);
-                let dark_msg = format!("{v:?}: disabled ink vanishes on dark canvas");
-                assert!((ink - canvas).abs() > 0.15, "{dark_msg}");
-                let fill_msg = format!("{v:?}: disabled ink vanishes on its fill");
-                assert!((ink - fill).abs() > 0.15, "{fill_msg}");
+            for bg in [st.background, None] {
+                if let Some(Background::Color(c)) = bg {
+                    let fill = relative_luma(c);
+                    let dark_msg = format!("{v:?}: disabled ink vanishes on dark canvas");
+                    assert!((ink - canvas).abs() > 0.15, "{dark_msg}");
+                    let fill_msg = format!("{v:?}: disabled ink vanishes on its fill");
+                    assert!((ink - fill).abs() > 0.15, "{fill_msg}");
+                }
             }
         }
         for v in [Variant::Ghost, Variant::Outlined] {
@@ -1010,8 +1012,10 @@ mod tests {
     #[test]
     fn dim_backdrop_at_rest_reads_on_dark() {
         let tok = named("dark").tokens;
-        if let Some(Background::Color(c)) = dim_backdrop(tok).background {
-            assert!(c.a >= 0.45, "rest dim must read on dark surface-container");
+        for bg in [dim_backdrop(tok).background, None] {
+            if let Some(Background::Color(c)) = bg {
+                assert!(c.a >= 0.45, "rest dim must read on dark surface-container");
+            }
         }
     }
 
@@ -1029,8 +1033,10 @@ mod tests {
         let _ = footer(tok);
         let _ = hairline(tok);
         let dim = dim_backdrop(tok);
-        if let Some(Background::Color(c)) = dim.background {
-            assert!(c.a >= 0.45, "rest dim must read on dark surface-container");
+        for bg in [dim.background, None] {
+            if let Some(Background::Color(c)) = bg {
+                assert!(c.a >= 0.45, "rest dim must read on dark surface-container");
+            }
         }
         let _ = dialog_sheet_face(tok);
         let faded = fade_face(dialog_sheet_face(tok), 0.5);

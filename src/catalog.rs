@@ -408,19 +408,21 @@ mod tests {
                 let section = &rest[..end];
                 let ctor = constructor(e.id).map(|(_, n)| n).unwrap();
                 assert!(section.contains(ctor), "{} section must name {ctor}", e.id);
-                if let Some((module, name)) = constructor(e.id) {
-                    let takes =
-                        module_src(module).is_some_and(|src| fn_params_mention(src, name, "A11y"));
-                    if takes {
-                        must(
-                            section.contains("A11y"),
-                            format!("{} section must mention A11y", e.id),
-                        );
-                    } else {
-                        must(
-                            !section.contains("Pass `A11y`"),
-                            format!("{} section must not say Pass A11y", e.id),
-                        );
+                for id in [e.id, "not-a-catalog-id"] {
+                    if let Some((module, name)) = constructor(id) {
+                        let takes = module_src(module)
+                            .is_some_and(|src| fn_params_mention(src, name, "A11y"));
+                        if takes {
+                            must(
+                                section.contains("A11y"),
+                                format!("{} section must mention A11y", e.id),
+                            );
+                        } else {
+                            must(
+                                !section.contains("Pass `A11y`"),
+                                format!("{} section must not say Pass `A11y`", e.id),
+                            );
+                        }
                     }
                 }
                 must(

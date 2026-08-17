@@ -1666,6 +1666,26 @@ mod tests {
             crate::chrome::SCROLL_HANDLE_MIN,
         );
         let fthumb = Point::new(frail.x + frail.width / 2.0, frail.y + foff + flen / 2.0);
+        let fpane = Point::new(flayout.bounds().x + 12.0, flayout.bounds().y + 24.0);
+        assert!(!frail.contains(fpane));
+        let _ = Widget::<f32, iced::Theme, iced::Renderer>::mouse_interaction(
+            &fresh,
+            &ftree,
+            flayout,
+            mouse::Cursor::Unavailable,
+            &viewport,
+            &renderer,
+        );
+        let over_pane = Widget::<f32, iced::Theme, iced::Renderer>::mouse_interaction(
+            &fresh,
+            &ftree,
+            flayout,
+            mouse::Cursor::Available(fpane),
+            &viewport,
+            &renderer,
+        );
+        assert_ne!(over_pane, mouse::Interaction::Grab);
+        assert_ne!(over_pane, mouse::Interaction::Grabbing);
         assert_eq!(
             Widget::<f32, iced::Theme, iced::Renderer>::mouse_interaction(
                 &fresh,
