@@ -4,26 +4,14 @@
 
 ## Bugs
 
-Material Design 3 shape map leftovers. `badge` now uses
-`Component::Badge`; these still pick the wrong family or omit a scale
-step.
-
-- Badge sizes: M3 small is a 6 dp circle with no text; large is 16 dp
-  tall, max 16×34. Ours are caption pads (`BadgeSize` Small / Large).
 - `toast` and tooltip use Card corners. M3 snackbar and tooltip are
   extra-small (4 dp).
 - `banner` uses Card corners. M3 banner is flush (0 dp).
 - Search uses Field. M3 search is extra-large or full.
 - Switch track, slider rail, and progress use Button. M3 those tracks
   are Full.
-- `m3::Shape` has no Large Increased (20 dp), Extra Large Increased
-  (32 dp), or Extra Extra Large (48 dp).
 
 ## Consider
-
-- Plugin surfaces and extension host chrome.
-- `markdown_view` page vs inset type map: inset uses title for H1 and
-  meta for body. `font_scale` stays the user scale.
 
 ## Discard
 
