@@ -11910,12 +11910,11 @@ mod tests {
             ],
         };
         let window = VisibleWindow::new(80.0);
-        let unused_click = || ItemClick {
+        let list_side = || ItemClick {
             id: 99,
             button: ItemButton::Primary,
             modifiers: keyboard::Modifiers::empty(),
         };
-        let _ = unused_click();
         let mut list_el: Element<'_, ItemClick> = list_view(
             &list,
             &Sel::None,
@@ -11924,12 +11923,12 @@ mod tests {
             window,
             24.0,
             0,
-            |_| unused_click(),
+            |_| list_side(),
             "Empty",
             |_| tok.muted,
             None,
             RowFace::FLUSH,
-            |_| unused_click(),
+            |_| list_side(),
             A11y::new("list", Role::List),
         );
         let list_msgs = press_messages(
@@ -12006,7 +12005,7 @@ mod tests {
             checks: vec![true],
         };
         let cols = crate::collection::ColumnLayout::new(vec![80.0, 80.0]);
-        let table_unused = || {
+        let table_side = || {
             (
                 ItemClick {
                     id: 0,
@@ -12016,16 +12015,10 @@ mod tests {
                 0usize,
             )
         };
-        let on_sort = |_: usize| table_unused();
-        let on_scroll = |_: VisibleWindow| table_unused();
-        let on_h_scroll = |_: f32| table_unused();
-        let on_check = |_: usize| table_unused();
-        let _ = (
-            on_sort(0),
-            on_scroll(VisibleWindow::new(80.0)),
-            on_h_scroll(0.0),
-            on_check(0),
-        );
+        let on_sort = |_: usize| table_side();
+        let on_scroll = |_: VisibleWindow| table_side();
+        let on_h_scroll = |_: f32| table_side();
+        let on_check = |_: usize| table_side();
         let mut table_el: Element<'_, (ItemClick, usize)> = data_table(
             &table,
             &Sel::None,
