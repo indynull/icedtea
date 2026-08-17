@@ -125,8 +125,9 @@ Constructor: [`widget::tab_bar`](https://docs.rs/icedtea/latest/icedtea/widget/f
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-`Tabs { closable: false }` is pinned sections. `with_badge` paints a
-count on a tab. `with_icon` paints icon-plus-text. `with_disabled`
+`Tabs { closable: false }` is pinned sections. Titles use the meta type
+step. `with_badge` paints a count on a tab. `with_icon` paints
+icon-plus-text. `with_disabled`
 freezes one tab so press is skipped. `tab_bar` takes
 `secondary` for a 1 dp underbar (3 dp when false). When `max_width`
 is set and titles do not fit, extra enabled tabs move into a More list. Select

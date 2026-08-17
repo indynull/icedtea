@@ -49,7 +49,7 @@ pub const PAGE: u32 = 22;
 pub const TITLE: u32 = 16;
 /// Body copy — M3 Body Medium (14).
 pub const BODY: u32 = 14;
-/// Captions and dense chrome — M3 Label Medium (12).
+/// Meta, tabs, footer, keys — M3 Label Medium (12).
 pub const META: u32 = 12;
 /// Code / monospace — M3 Body Small (12).
 pub const CODE: u32 = 12;

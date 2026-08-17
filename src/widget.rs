@@ -666,8 +666,8 @@ pub enum TreeFace {
     Files,
 }
 
-/// Badge size. Large is the default readable face (body type).
-/// Small is caption type for dense marks.
+/// Badge size. Large is the default chip-like face (meta type).
+/// Small is a tighter pad on the same caption step.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum BadgeSize {
     Small,
@@ -3920,7 +3920,7 @@ pub fn filter_chips<'a, M: Clone + 'a>(
 /// A count or status mark.
 ///
 /// Short text. Empty string is an empty pill.
-/// [`BadgeSize::Large`] paints at body type; [`BadgeSize::Small`] at meta.
+/// Both sizes use meta type; Large is not body reading type.
 ///
 ///
 /// ```
@@ -3953,10 +3953,7 @@ pub fn badge<'a, M: 'a>(
         BadgeSize::Small => [2, 5],
         BadgeSize::Large => [4, 8],
     };
-    let type_size = match size {
-        BadgeSize::Small => tok.meta(),
-        BadgeSize::Large => tok.body(),
-    };
+    let type_size = tok.meta();
     let mark: Element<'a, M> = container(text(title).size(type_size).color(ink))
         .padding(pad)
         .style(move |_| style::fill(wash, ink))
@@ -5788,8 +5785,8 @@ pub fn tab_visible_count(titles: &[String], max_width: f32) -> usize {
 
 /// A tab bar over a body the application paints.
 ///
-/// `Tabs { closable: false }` is pinned sections. `with_disabled`
-/// freezes one tab. Select sends the index.
+/// `Tabs { closable: false }` is pinned sections. Titles use meta type.
+/// `with_disabled` freezes one tab. Select sends the index.
 ///
 ///
 /// ```
@@ -5837,10 +5834,10 @@ pub fn tab_bar<'a, M: Clone + 'a>(
         }
         let title_el = if tab_off {
             text(title.clone())
-                .size(tok.body())
+                .size(tok.meta())
                 .color(tok.scheme().on_surface_variant)
         } else {
-            text(title.clone()).size(tok.body())
+            text(title.clone()).size(tok.meta())
         };
         label_row = label_row.push(title_el);
         if let Some(b) = badge {
@@ -11457,21 +11454,78 @@ mod tests {
             .unwrap();
         assert!(src.contains("is_disabled"));
         assert!(src.contains("tab_off"));
-        assert!(src.contains(".size(tok.body())"));
-        assert!(!src.contains(".size(tok.meta())"));
+    }
+
+    fn type_line(px: f32) -> f32 {
+        f32::from(iced::widget::text::LineHeight::default().to_absolute(iced::Pixels(px)))
     }
 
     #[test]
-    fn badge_large_uses_body_and_small_uses_meta() {
-        let src = include_str!("widget.rs")
-            .split("pub fn badge")
-            .nth(1)
-            .unwrap()
-            .split("/// A titled panel around children")
-            .next()
-            .unwrap();
-        assert!(src.contains("BadgeSize::Small => tok.meta()"));
-        assert!(src.contains("BadgeSize::Large => tok.body()"));
+    fn tab_bar_titles_layout_to_meta_not_body() {
+        let tok = named("dark").tokens;
+        assert!(tok.body() > tok.meta());
+        let tabs = Tabs::new(["One"]);
+        let mut el: Element<'_, usize> = tab_bar(
+            &tabs,
+            |i| i,
+            |_| 99,
+            480.0,
+            false,
+            tok,
+            A11y::new("tabs", Role::Tab),
+        );
+        let h = layout_size(&mut el, iced::Size::new(480.0, 80.0)).height;
+        let p = pad(tok);
+        let extra = 3.0 + 1.0;
+        let meta_h = type_line(tok.meta()) + p.top + p.bottom + extra;
+        let body_h = type_line(tok.body()) + p.top + p.bottom + extra;
+        assert!(
+            (h - meta_h).abs() < (h - body_h).abs(),
+            "tab_bar {h} must match meta {meta_h} closer than body {body_h}"
+        );
+        assert!(
+            (h - meta_h).abs() <= 2.0,
+            "tab_bar {h} must be within 2px of meta face {meta_h}"
+        );
+    }
+
+    #[test]
+    fn badge_sizes_use_meta_not_body() {
+        let tok = named("dark").tokens;
+        assert!(tok.body() > tok.meta());
+        let mut small: Element<'_, ()> = badge(
+            "New",
+            None,
+            tok,
+            Variant::Primary,
+            BadgeSize::Small,
+            A11y::new("New", Role::Status),
+        );
+        let mut large: Element<'_, ()> = badge(
+            "New",
+            None,
+            tok,
+            Variant::Primary,
+            BadgeSize::Large,
+            A11y::new("New", Role::Status),
+        );
+        let hs = layout_size(&mut small, iced::Size::new(200.0, 80.0)).height;
+        let hl = layout_size(&mut large, iced::Size::new(200.0, 80.0)).height;
+        let meta_small = type_line(tok.meta()) + 4.0;
+        let meta_large = type_line(tok.meta()) + 8.0;
+        let body_large = type_line(tok.body()) + 8.0;
+        assert!(
+            (hs - meta_small).abs() <= 2.0,
+            "Small badge {hs} must match meta {meta_small}"
+        );
+        assert!(
+            (hl - meta_large).abs() <= 2.0,
+            "Large badge {hl} must match meta {meta_large}"
+        );
+        assert!(
+            (hl - meta_large).abs() < (hl - body_large).abs(),
+            "Large badge {hl} must not match body {body_large}"
+        );
     }
 
     #[test]
