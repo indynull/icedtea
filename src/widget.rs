@@ -3578,6 +3578,7 @@ fn markdown_style(tok: Tokens) -> markdown::Style {
 /// Hover text on a child.
 ///
 /// Empty tip text is a no-op wrap. The child keeps its own `A11y`.
+/// Corners follow [`Tokens::shape`] ([`crate::m3::shape::Component::Tooltip`]).
 ///
 ///
 /// ```
@@ -4144,7 +4145,8 @@ pub fn breadcrumb<'a, M: Clone + 'a>(
 /// A transient notice.
 ///
 /// The application owns the queue and dismiss. Empty queue paints
-/// nothing.
+/// nothing. Corners follow [`Tokens::shape`]
+/// ([`crate::m3::shape::Component::Toast`]).
 ///
 ///
 /// ```
@@ -4193,7 +4195,7 @@ pub fn toast_view<'a, M: Clone + 'a>(
 }
 
 fn tip_style(tok: Tokens) -> impl Fn(&iced::Theme) -> iced::widget::container::Style {
-    move |_| style::raised_card(tok)
+    move |_| style::tooltip(tok)
 }
 
 fn toast_style(
@@ -6493,6 +6495,28 @@ mod tests {
             Variant::Primary,
             BadgeSize::Large,
             A11y::new("9", Role::Status),
+        );
+    }
+
+    #[test]
+    fn toast_and_tooltip_constructors_read_toast_family() {
+        let tok = named("dark")
+            .tokens
+            .with_shape(crate::m3::ShapePolicy::Material);
+        let toast = Toast {
+            id: 1,
+            kind: ToastKind::Success,
+            text: "Saved".into(),
+            ttl_ms: 0,
+            age_ms: 0,
+        };
+        let _: Element<'_, ()> = toast_view(&toast, (), tok, A11y::new("Saved", Role::Status));
+        let _: Element<'_, ()> = tooltip_wrap(
+            label("Hover", tok, A11y::new("Hover", Role::Header)),
+            "Tip",
+            TooltipAnchor::Follow,
+            tok,
+            A11y::new("Tip", Role::Tooltip),
         );
     }
 

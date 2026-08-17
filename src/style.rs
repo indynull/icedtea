@@ -209,6 +209,13 @@ pub fn table_cell(tok: Tokens, selected: bool, focused: bool, zebra: bool) -> co
     st
 }
 
+/// Hover tip (M3 tooltip): raised card fill, tooltip family corners.
+pub fn tooltip(tok: Tokens) -> container::Style {
+    let mut st = raised_card(tok);
+    st.border.radius = component_radius(tok, Component::Tooltip);
+    st
+}
+
 pub fn callout(tok: Tokens, kind: crate::toast::ToastKind) -> container::Style {
     let s = tok.scheme();
     let (bg, fg, border) = match kind {
@@ -231,7 +238,7 @@ pub fn callout(tok: Tokens, kind: crate::toast::ToastKind) -> container::Style {
         border: Border {
             color: border,
             width: 1.0,
-            radius: component_radius(tok, Component::Card),
+            radius: component_radius(tok, Component::Toast),
         },
         shadow: Shadow::default(),
         snap: false,
@@ -998,6 +1005,35 @@ mod tests {
     }
 
     #[test]
+    fn toast_and_tooltip_corners_follow_shape_policy() {
+        let tok = named("dark").tokens;
+        assert_eq!(callout(tok, ToastKind::Info).border.radius.top_left, 0.0);
+        assert_eq!(tooltip(tok).border.radius.top_left, 0.0);
+        let material = tok.with_shape(crate::m3::ShapePolicy::Material);
+        assert_eq!(
+            callout(material, ToastKind::Success).border.radius.top_left,
+            crate::m3::Shape::ExtraSmall.dp()
+        );
+        assert_eq!(
+            tooltip(material).border.radius.top_left,
+            crate::m3::Shape::ExtraSmall.dp()
+        );
+        let pill = tok.with_shape(crate::m3::ShapePolicy::Pill);
+        assert_eq!(
+            callout(pill, ToastKind::Warning).border.radius.top_left,
+            crate::m3::Shape::Medium.dp()
+        );
+        assert_eq!(
+            tooltip(pill).border.radius.top_left,
+            crate::m3::Shape::Medium.dp()
+        );
+        assert_ne!(
+            crate::m3::shape::Component::Toast.shape_for(crate::m3::ShapePolicy::Pill),
+            crate::m3::shape::Component::Button.shape_for(crate::m3::ShapePolicy::Pill)
+        );
+    }
+
+    #[test]
     fn switch_on_thumb_uses_scheme_on_primary() {
         let tok = named("gruvbox").tokens;
         let s = tok.scheme();
@@ -1063,6 +1099,7 @@ mod tests {
         ] {
             let _ = callout(tok, k);
         }
+        let _ = tooltip(tok);
         let _ = skeleton(tok);
         for v in Variant::ALL {
             let f = button_style(tok, v);

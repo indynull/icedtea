@@ -4,8 +4,6 @@
 
 ## Bugs
 
-- `toast` and tooltip use Card corners. M3 snackbar and tooltip are
-  extra-small (4 dp).
 - `banner` uses Card corners. M3 banner is flush (0 dp).
 - Search uses Field. M3 search is extra-large or full.
 - Switch track, slider rail, and progress use Button. M3 those tracks

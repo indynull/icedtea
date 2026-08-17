@@ -6,6 +6,8 @@
 
 - `badge` uses `Component::Badge` so Tight, Soft, Pill, and Material
   corners apply.
+- `toast` and tooltip use `Component::Toast` and `Component::Tooltip`
+  (Material extra-small).
 
 ## 0.10.0 — 2026-08-16
 
