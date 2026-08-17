@@ -13,6 +13,7 @@
 
 ### Bug fix
 
+- `tab_bar` titles use `tok.body()`, not `tok.meta()`.
 - `themed_text_input`, `search_input`, and `themed_pick_list` use
   `sized_control_height` so Default fields match Default picks under
   compact density.
