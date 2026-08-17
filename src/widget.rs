@@ -5835,10 +5835,10 @@ pub fn tab_bar<'a, M: Clone + 'a>(
         }
         let title_el = if tab_off {
             text(title.clone())
-                .size(tok.body())
+                .size(tok.meta())
                 .color(tok.scheme().on_surface_variant)
         } else {
-            text(title.clone()).size(tok.body())
+            text(title.clone()).size(tok.meta())
         };
         label_row = label_row.push(title_el);
         if let Some(b) = badge {
@@ -11455,8 +11455,7 @@ mod tests {
             .unwrap();
         assert!(src.contains("is_disabled"));
         assert!(src.contains("tab_off"));
-        assert!(src.contains(".size(tok.body())"));
-        assert!(!src.contains(".size(tok.meta())"));
+        assert!(src.contains(".size(tok.meta())"));
     }
 
     #[test]
