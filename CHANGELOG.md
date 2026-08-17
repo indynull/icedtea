@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.10.0 — 2026-08-16
+
 ### Feature
 
 - `search_input` and `search_input_clear` take submit and an input id.
