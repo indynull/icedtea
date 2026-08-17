@@ -430,6 +430,9 @@ const RAIL_GAP: f32 = 4.0;
 struct ThemedScrollState {
     scroll: f32,
     dragging: Option<f32>,
+    /// Left button went down inside the pane (not the rail). Move and
+    /// Release still reach the child after the cursor leaves.
+    content_press: bool,
     pinned_end: bool,
     last_notified: Option<f32>,
     content_h: f32,
@@ -441,6 +444,7 @@ impl Default for ThemedScrollState {
         Self {
             scroll: 0.0,
             dragging: None,
+            content_press: false,
             pinned_end: false,
             last_notified: None,
             content_h: 0.0,
@@ -669,6 +673,8 @@ where
                             moved = true;
                         }
                         shell.capture_event();
+                    } else if bounds.contains(pos) {
+                        state.content_press = true;
                     }
                 }
             }
@@ -721,7 +727,15 @@ where
 
         let over_pane = cursor.position().is_some_and(|p| bounds.contains(p));
         let pointer = matches!(event, Event::Mouse(_) | Event::Touch(_));
-        if !shell.is_event_captured() && (!pointer || over_pane) {
+        let drag_out = state.content_press
+            && matches!(
+                event,
+                Event::Mouse(
+                    mouse::Event::CursorMoved { .. }
+                        | mouse::Event::ButtonReleased(mouse::Button::Left)
+                )
+            );
+        if !shell.is_event_captured() && (!pointer || over_pane || drag_out) {
             self.content.as_widget_mut().update(
                 &mut tree.children[0],
                 event,
@@ -732,6 +746,12 @@ where
                 shell,
                 viewport,
             );
+        }
+        if matches!(
+            event,
+            Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
+        ) {
+            state.content_press = false;
         }
     }
 
@@ -1828,6 +1848,106 @@ mod tests {
             );
         }
         assert_eq!(messages.as_slice(), &[true]);
+    }
+
+    #[test]
+    fn themed_scroll_forwards_move_and_release_after_an_in_pane_press() {
+        use iced::widget::mouse_area;
+        use iced::widget::Space;
+
+        let tok = named("dark").tokens;
+        let kid: Element<'_, &'static str> = mouse_area(
+            Space::new()
+                .width(Length::Fill)
+                .height(Length::Fixed(400.0)),
+        )
+        .on_press("press")
+        .on_move(|_| "move")
+        .on_release("release")
+        .into();
+        let mut scroll = ThemedScroll::new(kid, tok, false, None, None);
+        let mut tree = Tree::new(&scroll as &dyn Widget<&str, iced::Theme, iced::Renderer>);
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(200.0, 80.0));
+        let node = Widget::<&str, iced::Theme, iced::Renderer>::layout(
+            &mut scroll,
+            &mut tree,
+            &renderer,
+            &limits,
+        );
+        let layout = Layout::new(&node);
+        let pane = layout.bounds();
+        let outside = Point::new(pane.x + 12.0, pane.y + pane.height + 40.0);
+        let inside = Point::new(pane.x + 12.0, pane.y + 12.0);
+        let viewport = pane;
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            Widget::<&str, iced::Theme, iced::Renderer>::update(
+                &mut scroll,
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(inside),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(messages.contains(&"press"));
+        messages.clear();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            Widget::<&str, iced::Theme, iced::Renderer>::update(
+                &mut scroll,
+                &mut tree,
+                &Event::Mouse(mouse::Event::CursorMoved { position: outside }),
+                layout,
+                mouse::Cursor::Available(outside),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(messages.contains(&"move"));
+        messages.clear();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            Widget::<&str, iced::Theme, iced::Renderer>::update(
+                &mut scroll,
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(outside),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(messages.contains(&"release"));
+        messages.clear();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            Widget::<&str, iced::Theme, iced::Renderer>::update(
+                &mut scroll,
+                &mut tree,
+                &Event::Mouse(mouse::Event::CursorMoved { position: outside }),
+                layout,
+                mouse::Cursor::Available(outside),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(!messages.contains(&"move"));
     }
 
     #[test]

@@ -25,8 +25,11 @@
   full).
 - Switch, slider, and progress tracks use `Component::Track` (Full
   under Material and Pill).
-- `themed_scroll` ignores pointer events and a pointer cursor outside
-  the pane. Keyboard still reaches the child.
+- `themed_scroll` ignores Press and a pointer cursor outside the pane.
+  Keyboard still reaches the child. Move and Release continue after a
+  press inside.
+- `markdown_view` publishes Move (clamped to the document) and Release
+  while a drag is active outside the pane.
 - `themed_checkbox` with an empty label is the box only (shrink
   width).
 - `accordion_view` start-aligns the open body so right-to-left

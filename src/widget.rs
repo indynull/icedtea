@@ -3246,7 +3246,8 @@ pub fn parse(source: &str) -> MarkdownDoc {
 /// The view is not flattened into one mixed-size `Rich`. The document
 /// tree stays one `view_with` whether a range is empty or not. Pointer
 /// events reach `on_pointer` first so paint and Copy share that span
-/// (a double-click selects the word under the caret).
+/// (a double-click selects the word under the caret). A drag that
+/// leaves the document still posts Move (clamped) and Release.
 /// Ctrl+C / Cmd+C on a span is [`crate::select::MarkdownSpan::text`] via
 /// [`crate::copy_text`]. Full document copy is [`MarkdownDoc::source`].
 ///
@@ -3415,6 +3416,7 @@ struct MarkdownListen<'a, Message> {
 struct MarkdownListenState {
     previous_click: Option<iced::advanced::mouse::Click>,
     last: Option<iced::Point>,
+    pressed: bool,
 }
 
 impl<'a, Message: Clone> Widget<Message, iced::Theme, iced::Renderer>
@@ -3462,16 +3464,11 @@ impl<'a, Message: Clone> Widget<Message, iced::Theme, iced::Renderer>
         shell: &mut Shell<'_, Message>,
         viewport: &iced::Rectangle,
     ) {
-        let local = cursor.position_in(layout.bounds());
-        let select_ev = matches!(
-            event,
-            Event::Mouse(
-                iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)
-                    | iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left)
-            )
-        );
+        let bounds = layout.bounds();
+        let local = cursor.position_in(bounds);
+        let state = tree.state.downcast_mut::<MarkdownListenState>();
+        let mut handled = false;
         if let Some(local) = local {
-            let state = tree.state.downcast_mut::<MarkdownListenState>();
             if state.last != Some(local) {
                 state.last = Some(local);
                 shell.publish((self.on_pointer)(crate::select::MarkdownPointer::Move {
@@ -3491,16 +3488,47 @@ impl<'a, Message: Clone> Widget<Message, iced::Theme, iced::Renderer>
                         shell.publish((self.on_pointer)(crate::select::MarkdownPointer::Double));
                     }
                     state.previous_click = Some(click);
+                    state.pressed = true;
                     shell.capture_event();
+                    handled = true;
                 }
                 Event::Mouse(iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left)) => {
                     shell.publish((self.on_pointer)(crate::select::MarkdownPointer::Release));
+                    state.pressed = false;
                     shell.capture_event();
+                    handled = true;
+                }
+                _ => {}
+            }
+        } else if state.pressed {
+            match event {
+                Event::Mouse(iced::mouse::Event::CursorMoved { .. }) => {
+                    if let Some(pos) = cursor.position() {
+                        let local = iced::Point::new(
+                            (pos.x - bounds.x).clamp(0.0, bounds.width),
+                            (pos.y - bounds.y).clamp(0.0, bounds.height),
+                        );
+                        if state.last != Some(local) {
+                            state.last = Some(local);
+                            shell.publish((self.on_pointer)(
+                                crate::select::MarkdownPointer::Move {
+                                    x: local.x,
+                                    y: local.y,
+                                },
+                            ));
+                        }
+                    }
+                }
+                Event::Mouse(iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left)) => {
+                    shell.publish((self.on_pointer)(crate::select::MarkdownPointer::Release));
+                    state.pressed = false;
+                    shell.capture_event();
+                    handled = true;
                 }
                 _ => {}
             }
         }
-        if select_ev && local.is_some() {
+        if handled {
             return;
         }
         self.content.as_widget_mut().update(
@@ -4244,6 +4272,8 @@ fn toast_style(
 /// `stick` pins to the end. `scroll_id` is for `scroll_to`. `on_scroll`
 /// receives the pixel offset from the start when the offset moves.
 /// The rail sits on the end side (`Tokens.direction`).
+/// Press and hover stay inside the pane. Move and Release continue
+/// after a press inside so a drag-select can finish outside.
 ///
 ///
 /// ```
@@ -9523,6 +9553,109 @@ mod tests {
             m,
             crate::select::MarkdownPointer::Move { x, y } if (*x - 40.0).abs() < 1.0 && (*y - 20.0).abs() < 1.0
         )));
+        let mut drag = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut drag);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(at),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(drag.contains(&crate::select::MarkdownPointer::Press));
+        let bounds = layout.bounds();
+        let outside = Point::new(
+            bounds.x + bounds.width + 40.0,
+            bounds.y + bounds.height + 40.0,
+        );
+        let mut out_move = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut out_move);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::CursorMoved { position: outside }),
+                layout,
+                mouse::Cursor::Available(outside),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(out_move.iter().any(|m| matches!(
+            m,
+            crate::select::MarkdownPointer::Move { x, y }
+                if (*x - bounds.width).abs() < 1.0 && (*y - bounds.height).abs() < 1.0
+        )));
+        let mut out_up = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut out_up);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(outside),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(out_up.contains(&crate::select::MarkdownPointer::Release));
+        let mut again = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut again);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(at),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(again.contains(&crate::select::MarkdownPointer::Press));
+        let mut gone = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut gone);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::CursorMoved { position: outside }),
+                layout,
+                mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(!gone
+            .iter()
+            .any(|m| matches!(m, crate::select::MarkdownPointer::Move { .. })));
+        let mut wheel = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut wheel);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::WheelScrolled {
+                    delta: mouse::ScrollDelta::Lines { x: 0.0, y: -1.0 },
+                }),
+                layout,
+                mouse::Cursor::Available(outside),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        let _ = wheel;
     }
 
     #[test]
