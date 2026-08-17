@@ -62,6 +62,8 @@ pub enum Component {
     Tooltip,
     /// Page-level message (M3 banner). Flush under Material and Pill.
     Banner,
+    /// Search field (M3 search). Extra-large under Material, full under Pill.
+    Search,
     /// App bar / shell / tab strip (flush).
     AppBar,
     Shell,
@@ -83,13 +85,13 @@ pub enum ShapePolicy {
     Tight,
     /// Medium (12 dp) on every family.
     Soft,
-    /// Full pill on buttons, chips, and badges. Cards, menus, fields,
-    /// dialogs, toasts, and tooltips stay boxes. Banners and app bars
-    /// stay flush.
+    /// Full pill on buttons, chips, badges, and search. Cards, menus,
+    /// fields, dialogs, toasts, and tooltips stay boxes. Banners and
+    /// app bars stay flush.
     Pill,
     /// Documented Material map (buttons extra-small, chips and badges
     /// small, cards medium, toasts and tooltips extra-small, dialogs
-    /// extra-large, app bars flush).
+    /// and search extra-large, app bars flush).
     Material,
 }
 
@@ -112,7 +114,7 @@ impl Component {
 
     fn pill_shape(self) -> Shape {
         match self {
-            Self::Button | Self::Chip | Self::Badge => Shape::Full,
+            Self::Button | Self::Chip | Self::Badge | Self::Search => Shape::Full,
             Self::AppBar | Self::Shell | Self::Tab | Self::Banner => Shape::None,
             Self::Field
             | Self::Checkbox
@@ -134,7 +136,7 @@ impl Component {
             | Self::Tooltip => Shape::ExtraSmall,
             Self::Chip | Self::Badge => Shape::Small,
             Self::Card => Shape::Medium,
-            Self::Dialog => Shape::ExtraLarge,
+            Self::Dialog | Self::Search => Shape::ExtraLarge,
             Self::AppBar | Self::Shell | Self::Tab | Self::Banner => Shape::None,
         }
     }
@@ -211,6 +213,7 @@ mod tests {
             Component::Toast,
             Component::Tooltip,
             Component::Banner,
+            Component::Search,
             Component::AppBar,
             Component::Shell,
             Component::Tab,
@@ -245,6 +248,7 @@ mod tests {
         assert_eq!(Component::Shell.shape_for(ShapePolicy::Pill), Shape::None);
         assert_eq!(Component::Tab.shape_for(ShapePolicy::Pill), Shape::None);
         assert_eq!(Component::Banner.shape_for(ShapePolicy::Pill), Shape::None);
+        assert_eq!(Component::Search.shape_for(ShapePolicy::Pill), Shape::Full);
         assert_eq!(
             Component::Button.shape_for(ShapePolicy::Material),
             Shape::ExtraSmall
@@ -297,6 +301,10 @@ mod tests {
         assert_eq!(
             Component::Banner.shape_for(ShapePolicy::Material),
             Shape::None
+        );
+        assert_eq!(
+            Component::Search.shape_for(ShapePolicy::Material),
+            Shape::ExtraLarge
         );
         assert_eq!(
             Component::Field.radius_for(ShapePolicy::Tight).top_left,

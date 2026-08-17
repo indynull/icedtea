@@ -1766,7 +1766,7 @@ pub fn number_input<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let shown = format!("{value}");
     let mut i = text_input("0", &shown)
-        .style(style::search_style(tok))
+        .style(style::field_style(tok, false))
         .padding(pad(tok))
         .size(tok.body());
     let el: Element<'a, M> = if a11y.disabled {
@@ -2023,7 +2023,7 @@ pub fn password_input<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let mut i = text_input(placeholder, value)
         .secure(masked)
-        .style(style::search_style(tok))
+        .style(style::field_style(tok, false))
         .padding(pad(tok))
         .size(tok.body());
     if !a11y.disabled {
@@ -2422,6 +2422,7 @@ pub fn editor_style(
 /// Use for palette and list filters. Empty query means show all.
 /// Placeholder is the a11y name. `on_submit` is Enter. `input_id`
 /// focuses the field (palette, find-in-page).
+/// Corners follow [`Tokens::shape`] ([`crate::m3::shape::Component::Search`]).
 ///
 ///
 /// ```
@@ -2486,15 +2487,26 @@ pub fn search_input_clear<'a, M: Clone + 'a>(
     } else {
         a11y.name.clone()
     };
-    let field: Element<'a, M> = themed_text_input(
-        &placeholder,
-        value,
-        on_input,
-        on_submit,
-        FieldOpts::NONE,
-        tok,
-        a11y.child(Role::TextBox),
-        input_id,
+    let field_a11y = a11y.child(Role::TextBox).merge_value(value.to_string());
+    let mut i = text_input(&placeholder, value)
+        .style(style::search_style(tok))
+        .padding(pad(tok))
+        .size(tok.body());
+    if let Some(id) = input_id {
+        i = i.id(id);
+    }
+    if !field_a11y.disabled {
+        i = i.on_input(on_input);
+        if let Some(m) = field_a11y.apply_message(on_submit) {
+            i = i.on_submit(m);
+        }
+    }
+    let field: Element<'a, M> = a11y::attach(
+        container(i)
+            .width(Length::Fill)
+            .height(Length::Fixed(control_height(tok)))
+            .into(),
+        &field_a11y,
     );
     let mut r = Row::new().spacing(gap(tok)).align_y(Alignment::Center);
     for kid in crate::i18n::order(tok.direction, [search_ic, field]) {
@@ -6531,6 +6543,22 @@ mod tests {
             Some(("Install".into(), ())),
             tok,
             A11y::new("Update available", Role::Status),
+        );
+    }
+
+    #[test]
+    fn search_constructor_reads_search_family() {
+        let tok = named("dark")
+            .tokens
+            .with_shape(crate::m3::ShapePolicy::Material);
+        let on_input = |s| s;
+        let _: Element<'_, String> = search_input(
+            "q",
+            on_input,
+            None,
+            tok,
+            A11y::new("Search", Role::TextBox),
+            None,
         );
     }
 

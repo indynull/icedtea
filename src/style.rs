@@ -535,7 +535,7 @@ pub fn search_style(tok: Tokens) -> impl Fn(&iced::Theme, text_input::Status) ->
             border: Border {
                 color: border_color,
                 width,
-                radius: component_radius(tok, Component::Field),
+                radius: component_radius(tok, Component::Search),
             },
             icon: s.on_surface_variant,
             placeholder: s.on_surface_variant,
@@ -1051,6 +1051,37 @@ mod tests {
         assert_ne!(
             crate::m3::shape::Component::Banner.shape_for(crate::m3::ShapePolicy::Pill),
             crate::m3::shape::Component::Card.shape_for(crate::m3::ShapePolicy::Pill)
+        );
+    }
+
+    #[test]
+    fn search_corners_follow_shape_policy() {
+        let tok = named("dark").tokens;
+        let theme = crate::theme::iced_theme("dark", tok);
+        let desktop = search_style(tok)(&theme, text_input::Status::Active);
+        assert_eq!(desktop.border.radius.top_left, 0.0);
+        let material = tok.with_shape(crate::m3::ShapePolicy::Material);
+        let material_st = search_style(material)(
+            &crate::theme::iced_theme("dark", material),
+            text_input::Status::Active,
+        );
+        assert_eq!(
+            material_st.border.radius.top_left,
+            crate::m3::Shape::ExtraLarge.dp()
+        );
+        let pill = tok.with_shape(crate::m3::ShapePolicy::Pill);
+        let pill_st = search_style(pill)(
+            &crate::theme::iced_theme("dark", pill),
+            text_input::Status::Active,
+        );
+        assert_eq!(pill_st.border.radius.top_left, crate::m3::Shape::Full.dp());
+        let field = field_style(tok.with_shape(crate::m3::ShapePolicy::Material), false)(
+            &crate::theme::iced_theme("dark", tok),
+            text_input::Status::Active,
+        );
+        assert_eq!(
+            field.border.radius.top_left,
+            crate::m3::Shape::ExtraSmall.dp()
         );
     }
 
