@@ -5463,6 +5463,14 @@ impl Gallery {
             ),
             "expander" => widget::expander(
                 self.catalog.t("expand.title"),
+                Some(widget::badge(
+                    "3",
+                    None,
+                    tok,
+                    Variant::Quiet,
+                    BadgeSize::Small,
+                    named("3", Role::Status),
+                )),
                 expand_notes_body(tok, &self.catalog),
                 widget::Peek::Lines(2),
                 self.expander_open,

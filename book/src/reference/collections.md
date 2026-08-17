@@ -163,9 +163,9 @@ Constructor: [`widget::expander`](https://docs.rs/icedtea/latest/icedtea/widget/
 
 The application owns `open` and `progress` (0 peek, 1 full). Closed
 shows a `Peek` of the child (pixels, or whole body lines with room
-for the last descent) and fades the cut. Title starts; the chevron
-sits on the trailing edge. Accordion is many headers; this is one
-card.
+for the last descent) and fades the cut. Title starts; optional
+`trail` sits after the title; the chevron sits on the trailing edge.
+Accordion is many headers; this is one card.
 
 Pass `A11y`.
 

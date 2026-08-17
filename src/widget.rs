@@ -5977,6 +5977,7 @@ pub fn tab_bar<'a, M: Clone + 'a>(
 /// rows — not a 180° flip of a down chevron (that painted as ^ open).
 fn disclosure_header<'a, M: Clone + 'a>(
     title: impl Into<String>,
+    trail: Option<Element<'a, M>>,
     open: bool,
     msg: Option<M>,
     tok: Tokens,
@@ -5996,11 +5997,22 @@ fn disclosure_header<'a, M: Clone + 'a>(
         .size(tok.body())
         .color(s.on_surface_variant)
         .into();
+    let title_row: Element<'a, M> = if let Some(extra) = trail {
+        Row::new()
+            .spacing(gap(tok))
+            .align_y(Alignment::Center)
+            .width(Length::Fill)
+            .push(title_el)
+            .push(extra)
+            .into()
+    } else {
+        title_el
+    };
     let mut face = Row::new()
         .spacing(gap(tok))
         .align_y(Alignment::Center)
         .width(Length::Fill);
-    for kid in crate::i18n::order(tok.direction, [title_el, mark_el]) {
+    for kid in crate::i18n::order(tok.direction, [title_row, mark_el]) {
         face = face.push(kid);
     }
     let mut b = button(face)
@@ -6052,6 +6064,7 @@ pub fn accordion_view<'a, M: Clone + 'a>(
         let open = state.open == Some(i);
         col = col.push(disclosure_header(
             title.clone(),
+            None,
             open,
             a11y.apply_message(Some(on_toggle(i))),
             tok,
@@ -6152,16 +6165,27 @@ fn peek_clip<'a, M: 'a>(child: Element<'a, M>, h: f32, tok: Tokens) -> Element<'
 /// The application owns `open` and `progress` (0 peek, 1 full). The
 /// header toggles. Closed shows a [`Peek`] of the child. Title and
 /// body share the card inset. The chevron sits on the trailing edge.
+/// `trail` sits after the title (count badge, meta) and before the mark.
 ///
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
 /// use icedtea::theme;
+/// use icedtea::variant::Variant;
 /// use icedtea::widget::{self, Peek};
 /// let tok = theme::named("dark").tokens;
 /// let body = widget::label("more", tok, A11y::new("more", Role::Status));
+/// let count = widget::badge(
+///     "3",
+///     None,
+///     tok,
+///     Variant::Quiet,
+///     widget::BadgeSize::Small,
+///     A11y::new("3", Role::Status),
+/// );
 /// let _: icedtea::Element<'_, bool> = widget::expander(
 ///     "Notes",
+///     Some(count),
 ///     body,
 ///     Peek::Lines(2),
 ///     false,
@@ -6174,6 +6198,7 @@ fn peek_clip<'a, M: 'a>(child: Element<'a, M>, h: f32, tok: Tokens) -> Element<'
 #[allow(clippy::too_many_arguments)]
 pub fn expander<'a, M: Clone + 'a>(
     title: impl Into<String>,
+    trail: Option<Element<'a, M>>,
     child: Element<'a, M>,
     collapsed: impl Into<Peek>,
     open: bool,
@@ -6186,6 +6211,7 @@ pub fn expander<'a, M: Clone + 'a>(
     let title = a11y.apply_name(title);
     let header = disclosure_header(
         title.clone(),
+        trail,
         open,
         a11y.apply_message(Some(on_toggle(!open))),
         tok,
@@ -7803,6 +7829,7 @@ mod tests {
         let note = label("more", tok, role("more", Role::Status));
         let _: Element<'_, bool> = expander(
             "Notes",
+            None,
             note,
             48.0,
             false,
@@ -7814,6 +7841,7 @@ mod tests {
         let note = label("more", tok, role("more", Role::Status));
         let _: Element<'_, bool> = expander(
             "Notes",
+            None,
             note,
             48.0,
             true,
@@ -8772,6 +8800,7 @@ mod tests {
         draw_once(&mut closed);
         let mut exp_shut = expander(
             "Notes",
+            None,
             label("more", tok, role("more", Role::Status)),
             48.0,
             false,
@@ -8783,6 +8812,7 @@ mod tests {
         draw_once(&mut exp_shut);
         let mut exp_open = expander(
             "Notes",
+            None,
             label("more", tok, role("more", Role::Status)),
             48.0,
             true,
@@ -8794,6 +8824,7 @@ mod tests {
         draw_once(&mut exp_open);
         let mut exp_off = expander(
             "Notes",
+            None,
             label("more", tok, role("more", Role::Status)),
             48.0,
             false,
@@ -10842,6 +10873,43 @@ mod tests {
         assert_eq!(crate::collection::ListRow::new("x").indent, 0);
     }
 
+    #[test]
+    fn expander_trail_keeps_the_string_title() {
+        let tok = named("dark").tokens;
+        let body = label("more", tok, A11y::new("more", Role::Status));
+        let count = badge(
+            "3",
+            None,
+            tok,
+            Variant::Quiet,
+            BadgeSize::Small,
+            A11y::new("3", Role::Status),
+        );
+        let _: Element<'_, bool> = expander(
+            "Notes",
+            Some(count),
+            body,
+            Peek::Lines(2),
+            false,
+            0.0,
+            |open| open,
+            tok,
+            A11y::new("Notes", Role::Group),
+        );
+        let body = label("more", tok, A11y::new("more", Role::Status));
+        let _: Element<'_, bool> = expander(
+            "Notes",
+            None,
+            body,
+            Peek::Lines(2),
+            false,
+            0.0,
+            |open| open,
+            tok,
+            A11y::new("Notes", Role::Group),
+        );
+    }
+
     fn drive_scroll(el: &mut Element<'_, f32>) -> Vec<f32> {
         use iced::advanced::clipboard;
         use iced::advanced::layout::{Layout, Limits};
@@ -11183,6 +11251,7 @@ mod tests {
         };
         let mut shut: Element<'_, bool> = expander(
             "Notes",
+            None,
             tall(),
             48.0,
             false,
@@ -11193,6 +11262,7 @@ mod tests {
         );
         let mut open: Element<'_, bool> = expander(
             "Notes",
+            None,
             tall(),
             48.0,
             true,
@@ -11288,6 +11358,7 @@ mod tests {
         let tok = named("dark").tokens;
         let mut el: Element<'_, bool> = expander(
             "Notes",
+            None,
             label("body-line", tok, A11y::new("body-line", Role::Status)),
             Peek::Lines(2),
             true,
@@ -11329,6 +11400,7 @@ mod tests {
         assert_eq!(Peek::Pixels(45.0).height(), 48.0);
         let mut lined: Element<'_, bool> = expander(
             "Notes",
+            None,
             label(
                 "more",
                 named("dark").tokens,
@@ -11899,6 +11971,7 @@ mod tests {
             .into();
         let mut mid: Element<'_, bool> = expander(
             "Notes",
+            None,
             tall,
             Peek::from(48.0),
             true,

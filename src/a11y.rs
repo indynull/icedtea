@@ -624,6 +624,7 @@ mod tests {
         assert_eq!(notes.expanded, Some(true));
         let _: Element<'_, bool> = widget::expander(
             "Notes",
+            None,
             iced::widget::text("body").into(),
             widget::Peek::Lines(2),
             true,

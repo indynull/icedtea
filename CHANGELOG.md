@@ -6,6 +6,7 @@
 
 - `list_view` takes per-row indent on `ListModel` and `RowSlot::Text`
   (small badge) on lead or trail.
+- `expander` takes an optional trailing child on the title row.
 
 ### Bug fix
 
