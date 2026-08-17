@@ -5998,13 +5998,14 @@ fn disclosure_header<'a, M: Clone + 'a>(
         .color(s.on_surface_variant)
         .into();
     let title_row: Element<'a, M> = if let Some(extra) = trail {
-        Row::new()
+        let mut r = Row::new()
             .spacing(gap(tok))
             .align_y(Alignment::Center)
-            .width(Length::Fill)
-            .push(title_el)
-            .push(extra)
-            .into()
+            .width(Length::Fill);
+        for kid in crate::i18n::order(tok.direction, [title_el, extra]) {
+            r = r.push(kid);
+        }
+        r.into()
     } else {
         title_el
     };
@@ -11346,6 +11347,96 @@ mod tests {
         must(
             head.contains("align_start(tok.direction)"),
             "disclosure title must start-align so RTL text sits on the right",
+        );
+    }
+
+    #[test]
+    fn expander_rtl_trail_sits_after_the_title() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+
+        let tok = named("dark")
+            .tokens
+            .with_direction(crate::i18n::Direction::Rtl);
+        let trail = badge(
+            "9",
+            None,
+            tok,
+            Variant::Quiet,
+            BadgeSize::Small,
+            A11y::new("9", Role::Status),
+        );
+        let mut el: Element<'_, bool> = expander(
+            "Notes",
+            Some(trail),
+            label("more", tok, A11y::new("more", Role::Status)),
+            Peek::Lines(2),
+            false,
+            0.0,
+            |open| open,
+            tok,
+            A11y::new("Notes", Role::Group),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let node = el.as_widget_mut().layout(
+            &mut tree,
+            &renderer,
+            &Limits::new(Size::ZERO, Size::new(320.0, 200.0)),
+        );
+        let layout = Layout::new(&node);
+        let origin = layout.bounds();
+        let mut boxes = Vec::new();
+        walk_bounds(layout, &mut boxes);
+        let marks: Vec<_> = boxes
+            .iter()
+            .filter(|b| b.width < 24.0 && b.height < 28.0 && b.width > 4.0)
+            .copied()
+            .collect();
+        let trails: Vec<_> = boxes
+            .iter()
+            .filter(|b| b.width >= 16.0 && b.width <= 48.0 && b.height >= 14.0 && b.height <= 28.0)
+            .copied()
+            .collect();
+        let titles: Vec<_> = boxes
+            .iter()
+            .filter(|b| b.width > 80.0 && b.height >= 16.0 && b.height < 40.0)
+            .copied()
+            .collect();
+        must(
+            marks.iter().any(|b| b.x - origin.x < origin.width / 2.0),
+            "RTL expander mark must sit on the end (left)",
+        );
+        must(
+            titles
+                .iter()
+                .any(|b| b.x + b.width - origin.x > origin.width / 2.0),
+            "RTL expander title must sit on the start (right)",
+        );
+        must(
+            marks.iter().any(|m| {
+                trails
+                    .iter()
+                    .any(|t| m.x < t.x && titles.iter().any(|n| t.x < n.x + n.width))
+            }),
+            format!(
+                "RTL trail must sit after the title and before the mark, marks={marks:?} trails={trails:?} titles={titles:?}"
+            ),
+        );
+        let head = include_str!("widget.rs")
+            .split("fn disclosure_header")
+            .nth(1)
+            .unwrap()
+            .split("pub fn accordion_view")
+            .next()
+            .unwrap();
+        must(
+            head.contains("order(tok.direction, [title_el, extra])"),
+            "title and trail must go through i18n::order",
         );
     }
 

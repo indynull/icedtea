@@ -7,6 +7,7 @@
 - `list_view` takes per-row indent on `ListModel` and `RowSlot::Text`
   (small badge) on lead or trail.
 - `expander` takes an optional trailing child on the title row.
+  Right-to-left order is title, trail, then the mark.
 - `Tokens::from_aliases` builds a scheme from the short color fields.
 
 ### Bug fix
