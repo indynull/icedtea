@@ -719,7 +719,9 @@ where
             state.last_notified = Some(state.scroll);
         }
 
-        if !shell.is_event_captured() {
+        let over_pane = cursor.position().is_some_and(|p| bounds.contains(p));
+        let pointer = matches!(event, Event::Mouse(_) | Event::Touch(_));
+        if !shell.is_event_captured() && (!pointer || over_pane) {
             self.content.as_widget_mut().update(
                 &mut tree.children[0],
                 event,
@@ -762,6 +764,9 @@ where
                 } else {
                     mouse::Interaction::Pointer
                 };
+            }
+            if !layout.bounds().contains(pos) {
+                return mouse::Interaction::default();
             }
         }
         self.content.as_widget().mouse_interaction(
@@ -1745,5 +1750,183 @@ mod tests {
         );
         let _ = on_thumb;
         assert!(!messages.is_empty());
+    }
+
+    #[test]
+    fn themed_scroll_drops_pointer_outside_the_pane() {
+        use iced::widget::mouse_area;
+        use iced::widget::Space;
+
+        let tok = named("dark").tokens;
+        let kid: Element<'_, bool> = mouse_area(
+            Space::new()
+                .width(Length::Fill)
+                .height(Length::Fixed(400.0)),
+        )
+        .on_press(true)
+        .into();
+        let mut scroll = ThemedScroll::new(kid, tok, false, None, None);
+        let mut tree = Tree::new(&scroll as &dyn Widget<bool, iced::Theme, iced::Renderer>);
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(200.0, 80.0));
+        let node = Widget::<bool, iced::Theme, iced::Renderer>::layout(
+            &mut scroll,
+            &mut tree,
+            &renderer,
+            &limits,
+        );
+        let layout = Layout::new(&node);
+        let pane = layout.bounds();
+        let outside = Point::new(pane.x + 12.0, pane.y + pane.height + 40.0);
+        let inside = Point::new(pane.x + 12.0, pane.y + 12.0);
+        assert!(!pane.contains(outside));
+        assert!(pane.contains(inside));
+        let viewport = pane;
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            Widget::<bool, iced::Theme, iced::Renderer>::update(
+                &mut scroll,
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(outside),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(messages.is_empty());
+        assert_eq!(
+            Widget::<bool, iced::Theme, iced::Renderer>::mouse_interaction(
+                &scroll,
+                &tree,
+                layout,
+                mouse::Cursor::Available(outside),
+                &viewport,
+                &renderer,
+            ),
+            mouse::Interaction::default()
+        );
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            Widget::<bool, iced::Theme, iced::Renderer>::update(
+                &mut scroll,
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(inside),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert_eq!(messages.as_slice(), &[true]);
+    }
+
+    #[test]
+    fn themed_scroll_forwards_keys_when_the_cursor_is_outside() {
+        use iced::advanced::layout::{Limits as LayLimits, Node};
+        use iced::advanced::renderer::Style;
+        use std::cell::Cell;
+        use std::rc::Rc;
+
+        struct KeyHit {
+            n: Rc<Cell<u32>>,
+        }
+        impl Widget<(), iced::Theme, iced::Renderer> for KeyHit {
+            fn size(&self) -> Size<Length> {
+                Size::new(Length::Fill, Length::Fixed(40.0))
+            }
+            fn layout(
+                &mut self,
+                _tree: &mut Tree,
+                _renderer: &iced::Renderer,
+                limits: &LayLimits,
+            ) -> Node {
+                Node::new(limits.resolve(Length::Fill, Length::Fixed(40.0), Size::new(40.0, 40.0)))
+            }
+            fn draw(
+                &self,
+                _tree: &Tree,
+                _renderer: &mut iced::Renderer,
+                _theme: &iced::Theme,
+                _style: &Style,
+                _layout: Layout<'_>,
+                _cursor: mouse::Cursor,
+                _viewport: &Rectangle,
+            ) {
+            }
+            fn update(
+                &mut self,
+                _tree: &mut Tree,
+                event: &Event,
+                _layout: Layout<'_>,
+                _cursor: mouse::Cursor,
+                _renderer: &iced::Renderer,
+                _clipboard: &mut dyn clipboard::Clipboard,
+                _shell: &mut iced::advanced::Shell<'_, ()>,
+                _viewport: &Rectangle,
+            ) {
+                if matches!(event, Event::Keyboard(_)) {
+                    self.n.set(self.n.get() + 1);
+                }
+            }
+        }
+
+        let tok = named("dark").tokens;
+        let hits = Rc::new(Cell::new(0));
+        let kid: Element<'_, ()> = Element::new(KeyHit { n: hits.clone() });
+        let mut scroll = ThemedScroll::new(kid, tok, false, None, None);
+        let mut tree = Tree::new(&scroll as &dyn Widget<(), iced::Theme, iced::Renderer>);
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(200.0, 80.0));
+        let node = Widget::<(), iced::Theme, iced::Renderer>::layout(
+            &mut scroll,
+            &mut tree,
+            &renderer,
+            &limits,
+        );
+        let layout = Layout::new(&node);
+        let pane = layout.bounds();
+        let outside = Point::new(pane.x + 12.0, pane.y + pane.height + 40.0);
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        let mut shell = iced::advanced::Shell::new(&mut messages);
+        Widget::<(), iced::Theme, iced::Renderer>::update(
+            &mut scroll,
+            &mut tree,
+            &Event::Keyboard(iced::keyboard::Event::KeyPressed {
+                key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Escape),
+                modified_key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Escape),
+                physical_key: iced::keyboard::key::Physical::Unidentified(
+                    iced::keyboard::key::NativeCode::Unidentified,
+                ),
+                location: iced::keyboard::Location::Standard,
+                modifiers: iced::keyboard::Modifiers::default(),
+                text: None,
+                repeat: false,
+            }),
+            layout,
+            mouse::Cursor::Available(outside),
+            &renderer,
+            &mut clipboard,
+            &mut shell,
+            &pane,
+        );
+        assert_eq!(
+            hits.get(),
+            1,
+            "keyboard must reach the child outside the pane"
+        );
     }
 }

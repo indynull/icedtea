@@ -554,7 +554,8 @@ pub fn toggle_button<'a, M: Clone + 'a>(
 /// Check or clear a boolean.
 ///
 /// The application owns the bool. The message carries the next value.
-/// Disabled keeps the box and ignores clicks.
+/// Disabled keeps the box and ignores clicks. An empty label is the
+/// box only (shrink width) so it can sit in a row next to a title.
 ///
 ///
 /// ```
@@ -579,13 +580,20 @@ pub fn themed_checkbox<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let a11y = a11y.merge_checked(checked);
-    let name = a11y.apply_name(label_s);
+    let caption: String = label_s.into();
+    let empty = caption.is_empty();
+    let name = a11y.apply_name(caption);
     let is_on = a11y.apply_checked(checked);
     let mut c = checkbox(is_on).style(style::checkbox_style(tok));
     if !a11y.disabled {
         c = c.on_toggle(msg);
     }
-    a11y::attach(labeled_control(c.into(), name, tok, a11y.disabled), &a11y)
+    let face: Element<'a, M> = if empty {
+        c.into()
+    } else {
+        labeled_control(c.into(), name, tok, a11y.disabled)
+    };
+    a11y::attach(face, &a11y)
 }
 
 /// Three-state checkbox value (M3 indeterminate for “partial”).
@@ -10107,6 +10115,30 @@ mod tests {
             .next()
             .unwrap();
         assert!(group_src.contains("align_start(tok.direction)"));
+    }
+
+    #[test]
+    fn empty_checkbox_label_is_shrink_width() {
+        let tok = named("dark").tokens;
+        let mut named_box: Element<'_, bool> = themed_checkbox(
+            "Accept",
+            false,
+            |on| on,
+            tok,
+            A11y::new("Accept", Role::Checkbox),
+        );
+        let mut empty: Element<'_, bool> =
+            themed_checkbox("", false, |on| on, tok, A11y::new("row", Role::Checkbox));
+        let named_w = layout_size(&mut named_box, iced::Size::new(320.0, 48.0)).width;
+        let empty_w = layout_size(&mut empty, iced::Size::new(320.0, 48.0)).width;
+        must(
+            named_w > 200.0,
+            format!("named checkbox must fill, got {named_w}"),
+        );
+        must(
+            empty_w < 48.0,
+            format!("empty-label checkbox must shrink to the box, got {empty_w}"),
+        );
     }
 
     #[test]

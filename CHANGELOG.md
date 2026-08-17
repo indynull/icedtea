@@ -13,6 +13,10 @@
   full).
 - Switch, slider, and progress tracks use `Component::Track` (Full
   under Material and Pill).
+- `themed_scroll` ignores pointer events and a pointer cursor outside
+  the pane. Keyboard still reaches the child.
+- `themed_checkbox` with an empty label is the box only (shrink
+  width).
 
 ## 0.10.0 — 2026-08-16
 
