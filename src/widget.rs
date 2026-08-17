@@ -666,7 +666,8 @@ pub enum TreeFace {
     Files,
 }
 
-/// Badge size. Large is the default chip-like face.
+/// Badge size. Large is the default readable face (body type).
+/// Small is caption type for dense marks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum BadgeSize {
     Small,
@@ -3919,6 +3920,7 @@ pub fn filter_chips<'a, M: Clone + 'a>(
 /// A count or status mark.
 ///
 /// Short text. Empty string is an empty pill.
+/// [`BadgeSize::Large`] paints at body type; [`BadgeSize::Small`] at meta.
 ///
 ///
 /// ```
@@ -3952,8 +3954,8 @@ pub fn badge<'a, M: 'a>(
         BadgeSize::Large => [4, 8],
     };
     let type_size = match size {
-        BadgeSize::Small => (tok.meta() - 2.0).max(10.0),
-        BadgeSize::Large => tok.meta(),
+        BadgeSize::Small => tok.meta(),
+        BadgeSize::Large => tok.body(),
     };
     let mark: Element<'a, M> = container(text(title).size(type_size).color(ink))
         .padding(pad)
@@ -5835,10 +5837,10 @@ pub fn tab_bar<'a, M: Clone + 'a>(
         }
         let title_el = if tab_off {
             text(title.clone())
-                .size(tok.meta())
+                .size(tok.body())
                 .color(tok.scheme().on_surface_variant)
         } else {
-            text(title.clone()).size(tok.meta())
+            text(title.clone()).size(tok.body())
         };
         label_row = label_row.push(title_el);
         if let Some(b) = badge {
@@ -11455,7 +11457,21 @@ mod tests {
             .unwrap();
         assert!(src.contains("is_disabled"));
         assert!(src.contains("tab_off"));
-        assert!(src.contains(".size(tok.meta())"));
+        assert!(src.contains(".size(tok.body())"));
+        assert!(!src.contains(".size(tok.meta())"));
+    }
+
+    #[test]
+    fn badge_large_uses_body_and_small_uses_meta() {
+        let src = include_str!("widget.rs")
+            .split("pub fn badge")
+            .nth(1)
+            .unwrap()
+            .split("/// A titled panel around children")
+            .next()
+            .unwrap();
+        assert!(src.contains("BadgeSize::Small => tok.meta()"));
+        assert!(src.contains("BadgeSize::Large => tok.body()"));
     }
 
     #[test]

@@ -13,6 +13,8 @@
 
 ### Bug fix
 
+- `tab_bar` titles use body type. `badge` Large uses body; Small uses
+  meta. Type scale moves both.
 - `themed_text_input`, `search_input`, and `themed_pick_list` use
   `sized_control_height` so Default fields match Default picks under
   compact density.
