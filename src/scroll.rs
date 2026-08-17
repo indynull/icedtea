@@ -1882,10 +1882,12 @@ mod tests {
 
         let tok = named("dark").tokens;
         let hits = Rc::new(Cell::new(0));
-        let kid: Element<'_, ()> = Element::new(KeyHit { n: hits.clone() });
+        let probe = KeyHit { n: hits.clone() };
+        let _ = Widget::<(), iced::Theme, iced::Renderer>::size(&probe);
+        let kid: Element<'_, ()> = Element::new(probe);
         let mut scroll = ThemedScroll::new(kid, tok, false, None, None);
         let mut tree = Tree::new(&scroll as &dyn Widget<(), iced::Theme, iced::Renderer>);
-        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+        let mut renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
             Font::DEFAULT,
             Pixels::from(16u32),
         ));
@@ -1923,10 +1925,17 @@ mod tests {
             &mut shell,
             &pane,
         );
-        assert_eq!(
-            hits.get(),
-            1,
-            "keyboard must reach the child outside the pane"
+        assert_eq!(hits.get(), 1);
+        let _ = Widget::<(), iced::Theme, iced::Renderer>::size(&scroll);
+        Widget::<(), iced::Theme, iced::Renderer>::draw(
+            &scroll,
+            &tree,
+            &mut renderer,
+            &iced::Theme::Dark,
+            &Style::default(),
+            layout,
+            mouse::Cursor::Available(outside),
+            &pane,
         );
     }
 }

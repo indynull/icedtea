@@ -1087,6 +1087,7 @@ mod tests {
         assert!(!TitlesOnly.is_empty());
         assert_eq!(TitlesOnly.leading(0), RowSlot::Empty);
         assert_eq!(TitlesOnly.trailing(0), RowSlot::Empty);
+        assert_eq!(TitlesOnly.indent(0), 0.0);
         assert!(TableModel::default().row_checked(0).is_none());
     }
 
