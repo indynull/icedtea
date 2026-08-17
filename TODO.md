@@ -2,23 +2,7 @@
 
 ## Do
 
-- `list_view`: per-row indent on `ListModel` (pixels or depth). `RowSlot`
-  grows a text / badge member on lead and trail. Same constructor;
-  `ListModel` stays title, meta, id, length, and check.
-- `expander`: optional trailing `Element` on the title row (count
-  badge, meta). String title stays the a11y name. One constructor.
-- Public `Tokens` constructor from the short color aliases (canvas,
-  surface, panel, text, muted, primary, accent, success, warning,
-  danger, border) that builds the scheme. Seat color stays in the
-  application.
-
 ## Bugs
-
-- `themed_scroll` `update` and `mouse_interaction`: pointer events and
-  the pointer cursor stay inside the pane bounds. Keyboard still
-  reaches the child. Paint already scissors.
-- `themed_checkbox` with an empty label is shrink-width (the box
-  only). `labeled_control` Fill is for a named row.
 
 ## Consider
 
