@@ -1839,7 +1839,10 @@ pub fn themed_text_input<'a, M: Clone + 'a>(
             i = i.on_submit(m);
         }
     }
-    let mut field: Element<'a, M> = i.into();
+    let mut field: Element<'a, M> = container(i)
+        .width(Length::Fill)
+        .height(Length::Fixed(control_height(tok)))
+        .into();
     if opts.icons != Icons::NONE {
         let mut r = Row::new().spacing(gap(tok)).align_y(Alignment::Center);
         if let Some(ic) = opts.icons.leading {
@@ -2667,8 +2670,12 @@ where
         .style(style::picker_style(tok))
         .padding(face_pad)
         .text_size(type_px);
-    let picker: Element<'a, M> = picker.into();
-    let mut face = Row::new().spacing(4).align_y(Alignment::Center);
+    let h = sized_control_height(tok, size);
+    let picker: Element<'a, M> = container(picker).height(Length::Fixed(h)).into();
+    let mut face = Row::new()
+        .spacing(4)
+        .align_y(Alignment::Center)
+        .height(Length::Fixed(h));
     for kid in crate::i18n::order(tok.direction, [picker, pick_chevron(tok)]) {
         face = face.push(kid);
     }
@@ -8721,6 +8728,38 @@ mod tests {
             );
         }
         assert!(messages.is_empty());
+    }
+
+    #[test]
+    fn search_input_matches_pick_height_under_compact() {
+        let tok = named("dark")
+            .tokens
+            .with_density(crate::density::Density::named(
+                crate::density::DensityName::Compact,
+            ));
+        let mut search: Element<'_, ()> = search_input(
+            "",
+            |_| (),
+            None,
+            tok,
+            A11y::new("Search", Role::TextBox),
+            None,
+        );
+        let mut pick: Element<'_, ()> = themed_pick_list(
+            &["All"][..],
+            Some("All"),
+            |_| (),
+            tok,
+            ControlSize::Default,
+            A11y::new("Filter", Role::ComboBox),
+        );
+        let max = iced::Size::new(400.0, 80.0);
+        let hs = layout_size(&mut search, max).height;
+        let hp = layout_size(&mut pick, max).height;
+        assert!(
+            (hs - hp).abs() <= 1.0,
+            "search {hs} must match pick {hp} under compact density"
+        );
     }
 
     #[test]
