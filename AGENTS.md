@@ -253,11 +253,12 @@ Only `just cov` and the test jobs set `CARGO_INCREMENTAL=0`
 (llvm-cov uses `target/llvm-cov-target`). After a passing local
 `just cov`, delete `target/llvm-cov-target` (and `target/llvm-cov`).
 The test jobs leave that tree so rust-cache can reuse it, write
-`lcov.info`, upload it to Codecov (`CODECOV_TOKEN`), and keep an HTML
+`lcov.info`, run `scripts/check_lcov.py` (fails the job on a counted
+`DA,0`), upload it to Codecov (`CODECOV_TOKEN`), and keep an HTML
 report on Linux (artifact `coverage-html`). Fail-under is
-`codecov.yml` (project and patch target 100 after the three host
-uploads). Local `just test` / `just clippy` / `just doc` keep the
-debug incremental graph. `just clean` is `cargo clean`. Recipes:
+`scripts/check_lcov.py` on each host plus `codecov.yml` (project and
+patch target 100 after the three host uploads). Local `just test` /
+`just clippy` / `just doc` keep the debug incremental graph. `just clean` is `cargo clean`. Recipes:
 `just lint`, `just fmt-check`, `just clippy`, `just test`, `just doc`,
 `just cov`.
 
@@ -287,7 +288,8 @@ exact command and result you ran.
   convenience.
 - Fail-under is 100 on lcov/Codecov source-line hits (a `DA` record
   with count 0). That is the HTML uncovered set, not llvm-cov's
-  macro-mapped misses. Gate is `codecov.yml`. Exercise every real
+  macro-mapped misses. Gate is `scripts/check_lcov.py` (each test
+  host, and `just cov`) plus `codecov.yml`. Exercise every real
   branch; do not add ignore prefixes.
 - Tests are named after production behavior, never leftover line counts
   or coverage percentages. Drive shipped entry points. No `*_for_test`
@@ -312,8 +314,9 @@ exact command and result you ran.
   source denylist is not the bar.
 - Continuous integration (`.github/workflows/ci.yml`) runs lint and
   docs on Ubuntu at Rust 1.89. The test job on Linux, macOS, and
-  Windows at 1.89 is `cargo llvm-cov --workspace --all-features` and
-  uploads lcov to Codecov. Ubuntu `stable` and `beta` run
+  Windows at 1.89 is `cargo llvm-cov --workspace --all-features`,
+  `scripts/check_lcov.py` on that lcov, and an upload to Codecov.
+  Ubuntu `stable` and `beta` run
   `cargo test --workspace --all-features`. A new push cancels the
   previous run on the same branch or pull request. Tag `vX.Y.Z`
   (matching `Cargo.toml` `version`) publishes `icedtea` to crates.io

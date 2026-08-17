@@ -55,6 +55,7 @@ jobs:
         run: echo "RUSTFLAGS=-C link-arg=-fuse-ld=lld" >> "$GITHUB_ENV"
       - run: cargo fmt --all -- --check
       - run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
+      - run: python3 scripts/check_lcov.py --self-test
 
   test:
     name: test (${{ matrix.os }})
@@ -91,6 +92,11 @@ jobs:
       # `just cov` still deletes the tree after a passing report.
       - name: Tests and coverage
         run: cargo llvm-cov --locked --workspace --all-features --ignore-filename-regex 'src[/\\]host' --lcov --output-path lcov.info
+      - name: Counted source lines
+        run: |
+          py=python3
+          command -v python3 >/dev/null || py=python
+          "$py" scripts/check_lcov.py lcov.info
       - name: HTML report
         if: runner.os == 'Linux' && always()
         run: cargo llvm-cov report --ignore-filename-regex 'src[/\\]host' --html --output-dir coverage-html
