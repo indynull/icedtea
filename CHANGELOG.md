@@ -11,6 +11,8 @@
 - `banner` uses `Component::Banner` (flush under Material and Pill).
 - `search_input` uses `Component::Search` (Material extra-large, Pill
   full).
+- Switch, slider, and progress tracks use `Component::Track` (Full
+  under Material and Pill).
 
 ## 0.10.0 — 2026-08-16
 

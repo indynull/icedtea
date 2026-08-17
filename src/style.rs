@@ -698,7 +698,7 @@ pub fn switch_style(tok: Tokens) -> impl Fn(&iced::Theme, toggler::Status) -> to
             foreground_border_width: 0.0,
             foreground_border_color: Color::TRANSPARENT,
             text_color: Some(s.on_surface),
-            border_radius: Some(component_radius(tok, Component::Button)),
+            border_radius: Some(component_radius(tok, Component::Track)),
             padding_ratio: 0.2,
         }
     }
@@ -721,7 +721,7 @@ pub fn slider_style(tok: Tokens) -> impl Fn(&iced::Theme, slider::Status) -> sli
                 border: Border {
                     color: Color::TRANSPARENT,
                     width: 0.0,
-                    radius: component_radius(tok, Component::Button),
+                    radius: component_radius(tok, Component::Track),
                 },
             },
             handle: slider::Handle {
@@ -743,7 +743,7 @@ pub fn progress_style(tok: Tokens) -> impl Fn(&iced::Theme) -> progress_bar::Sty
             border: Border {
                 color: Color::TRANSPARENT,
                 width: 0.0,
-                radius: component_radius(tok, Component::Button),
+                radius: component_radius(tok, Component::Track),
             },
         }
     }
@@ -1082,6 +1082,50 @@ mod tests {
         assert_eq!(
             field.border.radius.top_left,
             crate::m3::Shape::ExtraSmall.dp()
+        );
+    }
+
+    #[test]
+    fn track_corners_follow_shape_policy() {
+        let tok = named("dark").tokens;
+        let theme = crate::theme::iced_theme("dark", tok);
+        let sw = switch_style(tok)(&theme, toggler::Status::Active { is_toggled: true });
+        assert_eq!(sw.border_radius.map(|r| r.top_left), Some(0.0));
+        let sl = slider_style(tok)(&theme, slider::Status::Active);
+        assert_eq!(sl.rail.border.radius.top_left, 0.0);
+        assert_eq!(progress_style(tok)(&theme).border.radius.top_left, 0.0);
+        let material = tok.with_shape(crate::m3::ShapePolicy::Material);
+        let mtheme = crate::theme::iced_theme("dark", material);
+        let full = crate::m3::Shape::Full.dp();
+        assert_eq!(
+            switch_style(material)(&mtheme, toggler::Status::Active { is_toggled: false })
+                .border_radius
+                .map(|r| r.top_left),
+            Some(full)
+        );
+        assert_eq!(
+            slider_style(material)(&mtheme, slider::Status::Hovered)
+                .rail
+                .border
+                .radius
+                .top_left,
+            full
+        );
+        assert_eq!(
+            progress_style(material)(&mtheme).border.radius.top_left,
+            full
+        );
+        let pill = tok.with_shape(crate::m3::ShapePolicy::Pill);
+        assert_eq!(
+            crate::m3::shape::Component::Track.shape_for(crate::m3::ShapePolicy::Pill),
+            crate::m3::Shape::Full
+        );
+        assert_eq!(
+            progress_style(pill)(&crate::theme::iced_theme("dark", pill))
+                .border
+                .radius
+                .top_left,
+            full
         );
     }
 

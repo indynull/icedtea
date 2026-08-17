@@ -39,8 +39,8 @@ impl Shape {
 /// so chrome reads crisp and rectangular. Touch-pill Full / mobile Soft are
 /// not the product default; apps that want round can restyle later.
 ///
-/// M3 still documents Full for switches/FABs on mobile; here only the
-/// switch *thumb* stays circular via iced geometry, not container radius.
+/// Switch thumbs stay circular via iced geometry. The track uses
+/// [`Component::Track`] (Full under Material and Pill).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Component {
     /// Filled / tonal / text buttons, chips.
@@ -64,6 +64,8 @@ pub enum Component {
     Banner,
     /// Search field (M3 search). Extra-large under Material, full under Pill.
     Search,
+    /// Switch track, slider rail, linear progress.
+    Track,
     /// App bar / shell / tab strip (flush).
     AppBar,
     Shell,
@@ -85,13 +87,13 @@ pub enum ShapePolicy {
     Tight,
     /// Medium (12 dp) on every family.
     Soft,
-    /// Full pill on buttons, chips, badges, and search. Cards, menus,
-    /// fields, dialogs, toasts, and tooltips stay boxes. Banners and
-    /// app bars stay flush.
+    /// Full pill on buttons, chips, badges, search, and tracks. Cards,
+    /// menus, fields, dialogs, toasts, and tooltips stay boxes. Banners
+    /// and app bars stay flush.
     Pill,
     /// Documented Material map (buttons extra-small, chips and badges
     /// small, cards medium, toasts and tooltips extra-small, dialogs
-    /// and search extra-large, app bars flush).
+    /// and search extra-large, tracks full, app bars flush).
     Material,
 }
 
@@ -114,7 +116,7 @@ impl Component {
 
     fn pill_shape(self) -> Shape {
         match self {
-            Self::Button | Self::Chip | Self::Badge | Self::Search => Shape::Full,
+            Self::Button | Self::Chip | Self::Badge | Self::Search | Self::Track => Shape::Full,
             Self::AppBar | Self::Shell | Self::Tab | Self::Banner => Shape::None,
             Self::Field
             | Self::Checkbox
@@ -137,6 +139,7 @@ impl Component {
             Self::Chip | Self::Badge => Shape::Small,
             Self::Card => Shape::Medium,
             Self::Dialog | Self::Search => Shape::ExtraLarge,
+            Self::Track => Shape::Full,
             Self::AppBar | Self::Shell | Self::Tab | Self::Banner => Shape::None,
         }
     }
@@ -214,6 +217,7 @@ mod tests {
             Component::Tooltip,
             Component::Banner,
             Component::Search,
+            Component::Track,
             Component::AppBar,
             Component::Shell,
             Component::Tab,
@@ -249,6 +253,7 @@ mod tests {
         assert_eq!(Component::Tab.shape_for(ShapePolicy::Pill), Shape::None);
         assert_eq!(Component::Banner.shape_for(ShapePolicy::Pill), Shape::None);
         assert_eq!(Component::Search.shape_for(ShapePolicy::Pill), Shape::Full);
+        assert_eq!(Component::Track.shape_for(ShapePolicy::Pill), Shape::Full);
         assert_eq!(
             Component::Button.shape_for(ShapePolicy::Material),
             Shape::ExtraSmall
@@ -305,6 +310,10 @@ mod tests {
         assert_eq!(
             Component::Search.shape_for(ShapePolicy::Material),
             Shape::ExtraLarge
+        );
+        assert_eq!(
+            Component::Track.shape_for(ShapePolicy::Material),
+            Shape::Full
         );
         assert_eq!(
             Component::Field.radius_for(ShapePolicy::Tight).top_left,

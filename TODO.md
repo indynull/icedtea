@@ -4,9 +4,6 @@
 
 ## Bugs
 
-- Switch track, slider rail, and progress use Button. M3 those tracks
-  are Full.
-
 ## Consider
 
 ## Discard

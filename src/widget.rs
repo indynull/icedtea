@@ -1070,7 +1070,8 @@ pub fn icon_button_toggle<'a, M: Clone + 'a>(
 /// A sliding on/off control.
 ///
 /// Same contract as checkbox: the application owns the bool. Disabled
-/// freezes the thumb.
+/// freezes the thumb. Track corners follow [`Tokens::shape`]
+/// ([`crate::m3::shape::Component::Track`]).
 ///
 ///
 /// ```
@@ -1220,7 +1221,8 @@ impl SliderMarks<'static> {
 /// Pass min, max, and the current value. The message is the new value
 /// while the thumb moves. Wheel over the control steps by
 /// [`slider_step`]. Disabled ignores drag and wheel. `marks` paints
-/// ticks and end labels when set.
+/// ticks and end labels when set. Rail corners follow [`Tokens::shape`]
+/// ([`crate::m3::shape::Component::Track`]).
 ///
 ///
 /// ```
@@ -1438,6 +1440,8 @@ fn progress_weights(value: f32, buffer: Option<f32>) -> (u16, u16, u16) {
 /// A determinate bar from 0 to 1.
 ///
 /// Values outside the range clamp. No message; it is a readout.
+/// Track corners follow [`Tokens::shape`]
+/// ([`crate::m3::shape::Component::Track`]).
 /// Interpolate `value` with [`crate::motion::value_animation`] so the
 /// fill eases when the fraction changes. `indeterminate` paints a
 /// traveling chunk; pass a looping phase (0..=1) as `value`.
@@ -1469,10 +1473,19 @@ pub fn progress<'a, M: 'a>(
     let a11y = a11y.merge_value(format!("{value}"));
     let value = value.clamp(0.0, 1.0);
     let s = tok.scheme();
+    let track_r = tok.radius(crate::m3::shape::Component::Track);
     let seg = |w: u16, fill: iced::Color, ink: iced::Color| {
         container(Space::new().height(8))
             .width(Length::FillPortion(w))
-            .style(move |_| style::fill(fill, ink))
+            .style(move |_| {
+                let mut st = style::fill(fill, ink);
+                st.border = iced::border::Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: track_r,
+                };
+                st
+            })
     };
     let mut parts = Row::new().width(Length::Fill);
     let segs: [(u16, iced::Color, iced::Color); 3] = if indeterminate {
@@ -6559,6 +6572,36 @@ mod tests {
             tok,
             A11y::new("Search", Role::TextBox),
             None,
+        );
+    }
+
+    #[test]
+    fn track_constructors_read_track_family() {
+        let tok = named("dark")
+            .tokens
+            .with_shape(crate::m3::ShapePolicy::Material);
+        let _: Element<'_, bool> = themed_switch(
+            "Sounds",
+            false,
+            |on| on,
+            tok,
+            A11y::new("Sounds", Role::Switch),
+        );
+        let _: Element<'_, f32> = themed_slider(
+            0.0..=1.0,
+            0.4,
+            |v| v,
+            SliderMarks::NONE,
+            tok,
+            A11y::new("vol", Role::Slider).with_value("0.4"),
+        );
+        let _: Element<'_, ()> = progress(
+            0.4,
+            Some(0.7),
+            Some("12s"),
+            false,
+            tok,
+            A11y::new("p", Role::Progress).with_value("0.4"),
         );
     }
 

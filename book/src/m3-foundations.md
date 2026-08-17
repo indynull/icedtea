@@ -43,14 +43,14 @@ on `Tokens` picks the map:
 
 - **Desktop** — every family is shape **None** (0 dp). This is the default.
 - **Tight / Soft** — one corner (4 / 12 dp) on every family.
-- **Pill** — buttons, chips, badges, and search are full; cards, menus,
-  fields, dialogs, toasts, and tooltips stay boxes (12 dp); banners and
-  app bars stay flush.
+- **Pill** — buttons, chips, badges, search, and tracks are full; cards,
+  menus, fields, dialogs, toasts, and tooltips stay boxes (12 dp);
+  banners and app bars stay flush.
 - **Material** — buttons extra-small, chips and badges small (8 dp),
   toasts and tooltips extra-small (4 dp), cards medium, dialogs and
-  search extra-large (28 dp), banners and app bars flush.
+  search extra-large (28 dp), tracks full, banners and app bars flush.
 
-Switch thumbs stay circular via geometry, not container radius.
+Switch thumbs stay circular via geometry. Tracks use `Component::Track`.
 `m3::Elevation` uses tonal surface containers plus optional shadow.
 [`ElevationPolicy::Flat`](https://docs.rs/icedtea/latest/icedtea/m3/enum.ElevationPolicy.html)
 drops the shadow; surfaces stay on their tonal container.
