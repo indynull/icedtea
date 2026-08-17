@@ -4508,6 +4508,14 @@ fn row_slot_el<'a, M: Clone + 'a>(
         crate::collection::RowSlot::Icon(icon) => {
             icon_svg(icon, tok, A11y::new("row-icon", Role::Image))
         }
+        crate::collection::RowSlot::Text(mark) => badge(
+            mark.clone(),
+            None,
+            tok,
+            Variant::Quiet,
+            BadgeSize::Small,
+            A11y::new(mark, Role::Status),
+        ),
         crate::collection::RowSlot::Check(on) => {
             let s = tok.scheme();
             let face = container(Space::new().width(10).height(10))
@@ -5033,7 +5041,8 @@ impl<'a, Message: 'a> From<CapturePress<'a, Message>> for Element<'a, Message> {
 /// rows use [`RowHeights::PerRow`] and [`visible_window_var`].
 /// `face` is [`RowFace::Flush`] (clipped line) or [`RowFace::Card`]
 /// (wrapped title, 2px gap, optional meter). `scroll_id` names the
-/// clip pane. The 24px rail sits beside it.
+/// clip pane. The 24px rail sits beside it. `ListModel::indent` insets
+/// the row from start. `RowSlot::Text` paints a small badge.
 ///
 ///
 /// ```
@@ -5165,7 +5174,16 @@ where
                         ) {
                             line = line.push(kid);
                         }
-                        let row: Element<'a, M> = line.into();
+                        let indent = model.indent(i).max(0.0);
+                        let (pad_l, pad_r) = crate::i18n::inline_pad(tok.direction, indent, 0.0);
+                        let row: Element<'a, M> = container(line)
+                            .padding(Padding {
+                                top: 0.0,
+                                right: pad_r,
+                                bottom: 0.0,
+                                left: pad_l,
+                            })
+                            .into();
                         col = col.push(a11y::attach(
                             row,
                             &A11y::new(name, Role::ListItem)
@@ -10762,6 +10780,66 @@ mod tests {
             A11y::new("mail", Role::List),
         );
         draw_once(&mut el);
+    }
+
+    #[test]
+    fn list_view_indent_and_text_slot_paint() {
+        let tok = named("dark").tokens;
+        let win = VisibleWindow::new(200.0);
+        let check_only = VecList {
+            items: vec![crate::collection::ListRow::new("root")
+                .with_leading(crate::collection::RowSlot::Check(false))],
+        };
+        let indented = VecList {
+            items: vec![crate::collection::ListRow::new("child")
+                .with_indent(16)
+                .with_leading(crate::collection::RowSlot::Check(false))
+                .with_trailing(crate::collection::RowSlot::Text("A".into()))],
+        };
+        let mut flat_el: Element<'_, usize> = list_view(
+            &check_only,
+            &Sel::Single(0),
+            |c| c.id,
+            tok,
+            win,
+            32.0,
+            2,
+            |_| 0,
+            "No rows",
+            |_| tok.scheme().on_surface_variant,
+            None,
+            RowFace::FLUSH,
+            |_| 0,
+            A11y::new("mail", Role::List),
+        );
+        let mut step_el: Element<'_, usize> = list_view(
+            &indented,
+            &Sel::Single(0),
+            |c| c.id,
+            tok,
+            win,
+            32.0,
+            2,
+            |_| 0,
+            "No rows",
+            |_| tok.scheme().on_surface_variant,
+            None,
+            RowFace::FLUSH,
+            |_| 0,
+            A11y::new("mail", Role::List),
+        );
+        let flat = layout_size(&mut flat_el, iced::Size::new(320.0, 80.0));
+        let step = layout_size(&mut step_el, iced::Size::new(320.0, 80.0));
+        must(
+            (flat.width - step.width).abs() < 1.0,
+            format!(
+                "indent must not change list width {} vs {}",
+                flat.width, step.width
+            ),
+        );
+        draw_once(&mut flat_el);
+        draw_once(&mut step_el);
+        assert_eq!(crate::collection::ListRow::new("x").indent, 0);
     }
 
     fn drive_scroll(el: &mut Element<'_, f32>) -> Vec<f32> {

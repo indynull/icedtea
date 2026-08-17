@@ -30,9 +30,10 @@ selected row keeps the selection. Disabled drops row messages. `on_scroll` repor
 after a wheel or rail move. Pass `RowHeights::PerRow` for variable
 row heights (`visible_range_var`). `RowFace::Flush` is one clipped
 line. `RowFace::Card` is a surface, wrapped title, and an optional
-3px meter. `ListModel::leading` / `trailing` paint `RowSlot::Icon` or
-`RowSlot::Check` on the same virtualized rows. `on_check` toggles a
-check slot.
+3px meter. `ListModel::leading` / `trailing` paint `RowSlot::Icon`,
+`RowSlot::Check`, or `RowSlot::Text` (a small badge) on the same
+virtualized rows. `ListModel::indent` insets a row from start.
+`on_check` toggles a check slot.
 
 Pass `A11y`.
 

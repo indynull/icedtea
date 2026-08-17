@@ -775,12 +775,17 @@ fn sample_mail_localized(i: usize, cat: &Catalog) -> ListRow {
         1 => cat.t("mail.when.1"),
         _ => cat.t("mail.when.2"),
     };
-    ListRow::new(title)
+    let row = ListRow::new(title)
         .with_meta(when)
-        .with_leading(icedtea::collection::RowSlot::Check(i % 4 == 0))
-        .with_trailing(icedtea::collection::RowSlot::Icon(
+        .with_leading(icedtea::collection::RowSlot::Check(i % 4 == 0));
+    if i % 6 == 1 {
+        row.with_indent(16)
+            .with_trailing(icedtea::collection::RowSlot::Text("A".into()))
+    } else {
+        row.with_trailing(icedtea::collection::RowSlot::Icon(
             icedtea::icon::Icon::Search,
         ))
+    }
 }
 
 /// Unread / flagged flags for sample mail row `i` (same seed as [`sample_mail`]).
@@ -2976,7 +2981,7 @@ impl Gallery {
             }
             Message::ListCheck(i) => {
                 if let Some(row) = self.list.items.get_mut(i) {
-                    row.leading = match row.leading {
+                    row.leading = match row.leading.clone() {
                         icedtea::collection::RowSlot::Check(on) => {
                             icedtea::collection::RowSlot::Check(!on)
                         }

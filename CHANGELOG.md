@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Feature
+
+- `list_view` takes per-row indent on `ListModel` and `RowSlot::Text`
+  (small badge) on lead or trail.
+
 ### Bug fix
 
 - `badge` uses `Component::Badge` so Tight, Soft, Pill, and Material

@@ -217,13 +217,15 @@ pub fn scroll_from_rail(
 }
 
 /// List model: length, identity, borrowed title and optional meta.
-/// Leading or trailing glyph on a list row.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+/// Leading or trailing mark on a list row.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum RowSlot {
     #[default]
     Empty,
     Icon(crate::icon::Icon),
     Check(bool),
+    /// Short caption; `list_view` paints it with [`crate::widget::badge`].
+    Text(String),
 }
 
 pub trait ListModel {
@@ -252,6 +254,12 @@ pub trait ListModel {
         let _ = index;
         RowSlot::Empty
     }
+
+    /// Start-side inset in pixels. Default 0.
+    fn indent(&self, index: usize) -> f32 {
+        let _ = index;
+        0.0
+    }
 }
 
 /// One owned list row.
@@ -262,6 +270,7 @@ pub struct ListRow {
     pub separator: bool,
     pub leading: RowSlot,
     pub trailing: RowSlot,
+    pub indent: u16,
 }
 
 impl ListRow {
@@ -272,6 +281,7 @@ impl ListRow {
             separator: false,
             leading: RowSlot::Empty,
             trailing: RowSlot::Empty,
+            indent: 0,
         }
     }
 
@@ -287,7 +297,13 @@ impl ListRow {
             separator: true,
             leading: RowSlot::Empty,
             trailing: RowSlot::Empty,
+            indent: 0,
         }
+    }
+
+    pub fn with_indent(mut self, indent: u16) -> Self {
+        self.indent = indent;
+        self
     }
 
     pub fn with_leading(mut self, slot: RowSlot) -> Self {
@@ -339,15 +355,22 @@ impl ListModel for VecList {
     fn leading(&self, index: usize) -> RowSlot {
         self.items
             .get(index)
-            .map(|r| r.leading)
+            .map(|r| r.leading.clone())
             .unwrap_or(RowSlot::Empty)
     }
 
     fn trailing(&self, index: usize) -> RowSlot {
         self.items
             .get(index)
-            .map(|r| r.trailing)
+            .map(|r| r.trailing.clone())
             .unwrap_or(RowSlot::Empty)
+    }
+
+    fn indent(&self, index: usize) -> f32 {
+        self.items
+            .get(index)
+            .map(|r| f32::from(r.indent))
+            .unwrap_or(0.0)
     }
 }
 
@@ -1284,6 +1307,16 @@ mod tests {
         assert!(matches!(list.trailing(0), RowSlot::Icon(_)));
         assert_eq!(list.leading(1), RowSlot::Empty);
         assert_eq!(list.leading(9), RowSlot::Empty);
+        let marked = ListRow::new("child")
+            .with_indent(16)
+            .with_trailing(RowSlot::Text("A".into()));
+        assert_eq!(marked.indent, 16);
+        let forest = VecList {
+            items: vec![marked],
+        };
+        assert_eq!(forest.indent(0), 16.0);
+        assert_eq!(forest.trailing(0), RowSlot::Text("A".into()));
+        assert_eq!(forest.indent(3), 0.0);
         let mut tabs = Tabs::new(["A", "B", "C"]).with_badge(0, "2");
         assert_eq!(tabs.badges[0], "2");
         tabs.closable = true;
