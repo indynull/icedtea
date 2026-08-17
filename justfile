@@ -25,8 +25,9 @@ doc:
 # Isolated coverage tree. Incremental off only here so rustc flags do not
 # poison target/debug. Delete the tree after a passing local report.
 # Continuous integration runs this as the test job (Linux, macOS, Windows).
-# Fail-under is counted lcov DA,0 (`scripts/check_lcov.py`) plus Codecov
-# (`codecov.yml` target 100), not llvm-cov macros.
+# Fail-under is Codecov (`codecov.yml` target 100 after three hosts).
+# Local `check_lcov.py` is Linux-reachable DA,0 only; do not run it per
+# host job (macOS and Windows miss each other's cfg lines).
 cov:
     CARGO_INCREMENTAL=0 cargo llvm-cov --workspace --all-features --ignore-filename-regex 'src[/\\]host' --lcov --output-path target/lcov.info
     cargo llvm-cov report --ignore-filename-regex 'src[/\\]host'

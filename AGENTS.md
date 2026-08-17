@@ -141,8 +141,10 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   or Do pointing at finished work. Never park or discard a job because
   no application has asked for it.
 - Coverage fail-under is 100 on lcov/Codecov source-line hits
-  (`codecov.yml` project and patch target). Do not use
-  `llvm-cov --fail-under-lines` (macro expansions). Never rewrite
+  (`codecov.yml` project and patch target after the three host
+  uploads). Agents must pass that Codecov check. Never fail a
+  continuous-integration test job on one host's lcov `DA,0`. Do not
+  use `llvm-cov --fail-under-lines` (macro expansions). Never rewrite
   production so a coverage counter stops flagging a line. Cover the
   real path or leave the miss.
 - `catalog::ENTRIES` is the gallery checklist. Adding an export means
@@ -253,14 +255,16 @@ Only `just cov` and the test jobs set `CARGO_INCREMENTAL=0`
 (llvm-cov uses `target/llvm-cov-target`). After a passing local
 `just cov`, delete `target/llvm-cov-target` (and `target/llvm-cov`).
 The test jobs leave that tree so rust-cache can reuse it, write
-`lcov.info`, run `scripts/check_lcov.py` (fails the job on a counted
-`DA,0`), upload it to Codecov (`CODECOV_TOKEN`), and keep an HTML
+`lcov.info`, upload it to Codecov (`CODECOV_TOKEN`), and keep an HTML
 report on Linux (artifact `coverage-html`). Fail-under is
-`scripts/check_lcov.py` on each host plus `codecov.yml` (project and
-patch target 100 after the three host uploads). Local `just test` /
-`just clippy` / `just doc` keep the debug incremental graph. `just clean` is `cargo clean`. Recipes:
-`just lint`, `just fmt-check`, `just clippy`, `just test`, `just doc`,
-`just cov`.
+`codecov.yml` (project and patch target 100 after the three host
+uploads). A host job must not fail on its own lcov `DA,0` (`#[cfg]`
+lines the other hosts cover). Local `just cov` still runs
+`scripts/check_lcov.py` for Linux-reachable misses. Agents watch the
+Codecov check to 100. Local `just test` / `just clippy` / `just doc`
+keep the debug incremental graph. `just clean` is `cargo clean`.
+Recipes: `just lint`, `just fmt-check`, `just clippy`, `just test`,
+`just doc`, `just cov`.
 
 **Agent verification (default: targeted, not full `just check`)**
 
@@ -288,9 +292,11 @@ exact command and result you ran.
   convenience.
 - Fail-under is 100 on lcov/Codecov source-line hits (a `DA` record
   with count 0). That is the HTML uncovered set, not llvm-cov's
-  macro-mapped misses. Gate is `scripts/check_lcov.py` (each test
-  host, and `just cov`) plus `codecov.yml`. Exercise every real
-  branch; do not add ignore prefixes.
+  macro-mapped misses. Gate is `codecov.yml` after the three host
+  uploads. Never fail a test job on one host's lcov. Local `just cov`
+  runs `scripts/check_lcov.py` for Linux-reachable `DA,0`. Agents must
+  pass the Codecov check. Exercise every real branch; do not add
+  ignore prefixes.
 - Tests are named after production behavior, never leftover line counts
   or coverage percentages. Drive shipped entry points. No `*_for_test`
   library hooks, no `#[cfg(test)]` library paths.
@@ -314,9 +320,8 @@ exact command and result you ran.
   source denylist is not the bar.
 - Continuous integration (`.github/workflows/ci.yml`) runs lint and
   docs on Ubuntu at Rust 1.89. The test job on Linux, macOS, and
-  Windows at 1.89 is `cargo llvm-cov --workspace --all-features`,
-  `scripts/check_lcov.py` on that lcov, and an upload to Codecov.
-  Ubuntu `stable` and `beta` run
+  Windows at 1.89 is `cargo llvm-cov --workspace --all-features` and
+  an upload to Codecov. Ubuntu `stable` and `beta` run
   `cargo test --workspace --all-features`. A new push cancels the
   previous run on the same branch or pull request. Tag `vX.Y.Z`
   (matching `Cargo.toml` `version`) publishes `icedtea` to crates.io

@@ -92,11 +92,6 @@ jobs:
       # `just cov` still deletes the tree after a passing report.
       - name: Tests and coverage
         run: cargo llvm-cov --locked --workspace --all-features --ignore-filename-regex 'src[/\\]host' --lcov --output-path lcov.info
-      - name: Counted source lines
-        run: |
-          py=python3
-          command -v python3 >/dev/null || py=python
-          "$py" scripts/check_lcov.py lcov.info
       - name: HTML report
         if: runner.os == 'Linux' && always()
         run: cargo llvm-cov report --ignore-filename-regex 'src[/\\]host' --html --output-dir coverage-html
