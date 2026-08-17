@@ -9,6 +9,10 @@
 - `expander` takes an optional trailing child on the title row.
   Right-to-left order is title, trail, then the mark.
 - `Tokens::from_aliases` builds a scheme from the short color fields.
+- `split_view` paints the 6 px sash as a hairline and a short centered
+  handle. The constructor takes `Tokens`.
+- `tree_view` paints an optional trailing `RowSlot` on `TreeNode`.
+  `Text` is a badge.
 
 ### Bug fix
 

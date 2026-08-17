@@ -2,19 +2,6 @@
 
 ## Do
 
-- `split_view`: paint the existing 6 px sash (hairline plus one short
-  centered handle, both axes). Constructor takes `Tokens` so the line
-  uses the scheme outline. Grip still emits `SashEvent::Press` only;
-  Move and Release stay on `listen_sash`. Keep the 6 px thickness and
-  the resize cursor (empty `Space` over the paint: iced 0.14
-  `mouse_area.interaction` only wins when the child reports
-  `Interaction::None`). Same catalog id. Recapture gallery / book
-  stills that show the sash.
-
-- `tree_view`: optional trailing `RowSlot` on `TreeNode` (same slot as
-  `list_view`; `Text` is a badge). `TreeFace` stays Outline / Files.
-  The application supplies the title strings.
-
 ## Bugs
 
 ## Consider

@@ -1757,6 +1757,7 @@ where
                 total,
                 move |ev| on_sash(i, ev),
                 paint.tok.direction,
+                paint.tok,
             )
         }
     }

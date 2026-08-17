@@ -113,7 +113,9 @@ tree is an empty column. `animating` is the branch that is opening or
 closing and its 0–1 height progress. [`TreeFace::Outline`](https://docs.rs/icedtea/latest/icedtea/widget/enum.TreeFace.html)
 is a tight heading tree. `TreeFace::Files` is an explorer: inset
 selection and folder/file marks from `dir`. `Tokens.density` scales
-pad, gap, and indent.
+pad, gap, and indent. `TreeNode::trailing` is the same
+[`RowSlot`](https://docs.rs/icedtea/latest/icedtea/collection/enum.RowSlot.html)
+as `list_view`; `Text` is a badge.
 
 Pass `A11y`.
 

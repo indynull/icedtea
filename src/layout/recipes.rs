@@ -47,6 +47,8 @@ use super::size::{distribute, SizePolicy};
 use super::span::{cell_geometry, grid_extent, GridCell};
 use super::split::{Axis, SashEvent, SplitState};
 use crate::i18n::Direction;
+use crate::style;
+use crate::theme::Tokens;
 
 /// Clamp a child width to `max` while remaining centered when extra space exists.
 ///
@@ -371,8 +373,34 @@ pub fn stack_child<'a, M: 'a>(children: Vec<Element<'a, M>>, active: usize) -> E
 /// Split view. The sash grip emits [`SashEvent::Press`]; Move/Release come from
 /// [`super::split::listen_sash`] (window-space pointer) while pressed.
 ///
+/// The sash is a 6 px strip: a hairline and a short centered handle, painted
+/// from `tok`. An empty [`Space`] sits over the paint so hover shows the
+/// resize cursor.
+///
 /// On a horizontal split, `first` is the start pane: left in
 /// [`Direction::Ltr`], right in [`Direction::Rtl`].
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::layout::{self, Axis, SashEvent, SplitState};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// #[derive(Clone, Copy)]
+/// enum Msg {
+///     Sash(SashEvent),
+/// }
+/// let on_sash = Msg::Sash;
+/// let _: icedtea::Element<'_, Msg> = layout::split_view(
+///     widget::label("nav", tok, A11y::new("nav", Role::Status)),
+///     widget::label("body", tok, A11y::new("body", Role::Status)),
+///     SplitState::new(Axis::Horizontal, 0.3),
+///     400.0,
+///     on_sash,
+///     tok.direction,
+///     tok,
+/// );
+/// ```
 pub fn split_view<'a, M: Clone + 'a>(
     first: Element<'a, M>,
     second: Element<'a, M>,
@@ -380,19 +408,11 @@ pub fn split_view<'a, M: Clone + 'a>(
     total: f32,
     on_sash: impl Fn(SashEvent) -> M + 'a,
     dir: crate::i18n::Direction,
+    tok: Tokens,
 ) -> Element<'a, M> {
     let (a, sash, b) = split_sizes(state, total);
-    let axis = state.axis;
-    let grip = mouse_area(match axis {
-        Axis::Horizontal => Space::new().width(Length::Fixed(sash)).height(Length::Fill),
-        Axis::Vertical => Space::new().height(Length::Fixed(sash)).width(Length::Fill),
-    })
-    .on_press(on_sash(SashEvent::Press))
-    .interaction(match axis {
-        Axis::Horizontal => iced::mouse::Interaction::ResizingHorizontally,
-        Axis::Vertical => iced::mouse::Interaction::ResizingVertically,
-    });
-    match axis {
+    let grip = sash_grip(state.axis, sash, on_sash, tok);
+    match state.axis {
         Axis::Horizontal => {
             let start = container(first).width(Length::Fixed(a.max(1.0)));
             let end = container(second)
@@ -415,6 +435,91 @@ pub fn split_view<'a, M: Clone + 'a>(
             .push(container(second).height(Length::Fill))
             .into(),
     }
+}
+
+fn sash_face<'a, M: 'a>(axis: Axis, sash: f32, tok: Tokens) -> Element<'a, M> {
+    let outline = tok.scheme().outline;
+    let handle_len = (tok.density.gap() * 3.0).max(crate::density::GRID as f32 * 4.0);
+    match axis {
+        Axis::Horizontal => {
+            let line = container(Space::new())
+                .width(Length::Fixed(1.0))
+                .height(Length::Fill)
+                .style(move |_| style::fill(outline, outline));
+            let handle = container(Space::new())
+                .width(Length::Fixed(2.0))
+                .height(Length::Fixed(handle_len))
+                .style(move |_| style::fill(outline, outline));
+            Stack::new()
+                .width(Length::Fixed(sash))
+                .height(Length::Fill)
+                .push(
+                    container(line)
+                        .width(Length::Fixed(sash))
+                        .height(Length::Fill)
+                        .center_x(Length::Fill),
+                )
+                .push(
+                    container(handle)
+                        .width(Length::Fixed(sash))
+                        .height(Length::Fill)
+                        .center_x(Length::Fill)
+                        .center_y(Length::Fill),
+                )
+                .into()
+        }
+        Axis::Vertical => {
+            let line = container(Space::new())
+                .width(Length::Fill)
+                .height(Length::Fixed(1.0))
+                .style(move |_| style::fill(outline, outline));
+            let handle = container(Space::new())
+                .width(Length::Fixed(handle_len))
+                .height(Length::Fixed(2.0))
+                .style(move |_| style::fill(outline, outline));
+            Stack::new()
+                .width(Length::Fill)
+                .height(Length::Fixed(sash))
+                .push(
+                    container(line)
+                        .width(Length::Fill)
+                        .height(Length::Fixed(sash))
+                        .center_y(Length::Fill),
+                )
+                .push(
+                    container(handle)
+                        .width(Length::Fill)
+                        .height(Length::Fixed(sash))
+                        .center_x(Length::Fill)
+                        .center_y(Length::Fill),
+                )
+                .into()
+        }
+    }
+}
+
+fn sash_grip<'a, M: Clone + 'a>(
+    axis: Axis,
+    sash: f32,
+    on_sash: impl Fn(SashEvent) -> M + 'a,
+    tok: Tokens,
+) -> Element<'a, M> {
+    let face = sash_face(axis, sash, tok);
+    let hit = match axis {
+        Axis::Horizontal => Space::new().width(Length::Fixed(sash)).height(Length::Fill),
+        Axis::Vertical => Space::new().height(Length::Fixed(sash)).width(Length::Fill),
+    };
+    let grip = mouse_area(hit)
+        .on_press(on_sash(SashEvent::Press))
+        .interaction(match axis {
+            Axis::Horizontal => iced::mouse::Interaction::ResizingHorizontally,
+            Axis::Vertical => iced::mouse::Interaction::ResizingVertically,
+        });
+    let (w, h) = match axis {
+        Axis::Horizontal => (Length::Fixed(sash), Length::Fill),
+        Axis::Vertical => (Length::Fill, Length::Fixed(sash)),
+    };
+    Stack::new().width(w).height(h).push(face).push(grip).into()
 }
 
 /// Place children on a grid using [`GridCell`] spans (pixel offsets).
@@ -535,6 +640,8 @@ mod tests {
             .unwrap();
         assert!(grip.contains(".on_press(on_sash(SashEvent::Press))"));
         assert!(!grip.contains("on_move"), "grip must not drive sash move");
+        assert!(grip.contains("tok: Tokens"));
+        assert!(grip.contains("Space::new()"));
         let _: Element<'_, ()> = overlay_center(t().into(), t().into());
         let _: Element<'_, ()> = row_box(
             [t().into(), t().into()],
@@ -571,6 +678,7 @@ mod tests {
         let _: Element<'_, ()> = form([(t().into(), t().into())], 8, crate::i18n::Direction::Rtl);
         let _: Element<'_, ()> = stack_child(vec![t().into(), t().into()], 1);
         let _: Element<'_, ()> = stack_child(vec![], 3);
+        let tok = crate::theme::named("dark").tokens;
         let _: Element<'_, ()> = split_view(
             t().into(),
             t().into(),
@@ -578,6 +686,7 @@ mod tests {
             400.0,
             |_| (),
             crate::i18n::Direction::Ltr,
+            tok,
         );
         let _: Element<'_, ()> = split_view(
             t().into(),
@@ -586,6 +695,7 @@ mod tests {
             400.0,
             |_| (),
             crate::i18n::Direction::Rtl,
+            tok,
         );
         let _: Element<'_, ()> = split_view(
             t().into(),
@@ -594,6 +704,7 @@ mod tests {
             400.0,
             |_| (),
             crate::i18n::Direction::Ltr,
+            tok,
         );
         let _: Element<'_, ()> = grid_spanned(
             vec![
@@ -648,8 +759,19 @@ mod tests {
             400.0,
             |_| (),
             crate::i18n::Direction::Ltr,
+            tok,
         );
         paint(&mut sv);
+        let mut sv_h = split_view(
+            t().into(),
+            t().into(),
+            SplitState::new(Axis::Horizontal, 0.3),
+            400.0,
+            |_| (),
+            crate::i18n::Direction::Ltr,
+            tok,
+        );
+        paint(&mut sv_h);
         let mut gs = grid_spanned(vec![], 40.0, 20.0, 4.0);
         paint(&mut gs);
         let mut g = grid(vec![t().into(), t().into(), t().into()], 2, 8);

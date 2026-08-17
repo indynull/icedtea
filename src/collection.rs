@@ -864,6 +864,9 @@ pub struct TreeNode {
     pub expanded: bool,
     pub children: Vec<TreeNode>,
     pub dir: bool,
+    /// Trailing mark. [`crate::widget::tree_view`] paints [`RowSlot::Text`]
+    /// as a badge.
+    pub trailing: RowSlot,
 }
 
 impl TreeNode {
@@ -874,6 +877,7 @@ impl TreeNode {
             expanded: false,
             children: Vec::new(),
             dir: false,
+            trailing: RowSlot::Empty,
         }
     }
 
@@ -884,6 +888,7 @@ impl TreeNode {
             expanded: true,
             children,
             dir: true,
+            trailing: RowSlot::Empty,
         }
     }
 
@@ -895,7 +900,20 @@ impl TreeNode {
             expanded: false,
             children: Vec::new(),
             dir: true,
+            trailing: RowSlot::Empty,
         }
+    }
+
+    pub fn with_trailing(mut self, slot: RowSlot) -> Self {
+        self.trailing = slot;
+        self
+    }
+
+    pub fn find(&self, id: u64) -> Option<&TreeNode> {
+        if self.id == id {
+            return Some(self);
+        }
+        self.children.iter().find_map(|c| c.find(id))
     }
 
     pub fn flatten(&self) -> Vec<(u32, u64, String, bool, bool)> {
@@ -1294,6 +1312,18 @@ mod tests {
         assert!(folder.dir);
         assert!(folder.children.is_empty());
         assert!(!TreeNode::leaf(8, "file").dir);
+        let marked = TreeNode::leaf(2, "lib.rs").with_trailing(RowSlot::Text("rs".into()));
+        assert_eq!(marked.trailing, RowSlot::Text("rs".into()));
+        let root = TreeNode::branch(1, "src", vec![marked]);
+        assert_eq!(
+            root.find(2).map(|n| n.trailing.clone()),
+            Some(RowSlot::Text("rs".into()))
+        );
+        assert_eq!(
+            root.find(1).map(|n| n.trailing.clone()),
+            Some(RowSlot::Empty)
+        );
+        assert!(root.find(99).is_none());
         assert_eq!(page_range(100, 2, 10), 20..30);
         assert_eq!(page_range(5, 9, 10), 5..5);
         assert_eq!(page_count(0, 10), 0);

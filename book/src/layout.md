@@ -40,10 +40,11 @@ assert_eq!(sizes[0], 20.0);
 let _ = Breakpoint::from_width(800.0);
 ```
 
-Split ratios persist through `UiState::set_split`. The sash grip emits
-press; while pressed, `listen_sash` feeds window-space pointer move and
-release into `SashDrag::apply`. `listen_cursor` is the same window
-pointer for a placed context menu.
+Split ratios persist through `UiState::set_split`. `split_view` takes
+`Tokens` and paints the 6 px sash as a hairline plus a short centered
+handle. The sash grip emits press; while pressed, `listen_sash` feeds
+window-space pointer move and release into `SashDrag::apply`.
+`listen_cursor` is the same window pointer for a placed context menu.
 
 `workspace::DockNode` is a nested leaf / split / tab tree with JSON
 save and restore, ratio clamps, and `move_panel` between docks.

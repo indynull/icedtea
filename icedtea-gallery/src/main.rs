@@ -9,8 +9,8 @@ use icedtea::a11y::{A11y, Role};
 use icedtea::action::{Action, ActionTable};
 use icedtea::catalog;
 use icedtea::collection::{
-    Accordion, ListModel, ListRow, Selection, TableModel, Tabs, TreeNode, VecList, VisibleWindow,
-    OVERSCAN,
+    Accordion, ListModel, ListRow, RowSlot, Selection, TableModel, Tabs, TreeNode, VecList,
+    VisibleWindow, OVERSCAN,
 };
 use icedtea::i18n::{Catalog, Direction, Locale};
 use icedtea::iced::widget::text_editor::Content;
@@ -1606,17 +1606,22 @@ impl Gallery {
                         2,
                         "src",
                         vec![
-                            TreeNode::leaf(3, "lib.rs"),
-                            TreeNode::leaf(4, "catalog.rs"),
-                            TreeNode::leaf(5, "widget.rs"),
+                            TreeNode::leaf(3, "lib.rs").with_trailing(RowSlot::Text("rs".into())),
+                            TreeNode::leaf(4, "catalog.rs")
+                                .with_trailing(RowSlot::Text("rs".into())),
+                            TreeNode::leaf(5, "widget.rs")
+                                .with_trailing(RowSlot::Text("rs".into())),
                         ],
-                    ),
+                    )
+                    .with_trailing(RowSlot::Text("3".into())),
                     TreeNode::branch(
                         6,
                         "book",
                         vec![
-                            TreeNode::leaf(7, "install.md"),
-                            TreeNode::leaf(8, "introduction.md"),
+                            TreeNode::leaf(7, "install.md")
+                                .with_trailing(RowSlot::Text("md".into())),
+                            TreeNode::leaf(8, "introduction.md")
+                                .with_trailing(RowSlot::Text("md".into())),
                         ],
                     ),
                     TreeNode::folder(9, "assets"),
@@ -3635,6 +3640,7 @@ impl Gallery {
             self.window_width,
             Message::Sash,
             self.direction,
+            tok,
         );
         let themes = container(self.look_strip(tok))
             .width(Length::Fill)

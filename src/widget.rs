@@ -4496,12 +4496,9 @@ fn ellipsize_line(s: &str, max_chars: usize) -> String {
     format!("{}…", cut.iter().collect::<String>())
 }
 
-fn row_slot_el<'a, M: Clone + 'a>(
+fn row_slot_face<'a, M: Clone + 'a>(
     slot: crate::collection::RowSlot,
-    index: usize,
-    on_check: impl Fn(usize) -> M + Copy + 'a,
     tok: Tokens,
-    disabled: bool,
 ) -> Element<'a, M> {
     match slot {
         crate::collection::RowSlot::Empty => Space::new().width(0).height(16).into(),
@@ -4518,7 +4515,7 @@ fn row_slot_el<'a, M: Clone + 'a>(
         ),
         crate::collection::RowSlot::Check(on) => {
             let s = tok.scheme();
-            let face = container(Space::new().width(10).height(10))
+            container(Space::new().width(10).height(10))
                 .width(16)
                 .height(16)
                 .center_x(16)
@@ -4535,13 +4532,24 @@ fn row_slot_el<'a, M: Clone + 'a>(
                         };
                         st
                     }
-                });
-            if disabled {
-                face.into()
-            } else {
-                mouse_area(face).on_press(on_check(index)).into()
-            }
+                })
+                .into()
         }
+    }
+}
+
+fn row_slot_el<'a, M: Clone + 'a>(
+    slot: crate::collection::RowSlot,
+    index: usize,
+    on_check: impl Fn(usize) -> M + Copy + 'a,
+    tok: Tokens,
+    disabled: bool,
+) -> Element<'a, M> {
+    match slot {
+        crate::collection::RowSlot::Check(_) if !disabled => mouse_area(row_slot_face(slot, tok))
+            .on_press(on_check(index))
+            .into(),
+        _ => row_slot_face(slot, tok),
     }
 }
 
@@ -5550,6 +5558,8 @@ where
 /// The application owns expand state. Leaf rows have no twisty.
 /// `animating` is the branch that is opening or closing and its 0–1
 /// height progress. `None` paints the committed tree.
+/// `TreeNode::trailing` is the same [`crate::collection::RowSlot`] as
+/// `list_view`; [`crate::collection::RowSlot::Text`] is a badge.
 ///
 ///
 /// ```
@@ -5558,7 +5568,8 @@ where
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let tree = TreeNode::leaf(1, "lib.rs");
+/// let tree = TreeNode::leaf(1, "lib.rs")
+///     .with_trailing(icedtea::collection::RowSlot::Text("rs".into()));
 /// #[derive(Clone, Copy)]
 /// enum Msg {
 ///     Toggle(u64),
@@ -5602,6 +5613,10 @@ pub fn tree_view<'a, M: Clone + 'a>(
             col = tree_push_branch(col, std::mem::take(&mut branch), progress, tok);
             wrap_depth = None;
         }
+        let trail = root
+            .find(id)
+            .map(|n| n.trailing.clone())
+            .unwrap_or_default();
         let line = tree_line(
             depth,
             id,
@@ -5611,6 +5626,7 @@ pub fn tree_view<'a, M: Clone + 'a>(
             selected,
             &on_toggle,
             on_select,
+            trail,
             face,
             tok,
             &a11y,
@@ -5669,6 +5685,7 @@ fn tree_line<'a, M: Clone + 'a>(
     selected: Option<u64>,
     on_toggle: &impl Fn(u64) -> M,
     on_select: impl Fn(ItemClick<u64>) -> M + Copy + 'a,
+    trail: crate::collection::RowSlot,
     face: TreeFace,
     tok: Tokens,
     a11y: &A11y,
@@ -5760,6 +5777,9 @@ fn tree_line<'a, M: Clone + 'a>(
         ));
     }
     kids.push(pick);
+    if !matches!(trail, crate::collection::RowSlot::Empty) {
+        kids.push(row_slot_face(trail, tok));
+    }
     let mut line = Row::new()
         .spacing(crate::density::GRID as f32)
         .align_y(Alignment::Center)
@@ -6301,7 +6321,7 @@ pub fn pagination<'a, M: Clone + 'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::collection::{Selection as Sel, TableModel, VecList};
+    use crate::collection::{RowSlot, Selection as Sel, TableModel, VecList};
     use crate::density::Density;
     use crate::theme::named;
 
@@ -9044,6 +9064,55 @@ mod tests {
             A11y::new("tree", Role::Tree),
         );
         draw_once(&mut roomy);
+    }
+
+    #[test]
+    fn tree_view_paints_trailing_row_slot() {
+        let tok = named("dark").tokens;
+        let empty = TreeNode::branch(1, "src", vec![TreeNode::leaf(2, "lib.rs")]);
+        let marked = TreeNode::branch(
+            1,
+            "src",
+            vec![TreeNode::leaf(2, "lib.rs").with_trailing(RowSlot::Text("rs".into()))],
+        );
+        assert_eq!(empty.find(2).map(|n| &n.trailing), Some(&RowSlot::Empty));
+        assert_eq!(
+            marked.find(2).map(|n| n.trailing.clone()),
+            Some(RowSlot::Text("rs".into()))
+        );
+        for face in [TreeFace::Outline, TreeFace::Files] {
+            let mut bare: Element<'_, ()> = tree_view(
+                &empty,
+                None,
+                None,
+                |_| (),
+                |_| (),
+                face,
+                tok,
+                A11y::new("tree", Role::Tree),
+            );
+            draw_once(&mut bare);
+            let mut badged: Element<'_, ()> = tree_view(
+                &marked,
+                Some(2),
+                None,
+                |_| (),
+                |_| (),
+                face,
+                tok,
+                A11y::new("tree", Role::Tree),
+            );
+            draw_once(&mut badged);
+        }
+        let line_src = include_str!("widget.rs")
+            .split("fn tree_line")
+            .nth(1)
+            .unwrap()
+            .split("fn tree_push_branch")
+            .next()
+            .unwrap();
+        assert!(line_src.contains("RowSlot::Empty"));
+        assert!(line_src.contains("row_slot_face"));
     }
 
     #[test]
