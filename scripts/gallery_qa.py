@@ -502,8 +502,8 @@ DEFAULT_INTERACT: list[dict[str, str]] = [
     {
         "match": "list:",
         "name": "list-select",
-        "script": "list 2\nface card\n",
-        "expect": "third list row selected; card face",
+        "script": "list 1\nface card\n",
+        "expect": "second list row selected; card face",
     },
     {
         "match": "list:",
