@@ -46,6 +46,8 @@ pub enum Component {
     /// Filled / tonal / text buttons, chips.
     Button,
     Chip,
+    /// Count or status mark (M3 Badge).
+    Badge,
     /// Text fields, pickers, checkbox container.
     Field,
     Checkbox,
@@ -75,11 +77,11 @@ pub enum ShapePolicy {
     Tight,
     /// Medium (12 dp) on every family.
     Soft,
-    /// Full pill on buttons and chips. Cards, menus, fields, dialogs,
-    /// and chrome rows stay boxes (medium or flush).
+    /// Full pill on buttons, chips, and badges. Cards, menus, fields,
+    /// dialogs, and chrome rows stay boxes (medium or flush).
     Pill,
-    /// Documented Material map (buttons extra-small, cards medium,
-    /// dialogs extra-large, app bars flush).
+    /// Documented Material map (buttons extra-small, chips and badges
+    /// small, cards medium, dialogs extra-large, app bars flush).
     Material,
 }
 
@@ -102,7 +104,7 @@ impl Component {
 
     fn pill_shape(self) -> Shape {
         match self {
-            Self::Button | Self::Chip => Shape::Full,
+            Self::Button | Self::Chip | Self::Badge => Shape::Full,
             Self::AppBar | Self::Shell | Self::Tab => Shape::None,
             Self::Field | Self::Checkbox | Self::Card | Self::Menu | Self::Dialog => Shape::Medium,
         }
@@ -111,7 +113,7 @@ impl Component {
     fn material_shape(self) -> Shape {
         match self {
             Self::Button | Self::Field | Self::Checkbox | Self::Menu => Shape::ExtraSmall,
-            Self::Chip => Shape::Small,
+            Self::Chip | Self::Badge => Shape::Small,
             Self::Card => Shape::Medium,
             Self::Dialog => Shape::ExtraLarge,
             Self::AppBar | Self::Shell | Self::Tab => Shape::None,
@@ -181,6 +183,7 @@ mod tests {
         for c in [
             Component::Button,
             Component::Chip,
+            Component::Badge,
             Component::Field,
             Component::Checkbox,
             Component::Card,
@@ -199,6 +202,7 @@ mod tests {
         }
         assert_eq!(Component::Button.shape_for(ShapePolicy::Pill), Shape::Full);
         assert_eq!(Component::Chip.shape_for(ShapePolicy::Pill), Shape::Full);
+        assert_eq!(Component::Badge.shape_for(ShapePolicy::Pill), Shape::Full);
         assert_eq!(Component::Card.shape_for(ShapePolicy::Pill), Shape::Medium);
         assert_eq!(Component::Menu.shape_for(ShapePolicy::Pill), Shape::Medium);
         assert_eq!(
@@ -219,6 +223,10 @@ mod tests {
         );
         assert_eq!(
             Component::Chip.shape_for(ShapePolicy::Material),
+            Shape::Small
+        );
+        assert_eq!(
+            Component::Badge.shape_for(ShapePolicy::Material),
             Shape::Small
         );
         assert_eq!(

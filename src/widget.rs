@@ -3908,8 +3908,9 @@ pub fn filter_chips<'a, M: Clone + 'a>(
 
 /// A count or status mark.
 ///
-/// Short text. Empty string is an empty pill.
+/// Short text. Empty string is an empty mark.
 /// Both sizes use meta type; Large is not body reading type.
+/// Corners follow [`Tokens::shape`] ([`crate::m3::shape::Component::Badge`]).
 ///
 ///
 /// ```
@@ -3937,7 +3938,8 @@ pub fn badge<'a, M: 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let title = a11y.apply_name(title);
-    let (wash, ink, _) = chip_face(tok, variant);
+    let (wash, ink, mut border) = chip_face(tok, variant);
+    border.radius = tok.radius(crate::m3::shape::Component::Badge);
     let pad = match size {
         BadgeSize::Small => [2, 5],
         BadgeSize::Large => [4, 8],
@@ -3945,7 +3947,11 @@ pub fn badge<'a, M: 'a>(
     let type_size = tok.meta();
     let mark: Element<'a, M> = container(text(title).size(type_size).color(ink))
         .padding(pad)
-        .style(move |_| style::fill(wash, ink))
+        .style(move |_| {
+            let mut st = style::fill(wash, ink);
+            st.border = border;
+            st
+        })
         .into();
     let body = if let Some(child) = host {
         Stack::new()
@@ -6460,6 +6466,33 @@ mod tests {
             Variant::Primary,
             BadgeSize::Small,
             A11y::new("2", Role::Status),
+        );
+    }
+
+    #[test]
+    fn badge_corners_follow_shape_policy() {
+        let desktop = named("dark").tokens;
+        assert_eq!(
+            desktop.radius(crate::m3::shape::Component::Badge).top_left,
+            0.0
+        );
+        let pill = desktop.with_shape(crate::m3::ShapePolicy::Pill);
+        assert_eq!(
+            pill.radius(crate::m3::shape::Component::Badge).top_left,
+            crate::m3::Shape::Full.dp()
+        );
+        let material = desktop.with_shape(crate::m3::ShapePolicy::Material);
+        assert_eq!(
+            material.radius(crate::m3::shape::Component::Badge).top_left,
+            crate::m3::Shape::Small.dp()
+        );
+        let _: Element<'_, ()> = badge(
+            "9",
+            None,
+            pill,
+            Variant::Primary,
+            BadgeSize::Large,
+            A11y::new("9", Role::Status),
         );
     }
 

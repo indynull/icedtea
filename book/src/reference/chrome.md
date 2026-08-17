@@ -116,8 +116,9 @@ Constructor: [`widget::badge`](https://docs.rs/icedtea/latest/icedtea/widget/fn.
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-`BadgeSize` is small or large. Both use meta type. Pass a host element
-to overlap the mark on an icon. Empty string is an empty pill.
+`BadgeSize` is small or large. Both use meta type. Corners follow
+`Tokens.shape`. Pass a host element to overlap the mark on an icon.
+Empty string is an empty mark.
 
 Pass `A11y`.
 

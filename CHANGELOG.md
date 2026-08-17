@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Bug fix
+
+- `badge` uses `Component::Badge` so Tight, Soft, Pill, and Material
+  corners apply.
+
 ## 0.10.0 — 2026-08-16
 
 ### Feature
