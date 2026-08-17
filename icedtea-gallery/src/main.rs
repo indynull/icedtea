@@ -155,6 +155,7 @@ fn expand_notes_body<'a>(tok: Tokens, cat: &'a Catalog) -> Element<'a, Message> 
         widget::label(cat.t("expand.7"), tok, named("exp-7", Role::Status),),
     ]
     .spacing(8)
+    .align_x(icedtea::i18n::align_start(tok.direction))
     .into()
 }
 
@@ -5477,7 +5478,26 @@ impl Gallery {
                     BadgeSize::Small,
                     named("3", Role::Status),
                 )),
-                expand_notes_body(tok, &self.catalog),
+                column![
+                    widget::label(
+                        self.catalog.t("expand.1"),
+                        tok,
+                        named("exp-1", Role::Status),
+                    ),
+                    widget::label(
+                        self.catalog.t("expand.2"),
+                        tok,
+                        named("exp-2", Role::Status),
+                    ),
+                    widget::label(
+                        self.catalog.t("expand.3"),
+                        tok,
+                        named("exp-3", Role::Status),
+                    ),
+                ]
+                .spacing(8)
+                .align_x(icedtea::i18n::align_start(tok.direction))
+                .into(),
                 widget::Peek::Lines(2),
                 self.expander_open,
                 Self::anim_progress(&self.expand_anim),

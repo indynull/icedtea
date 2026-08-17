@@ -29,6 +29,8 @@
   the pane. Keyboard still reaches the child.
 - `themed_checkbox` with an empty label is the box only (shrink
   width).
+- `accordion_view` start-aligns the open body so right-to-left
+  copy sits on the start edge.
 
 ## 0.10.0 — 2026-08-16
 

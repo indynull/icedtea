@@ -478,8 +478,8 @@ DEFAULT_INTERACT: list[dict[str, str]] = [
     {
         "match": "controls:",
         "name": "controls-toggles",
-        "script": "check true\nswitch true\nsounds true\nradio 1\nslide 0.75\nsegment 1\nrange 15 90\ngroup 1\n",
-        "expect": "Outlined and Elevated faces; icon-plus-label; toggle-icon; vertical slider; Accept and Sounds on",
+        "script": "check true\nswitch true\nradio 1\nslide 0.75\nsegment 1\nrange 15 90\ngroup 1\n",
+        "expect": "Outlined and Elevated faces; icon-plus-label; toggle-icon; vertical slider; Accept and Notify on",
     },
     {
         "match": "fields:",

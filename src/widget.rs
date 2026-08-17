@@ -6103,6 +6103,7 @@ pub fn accordion_view<'a, M: Clone + 'a>(
             let pane = container(body)
                 .width(Length::Fill)
                 .padding(inset(tok))
+                .align_x(crate::i18n::align_start(tok.direction))
                 .style(move |_| style::panel(tok));
             col = col.push(crate::motion::expand(
                 pane.into(),
@@ -11688,6 +11689,14 @@ mod tests {
             ),
         );
         assert!((open_size.width - 300.0).abs() < 1.0);
+        let acc = include_str!("widget.rs")
+            .split("pub fn accordion_view")
+            .nth(1)
+            .unwrap()
+            .split("pub fn expander")
+            .next()
+            .unwrap();
+        assert!(acc.contains("align_x(crate::i18n::align_start(tok.direction))"));
     }
 
     fn pump_wheel<M: Clone>(el: &mut Element<'_, M>, delta: iced::mouse::ScrollDelta) -> Vec<M> {
