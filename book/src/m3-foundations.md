@@ -44,10 +44,11 @@ on `Tokens` picks the map:
 - **Desktop** — every family is shape **None** (0 dp). This is the default.
 - **Tight / Soft** — one corner (4 / 12 dp) on every family.
 - **Pill** — buttons, chips, and badges are full; cards, menus, fields,
-  dialogs, toasts, and tooltips stay boxes (12 dp); app bars stay flush.
+  dialogs, toasts, and tooltips stay boxes (12 dp); banners and app bars
+  stay flush.
 - **Material** — buttons extra-small, chips and badges small (8 dp),
   toasts and tooltips extra-small (4 dp), cards medium, dialogs
-  extra-large, app bars flush.
+  extra-large, banners and app bars flush.
 
 Switch thumbs stay circular via geometry, not container radius.
 `m3::Elevation` uses tonal surface containers plus optional shadow.

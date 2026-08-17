@@ -4013,6 +4013,7 @@ pub fn group_box<'a, M: 'a>(
 /// A page-level message with an optional action.
 ///
 /// Use for “offline” or “update available”. Optional button message.
+/// Corners follow [`Tokens::shape`] ([`crate::m3::shape::Component::Banner`]).
 ///
 ///
 /// ```
@@ -4052,7 +4053,7 @@ pub fn banner<'a, M: Clone + 'a>(
         container(r)
             .width(Length::Fill)
             .padding(inset(tok))
-            .style(move |_| style::callout(tok, ToastKind::Info))
+            .style(move |_| style::banner(tok))
             .into(),
         &a11y,
     )
@@ -6517,6 +6518,19 @@ mod tests {
             TooltipAnchor::Follow,
             tok,
             A11y::new("Tip", Role::Tooltip),
+        );
+    }
+
+    #[test]
+    fn banner_constructor_reads_banner_family() {
+        let tok = named("dark")
+            .tokens
+            .with_shape(crate::m3::ShapePolicy::Material);
+        let _: Element<'_, ()> = banner(
+            "Update available",
+            Some(("Install".into(), ())),
+            tok,
+            A11y::new("Update available", Role::Status),
         );
     }
 

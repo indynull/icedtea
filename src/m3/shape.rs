@@ -60,6 +60,8 @@ pub enum Component {
     Toast,
     /// Hover tip.
     Tooltip,
+    /// Page-level message (M3 banner). Flush under Material and Pill.
+    Banner,
     /// App bar / shell / tab strip (flush).
     AppBar,
     Shell,
@@ -82,7 +84,8 @@ pub enum ShapePolicy {
     /// Medium (12 dp) on every family.
     Soft,
     /// Full pill on buttons, chips, and badges. Cards, menus, fields,
-    /// dialogs, toasts, and tooltips stay boxes (medium or flush).
+    /// dialogs, toasts, and tooltips stay boxes. Banners and app bars
+    /// stay flush.
     Pill,
     /// Documented Material map (buttons extra-small, chips and badges
     /// small, cards medium, toasts and tooltips extra-small, dialogs
@@ -110,7 +113,7 @@ impl Component {
     fn pill_shape(self) -> Shape {
         match self {
             Self::Button | Self::Chip | Self::Badge => Shape::Full,
-            Self::AppBar | Self::Shell | Self::Tab => Shape::None,
+            Self::AppBar | Self::Shell | Self::Tab | Self::Banner => Shape::None,
             Self::Field
             | Self::Checkbox
             | Self::Card
@@ -132,7 +135,7 @@ impl Component {
             Self::Chip | Self::Badge => Shape::Small,
             Self::Card => Shape::Medium,
             Self::Dialog => Shape::ExtraLarge,
-            Self::AppBar | Self::Shell | Self::Tab => Shape::None,
+            Self::AppBar | Self::Shell | Self::Tab | Self::Banner => Shape::None,
         }
     }
 
@@ -207,6 +210,7 @@ mod tests {
             Component::Dialog,
             Component::Toast,
             Component::Tooltip,
+            Component::Banner,
             Component::AppBar,
             Component::Shell,
             Component::Tab,
@@ -240,6 +244,7 @@ mod tests {
         assert_eq!(Component::AppBar.shape_for(ShapePolicy::Pill), Shape::None);
         assert_eq!(Component::Shell.shape_for(ShapePolicy::Pill), Shape::None);
         assert_eq!(Component::Tab.shape_for(ShapePolicy::Pill), Shape::None);
+        assert_eq!(Component::Banner.shape_for(ShapePolicy::Pill), Shape::None);
         assert_eq!(
             Component::Button.shape_for(ShapePolicy::Material),
             Shape::ExtraSmall
@@ -289,6 +294,10 @@ mod tests {
             Shape::None
         );
         assert_eq!(Component::Tab.shape_for(ShapePolicy::Material), Shape::None);
+        assert_eq!(
+            Component::Banner.shape_for(ShapePolicy::Material),
+            Shape::None
+        );
         assert_eq!(
             Component::Field.radius_for(ShapePolicy::Tight).top_left,
             4.0

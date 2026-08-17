@@ -209,6 +209,13 @@ pub fn table_cell(tok: Tokens, selected: bool, focused: bool, zebra: bool) -> co
     st
 }
 
+/// Page banner: callout wash, banner family corners (flush under Material).
+pub fn banner(tok: Tokens) -> container::Style {
+    let mut st = callout(tok, crate::toast::ToastKind::Info);
+    st.border.radius = component_radius(tok, Component::Banner);
+    st
+}
+
 /// Hover tip (M3 tooltip): raised card fill, tooltip family corners.
 pub fn tooltip(tok: Tokens) -> container::Style {
     let mut st = raised_card(tok);
@@ -1034,6 +1041,20 @@ mod tests {
     }
 
     #[test]
+    fn banner_corners_stay_flush_under_material_and_pill() {
+        let tok = named("dark").tokens;
+        assert_eq!(banner(tok).border.radius.top_left, 0.0);
+        let material = tok.with_shape(crate::m3::ShapePolicy::Material);
+        assert_eq!(banner(material).border.radius.top_left, 0.0);
+        let pill = tok.with_shape(crate::m3::ShapePolicy::Pill);
+        assert_eq!(banner(pill).border.radius.top_left, 0.0);
+        assert_ne!(
+            crate::m3::shape::Component::Banner.shape_for(crate::m3::ShapePolicy::Pill),
+            crate::m3::shape::Component::Card.shape_for(crate::m3::ShapePolicy::Pill)
+        );
+    }
+
+    #[test]
     fn switch_on_thumb_uses_scheme_on_primary() {
         let tok = named("gruvbox").tokens;
         let s = tok.scheme();
@@ -1100,6 +1121,7 @@ mod tests {
             let _ = callout(tok, k);
         }
         let _ = tooltip(tok);
+        let _ = banner(tok);
         let _ = skeleton(tok);
         for v in Variant::ALL {
             let f = button_style(tok, v);

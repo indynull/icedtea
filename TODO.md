@@ -4,7 +4,6 @@
 
 ## Bugs
 
-- `banner` uses Card corners. M3 banner is flush (0 dp).
 - Search uses Field. M3 search is extra-large or full.
 - Switch track, slider rail, and progress use Button. M3 those tracks
   are Full.

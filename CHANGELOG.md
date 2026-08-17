@@ -8,6 +8,7 @@
   corners apply.
 - `toast` and tooltip use `Component::Toast` and `Component::Tooltip`
   (Material extra-small).
+- `banner` uses `Component::Banner` (flush under Material and Pill).
 
 ## 0.10.0 — 2026-08-16
 
