@@ -5,7 +5,9 @@ map onto Material Design 3 roles (`Tokens::scheme()` for the full
 set). See [Material Design 3 foundations](./m3-foundations.md).
 
 Aliases: `canvas`/`surface`/`panel`/`text`/`muted`/`primary`/
-`accent`/`danger`/`border`/`selection`. Colorways sync containers from
+`accent`/`danger`/`border`/`selection`.
+[`Tokens::from_aliases`](https://docs.rs/icedtea/latest/icedtea/theme/struct.Tokens.html#method.from_aliases)
+builds a scheme from those fields. Colorways sync containers from
 those aliases and recompute solid-fill `on_*` roles for contrast.
 Washes use scheme state layers (`hover_fill` / `pressed_fill`). Desktop
 control corners are M3 shape **None** unless

@@ -122,6 +122,70 @@ impl Tokens {
         self.full
     }
 
+    /// Build tokens from the short color aliases.
+    ///
+    /// Selection wash is primary mixed onto canvas. Density, shape,
+    /// elevation, and direction stay at the desktop defaults; chain
+    /// [`Self::with_density`] and the other setters.
+    ///
+    /// ```
+    /// use icedtea::iced::Color;
+    /// let tok = icedtea::theme::Tokens::from_aliases(
+    ///     Color::from_rgb8(0x1e, 0x1e, 0x2e),
+    ///     Color::from_rgb8(0x31, 0x32, 0x44),
+    ///     Color::from_rgb8(0x18, 0x18, 0x25),
+    ///     Color::from_rgb8(0xcd, 0xd6, 0xf4),
+    ///     Color::from_rgb8(0xa6, 0xad, 0xc8),
+    ///     Color::from_rgb8(0x89, 0xb4, 0xfa),
+    ///     Color::from_rgb8(0xf5, 0xc2, 0xe7),
+    ///     Color::from_rgb8(0xa6, 0xe3, 0xa1),
+    ///     Color::from_rgb8(0xf9, 0xe2, 0xaf),
+    ///     Color::from_rgb8(0xf3, 0x8b, 0xa8),
+    ///     Color::from_rgb8(0x45, 0x47, 0x5a),
+    /// );
+    /// assert_eq!(tok.scheme().primary, tok.primary);
+    /// assert_eq!(tok.scheme().surface, tok.canvas);
+    /// ```
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_aliases(
+        canvas: Color,
+        surface: Color,
+        panel: Color,
+        text: Color,
+        muted: Color,
+        primary: Color,
+        accent: Color,
+        success: Color,
+        warning: Color,
+        danger: Color,
+        border: Color,
+    ) -> Self {
+        let selection = mix(primary, canvas, 0.28);
+        Self {
+            canvas,
+            surface,
+            panel,
+            text,
+            muted,
+            primary,
+            accent,
+            success,
+            warning,
+            danger,
+            border,
+            selection,
+            selection_text: text,
+            density: crate::m3::Density::default(),
+            reduced_motion: false,
+            font_scale: 1.0,
+            shape: crate::m3::ShapePolicy::Desktop,
+            elevation: crate::m3::ElevationPolicy::Desktop,
+            direction: crate::i18n::Direction::Ltr,
+            full: crate::m3::scheme_dark(),
+        }
+        .sync_full_from_aliases()
+    }
+
     /// Same tokens with a different density (pad and control height).
     pub fn with_density(mut self, density: crate::m3::Density) -> Self {
         self.density = density;
@@ -1075,6 +1139,32 @@ mod tests {
         assert_eq!(light.canvas, rgb(0xF3, 0xF3, 0xF3));
         assert_ne!(dark.primary, crate::m3::scheme_dark().primary);
         assert_ne!(light.primary, crate::m3::scheme_light().primary);
+    }
+
+    #[test]
+    fn from_aliases_scheme_matches_the_passed_colors() {
+        let canvas = rgb(0x1e, 0x1e, 0x2e);
+        let primary = rgb(0x89, 0xb4, 0xfa);
+        let tok = Tokens::from_aliases(
+            canvas,
+            rgb(0x31, 0x32, 0x44),
+            rgb(0x18, 0x18, 0x25),
+            rgb(0xcd, 0xd6, 0xf4),
+            rgb(0xa6, 0xad, 0xc8),
+            primary,
+            rgb(0xf5, 0xc2, 0xe7),
+            rgb(0xa6, 0xe3, 0xa1),
+            rgb(0xf9, 0xe2, 0xaf),
+            rgb(0xf3, 0x8b, 0xa8),
+            rgb(0x45, 0x47, 0x5a),
+        );
+        assert_eq!(tok.canvas, canvas);
+        assert_eq!(tok.primary, primary);
+        assert_eq!(tok.scheme().surface, canvas);
+        assert_eq!(tok.scheme().primary, primary);
+        assert_ne!(tok.scheme().primary, named("dark").tokens.primary);
+        assert_ne!(tok.scheme().primary, crate::m3::scheme_dark().primary);
+        let _ = crate::style::button_style(tok, crate::variant::Variant::Primary);
     }
 
     #[test]
