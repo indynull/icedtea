@@ -211,7 +211,7 @@ impl Prepared {
 
     /// Open a window with these settings. Used from [`crate::daemon!`].
     ///
-    /// The process stays up when the window closes. Map the [`Task`]
+    /// The process stays up when the window closes. Map the [`iced::Task`]
     /// to store the id, then [`iced::window::close`] to hide.
     ///
     /// ```

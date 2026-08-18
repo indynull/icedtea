@@ -1,7 +1,7 @@
 //! Application chrome: menu, toolbar, list/detail, prefs, about, palette.
 //!
-//! Pass an [`ActionTable`](crate::action::ActionTable) and tokens.
-//! Children are icedtea widgets (they already carry [`A11y`](crate::a11y::A11y)).
+//! Pass an [`ActionTable`] and tokens.
+//! Children are icedtea widgets (they already carry [`A11y`]).
 //!
 //! ```
 //! use icedtea::action::{Action, ActionTable};

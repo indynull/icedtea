@@ -2,7 +2,7 @@
 //!
 //! `dock`, `split_view`, `clamp`, `form`, and `pad` return iced
 //! [`Element`](crate::Element)s. Split sash: the grip emits
-//! [`SashEvent::Press`](split::SashEvent::Press) only; move and
+//! [`SashEvent::Press`] only; move and
 //! release come from [`listen_sash`]. The sash paints a hairline and a
 //! short handle from `Tokens`. Scroll with
 //! [`crate::widget::themed_scroll`], not a raw iced scroller.

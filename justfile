@@ -20,7 +20,11 @@ test:
     cargo test --workspace --all-features
 
 doc:
-    cargo doc --package icedtea --no-deps --document-private-items
+    RUSTDOCFLAGS="-D warnings" cargo doc --package icedtea --no-deps --document-private-items
+
+# Advisories, yanked crates, licenses, crates.io-only sources.
+deny:
+    cargo deny check
 
 # Isolated coverage tree. Incremental off only here so rustc flags do not
 # poison target/debug. Delete the tree after a passing local report.

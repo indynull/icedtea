@@ -31,7 +31,7 @@ use crate::theme::Tokens;
 /// Keep selection, click, drag, and scroll. Typing, paste, and delete
 /// become a zero scroll so `Content::perform` does not change the text.
 ///
-/// iced's editor emits [`Action::Click`] on the left button only. A
+/// iced's editor emits [`iced::widget::text_editor::Action::Click`] on the left button only. A
 /// right press is [`crate::layout::listen_cursor`] `Context` and never
 /// reaches this function. Dropping `Click` here would stop a left
 /// press from clearing the range.
@@ -75,7 +75,7 @@ fn ceil_char_boundary(s: &str, i: usize) -> usize {
 
 /// Paint settings for [`crate::widget::markdown_view`].
 ///
-/// Body, code, and headings use [`typo`] steps times [`Tokens::font_scale`].
+/// Body, code, and headings use [`crate::typo`] steps times [`Tokens::font_scale`].
 pub(crate) fn markdown_paint_settings(style: markdown::Style, tok: Tokens) -> Settings {
     let body = tok.body();
     Settings {
@@ -469,7 +469,7 @@ pub fn markdown_item_range(
 }
 
 /// Byte range of `fragment` inside `item`, using the same flatten as
-/// [`markdown_item_plain`].
+/// full-item plain text.
 pub fn markdown_fragment_range(item: &Item, fragment: &Text) -> Option<(usize, usize)> {
     let mut at = 0usize;
     find_fragment(std::slice::from_ref(item), fragment, &mut at, 0)

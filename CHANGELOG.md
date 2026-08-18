@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Chore
+
+- rustdoc fails the build on warnings.
+- `cargo deny` checks advisories, yanked crates, and licenses.
+
 ## 0.11.0 — 2026-08-17
 
 ### Feature

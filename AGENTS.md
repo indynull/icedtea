@@ -16,6 +16,7 @@ rules file.
 
 ```bash
 just lint           # format check + clippy -D warnings
+just deny           # cargo deny (advisories, licenses, sources)
 just check          # lint, test, docs, coverage
 just clean          # cargo clean (debug, release, coverage trees)
 cargo run -p icedtea-gallery
@@ -33,7 +34,7 @@ just book-stills    # recapture book/src/images/ constructor stills
 | `book/` | Guide (mdBook). Published from `master` to GitHub Pages |
 | `TODO.md` | Remaining work |
 | `assets/icons/` | Chrome SVGs |
-| `.github/workflows/ci.yml` | Linux lint and docs; tests with coverage on Linux, macOS, Windows |
+| `.github/workflows/ci.yml` | Linux lint, docs, and cargo-deny; tests with coverage on Linux, macOS, Windows |
 | `.github/workflows/publish.yml` | Tag `vX.Y.Z` publishes `icedtea` to crates.io and opens a GitHub release from that version's changelog |
 | `.github/workflows/book.yml` | `mdbook build`; deploys the guide on `master` |
 
@@ -264,7 +265,7 @@ lines the other hosts cover). Local `just cov` still runs
 Codecov check to 100. Local `just test` / `just clippy` / `just doc`
 keep the debug incremental graph. `just clean` is `cargo clean`.
 Recipes: `just lint`, `just fmt-check`, `just clippy`, `just test`,
-`just doc`, `just cov`.
+`just doc`, `just deny`, `just cov`.
 
 **Agent verification (default: targeted, not full `just check`)**
 

@@ -5077,7 +5077,7 @@ impl<'a, Message: 'a> From<CapturePress<'a, Message>> for Element<'a, Message> {
 /// `empty` is the copy when `model` has no rows. `meta_color` paints
 /// the second line. `scroll` is the only offset: the rail and the
 /// wheel write it. Uniform rows sit at `i * row_h - scroll`. Variable
-/// rows use [`RowHeights::PerRow`] and [`visible_window_var`].
+/// rows use [`RowHeights::PerRow`] and [`crate::collection::visible_window_var`].
 /// `face` is [`RowFace::Flush`] (clipped line) or [`RowFace::Card`]
 /// (wrapped title, 2px gap, optional meter). `scroll_id` names the
 /// clip pane. The 24px rail sits beside it. `ListModel::indent` insets

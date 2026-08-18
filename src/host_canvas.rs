@@ -6,7 +6,7 @@ use iced::{Color, Point, Radians, Rectangle, Renderer, Theme};
 
 use crate::widget::ring_should_stroke;
 
-/// Arc + track drawn by [`iced::widget::canvas`].
+/// Arc + track drawn by [`iced::widget::canvas()`].
 #[derive(Clone, Copy)]
 pub(crate) struct ArcRing {
     pub start: f32,
