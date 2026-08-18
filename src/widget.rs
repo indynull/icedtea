@@ -9552,11 +9552,7 @@ mod tests {
             let kids: Vec<_> = layout.children().collect();
             // Files leaf with a trailing slot: indent, twisty, icon, title, badge.
             if kids.len() == 5 {
-                let title = kids[3].bounds();
-                let badge = kids[4].bounds();
-                if title.width > badge.width && badge.width > 8.0 {
-                    out.push((title, badge));
-                }
+                out.push((kids[3].bounds(), kids[4].bounds()));
             }
             for kid in kids {
                 title_and_badge(kid, out);
@@ -9566,10 +9562,7 @@ mod tests {
         title_and_badge(layout, &mut pairs);
         assert_eq!(pairs.len(), 1, "expected the Files leaf title and badge");
         let (title, badge) = pairs[0];
-        assert!(
-            title.x + title.width <= badge.x + 0.5 || badge.x + badge.width <= title.x + 0.5,
-            "title and badge must not overlap, title={title:?} badge={badge:?}"
-        );
+        assert!(title.x + title.width <= badge.x + 0.5);
     }
 
     #[test]
@@ -12212,15 +12205,8 @@ mod tests {
             }
         }
         walk_h(layout, &mut heights);
-        assert!(
-            heights.iter().any(|h| *h <= cap),
-            "item_grid tiles must hug control height, got {heights:?} cap={cap}"
-        );
-        assert!(
-            node.size().height <= cap + 8.0,
-            "item_grid must not Fill a tall parent, height={}",
-            node.size().height
-        );
+        assert!(heights.iter().any(|h| *h <= cap));
+        assert!(node.size().height <= cap + 8.0);
     }
 
     #[test]
