@@ -9161,27 +9161,27 @@ mod tests {
         let limits = Limits::new(Size::ZERO, Size::new(240.0, 200.0));
         let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
         let layout = Layout::new(&node);
-        let mut boxes = Vec::new();
-        walk_bounds(layout, &mut boxes);
-        let badges: Vec<_> = boxes
-            .iter()
-            .filter(|b| b.width > 12.0 && b.width < 40.0 && b.height > 10.0 && b.height < 28.0)
-            .copied()
-            .collect();
+        fn title_and_badge(layout: Layout<'_>, out: &mut Vec<(iced::Rectangle, iced::Rectangle)>) {
+            let kids: Vec<_> = layout.children().collect();
+            // Files leaf with a trailing slot: indent, twisty, icon, title, badge.
+            if kids.len() == 5 {
+                let title = kids[3].bounds();
+                let badge = kids[4].bounds();
+                if title.width > badge.width && badge.width > 8.0 {
+                    out.push((title, badge));
+                }
+            }
+            for kid in kids {
+                title_and_badge(kid, out);
+            }
+        }
+        let mut pairs = Vec::new();
+        title_and_badge(layout, &mut pairs);
+        assert_eq!(pairs.len(), 1, "expected the Files leaf title and badge");
+        let (title, badge) = pairs[0];
         assert!(
-            !badges.is_empty(),
-            "expected a compact trailing badge, boxes={boxes:?}"
-        );
-        let titles: Vec<_> = boxes
-            .iter()
-            .filter(|b| b.width > 60.0 && b.height > 10.0 && b.height < 36.0)
-            .copied()
-            .collect();
-        assert!(
-            titles.iter().any(|t| badges.iter().all(|badge| {
-                t.x + t.width <= badge.x + 0.5 || badge.x + badge.width <= t.x + 0.5
-            })),
-            "title and badge must not overlap, titles={titles:?} badges={badges:?}"
+            title.x + title.width <= badge.x + 0.5 || badge.x + badge.width <= title.x + 0.5,
+            "title and badge must not overlap, title={title:?} badge={badge:?}"
         );
     }
 
