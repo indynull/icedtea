@@ -1097,6 +1097,8 @@ fn parse_inject_line(line: &str) -> Option<Message> {
         "sort" => Some(Message::Sort(parts.next()?.parse().ok()?)),
         "group" => Some(Message::GroupPress(parts.next()?.parse().ok()?)),
         "query" => Some(Message::Query(parts.next()?.to_string())),
+        "icon-query" | "icon_query" => Some(Message::IconQuery(parts.next()?.to_string())),
+        "copy-icon" | "copy_icon" => Some(Message::CopyIcon(parts.next()?.to_string())),
         "search-go" | "search_go" => Some(Message::SearchGo),
         "code-wrap" | "code_wrap" => Some(Message::CodeWrap(parts.next()? == "true")),
         "pick" => Some(Message::SearchPick(parts.next()?.parse().ok()?)),
@@ -1169,6 +1171,8 @@ enum Message {
     Select(&'static str),
     Theme(String),
     Query(String),
+    IconQuery(String),
+    CopyIcon(String),
     PrefsQuery(String),
     Name(String),
     Toggle(bool),
@@ -1382,6 +1386,7 @@ struct Gallery {
     /// (unread, flagged) parallel to `list_all`.
     list_flags: Vec<(bool, bool)>,
     list_filter: String,
+    icon_query: String,
     list_bucket: ListBucket,
     /// Rows matching the current filter (all pages).
     list_matched: usize,
@@ -1636,6 +1641,7 @@ impl Gallery {
             },
             list_flags: (0..1_000).map(sample_mail_flags).collect(),
             list_filter: String::new(),
+            icon_query: String::new(),
             list_bucket: ListBucket::All,
             list_matched: 1_000,
             list: VecList {
@@ -3281,6 +3287,11 @@ impl Gallery {
                 self.refresh_list_view();
             }
             Message::TreeFace(face) => self.tree_face = face,
+            Message::IconQuery(q) => self.icon_query = q,
+            Message::CopyIcon(slug) => {
+                self.note = format!("{} · {slug}", self.catalog.t("note.copied"));
+                return icedtea::copy_text(slug);
+            }
             Message::ListFilter(q) => {
                 self.list_filter = q;
                 self.list_page = 0;
@@ -4967,55 +4978,87 @@ impl Gallery {
                 .into()
             }
             "icon" => {
-                let mut row_icons = row![].spacing(16);
-                for (name, icon) in [
-                    ("search", icedtea::icon::Icon::Search),
-                    ("menu", icedtea::icon::Icon::Menu),
-                    ("back", icedtea::icon::Icon::Back),
-                    ("close", icedtea::icon::Icon::Close),
-                    ("check", icedtea::icon::Icon::Check),
-                    ("warning", icedtea::icon::Icon::Warning),
-                    ("chevron", icedtea::icon::Icon::Chevron),
-                ] {
-                    row_icons = row_icons.push(
-                        column![
-                            widget::icon_svg(icon, tok, named(name, Role::Image)),
-                            widget::meta(name, tok, named(name, Role::Status)),
-                        ]
-                        .spacing(4)
-                        .align_x(icedtea::iced::Alignment::Center),
-                    );
-                }
-                const APP_MARK: &[u8] = br##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="#000"><path d="M8 1 15 8 8 15 1 8z"/></svg>"##;
-                row_icons = row_icons.push(
-                    column![
-                        widget::icon_svg(
-                            icedtea::icon::Glyph::Bytes(APP_MARK),
-                            tok,
-                            named("app", Role::Image),
-                        ),
-                        widget::meta("app", tok, named("app-cap", Role::Status)),
+                const TILE: f32 = 88.0;
+                const COLS: usize = 5;
+                const ROWS: usize = 4;
+                let gap = tok.density.gap();
+                let pad = tok.density.sheet();
+                let inner = COLS as f32 * TILE + (COLS - 1) as f32 * gap;
+                let grid_h = ROWS as f32 * TILE + (ROWS - 1) as f32 * gap;
+                let scroll_w = inner + icedtea::chrome::SCROLL_RAIL_WIDTH + gap;
+                let pane = scroll_w + pad * 2.0;
+                let q = self.icon_query.to_ascii_lowercase();
+                let cell = |name: String, glyph: icedtea::icon::Glyph| -> Element<'_, Message> {
+                    let note = name.clone();
+                    let face = column![
+                        widget::icon_svg(glyph, tok, named(&name, Role::Image)),
+                        widget::meta(name.clone(), tok, named(&name, Role::Status)),
                     ]
-                    .spacing(4)
-                    .align_x(icedtea::iced::Alignment::Center),
-                );
-                column![
+                    .spacing(gap / 2.0)
+                    .width(Length::Fill)
+                    .align_x(Alignment::Center);
+                    widget::item_press(
+                        container(face)
+                            .width(Length::Fixed(TILE))
+                            .height(Length::Fixed(TILE))
+                            .align_x(Alignment::Center)
+                            .align_y(Alignment::Center)
+                            .padding(tok.density.inset() / 3.0)
+                            .into(),
+                        move |_, _| Message::CopyIcon(note.clone()),
+                    )
+                };
+                let mut cells: Vec<Element<'_, Message>> = icedtea::icon::Icon::ALL
+                    .into_iter()
+                    .filter(|icon| q.is_empty() || icon.slug().contains(&q))
+                    .map(|icon| cell(icon.slug().to_string(), icon.into()))
+                    .collect();
+                const APP_MARK: &[u8] = br##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="#000"><path d="M8 1 15 8 8 15 1 8z"/></svg>"##;
+                if q.is_empty() || "app".contains(&q) {
+                    cells.push(cell("app".into(), icedtea::icon::Glyph::Bytes(APP_MARK)));
+                }
+                let grid: Element<'_, Message> = if cells.is_empty() {
                     widget::meta(
-                        self.catalog.t("hint.icon"),
+                        self.catalog.t("icon.empty"),
                         tok,
-                        named("icon-hint", Role::Status),
-                    ),
-                    row_icons,
-                    widget::icon_button(
-                        icedtea::icon::Glyph::Bytes(APP_MARK),
-                        Some(Message::Note("app".into())),
-                        tok,
-                        Variant::Quiet,
-                        widget::ControlSize::Default,
-                        btn("app"),
-                    ),
-                ]
-                .spacing(12)
+                        named("icon-empty", Role::Status),
+                    )
+                } else {
+                    layout::wrap(cells, TILE, gap, inner)
+                };
+                container(
+                    column![
+                        widget::meta(
+                            self.catalog.t("hint.icon"),
+                            tok,
+                            named("icon-hint", Role::Status),
+                        ),
+                        widget::search_input_clear(
+                            &self.icon_query,
+                            Message::IconQuery,
+                            Some(Message::IconQuery(String::new())),
+                            None,
+                            tok,
+                            named(self.catalog.t("search"), Role::TextBox),
+                            None,
+                        ),
+                        container(widget::themed_scroll(
+                            grid,
+                            tok,
+                            named("icon-grid", Role::Group),
+                            false,
+                            None,
+                            None::<fn(f32) -> Message>,
+                        ))
+                        .width(Length::Fixed(scroll_w))
+                        .height(Length::Fixed(grid_h)),
+                    ]
+                    .spacing(gap)
+                    .width(Length::Fill),
+                )
+                .padding(pad)
+                .width(Length::Fixed(pane))
+                .style(move |_| icedtea::style::outlined_card(tok))
                 .into()
             }
             "image" => {
@@ -8325,6 +8368,44 @@ mod tests {
             .unwrap();
         assert!(nav.contains("Length::Fill"));
         assert!(nav.contains("align_start(tok.direction)"));
+    }
+
+    #[test]
+    fn icon_page_lists_every_shipped_mark() {
+        let icon_page = include_str!("main.rs")
+            .split("\"icon\" =>")
+            .nth(1)
+            .unwrap()
+            .split("\"image\" =>")
+            .next()
+            .unwrap();
+        assert!(icon_page.contains("Icon::ALL"));
+        assert!(icon_page.contains("search_input_clear"));
+        assert!(icon_page.contains("themed_scroll"));
+        assert!(icon_page.contains("layout::wrap"));
+        assert!(icon_page.contains("Length::Fixed(TILE)"));
+        assert!(icon_page.contains("align_x(Alignment::Center)"));
+        assert!(!icon_page.contains("center_x("));
+        assert!(icon_page.contains("const COLS: usize = 5"));
+        assert!(icon_page.contains("const ROWS: usize = 4"));
+        assert!(icon_page.contains("Length::Fixed(grid_h)"));
+        assert!(icon_page.contains("outlined_card"));
+        let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
+        g.page = "icon";
+        let _ = g.page_view();
+        let _ = g.update(super::Message::IconQuery("save".into()));
+        assert_eq!(g.icon_query, "save");
+        let _ = g.page_view();
+        let _ = g.update(super::Message::CopyIcon("save".into()));
+        assert!(g.note.contains("save"));
+        assert!(matches!(
+            super::parse_inject_line("icon-query play"),
+            Some(super::Message::IconQuery(q)) if q == "play"
+        ));
+        assert!(matches!(
+            super::parse_inject_line("copy-icon folder_open"),
+            Some(super::Message::CopyIcon(s)) if s == "folder_open"
+        ));
     }
 
     #[test]
