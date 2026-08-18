@@ -147,7 +147,7 @@ pub fn dim_backdrop_at(tok: Tokens, progress: f32) -> container::Style {
             scrim.r,
             scrim.g,
             scrim.b,
-            0.50 * t,
+            0.64 * t,
         ))),
         snap: false,
         ..container::Style::default()
@@ -1146,7 +1146,7 @@ mod tests {
         let tok = named("dark").tokens;
         for bg in [dim_backdrop(tok).background, None] {
             if let Some(Background::Color(c)) = bg {
-                assert!(c.a >= 0.45, "rest dim must read on dark surface-container");
+                assert!(c.a >= 0.55, "rest dim must read on dark surface-container");
             }
         }
     }
@@ -1167,7 +1167,7 @@ mod tests {
         let dim = dim_backdrop(tok);
         for bg in [dim.background, None] {
             if let Some(Background::Color(c)) = bg {
-                assert!(c.a >= 0.45, "rest dim must read on dark surface-container");
+                assert!(c.a >= 0.55, "rest dim must read on dark surface-container");
             }
         }
         let _ = dialog_sheet_face(tok);

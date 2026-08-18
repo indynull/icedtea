@@ -5242,7 +5242,8 @@ where
 
 /// Tiles that share the row width.
 ///
-/// Click sends the index. Empty grid is an empty column.
+/// Each tile is control height. Click sends the index. Empty grid is
+/// an empty column.
 ///
 ///
 /// ```
@@ -5268,16 +5269,16 @@ pub fn item_grid<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let cols = 3;
+    let tile_h = Length::Fixed(control_height(tok));
     let mut rows = iced::widget::Column::new()
         .spacing(gap(tok))
-        .width(Length::Fill)
-        .height(Length::Fill);
+        .width(Length::Fill);
     let mut i = 0;
     while i < labels.len() {
         let mut r = iced::widget::Row::new()
             .spacing(gap(tok))
             .width(Length::Fill)
-            .height(Length::Fill);
+            .height(tile_h);
         for _ in 0..cols {
             if i < labels.len() {
                 let s = labels[i].clone();
@@ -5294,7 +5295,7 @@ pub fn item_grid<'a, M: Clone + 'a>(
                     },
                     Icons::NONE,
                     Length::Fill,
-                    Length::Fill,
+                    tile_h,
                     A11y::new(s.clone(), Role::ListItem)
                         .with_checked(on)
                         .with_disabled(a11y.disabled),
@@ -5312,7 +5313,7 @@ pub fn item_grid<'a, M: Clone + 'a>(
                 });
                 i += 1;
             } else {
-                r = r.push(Space::new().width(Length::Fill).height(Length::Fill));
+                r = r.push(Space::new().width(Length::Fill).height(tile_h));
             }
         }
         rows = rows.push(r);
@@ -5760,7 +5761,8 @@ fn tree_line<'a, M: Clone + 'a>(
     ))
     .width(Length::Fill)
     .align_x(start)
-    .padding([v / 2.0, v]);
+    .padding([v / 2.0, v])
+    .clip(true);
     let pick: Element<'a, M> = if a11y.disabled {
         title.into()
     } else {
@@ -9125,8 +9127,62 @@ mod tests {
             .next()
             .unwrap();
         assert!(line_src.contains("RowSlot::Empty"));
+        assert!(line_src.contains("clip(true)"));
         assert!(line_src.contains("row_slot_face"));
         assert!(line_src.contains("style::list_row(tok, is_sel)"));
+    }
+
+    #[test]
+    fn tree_trailing_badge_does_not_cover_a_long_title() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+        let tok = named("dark").tokens;
+        let root = TreeNode::branch(
+            1,
+            "src",
+            vec![TreeNode::leaf(2, "introduction.md").with_trailing(RowSlot::Text("md".into()))],
+        );
+        let mut el: Element<'_, ()> = tree_view(
+            &root,
+            Some(2),
+            None,
+            |_| (),
+            |_| (),
+            TreeFace::Files,
+            tok,
+            A11y::new("tree", Role::Tree),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(240.0, 200.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let mut boxes = Vec::new();
+        walk_bounds(layout, &mut boxes);
+        let badges: Vec<_> = boxes
+            .iter()
+            .filter(|b| b.width > 12.0 && b.width < 40.0 && b.height > 10.0 && b.height < 28.0)
+            .copied()
+            .collect();
+        assert!(
+            !badges.is_empty(),
+            "expected a compact trailing badge, boxes={boxes:?}"
+        );
+        let titles: Vec<_> = boxes
+            .iter()
+            .filter(|b| b.width > 60.0 && b.height > 10.0 && b.height < 36.0)
+            .copied()
+            .collect();
+        assert!(
+            titles.iter().any(|t| badges.iter().all(|badge| {
+                t.x + t.width <= badge.x + 0.5 || badge.x + badge.width <= t.x + 0.5
+            })),
+            "title and badge must not overlap, titles={titles:?} badges={badges:?}"
+        );
     }
 
     #[test]
@@ -11768,6 +11824,27 @@ mod tests {
         must(
             (widths[0] * 3.0 + 16.0 - 300.0).abs() < 4.0,
             format!("cells {widths:?} should share the 300px row"),
+        );
+        let cap = control_height(tok) + 2.0;
+        let mut heights = Vec::new();
+        fn walk_h(layout: Layout<'_>, heights: &mut Vec<f32>) {
+            let b = layout.bounds();
+            if b.width > 40.0 && b.height > 8.0 && b.height < 80.0 {
+                heights.push(b.height);
+            }
+            for k in layout.children() {
+                walk_h(k, heights);
+            }
+        }
+        walk_h(layout, &mut heights);
+        assert!(
+            heights.iter().any(|h| *h <= cap),
+            "item_grid tiles must hug control height, got {heights:?} cap={cap}"
+        );
+        assert!(
+            node.size().height <= cap + 8.0,
+            "item_grid must not Fill a tall parent, height={}",
+            node.size().height
         );
     }
 

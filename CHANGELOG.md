@@ -16,6 +16,11 @@
 
 - `themed_scroll` uses iced's 60 px wheel line and keeps a short wheel
   gesture on the pane under the pointer.
+- `item_grid` tiles hug control height instead of filling the pane.
+- A tree trailing `RowSlot::Text` badge stays in its end slot; the
+  title clips instead of painting over it.
+- Dialog dim is a 64 percent scrim so the sheet reads over dark
+  surface-container.
 
 ### Chore
 
