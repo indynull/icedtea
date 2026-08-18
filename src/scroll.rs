@@ -1942,8 +1942,8 @@ mod tests {
         let outer_moved = messages
             .iter()
             .any(|m| matches!(m, Scroll::Outer(y) if *y > 0.0));
-        assert!(inner_moved, "{messages:?}");
-        assert!(!outer_moved, "{messages:?}");
+        assert!(inner_moved);
+        assert!(!outer_moved);
         messages.clear();
         {
             let mut shell = iced::advanced::Shell::new(&mut messages);
@@ -1959,12 +1959,9 @@ mod tests {
                 &pane,
             );
         }
-        assert!(
-            messages
-                .iter()
-                .any(|m| matches!(m, Scroll::Outer(y) if *y > 0.0)),
-            "{messages:?}"
-        );
+        assert!(messages
+            .iter()
+            .any(|m| matches!(m, Scroll::Outer(y) if *y > 0.0)));
     }
 
     #[test]
@@ -2086,12 +2083,9 @@ mod tests {
                 &pane,
             );
         }
-        assert!(
-            !messages
-                .iter()
-                .any(|m| matches!(m, Scroll::Outer(y) if *y > 0.0)),
-            "{messages:?}"
-        );
+        assert!(!messages
+            .iter()
+            .any(|m| matches!(m, Scroll::Outer(y) if *y > 0.0)));
     }
 
     #[test]
