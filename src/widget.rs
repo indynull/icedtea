@@ -4275,6 +4275,8 @@ fn toast_style(
 /// The rail sits on the end side (`Tokens.direction`).
 /// Press and hover stay inside the pane. Move and Release continue
 /// after a press inside so a drag-select can finish outside.
+/// A nested [`themed_scroll`] under the pointer takes the wheel first.
+/// Wheel lines are [`crate::chrome::SCROLL_LINE`] (60 px), same as iced.
 ///
 ///
 /// ```

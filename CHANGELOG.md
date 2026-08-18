@@ -12,6 +12,11 @@
   `icon_svg`. `icon::material_symbol_sharp_url` is the Sharp FILL 1
   URL the application downloads.
 
+### Bug fix
+
+- `themed_scroll` uses iced's 60 px wheel line and keeps a short wheel
+  gesture on the pane under the pointer.
+
 ### Chore
 
 - rustdoc fails the build on warnings.

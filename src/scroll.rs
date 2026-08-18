@@ -1,5 +1,7 @@
 //! Scroll rail with a usable minimum handle.
 
+use std::time::{Duration, Instant};
+
 use iced::advanced::layout::{self, Layout};
 use iced::advanced::renderer;
 use iced::advanced::widget::operation::{self, Operation};
@@ -11,7 +13,16 @@ use iced::{Background, Color, Element, Event, Length, Point, Rectangle, Size, Ve
 
 use crate::i18n::Direction;
 
-use crate::chrome::{SCROLL_HANDLE_MIN, SCROLL_RAIL_WIDTH};
+use crate::chrome::{SCROLL_HANDLE_MIN, SCROLL_LINE, SCROLL_RAIL_WIDTH};
+
+fn wheel_y(delta: mouse::ScrollDelta) -> f32 {
+    match delta {
+        mouse::ScrollDelta::Lines { y, .. } => -y * SCROLL_LINE,
+        mouse::ScrollDelta::Pixels { y, .. } => -y,
+    }
+}
+
+const WHEEL_HOLD: Duration = Duration::from_millis(1500);
 use crate::collection::{scroll_from_rail, scroller_span};
 use crate::theme::Tokens;
 
@@ -148,10 +159,7 @@ where
                 if !cursor.is_over(bounds) {
                     return;
                 }
-                let dy = match delta {
-                    mouse::ScrollDelta::Lines { y, .. } => -y * 24.0,
-                    mouse::ScrollDelta::Pixels { y, .. } => -y,
-                };
+                let dy = wheel_y(*delta);
                 let max_scroll = (self.content - self.viewport).max(0.0);
                 shell.publish((self.on_scroll)((self.scroll + dy).clamp(0.0, max_scroll)));
                 shell.capture_event();
@@ -437,6 +445,7 @@ struct ThemedScrollState {
     last_notified: Option<f32>,
     content_h: f32,
     viewport_h: f32,
+    last_wheel: Option<Instant>,
 }
 
 impl Default for ThemedScrollState {
@@ -449,6 +458,7 @@ impl Default for ThemedScrollState {
             last_notified: None,
             content_h: 0.0,
             viewport_h: 0.0,
+            last_wheel: None,
         }
     }
 }
@@ -647,6 +657,21 @@ where
         let content_h = content_layout.bounds().height;
         let view_h = bounds.height;
         let max_scroll = (content_h - view_h).max(0.0);
+        let over_pane = cursor.position().is_some_and(|p| bounds.contains(p));
+        let is_wheel = matches!(event, Event::Mouse(mouse::Event::WheelScrolled { .. }));
+        // A nested themed_scroll under the pointer consumes the wheel first.
+        if is_wheel && over_pane && !shell.is_event_captured() {
+            self.content.as_widget_mut().update(
+                &mut tree.children[0],
+                event,
+                content_layout,
+                cursor,
+                renderer,
+                clipboard,
+                shell,
+                viewport,
+            );
+        }
         let state = tree.state.downcast_mut::<ThemedScrollState>();
         let rail = rail_layout.bounds();
         let (off, len) = thumb(content_h, view_h, state.scroll, rail.height);
@@ -654,6 +679,7 @@ where
         let mut moved = false;
         match event {
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
+                state.last_wheel = None;
                 if let Some(pos) = cursor.position() {
                     if rail.contains(pos) {
                         let y = pos.y - rail.y;
@@ -700,24 +726,27 @@ where
                 }
             }
             Event::Mouse(mouse::Event::WheelScrolled { delta }) => {
-                let over_pane = cursor.position().is_some_and(|p| bounds.contains(p));
-                if over_pane && max_scroll > 0.0 {
-                    let dy = match delta {
-                        mouse::ScrollDelta::Lines { y, .. } => -y * 24.0,
-                        mouse::ScrollDelta::Pixels { y, .. } => -y,
-                    };
+                if !shell.is_event_captured() && over_pane && max_scroll > 0.0 {
+                    let dy = wheel_y(*delta);
                     let next = (state.scroll + dy).clamp(0.0, max_scroll);
                     if (next - state.scroll).abs() > f32::EPSILON {
                         state.scroll = next;
                         state.pinned_end = self.stick && (max_scroll - next) < 1.0;
+                        state.last_wheel = Some(Instant::now());
                         moved = true;
+                        shell.capture_event();
+                    } else if state.last_wheel.is_some_and(|t| t.elapsed() < WHEEL_HOLD) {
+                        shell.capture_event();
                     }
-                    shell.capture_event();
                 }
             }
             _ => {}
         }
 
+        if moved {
+            shell.invalidate_layout();
+            shell.request_redraw();
+        }
         if moved || state.last_notified != Some(state.scroll) {
             if let Some(f) = &self.on_scroll {
                 shell.publish(f(state.scroll));
@@ -725,7 +754,6 @@ where
             state.last_notified = Some(state.scroll);
         }
 
-        let over_pane = cursor.position().is_some_and(|p| bounds.contains(p));
         let pointer = matches!(event, Event::Mouse(_) | Event::Touch(_));
         let drag_out = state.content_press
             && matches!(
@@ -735,7 +763,7 @@ where
                         | mouse::Event::ButtonReleased(mouse::Button::Left)
                 )
             );
-        if !shell.is_event_captured() && (!pointer || over_pane || drag_out) {
+        if !is_wheel && !shell.is_event_captured() && (!pointer || over_pane || drag_out) {
             self.content.as_widget_mut().update(
                 &mut tree.children[0],
                 event,
@@ -1848,6 +1876,222 @@ mod tests {
             );
         }
         assert_eq!(messages.as_slice(), &[true]);
+    }
+
+    #[test]
+    fn themed_scroll_nested_pane_takes_the_wheel_first() {
+        use iced::widget::{column, container, Space};
+        use iced::Length;
+
+        #[derive(Debug, Clone, PartialEq)]
+        enum Scroll {
+            Inner(f32),
+            Outer(f32),
+        }
+
+        let tok = named("dark").tokens;
+        let tall: Element<'_, Scroll> = column![
+            Space::new().width(Length::Fill).height(400.0),
+            Space::new().width(Length::Fill).height(400.0),
+        ]
+        .into();
+        let inner = ThemedScroll::new(tall, tok, false, None, Some(Box::new(Scroll::Inner)));
+        let inner_el: Element<'_, Scroll> = container(Element::from(inner))
+            .width(Length::Fill)
+            .height(Length::Fixed(80.0))
+            .into();
+        let outer_kid: Element<'_, Scroll> =
+            column![inner_el, Space::new().width(Length::Fill).height(400.0),].into();
+        let mut outer =
+            ThemedScroll::new(outer_kid, tok, false, None, Some(Box::new(Scroll::Outer)));
+        let mut tree = Tree::new(&outer as &dyn Widget<Scroll, iced::Theme, iced::Renderer>);
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(240.0, 160.0));
+        let node = Widget::<Scroll, iced::Theme, iced::Renderer>::layout(
+            &mut outer, &mut tree, &renderer, &limits,
+        );
+        let layout = Layout::new(&node);
+        let pane = layout.bounds();
+        let over_inner = Point::new(pane.x + 12.0, pane.y + 20.0);
+        let over_outer = Point::new(pane.x + 12.0, pane.y + 120.0);
+        let wheel = Event::Mouse(mouse::Event::WheelScrolled {
+            delta: mouse::ScrollDelta::Pixels { x: 0.0, y: -40.0 },
+        });
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            Widget::<Scroll, iced::Theme, iced::Renderer>::update(
+                &mut outer,
+                &mut tree,
+                &wheel,
+                layout,
+                mouse::Cursor::Available(over_inner),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &pane,
+            );
+        }
+        let inner_moved = messages
+            .iter()
+            .any(|m| matches!(m, Scroll::Inner(y) if *y > 0.0));
+        let outer_moved = messages
+            .iter()
+            .any(|m| matches!(m, Scroll::Outer(y) if *y > 0.0));
+        assert!(inner_moved, "{messages:?}");
+        assert!(!outer_moved, "{messages:?}");
+        messages.clear();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            Widget::<Scroll, iced::Theme, iced::Renderer>::update(
+                &mut outer,
+                &mut tree,
+                &wheel,
+                layout,
+                mouse::Cursor::Available(over_outer),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &pane,
+            );
+        }
+        assert!(
+            messages
+                .iter()
+                .any(|m| matches!(m, Scroll::Outer(y) if *y > 0.0)),
+            "{messages:?}"
+        );
+    }
+
+    #[test]
+    fn themed_scroll_wheel_line_matches_iced() {
+        use iced::widget::{column, Space};
+        use iced::Length;
+
+        let tok = named("dark").tokens;
+        let tall: Element<'_, f32> = column![
+            Space::new().width(Length::Fill).height(400.0),
+            Space::new().width(Length::Fill).height(400.0),
+        ]
+        .into();
+        let mut scroll = ThemedScroll::new(tall, tok, false, None, Some(Box::new(|y| y)));
+        let mut tree = Tree::new(&scroll as &dyn Widget<f32, iced::Theme, iced::Renderer>);
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(240.0, 160.0));
+        let node = Widget::<f32, iced::Theme, iced::Renderer>::layout(
+            &mut scroll,
+            &mut tree,
+            &renderer,
+            &limits,
+        );
+        let layout = Layout::new(&node);
+        let pane = layout.bounds();
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            Widget::<f32, iced::Theme, iced::Renderer>::update(
+                &mut scroll,
+                &mut tree,
+                &Event::Mouse(mouse::Event::WheelScrolled {
+                    delta: mouse::ScrollDelta::Lines { x: 0.0, y: -1.0 },
+                }),
+                layout,
+                mouse::Cursor::Available(Point::new(pane.x + 12.0, pane.y + 12.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &pane,
+            );
+        }
+        assert_eq!(messages.last().copied(), Some(SCROLL_LINE));
+    }
+
+    #[test]
+    fn themed_scroll_holds_the_wheel_at_the_end() {
+        use iced::widget::{column, container, Space};
+        use iced::Length;
+
+        #[derive(Debug, Clone, PartialEq)]
+        enum Scroll {
+            Inner(f32),
+            Outer(f32),
+        }
+
+        let tok = named("dark").tokens;
+        let tall: Element<'_, Scroll> = column![
+            Space::new().width(Length::Fill).height(400.0),
+            Space::new().width(Length::Fill).height(400.0),
+        ]
+        .into();
+        let inner = ThemedScroll::new(tall, tok, false, None, Some(Box::new(Scroll::Inner)));
+        let inner_el: Element<'_, Scroll> = container(Element::from(inner))
+            .width(Length::Fill)
+            .height(Length::Fixed(80.0))
+            .into();
+        let outer_kid: Element<'_, Scroll> =
+            column![inner_el, Space::new().width(Length::Fill).height(400.0),].into();
+        let mut outer =
+            ThemedScroll::new(outer_kid, tok, false, None, Some(Box::new(Scroll::Outer)));
+        let mut tree = Tree::new(&outer as &dyn Widget<Scroll, iced::Theme, iced::Renderer>);
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(240.0, 160.0));
+        let node = Widget::<Scroll, iced::Theme, iced::Renderer>::layout(
+            &mut outer, &mut tree, &renderer, &limits,
+        );
+        let layout = Layout::new(&node);
+        let pane = layout.bounds();
+        let over_inner = Point::new(pane.x + 12.0, pane.y + 20.0);
+        let slam = Event::Mouse(mouse::Event::WheelScrolled {
+            delta: mouse::ScrollDelta::Pixels { x: 0.0, y: -2000.0 },
+        });
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            Widget::<Scroll, iced::Theme, iced::Renderer>::update(
+                &mut outer,
+                &mut tree,
+                &slam,
+                layout,
+                mouse::Cursor::Available(over_inner),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &pane,
+            );
+        }
+        messages.clear();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            Widget::<Scroll, iced::Theme, iced::Renderer>::update(
+                &mut outer,
+                &mut tree,
+                &slam,
+                layout,
+                mouse::Cursor::Available(over_inner),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &pane,
+            );
+        }
+        assert!(
+            !messages
+                .iter()
+                .any(|m| matches!(m, Scroll::Outer(y) if *y > 0.0)),
+            "{messages:?}"
+        );
     }
 
     #[test]
