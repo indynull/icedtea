@@ -33,7 +33,10 @@ include = [
     "examples/**",
     "README.md",
     "LICENSE",
+    "LICENSE-APACHE-2.0",
+    "NOTICE",
     "CHANGELOG.md",
+    "scripts/material_symbols.py",
 ]
 
 [lib]

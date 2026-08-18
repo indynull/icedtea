@@ -1,5 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="#000">
-  <rect x="2.5" y="3.5" width="11" height="1.75" rx="0.8"/>
-  <rect x="2.5" y="7.1" width="11" height="1.75" rx="0.8"/>
-  <rect x="2.5" y="10.7" width="11" height="1.75" rx="0.8"/>
+<!-- Material Symbols Sharp `menu` FILL 1, 24 dp.
+     Copyright Google LLC. Apache License 2.0.
+     https://github.com/google/material-design-icons -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="16" height="16" fill="#000">
+  <path d="M120-240v-80h720v80H120Zm0-200v-80h720v80H120Zm0-200v-80h720v80H120Z"/>
 </svg>

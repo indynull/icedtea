@@ -71,3 +71,9 @@ gallery-gif:
 # Same Xephyr path as gallery-qa. Does not invent screenshots.
 book-stills *args:
     python3 scripts/gallery_qa.py --book {{args}}
+
+# Fetch Material Symbols Sharp FILL 1 for Glyph::Bytes.
+#   just material-symbols close folder save --out src/icons
+#   just material-symbols --self-test
+material-symbols *args:
+    python3 scripts/material_symbols.py {{args}}

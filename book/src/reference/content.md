@@ -49,9 +49,14 @@ Constructor: [`widget::icon_svg`](https://docs.rs/icedtea/latest/icedtea/widget/
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-The seven names stay the shipped set. Pass
+`Icon` is the desktop chrome set (Material Symbols Sharp; see
+`NOTICE`). Pass
 [`Glyph::Bytes`](https://docs.rs/icedtea/latest/icedtea/icon/enum.Glyph.html)
 for an app mark (filled black paths). Tokens tint the fill.
+[`material_symbol_sharp_url`](https://docs.rs/icedtea/latest/icedtea/icon/fn.material_symbol_sharp_url.html)
+and [`adapt_material_svg`](https://docs.rs/icedtea/latest/icedtea/icon/fn.adapt_material_svg.html)
+are the crate path for more Sharp marks; see
+[More Material icons](../cookbook/icons.md).
 
 Pass `A11y`.
 

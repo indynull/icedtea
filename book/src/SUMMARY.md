@@ -21,6 +21,7 @@
     - [List and detail](cookbook/list-detail.md)
     - [Sortable table](cookbook/table.md)
     - [Command palette](cookbook/palette.md)
+    - [More Material icons](cookbook/icons.md)
 - [Reference]()
     - [Widgets](widgets.md)
     - [Controls](reference/controls.md)

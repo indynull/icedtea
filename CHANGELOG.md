@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Feature
+
+- Chrome icons and tree folder/file marks use Material Symbols Sharp
+  (Apache 2.0). See `NOTICE`.
+- `Icon` covers Fyne's theme-icon jobs (window, edit, file, mail,
+  media, view). A product mark is still `Glyph::Bytes`.
+- `icon::adapt_material_svg` prepares a Material Symbols SVG for
+  `icon_svg`. `icon::material_symbol_sharp_url` is the Sharp FILL 1
+  URL the application downloads.
+
 ### Chore
 
 - rustdoc fails the build on warnings.

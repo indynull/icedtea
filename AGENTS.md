@@ -23,6 +23,7 @@ cargo run -p icedtea-gallery
 just gallery-qa     # visual QA (shots under tmp/gallery-qa/); see .grok/skills/gallery-qa
 just gallery-gif    # recapture assets/gallery.gif when the gallery shell changes
 just book-stills    # recapture book/src/images/ constructor stills
+just material-symbols  # fetch Material Symbols Sharp for Glyph::Bytes
 ```
 
 ## Tree

@@ -1,0 +1,114 @@
+icedtea
+Copyright 2026 Ali-Akber Saifee
+
+This product includes Material Symbols Sharp icons from
+https://github.com/google/material-design-icons
+
+  Copyright Google LLC
+  Licensed under the Apache License, Version 2.0
+  (the "License"); you may not use those files except in compliance
+  with the License. You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  A copy is in LICENSE-APACHE-2.0.
+
+The files under assets/icons/ are those Sharp FILL 1, 24 dp glyphs,
+adapted only to set fill="#000" so tokens can recolor them:
+
+  close.svg              close
+  back.svg               arrow_back
+  search.svg             search
+  menu.svg               menu
+  chevron.svg            chevron_right
+  check.svg              check
+  warning.svg            warning
+  home.svg               home
+  more.svg               more_horiz
+  more_vert.svg          more_vert
+  refresh.svg            refresh
+  filter.svg             filter_alt
+  visibility.svg         visibility
+  visibility_off.svg     visibility_off
+  fullscreen.svg         fullscreen
+  fullscreen_exit.svg    fullscreen_exit
+  add.svg                add
+  remove.svg             remove
+  edit.svg               edit
+  delete.svg             delete
+  undo.svg               undo
+  redo.svg               redo
+  copy.svg               content_copy
+  cut.svg                content_cut
+  paste.svg              content_paste
+  folder.svg             folder
+  folder_open.svg        folder_open
+  file.svg               draft
+  save.svg               save
+  download.svg           download
+  upload.svg             upload
+  print.svg              print
+  error.svg              error
+  info.svg               info
+  help.svg               help
+  settings.svg           settings
+  account.svg            account_circle
+  arrow_drop_down.svg    arrow_drop_down
+  arrow_drop_up.svg      arrow_drop_up
+  broken_image.svg       broken_image
+  calendar.svg           calendar_month
+  cancel.svg             cancel
+  check_box.svg          check_box_outline_blank
+  check_box_on.svg       check_box
+  check_box_partial.svg  indeterminate_check_box
+  contrast.svg           contrast
+  palette.svg            palette
+  colors.svg             colors
+  computer.svg           computer
+  clear.svg              clear
+  desktop.svg            desktop_windows
+  document.svg           description
+  document_create.svg    note_add
+  drag.svg               drag_indicator
+  file_app.svg           apps
+  file_audio.svg         audio_file
+  file_image.svg         image
+  file_text.svg          article
+  file_video.svg         video_file
+  folder_new.svg         create_new_folder
+  grid.svg               grid_view
+  history.svg            history
+  list.svg               list
+  logout.svg             logout
+  mail_attach.svg        attach_file
+  mail_compose.svg       edit_note
+  mail_forward.svg       forward
+  mail_reply.svg         reply
+  mail_reply_all.svg     reply_all
+  mail_send.svg          send
+  fast_forward.svg       fast_forward
+  rewind.svg             fast_rewind
+  music.svg              music_note
+  pause.svg              pause
+  photo.svg              photo
+  play.svg               play_arrow
+  record.svg             fiber_manual_record
+  replay.svg             replay
+  stop.svg               stop
+  movie.svg              movie
+  menu_expand.svg        unfold_more
+  move_down.svg          arrow_downward
+  move_up.svg            arrow_upward
+  question.svg           question_mark
+  radio.svg              radio_button_unchecked
+  radio_on.svg           radio_button_checked
+  find_replace.svg       find_replace
+  storage.svg            hard_drive
+  zoom_fit.svg           fit_screen
+  zoom_in.svg            zoom_in
+  zoom_out.svg           zoom_out
+  volume_down.svg        volume_down
+  volume_mute.svg        volume_off
+  volume_up.svg          volume_up
+  maximize.svg           crop_square
+  minimize.svg           minimize

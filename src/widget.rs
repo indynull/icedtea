@@ -205,7 +205,7 @@ pub fn icon_style(tok: Tokens) -> impl Fn(&iced::Theme, svg::Status) -> svg::Sty
 ///
 /// Pass a shipped [`Icon`] or [`Glyph::Bytes`] (filled black SVG). Tokens
 /// recolor non-transparent pixels (Linux, macOS Metal, and Windows).
-/// The seven names stay the shipped set.
+/// [`Icon`] is the desktop chrome set.
 ///
 ///
 /// ```
@@ -5705,9 +5705,6 @@ fn tree_twisty<'a, M: Clone + 'a>(
     a11y::attach(b.into(), &a11y)
 }
 
-const TREE_FOLDER_SVG: &[u8] = br##"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="#000"><path d="M1.5 3.5h4.1L7 5.2h7.5v7.8H1.5z"/></svg>"##;
-const TREE_FILE_SVG: &[u8] = br##"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="#000"><path d="M4 1.5h5.2L12.5 5v9.5H4z"/></svg>"##;
-
 #[allow(clippy::too_many_arguments)]
 fn tree_line<'a, M: Clone + 'a>(
     depth: u32,
@@ -5780,15 +5777,11 @@ fn tree_line<'a, M: Clone + 'a>(
     let mut kids = vec![indent, twisty];
     if face == TreeFace::Files {
         let mark = if has_children {
-            TREE_FOLDER_SVG
+            Icon::Folder
         } else {
-            TREE_FILE_SVG
+            Icon::File
         };
-        kids.push(icon_svg(
-            crate::icon::Glyph::Bytes(mark),
-            tok,
-            A11y::new(label_s, Role::Image),
-        ));
+        kids.push(icon_svg(mark, tok, A11y::new(label_s, Role::Image)));
     }
     kids.push(pick);
     if !matches!(trail, crate::collection::RowSlot::Empty) {

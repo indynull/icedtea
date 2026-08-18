@@ -1,3 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="#000">
-  <path d="M6.2 11.6 2.4 7.8l1.1-1.1 2.7 2.7 6.3-6.3 1.1 1.1z"/>
+<!-- Material Symbols Sharp `check` FILL 1, 24 dp.
+     Copyright Google LLC. Apache License 2.0.
+     https://github.com/google/material-design-icons -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960" width="16" height="16" fill="#000">
+  <path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/>
 </svg>

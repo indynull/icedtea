@@ -359,6 +359,7 @@ mod tests {
             "cookbook/list-detail.md",
             "cookbook/table.md",
             "cookbook/palette.md",
+            "cookbook/icons.md",
             "overlay-windows.md",
             "compact-tools.md",
             "reference/controls.md",
@@ -594,6 +595,7 @@ mod tests {
             "book/src/cookbook/list-detail.md",
             "book/src/cookbook/table.md",
             "book/src/cookbook/palette.md",
+            "book/src/cookbook/icons.md",
         ];
         for rel in files {
             let text = std::fs::read_to_string(root.join(rel)).unwrap();
@@ -979,7 +981,7 @@ mod tests {
         assert!(summary.contains("    - [Install](install.md)"));
         assert!(summary.contains("    - [Widgets](widgets.md)"));
         assert!(summary.contains("    - [Accessibility](accessibility.md)"));
-        let pages: [(&str, &[&str]); 4] = [
+        let pages: [(&str, &[&str]); 5] = [
             (
                 include_str!("../book/src/cookbook/save.md"),
                 &["file.save", "toolbar", "key::handle", "textarea"],
@@ -995,6 +997,15 @@ mod tests {
             (
                 include_str!("../book/src/cookbook/palette.md"),
                 &["CommandPalette", "command_palette_view"],
+            ),
+            (
+                include_str!("../book/src/cookbook/icons.md"),
+                &[
+                    "adapt_material_svg",
+                    "material_symbol_sharp_url",
+                    "Glyph::Bytes",
+                    "icon_svg",
+                ],
             ),
         ];
         for (text, needles) in pages {
