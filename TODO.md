@@ -13,6 +13,10 @@ Non-goals:
 
 - Language-service hooks, editors' language servers.
 - Timeline, audio, or video engines; CAD kernels; live telemetry daemons.
+  Applications own decode and paint (`iced_video_player`, shader blit).
+  `image_slot` is stills.
+- In-process web view (WebKitGTK, Servo, CEF, WebView2). Applications
+  host the engine as a custom iced element.
 - Document undo/redo.
 - Multiple-document-interface window mosaics.
 - A second collection widget for variable-height cards.
