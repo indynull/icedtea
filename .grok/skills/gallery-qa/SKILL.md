@@ -48,10 +48,23 @@ Shots land under `tmp/gallery-qa/<timestamp>/` (or `--out DIR`).
    fix is genuinely unclear (need a human pointer, other host). A
    known packing, contrast, or clip fix is not residual.
 4. **Inject ≠ pointer.** Inject proves `update`. Scroll clip, slider
-   drag, menu/flyout need live pass or a real unit/layout test.
+   drag, menu/flyout, and pick-list open need live pass or a real
+   unit/layout test that calls the shipped constructor.
 5. **Prove what you claim.** Xephyr ≠ macOS type. Do not call a font
    path done without a host/Mac pass when those files changed.
 6. **No fake evidence.** No `image_gen` UI, no hand-edited PNGs.
+7. **Drive the shipped constructor.** Tests call `themed_pick_list`
+   (or the public fn under review) from a real start state. Do not
+   assert only a private helper, and do not start past the widget.
+8. **Score the published tour** after a paint change (`just gallery-gif`
+   / handbook stills). A source fix whose published GIF still shows
+   the old mark is **broken**.
+9. **Trailing-icon geometry** is `references/m3-trailing-icon.md`
+   (24 dp / 12 dp default). Do not accept a body-sized or 4 dp-flush
+   chevron as residual when the Material numbers are in-repo.
+10. **Idle must show the constructor under review.** Shared pages pack
+    unpublished or changed hosts above the fold (`pack_at` / catalog
+    order). A look-strip neighbor is not a Fields/select score.
 
 ## Loop (do this)
 
@@ -115,6 +128,7 @@ Only if a second grab is still the previous page is the gallery stuck.
 ## Related
 
 - `references/rubric.md` — what counts as broken/ugly  
+- `references/m3-trailing-icon.md` — pick / menu / list trailing mark  
 - `references/rtl.md` — Firefox + Microsoft direction beats  
 - `references/manual-pass.md` — pointer / live protocol  
 - `scripts/gallery_qa.py` — capture harness  

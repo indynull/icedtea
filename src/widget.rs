@@ -69,19 +69,25 @@ fn pad(tok: Tokens) -> Padding {
 }
 
 /// Iced paints `Handle::Arrow` right-aligned at `width - padding.right`.
-/// A hairline end pad puts the glyph in the trailing band instead of
-/// leaving an empty pocket after the triangle.
-fn pick_mark_pad(face: Padding) -> Padding {
+/// End inset is the M3 trailing-icon inset (`Density::inset`: 8 / 12 / 16).
+fn pick_mark_pad(tok: Tokens, face: Padding) -> Padding {
     Padding {
         top: face.top,
-        right: crate::density::GRID as f32,
+        right: tok.density.inset(),
         bottom: face.bottom,
         left: face.left,
     }
 }
 
-fn pick_handle_size(type_px: f32) -> f32 {
-    type_px
+/// M3 medium trailing icon (24 dp) on Default/Comfortable; small (20 dp)
+/// on Compact. Cap so the mark stays inside the control face.
+fn pick_handle_size(tok: Tokens, size: ControlSize) -> f32 {
+    let want = match size {
+        ControlSize::Compact => crate::m3::density::TRAILING_ICON_COMPACT as f32,
+        _ => crate::m3::density::TRAILING_ICON as f32,
+    };
+    let face = sized_control_height(tok, size);
+    want.min((face - crate::density::GRID as f32 * 2.0).max(12.0))
 }
 
 fn gap(tok: Tokens) -> f32 {
@@ -2715,11 +2721,11 @@ where
     };
     let picker = pick_list(options, selected, on_pick)
         .handle(pick_list::Handle::Arrow {
-            size: Some(pick_handle_size(type_px).into()),
+            size: Some(pick_handle_size(tok, size).into()),
         })
         .width(Length::Fill)
         .style(style::picker_style(tok))
-        .padding(pick_mark_pad(face_pad))
+        .padding(pick_mark_pad(tok, face_pad))
         .text_size(type_px);
     let h = sized_control_height(tok, size);
     let picker: Element<'a, M> = container(picker)
@@ -2790,9 +2796,11 @@ impl<'a, M> FormRow<'a, M> {
 /// `layout::form` only stacks label/field rows. This constructor walks
 /// those rows: Tab and Shift+Tab wrap, and the first text field takes
 /// iced focus on mount. Space activates the focused non-text row
-/// (checkbox, radio, pick, chips, segmented). Pick lists, chips,
-/// checkboxes, radios, and segmented buttons sit in the same order.
-/// The application owns values, messages, and `active`.
+/// (checkbox, radio, pick, chips, segmented). An empty row title
+/// leaves the label column blank so a checkbox or chip can carry its
+/// own caption. Pick lists, chips, checkboxes, radios, and segmented
+/// buttons sit in the same order. The application owns values,
+/// messages, and `active`.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -2838,11 +2846,15 @@ pub fn form_group<'a, M: Clone + 'a>(
     let n = rows.len();
     let active = if n == 0 { 0 } else { active.min(n - 1) };
     let pairs = rows.into_iter().enumerate().map(|(i, row)| {
-        let lab = label(
-            row.label,
-            tok,
-            A11y::new(format!("form-label-{i}"), Role::Header),
-        );
+        let lab = if row.label.is_empty() {
+            Space::new().width(0).height(0).into()
+        } else {
+            label(
+                row.label,
+                tok,
+                A11y::new(format!("form-label-{i}"), Role::Header),
+            )
+        };
         let field = container(row.field)
             .width(Length::Fill)
             .style(move |_| form_active_frame(tok, i == active));
@@ -12479,28 +12491,62 @@ mod tests {
         assert!(!src.contains("pick_list::Handle::None"));
         assert!(!src.contains("pick_chevron"));
         assert!(src.contains("pick_mark_pad"));
-        assert!(src.contains("pick_handle_size(type_px)"));
+        assert!(src.contains("pick_handle_size(tok, size)"));
+    }
+
+    #[test]
+    fn themed_pick_list_trailing_mark_follows_m3_icon_band() {
+        let tok = named("dark").tokens;
+        let face = pad(tok);
+        let mark = pick_mark_pad(tok, face);
+        assert_eq!(mark.right, tok.density.inset());
+        assert_eq!(mark.left, face.left);
+        assert_eq!(
+            pick_handle_size(tok, ControlSize::Default),
+            crate::m3::density::TRAILING_ICON as f32
+        );
+        let compact = pick_handle_size(tok, ControlSize::Compact);
+        assert!(compact <= crate::m3::density::TRAILING_ICON_COMPACT as f32);
+        assert!(compact < pick_handle_size(tok, ControlSize::Default));
+        assert!(compact <= sized_control_height(tok, ControlSize::Compact) - 8.0);
+        let mut el: Element<'_, &str> = themed_pick_list(
+            ["nord", "dark"],
+            Some("nord"),
+            |s| s,
+            tok,
+            ControlSize::Default,
+            A11y::new("theme", Role::ComboBox),
+        );
+        let size = layout_size(&mut el, iced::Size::new(240.0, 80.0));
+        must(
+            size.width >= 24.0 && size.height >= 16.0,
+            format!("pick face must stay a control, got {size:?}"),
+        );
+        let src = include_str!("widget.rs")
+            .split("pub fn themed_pick_list")
+            .nth(1)
+            .unwrap()
+            .split("pub fn date_picker")
+            .next()
+            .unwrap();
+        assert!(src.contains("Handle::Arrow"));
+        let helper = include_str!("widget.rs")
+            .split("fn pick_handle_size")
+            .nth(1)
+            .unwrap()
+            .split("fn gap")
+            .next()
+            .unwrap();
+        assert!(helper.contains("TRAILING_ICON"));
     }
 
     #[test]
     fn themed_pick_list_matches_field_height_without_extra_gutter() {
         let tok = named("dark").tokens;
         let face = pad(tok);
-        let mark = pick_mark_pad(face);
-        must(
-            mark.right <= crate::density::GRID as f32,
-            format!("pick end pad {} must be a 4 dp hairline", mark.right),
-        );
-        must(
-            mark.right < face.right,
-            format!(
-                "pick end pad {} must be tighter than field pad {}",
-                mark.right, face.right
-            ),
-        );
+        let mark = pick_mark_pad(tok, face);
+        assert_eq!(mark.right, tok.density.inset());
         assert_eq!(mark.left, face.left);
-        assert_eq!(pick_handle_size(tok.body()), tok.body());
-        assert_eq!(pick_handle_size(tok.meta()), tok.meta());
         let mut field: Element<'_, String> = themed_text_input(
             "Name",
             "nord",
@@ -12910,10 +12956,120 @@ mod tests {
             .split("fn form_active_frame")
             .next()
             .unwrap();
-        assert!(
-            !ctor.contains(".padding(2)"),
-            "idle form rows must not grow a 2 px ring pad"
+        assert!(!ctor.contains(".padding(2)"));
+    }
+
+    #[test]
+    fn form_group_empty_row_title_does_not_paint_a11y_id() {
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, usize> = form_group(
+            [FormRow::new(
+                "",
+                themed_checkbox(
+                    "Remember",
+                    false,
+                    |_| 99usize,
+                    tok,
+                    A11y::new("Remember", Role::Checkbox),
+                ),
+            )],
+            0,
+            |i| i,
+            tok,
+            crate::i18n::Direction::Ltr,
+            A11y::new("compose", Role::Group),
         );
+        let size = layout_size(&mut el, iced::Size::new(400.0, 80.0));
+        must(
+            size.width > 0.0 && size.height > 0.0,
+            format!("empty-title form row must layout, got {size:?}"),
+        );
+        let ctor = include_str!("widget.rs")
+            .split("pub fn form_group")
+            .nth(1)
+            .unwrap()
+            .split("fn form_active_frame")
+            .next()
+            .unwrap();
+        assert!(ctor.contains("row.label.is_empty()"));
+        assert!(ctor.contains("Space::new()"));
+        let mut labeled: Element<'_, usize> = form_group(
+            [FormRow::new(
+                "Name",
+                themed_text_input(
+                    "Name",
+                    "",
+                    |_| 99usize,
+                    None,
+                    FieldOpts::NONE,
+                    tok,
+                    A11y::new("Name", Role::TextBox),
+                    None,
+                ),
+            )],
+            0,
+            |i| i,
+            tok,
+            crate::i18n::Direction::Ltr,
+            A11y::new("named", Role::Group),
+        );
+        let labeled_h = layout_size(&mut labeled, iced::Size::new(400.0, 80.0)).height;
+        must(
+            labeled_h > 0.0,
+            format!("named form row must layout, got {labeled_h}"),
+        );
+        assert!(ctor.contains("form-label-"));
+    }
+
+    #[test]
+    fn form_group_space_activates_a_right_to_left_checkbox() {
+        let tok = named("dark")
+            .tokens
+            .with_direction(crate::i18n::Direction::Rtl);
+        let on_tab = |i| i;
+        let mut el: Element<'_, usize> = form_group(
+            [
+                FormRow::new(
+                    "Ok",
+                    themed_checkbox(
+                        "Ok",
+                        false,
+                        |_| 99usize,
+                        tok,
+                        A11y::new("Ok", Role::Checkbox),
+                    ),
+                ),
+                FormRow::new(
+                    "Kind",
+                    themed_radio(
+                        "A",
+                        0u8,
+                        Some(0),
+                        |_| 99usize,
+                        tok,
+                        A11y::new("A", Role::Radio),
+                    ),
+                ),
+            ],
+            0,
+            on_tab,
+            tok,
+            crate::i18n::Direction::Rtl,
+            A11y::new("rtl-form", Role::Group),
+        );
+        assert_eq!(
+            pump_form_named(&mut el, iced::keyboard::key::Named::Space, false),
+            vec![99]
+        );
+        let mut empty: Element<'_, usize> = form_group(
+            [],
+            0,
+            |i| i,
+            tok,
+            crate::i18n::Direction::Rtl,
+            A11y::new("empty-rtl", Role::Group),
+        );
+        assert!(pump_form_named(&mut empty, iced::keyboard::key::Named::Space, false).is_empty());
     }
 
     fn form_idle_field_height(el: &mut Element<'_, usize>) -> f32 {
@@ -12936,10 +13092,8 @@ mod tests {
                     .iter()
                     .max_by(|a, b| a.bounds().width.total_cmp(&b.bounds().width))
                     .unwrap();
-                if field.bounds().width > crate::layout::FORM_LABEL {
-                    *best = field.bounds().height;
-                    return;
-                }
+                *best = field.bounds().height;
+                return;
             }
             for k in kids {
                 walk(k, best);

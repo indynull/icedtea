@@ -3961,10 +3961,11 @@ impl Gallery {
         // Two columns share the width so fill-width hosts keep a real
         // column. Controls start the second column at the button group
         // so that row, checks, and radios sit on the first screen.
-        // Fields put number, date, and time beside the text hosts.
+        // Fields put select, form, number, date, and time beside the
+        // text hosts so idle QA can score the pick mark and form_group.
         let pack_at = match page {
             "controls" => Some("button-group"),
-            "fields" => Some("number"),
+            "fields" => Some("select"),
             _ => None,
         };
         if let Some(id) = pack_at {

@@ -32,12 +32,18 @@ prefer control correctness and catalog honesty over pixel-diff thrash.
 - Gaps on the **4px grid** (default density 8px); uneven “random” air is ugly
 - Related items grouped; orphan controls or two copies of the same idea are broken catalog sense
 - Multi-host pages: each host has usable height (not one row + empty Fill hole)
+- A constructor this pass changed must be **on the idle first screen**
+  of its page. Below-fold only is not a score for that widget.
 
 ## 2. Alignment and geometry
 
 - Shared leading edges for labels/fields in a column
 - Buttons in a row share height and baseline; split primary + overflow same height
 - Icons optically centered in hit boxes; chevrons are chevrons, not dots
+- Trailing pick / menu / list icons: **24 dp** (20 dp Compact),
+  **12 dp** from the trailing edge at default density
+  (`references/m3-trailing-icon.md`). A body-sized or 4 dp-flush
+  chevron is **ugly**. A disc or missing mark is **broken**.
 - Text and chrome clear card edges (no flush titles); ~12–16px page inset
 - Body not under status/menu; nav selection matches the open page
 

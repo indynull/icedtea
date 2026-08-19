@@ -74,6 +74,9 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
 - Every public widget constructor takes `a11y::A11y` and calls
   `a11y::attach` (name, role, value, disabled, checked). iced 0.14 has
   no accesskit slot; the widget id carries the node id.
+- Always size `themed_pick_list` trailing marks from
+  `m3::density::TRAILING_ICON` (24 dp, 20 dp Compact) and
+  `Density::inset`. Never body type size or a 4 dp hairline.
 - Lists and tables virtualize when row counts leave the hundreds
   (`collection::visible_range` + scroll offset). Their rail uses
   `collection::scroller_span` with a 24px minimum handle. `themed_scroll`

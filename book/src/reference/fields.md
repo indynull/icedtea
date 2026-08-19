@@ -149,8 +149,9 @@ Constructor: [`widget::themed_pick_list`](https://docs.rs/icedtea/latest/icedtea
 
 `ControlSize` picks the face. Compact uses tight pad and meta type
 so a toolbar can nest a dropdown. Default keeps the field body look.
-Placeholder shows when nothing is selected. Disabled keeps the
-current face.
+The trailing mark is iced's arrow handle: 24 dp (20 dp Compact),
+inset `Density::inset` from the end. Placeholder shows when nothing
+is selected. Disabled keeps the current face.
 
 Pass `A11y`.
 
@@ -165,8 +166,9 @@ Constructor: [`widget::form_group`](https://docs.rs/icedtea/latest/icedtea/widge
 
 Tab and Shift+Tab walk the rows and wrap. The first text field can
 take iced focus on mount when that row is `active` and carries an
-`Id`. Space activates the focused non-text row. Pick lists, chips,
-checkboxes, radios, and segmented buttons sit in the same order.
+`Id`. Space activates the focused non-text row. An empty row title
+leaves the label column blank. Pick lists, chips, checkboxes,
+radios, and segmented buttons sit in the same order.
 `layout::form` only stacks the pairs. The application owns values,
 messages, and `active`.
 

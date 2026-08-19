@@ -4,6 +4,12 @@ use serde::{Deserialize, Serialize};
 
 pub const GRID: u32 = 4;
 
+/// M3 list / menu / text-field trailing icon (medium).
+/// See <https://m3.material.io/components/lists/specs> and menus specs.
+pub const TRAILING_ICON: u32 = 24;
+/// M3 small icon, used on Compact faces.
+pub const TRAILING_ICON_COMPACT: u32 = 20;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DensityName {
     Compact,
@@ -103,6 +109,8 @@ mod tests {
         assert_eq!(Density::snap(0), 0);
         assert_eq!(Density::snap(4), 4);
         assert_eq!(Density::snap(5), 8);
+        assert_eq!(TRAILING_ICON, 24);
+        assert_eq!(TRAILING_ICON_COMPACT, 20);
         assert_eq!(Density::named(DensityName::Compact).touch_target(), 40);
         assert_eq!(Density::named(DensityName::Comfortable).touch_target(), 56);
         let compact = Density::named(DensityName::Compact);

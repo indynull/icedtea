@@ -56,6 +56,7 @@ pub const ENTRIES: &[Entry] = &[
     Entry { id: "value-field", title: "Value field", group: "Fields", page: "fields" },
     Entry { id: "textarea", title: "Text area", group: "Fields", page: "fields" },
     Entry { id: "suggest", title: "Suggest", group: "Fields", page: "fields" },
+    // Select and form start the Fields right column (gallery pack_at).
     Entry { id: "select", title: "Select", group: "Fields", page: "fields" },
     Entry { id: "form", title: "Form", group: "Fields", page: "fields" },
     Entry { id: "number", title: "Number", group: "Fields", page: "fields" },

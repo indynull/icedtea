@@ -24,8 +24,11 @@
 
 ### Bug fix
 
-- `themed_pick_list` uses iced's handle in the trailing band, so a
-  press on the mark opens the menu.
+- `themed_pick_list` uses iced's arrow handle: 24 dp (20 dp Compact),
+  inset `Density::inset` from the end, so a press on the mark opens
+  the menu.
+- `form_group` leaves the label column blank when the row title is
+  empty, so the generated a11y node id is not painted.
 - Tab labels, banners, app bars, and exclusive segments stay
   rectangular under Tight, Soft, and Pill. Segment cells are not
   independent stadiums. Disclosure, menu, search, and suggest rows
