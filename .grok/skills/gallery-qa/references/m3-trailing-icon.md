@@ -11,10 +11,13 @@ and the M3 icon size scale (small 20 dp, medium 24 dp).
 | Compact pick | **20 dp** (small) | **8 dp** (compact inset) |
 | Comfortable inset | 24 dp | **16 dp** |
 
-Color is `on_surface_variant`. The mark is a **chevron / arrow**, not a
-disc. It sits in the trailing band and is optically centered on the
-control height. Iced `pick_list::Handle::Arrow` paints right-aligned
-at `width - padding.right`, so end pad **is** the inset.
+Color is `on_surface_variant`. The mark is Material
+`arrow_drop_down` (a down triangle), not a disc and not a sideways
+chevron. It sits in the **end** band (physical right in LTR, left in
+RTL) and is optically centered on the control height. The down
+triangle does not flip (Firefox keep). `themed_pick_list` owns that
+paint; iced `Handle::Arrow` is physical-right and is not the product
+path.
 
 Constants: `m3::density::TRAILING_ICON` (24) and
 `TRAILING_ICON_COMPACT` (20). `themed_pick_list` must use those, not

@@ -68,17 +68,6 @@ fn pad(tok: Tokens) -> Padding {
     Padding::from([v as f32, h as f32])
 }
 
-/// Iced paints `Handle::Arrow` right-aligned at `width - padding.right`.
-/// End inset is the M3 trailing-icon inset (`Density::inset`: 8 / 12 / 16).
-fn pick_mark_pad(tok: Tokens, face: Padding) -> Padding {
-    Padding {
-        top: face.top,
-        right: tok.density.inset(),
-        bottom: face.bottom,
-        left: face.left,
-    }
-}
-
 /// M3 medium trailing icon (24 dp) on Default/Comfortable; small (20 dp)
 /// on Compact. Cap so the mark stays inside the control face.
 fn pick_handle_size(tok: Tokens, size: ControlSize) -> f32 {
@@ -88,6 +77,220 @@ fn pick_handle_size(tok: Tokens, size: ControlSize) -> f32 {
     };
     let face = sized_control_height(tok, size);
     want.min((face - crate::density::GRID as f32 * 2.0).max(12.0))
+}
+
+fn pick_mark_svg<'a, M: 'a>(tok: Tokens, size: f32) -> Element<'a, M> {
+    let handle = svg::Handle::from_memory(Icon::ArrowDropDown.bytes());
+    svg(handle)
+        .width(size)
+        .height(size)
+        .style(move |_t, _s| svg::Style {
+            color: Some(tok.scheme().on_surface_variant),
+        })
+        .into()
+}
+
+/// End pad so the value clears the Material trailing icon.
+fn pick_mark_pad(tok: Tokens, face: Padding, size: ControlSize) -> Padding {
+    let end = tok.density.inset() + pick_handle_size(tok, size);
+    match tok.direction {
+        Direction::Ltr => Padding {
+            top: face.top,
+            right: end,
+            bottom: face.bottom,
+            left: face.left,
+        },
+        Direction::Rtl => Padding {
+            top: face.top,
+            right: face.right,
+            bottom: face.bottom,
+            left: end,
+        },
+    }
+}
+
+/// Select face: the pick list fills the field; the drop mark paints on
+/// the end of that same face. Pointer events on the mark band go to the
+/// list so a press opens the menu. The down arrow does not flip
+/// (Firefox keep).
+struct PickFace<'a, Message> {
+    list: Element<'a, Message>,
+    mark: Element<'a, Message>,
+    dir: Direction,
+    inset: f32,
+    mark_size: f32,
+}
+
+impl<'a, Message: 'a> PickFace<'a, Message> {
+    fn new(list: Element<'a, Message>, tok: Tokens, size: ControlSize) -> Self {
+        let mark_size = pick_handle_size(tok, size);
+        Self {
+            list,
+            mark: pick_mark_svg(tok, mark_size),
+            dir: tok.direction,
+            inset: tok.density.inset(),
+            mark_size,
+        }
+    }
+}
+
+impl<Message> Widget<Message, iced::Theme, iced::Renderer> for PickFace<'_, Message> {
+    fn children(&self) -> Vec<Tree> {
+        vec![
+            Tree::new(self.list.as_widget()),
+            Tree::new(self.mark.as_widget()),
+        ]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(&[&self.list, &self.mark]);
+    }
+
+    fn size(&self) -> iced::Size<Length> {
+        iced::Size::new(Length::Fill, self.list.as_widget().size().height)
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        let list = self
+            .list
+            .as_widget_mut()
+            .layout(&mut tree.children[0], renderer, limits);
+        let mark_limits = layout::Limits::new(
+            iced::Size::ZERO,
+            iced::Size::new(self.mark_size, self.mark_size),
+        );
+        let mark = self
+            .mark
+            .as_widget_mut()
+            .layout(&mut tree.children[1], renderer, &mark_limits);
+        let width = list.size().width;
+        let height = list.size().height.max(self.mark_size);
+        let mark_x = match self.dir {
+            Direction::Ltr => width - self.inset - self.mark_size,
+            Direction::Rtl => self.inset,
+        };
+        let mark_y = ((height - self.mark_size) / 2.0).max(0.0);
+        let mark = mark.move_to(iced::Point::new(mark_x, mark_y));
+        layout::Node::with_children(iced::Size::new(width, height), vec![list, mark])
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        renderer: &iced::Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &iced::Rectangle,
+    ) {
+        let mut kids = layout.children();
+        let list_layout = kids.next().expect("pick list");
+        self.list.as_widget_mut().update(
+            &mut tree.children[0],
+            event,
+            list_layout,
+            cursor,
+            renderer,
+            clipboard,
+            shell,
+            viewport,
+        );
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut iced::Renderer,
+        theme: &iced::Theme,
+        style: &iced::advanced::renderer::Style,
+        layout: Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        viewport: &iced::Rectangle,
+    ) {
+        let mut kids = layout.children();
+        let list_layout = kids.next().expect("pick list");
+        let mark_layout = kids.next().expect("pick mark");
+        self.list.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            list_layout,
+            cursor,
+            viewport,
+        );
+        self.mark.as_widget().draw(
+            &tree.children[1],
+            renderer,
+            theme,
+            style,
+            mark_layout,
+            cursor,
+            viewport,
+        );
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &iced::Renderer,
+        operation: &mut dyn iced::advanced::widget::Operation,
+    ) {
+        let list_layout = layout.children().next().expect("pick list");
+        self.list
+            .as_widget_mut()
+            .operate(&mut tree.children[0], list_layout, renderer, operation);
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        viewport: &iced::Rectangle,
+        renderer: &iced::Renderer,
+    ) -> iced::mouse::Interaction {
+        let list_layout = layout.children().next().expect("pick list");
+        self.list.as_widget().mouse_interaction(
+            &tree.children[0],
+            list_layout,
+            cursor,
+            viewport,
+            renderer,
+        )
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &iced::Renderer,
+        viewport: &iced::Rectangle,
+        translation: iced::Vector,
+    ) -> Option<iced::advanced::overlay::Element<'b, Message, iced::Theme, iced::Renderer>> {
+        let list_layout = layout.children().next().expect("pick list");
+        self.list.as_widget_mut().overlay(
+            &mut tree.children[0],
+            list_layout,
+            renderer,
+            viewport,
+            translation,
+        )
+    }
+}
+
+impl<'a, Message: 'a> From<PickFace<'a, Message>> for Element<'a, Message> {
+    fn from(value: PickFace<'a, Message>) -> Self {
+        Self::new(value)
+    }
 }
 
 fn gap(tok: Tokens) -> f32 {
@@ -2651,8 +2854,11 @@ pub fn search_view<'a, M: Clone + 'a>(
 ///
 /// `size` is [`ControlSize`]. Compact uses tight pad and meta type so a
 /// toolbar or HUD can nest a dropdown. Default keeps the field body
-/// look. Placeholder shows when nothing is selected. Wheel over the
-/// control moves the selection. Disabled keeps the current face.
+/// look. The trailing mark is Material `arrow_drop_down` (24 dp, 20 dp
+/// Compact), inset `Density::inset` from the **end**. A press on the
+/// mark opens the menu. Placeholder shows when nothing is selected.
+/// Wheel over the control moves the selection. Disabled keeps the
+/// current face.
 ///
 ///
 /// ```
@@ -2700,17 +2906,16 @@ where
             .as_ref()
             .map(ToString::to_string)
             .unwrap_or_default();
-        return a11y::attach(
-            container(
-                text(shown)
-                    .size(type_px)
-                    .color(tok.scheme().on_surface_variant),
-            )
-            .padding(face_pad)
-            .style(move |_| style::panel(tok))
-            .into(),
-            &a11y,
-        );
+        let body = container(
+            text(shown)
+                .size(type_px)
+                .color(tok.scheme().on_surface_variant),
+        )
+        .padding(pick_mark_pad(tok, face_pad, size))
+        .width(Length::Fill)
+        .style(move |_| style::panel(tok))
+        .into();
+        return a11y::attach(PickFace::new(body, tok, size).into(), &a11y);
     }
     let opts: Vec<T> = options.borrow().to_vec();
     let sel = selected.clone();
@@ -2720,18 +2925,17 @@ where
         move |t| on_select(t)
     };
     let picker = pick_list(options, selected, on_pick)
-        .handle(pick_list::Handle::Arrow {
-            size: Some(pick_handle_size(tok, size).into()),
-        })
+        .handle(pick_list::Handle::None)
         .width(Length::Fill)
         .style(style::picker_style(tok))
-        .padding(pick_mark_pad(tok, face_pad))
+        .padding(pick_mark_pad(tok, face_pad, size))
         .text_size(type_px);
     let h = sized_control_height(tok, size);
     let picker: Element<'a, M> = container(picker)
         .width(Length::Fill)
         .height(Length::Fixed(h))
         .into();
+    let picker: Element<'a, M> = PickFace::new(picker, tok, size).into();
     let el: Element<'a, M> = if opts.is_empty() {
         picker
     } else {
@@ -10684,7 +10888,27 @@ mod tests {
             Pixels::from(16u32),
         ));
         let limits = Limits::new(Size::ZERO, Size::new(240.0, 48.0));
-        let _ = pick.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let node = pick.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let origin = layout.bounds();
+        let mark = pick_handle_size(tok, ControlSize::Default);
+        let (list, icon) = pick_list_and_mark(layout, mark).expect("RTL pick face");
+        must(
+            (list.width - origin.width).abs() < 1.0,
+            format!("RTL pick list must fill the field, list={list:?} face={origin:?}"),
+        );
+        must(
+            icon.x >= list.x && icon.x + icon.width <= list.x + list.width + 0.5,
+            format!("RTL mark must sit on the field, mark={icon:?} list={list:?}"),
+        );
+        must(
+            icon.x - origin.x < origin.width / 2.0,
+            "RTL pick chevron must sit on the end (left) side",
+        );
+        must(
+            (icon.x - origin.x - tok.density.inset()).abs() < 1.0,
+            "RTL pick mark must use Density::inset from the end",
+        );
         assert_eq!(closed_disclosure(tok), "◂");
 
         let titles = ["Files".into()];
@@ -12487,24 +12711,55 @@ mod tests {
         assert!(src.contains("tok.meta()"));
         assert!(src.contains("tok.body()"));
         assert!(src.contains("size.pad()"));
-        assert!(src.contains("pick_list::Handle::Arrow"));
-        assert!(!src.contains("pick_list::Handle::None"));
-        assert!(!src.contains("pick_chevron"));
+        assert!(src.contains("pick_list::Handle::None"));
+        assert!(!src.contains("pick_list::Handle::Arrow"));
+        assert!(src.contains("PickFace::new"));
+        assert!(src.contains("PickFace::new(picker, tok, size)"));
         assert!(src.contains("pick_mark_pad"));
-        assert!(src.contains("pick_handle_size(tok, size)"));
+    }
+
+    fn pick_list_and_mark(
+        layout: iced::advanced::layout::Layout<'_>,
+        mark: f32,
+    ) -> Option<(iced::Rectangle, iced::Rectangle)> {
+        let kids: Vec<_> = layout.children().collect();
+        if kids.len() == 2 {
+            let list = kids[0].bounds();
+            let icon = kids[1].bounds();
+            if (icon.width - mark).abs() < 0.6 && (icon.height - mark).abs() < 0.6 {
+                return Some((list, icon));
+            }
+        }
+        kids.into_iter()
+            .find_map(|kid| pick_list_and_mark(kid, mark))
+    }
+
+    fn pick_mark_boxes(
+        el: &mut Element<'_, &str>,
+        max: iced::Size,
+        mark: f32,
+    ) -> (iced::Rectangle, iced::Rectangle, iced::Rectangle) {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels};
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(iced::Size::ZERO, max);
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let origin = layout.bounds();
+        let (list, icon) = pick_list_and_mark(layout, mark).expect("pick face list + mark");
+        (origin, list, icon)
     }
 
     #[test]
     fn themed_pick_list_trailing_mark_follows_m3_icon_band() {
         let tok = named("dark").tokens;
-        let face = pad(tok);
-        let mark = pick_mark_pad(tok, face);
-        assert_eq!(mark.right, tok.density.inset());
-        assert_eq!(mark.left, face.left);
-        assert_eq!(
-            pick_handle_size(tok, ControlSize::Default),
-            crate::m3::density::TRAILING_ICON as f32
-        );
+        let mark = pick_handle_size(tok, ControlSize::Default);
+        assert_eq!(mark, crate::m3::density::TRAILING_ICON as f32);
         let compact = pick_handle_size(tok, ControlSize::Compact);
         assert!(compact <= crate::m3::density::TRAILING_ICON_COMPACT as f32);
         assert!(compact < pick_handle_size(tok, ControlSize::Default));
@@ -12517,10 +12772,42 @@ mod tests {
             ControlSize::Default,
             A11y::new("theme", Role::ComboBox),
         );
-        let size = layout_size(&mut el, iced::Size::new(240.0, 80.0));
+        let (origin, list, icon) = pick_mark_boxes(&mut el, iced::Size::new(240.0, 80.0), mark);
+        {
+            use iced::advanced::layout::{Layout, Limits};
+            use iced::advanced::widget::Tree;
+            use iced::{Font, Pixels};
+            let mut tree = Tree::new(el.as_widget());
+            let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+                Font::DEFAULT,
+                Pixels::from(16u32),
+            ));
+            let node = el.as_widget_mut().layout(
+                &mut tree,
+                &renderer,
+                &Limits::new(iced::Size::ZERO, iced::Size::new(240.0, 80.0)),
+            );
+            assert!(pick_list_and_mark(Layout::new(&node), 3.0).is_none());
+        }
         must(
-            size.width >= 24.0 && size.height >= 16.0,
-            format!("pick face must stay a control, got {size:?}"),
+            origin.width >= 24.0 && origin.height >= 16.0,
+            format!("pick face must stay a control, got {origin:?}"),
+        );
+        must(
+            (list.width - origin.width).abs() < 1.0,
+            format!("pick list must fill the field, list={list:?} face={origin:?}"),
+        );
+        must(
+            icon.x >= list.x && icon.x + icon.width <= list.x + list.width + 0.5,
+            format!("LTR mark must sit on the field, mark={icon:?} list={list:?}"),
+        );
+        must(
+            icon.x - origin.x > origin.width / 2.0,
+            "LTR pick mark must sit on the end (right) side",
+        );
+        must(
+            ((origin.x + origin.width) - (icon.x + icon.width) - tok.density.inset()).abs() < 1.0,
+            "LTR pick mark must use Density::inset from the end",
         );
         let src = include_str!("widget.rs")
             .split("pub fn themed_pick_list")
@@ -12529,12 +12816,13 @@ mod tests {
             .split("pub fn date_picker")
             .next()
             .unwrap();
-        assert!(src.contains("Handle::Arrow"));
+        assert!(src.contains("Handle::None"));
+        assert!(src.contains("PickFace"));
         let helper = include_str!("widget.rs")
             .split("fn pick_handle_size")
             .nth(1)
             .unwrap()
-            .split("fn gap")
+            .split("fn pick_mark_svg")
             .next()
             .unwrap();
         assert!(helper.contains("TRAILING_ICON"));
@@ -12543,10 +12831,6 @@ mod tests {
     #[test]
     fn themed_pick_list_matches_field_height_without_extra_gutter() {
         let tok = named("dark").tokens;
-        let face = pad(tok);
-        let mark = pick_mark_pad(tok, face);
-        assert_eq!(mark.right, tok.density.inset());
-        assert_eq!(mark.left, face.left);
         let mut field: Element<'_, String> = themed_text_input(
             "Name",
             "nord",
@@ -12578,13 +12862,12 @@ mod tests {
         }
     }
 
-    fn pick_press_overlay(at: iced::Point, disabled: bool) -> bool {
+    fn pick_press_overlay_at(tok: Tokens, at: iced::Point, disabled: bool) -> bool {
         use iced::advanced::clipboard;
         use iced::advanced::layout::{Layout, Limits};
         use iced::advanced::widget::Tree;
         use iced::mouse;
         use iced::{Event, Font, Pixels, Point, Rectangle, Size};
-        let tok = named("dark").tokens;
         let opts = ["nord", "dark"];
         let mut a11y = A11y::new("theme", Role::ComboBox);
         if disabled {
@@ -12651,18 +12934,31 @@ mod tests {
         let layout = Layout::new(&node);
         let origin = layout.bounds();
         let value = Point::new(origin.x + 20.0, origin.center_y());
-        let mark = Point::new(origin.x + origin.width - 8.0, origin.center_y());
+        let mark_size = pick_handle_size(tok, ControlSize::Default);
+        let mark = Point::new(
+            origin.x + origin.width - tok.density.inset() - mark_size / 2.0,
+            origin.center_y(),
+        );
         must(
-            pick_press_overlay(value, false),
+            pick_press_overlay_at(tok, value, false),
             "press on the value must open the pick overlay",
         );
         must(
-            pick_press_overlay(mark, false),
+            pick_press_overlay_at(tok, mark, false),
             "press on the chevron must open the pick overlay",
         );
         must(
-            !pick_press_overlay(value, true),
+            !pick_press_overlay_at(tok, value, true),
             "press on a disabled pick must not open the overlay",
+        );
+        let rtl = tok.with_direction(crate::i18n::Direction::Rtl);
+        let rtl_mark = Point::new(
+            origin.x + rtl.density.inset() + mark_size / 2.0,
+            origin.center_y(),
+        );
+        must(
+            pick_press_overlay_at(rtl, rtl_mark, false),
+            "press on the RTL end mark must open the pick overlay",
         );
     }
 

@@ -149,9 +149,11 @@ Constructor: [`widget::themed_pick_list`](https://docs.rs/icedtea/latest/icedtea
 
 `ControlSize` picks the face. Compact uses tight pad and meta type
 so a toolbar can nest a dropdown. Default keeps the field body look.
-The trailing mark is iced's arrow handle: 24 dp (20 dp Compact),
-inset `Density::inset` from the end. Placeholder shows when nothing
-is selected. Disabled keeps the current face.
+The trailing mark is Material `arrow_drop_down`: 24 dp (20 dp
+Compact), inset `Density::inset` from the end. A press on the mark
+opens the menu. Right-to-left puts the mark on the physical left.
+Placeholder shows when nothing is selected. Disabled keeps the
+current face.
 
 Pass `A11y`.
 

@@ -10,23 +10,26 @@
 - `command_palette_view` takes `PaletteOpts` for group headings, row
   face, empty omit, panel size, highlight, and leading or trailing
   slots. The query field stays visible with a nested page or `ask`.
-- `Action` carries `section`, `keywords`, and `children`.
+  0.11 callers pass `PaletteOpts::new()` as the new argument.
+- `Action` carries `section`, `keywords`, and `children`. A 0.11
+  `Action { ... }` literal must set those fields (or use `Action::new`).
+- `Icon` adds the Material Sharp chrome set (window, edit, file, mail,
+  media, view). Exhaustive `match` on `Icon` from 0.11 must cover the
+  new variants. A product mark is still `Glyph::Bytes`.
 - `CommandPalette` opens a child page and accepts a rank override.
 - Command palette rows paint the action's icon, title, tooltip, and
   shortcut when those fields are set.
 - Chrome icons and tree folder/file marks use Material Symbols Sharp
   (Apache 2.0). See `NOTICE`.
-- `Icon` covers Fyne's theme-icon jobs (window, edit, file, mail,
-  media, view). A product mark is still `Glyph::Bytes`.
 - `icon::adapt_material_svg` prepares a Material Symbols SVG for
   `icon_svg`. `icon::material_symbol_sharp_url` is the Sharp FILL 1
   URL the application downloads.
 
 ### Bug fix
 
-- `themed_pick_list` uses iced's arrow handle: 24 dp (20 dp Compact),
-  inset `Density::inset` from the end, so a press on the mark opens
-  the menu.
+- `themed_pick_list` paints Material `arrow_drop_down` on the end
+  (24 dp, 20 dp Compact, `Density::inset`). A press on the mark opens
+  the menu. Right-to-left puts the mark on the physical left.
 - `form_group` leaves the label column blank when the row title is
   empty, so the generated a11y node id is not painted.
 - Tab labels, banners, app bars, and exclusive segments stay
