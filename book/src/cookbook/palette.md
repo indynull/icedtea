@@ -65,6 +65,9 @@ impl App {
 ```
 
 `CommandPalette` owns the query and the highlight. Empty query lists
-favorites, then recent. `ask` opens a parameter field that
-`command_palette_view` paints. An overlay window uses `Boot` with an
-overlay kind; `window::place_pinned` keeps it on a chosen display.
+favorites, then recent. Type to rank the table. Enter on the field
+invokes the highlighted row. A row paints the action's icon, title,
+tooltip, and shortcut when those fields are set. `ask` opens a
+parameter field that `command_palette_view` paints. An overlay window
+uses `Boot` with an overlay kind; `window::place_pinned` keeps it on
+a chosen display.

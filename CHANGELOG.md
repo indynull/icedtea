@@ -7,6 +7,8 @@
 - `form_group` walks Tab and Shift+Tab among mixed fields and wraps.
   The first text field can take focus on mount. Space activates the
   focused checkbox, radio, pick, chips, or segmented row.
+- Command palette rows paint the action's icon, title, tooltip, and
+  shortcut when those fields are set.
 - Chrome icons and tree folder/file marks use Material Symbols Sharp
   (Apache 2.0). See `NOTICE`.
 - `Icon` covers Fyne's theme-icon jobs (window, edit, file, mail,
@@ -19,6 +21,8 @@
 
 - `themed_pick_list` uses iced's handle in the trailing band, so a
   press on the mark opens the menu.
+- Command palette Enter on the query invokes the highlighted row.
+  Empty query lists favorites, then recent.
 - `themed_scroll` uses iced's 60 px wheel line and keeps a short wheel
   gesture on the pane under the pointer.
 - `item_grid` tiles hug control height instead of filling the pane.

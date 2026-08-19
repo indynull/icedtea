@@ -176,9 +176,10 @@ Constructor: [`pattern::command_palette_view`](https://docs.rs/icedtea/latest/ic
 [source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-`CommandPalette` owns the query and hits. Empty query can show
-recent and favorites. `progress` fades and slides the panel.
-See [Overlay windows](../overlay-windows.md).
+`CommandPalette` owns the query and hits. Empty query shows
+favorites, then recent. A row paints the action's icon, title,
+tooltip, and shortcut when set. `progress` fades and slides the
+panel. See [Overlay windows](../overlay-windows.md).
 
 ### Main window
 

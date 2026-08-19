@@ -112,11 +112,6 @@ impl CommandPalette {
                     hits.push(id.clone());
                 }
             }
-            for a in table.iter().filter(|a| a.enabled) {
-                if !hits.iter().any(|h| h == a.id.as_str()) {
-                    hits.push(a.id.as_str().to_string());
-                }
-            }
             self.hits = hits;
         } else {
             let blobs: Vec<(String, String)> = table
@@ -200,13 +195,13 @@ mod tests {
         pal.move_sel(1);
         pal.move_sel(-1);
         pal.set_query(&table, "");
-        assert_eq!(pal.results(&table).len(), 2);
+        assert!(pal.results(&table).is_empty());
         pal.set_query(&table, "nope");
         assert!(pal.results(&table).is_empty());
         assert_eq!(pal.invoke_selected(&table), None);
         pal.move_sel(3);
         assert_eq!(pal.selected(), 0);
-        pal.set_query(&table, "");
+        pal.set_query(&table, "file");
         pal.apply_press(&crate::key::Press::End, 5);
         assert_eq!(pal.selected(), 1);
         pal.apply_press(&crate::key::Press::Home, 5);
@@ -226,6 +221,7 @@ mod tests {
         assert_eq!(pal.favorites.len(), 1);
         pal.set_query(&table, "");
         let empty = pal.results(&table);
+        assert_eq!(empty.len(), 2);
         assert_eq!(empty[0].id.as_str(), "file.save");
         pal.ask("go.line", "Line");
         pal.prompt.as_mut().unwrap().value = "12".into();
@@ -233,5 +229,61 @@ mod tests {
         assert_eq!(p.action, "go.line");
         assert_eq!(p.value, "12");
         assert!(pal.answer().is_none());
+    }
+
+    #[test]
+    fn spotlight_query_keeps_icon_and_name() {
+        use crate::icon::Icon;
+        let mut table = ActionTable::new();
+        table.insert(Action::new("app.notes", "Notes", 1u8).with_icon(Icon::Document));
+        table.insert(Action::new("app.mail", "Mail", 2u8).with_icon(Icon::MailCompose));
+        let mut pal = CommandPalette::new();
+        pal.set_query(&table, "no");
+        let hit = pal.results(&table)[0];
+        assert_eq!(hit.title, "Notes");
+        assert_eq!(hit.icon, Some(Icon::Document));
+        assert_eq!(pal.invoke_selected(&table), Some(1));
+        pal.move_sel(1);
+        assert_eq!(pal.selected(), 0);
+    }
+
+    #[test]
+    fn command_list_filters_and_invokes() {
+        let mut table = ActionTable::new();
+        table.insert(Action::new("file.save", "Save", 10u8));
+        table.insert(Action::new("file.quit", "Quit", 11u8));
+        let mut pal = CommandPalette::new();
+        pal.set_query(&table, "qu");
+        assert_eq!(pal.results(&table)[0].title, "Quit");
+        assert!(pal.results(&table)[0].icon.is_none());
+        assert_eq!(pal.invoke_selected(&table), Some(11));
+    }
+
+    #[test]
+    fn mixed_media_rows_filter_and_invoke() {
+        use crate::icon::Icon;
+        let mut table = ActionTable::new();
+        table.insert(
+            Action::new("media.photo", "Harbor", 21u8)
+                .with_icon(Icon::FileImage)
+                .with_tooltip("photos/harbor.jpg"),
+        );
+        table.insert(
+            Action::new("media.clip", "Demo reel", 22u8)
+                .with_icon(Icon::FileVideo)
+                .with_tooltip("videos/reel.mp4"),
+        );
+        table.insert(
+            Action::new("media.track", "Theme", 23u8)
+                .with_icon(Icon::FileAudio)
+                .with_tooltip("audio/theme.ogg"),
+        );
+        let mut pal = CommandPalette::new();
+        pal.set_query(&table, "reel");
+        let hit = pal.results(&table)[0];
+        assert_eq!(hit.title, "Demo reel");
+        assert_eq!(hit.icon, Some(Icon::FileVideo));
+        assert_eq!(hit.tooltip.as_deref(), Some("videos/reel.mp4"));
+        assert_eq!(pal.invoke_selected(&table), Some(22));
     }
 }

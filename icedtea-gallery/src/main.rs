@@ -21,7 +21,7 @@ use icedtea::layout;
 use icedtea::layout::{Axis, PointerDrive, SashDrag, SashEvent, SplitState};
 
 use icedtea::density::DensityName;
-use icedtea::icon::Icons;
+use icedtea::icon::{Icon, Icons};
 use icedtea::m3::{ElevationPolicy, ShapePolicy};
 use icedtea::nav::NavStack;
 use icedtea::palette::CommandPalette;
@@ -1166,6 +1166,33 @@ fn main() -> icedtea::iced::Result {
     )
 }
 
+fn pal_table() -> ActionTable<Message> {
+    let mut t = ActionTable::new();
+    t.insert(
+        Action::new("app.notes", "Notes", Message::PalRan("Notes".into()))
+            .with_icon(Icon::Document),
+    );
+    t.insert(
+        Action::new("file.save", "Save", Message::PalRan("Save".into()))
+            .with_icon(Icon::Save)
+            .with_shortcut(Shortcut::parse("ctrl+s").unwrap()),
+    );
+    t.insert(
+        Action::new("app.files", "Files", Message::PalRan("Files".into())).with_icon(Icon::Folder),
+    );
+    t.insert(Action::new("go.line", "Go to line", Message::AskLine));
+    t.insert(
+        Action::new(
+            "media.reel",
+            "Demo reel",
+            Message::PalRan("Demo reel".into()),
+        )
+        .with_icon(Icon::FileVideo)
+        .with_tooltip("videos/reel.mp4"),
+    );
+    t
+}
+
 #[derive(Debug, Clone)]
 enum Message {
     Select(&'static str),
@@ -1269,6 +1296,7 @@ enum Message {
     PalettePrompt(String),
     PaletteApply,
     AskLine,
+    PalRan(String),
     TableHScroll(f32),
     ListFace(bool),
     TreeFace(widget::TreeFace),
@@ -1454,6 +1482,8 @@ struct Gallery {
     dialog_note: String,
     palette: CommandPalette,
     palette_focus: bool,
+    pal_table: ActionTable<Message>,
+    pal_ran: String,
     reduced_motion: bool,
     dialog_open: bool,
     dialog_anim: icedtea::iced::Animation<bool>,
@@ -1556,9 +1586,13 @@ impl Gallery {
         );
         actions.insert(Action::new("go.line", "Go to line", Message::AskLine));
         // Titles are replaced in `retitle_actions` after locale fill.
+        let pal_table = pal_table();
         let mut palette = CommandPalette::new();
         palette.open();
-        palette.set_query(&actions, "");
+        for a in pal_table.iter() {
+            palette.pin_favorite(a.id.as_str());
+        }
+        palette.set_query(&pal_table, "");
         let md = MarkdownDoc::parse(samples::MARKDOWN);
         let md_heads = md.headings();
         let mut gallery = Self {
@@ -1776,6 +1810,8 @@ impl Gallery {
             dialog_note: String::new(),
             palette,
             palette_focus: true,
+            pal_table,
+            pal_ran: String::new(),
             reduced_motion: false,
             dialog_open: true,
             dialog_anim: icedtea::motion::overlay_animation(true, false),
@@ -3183,12 +3219,19 @@ impl Gallery {
                     if self.page == "palette" {
                         match press {
                             icedtea::key::Press::Enter => {
-                                if let Some(msg) = self.palette.invoke_selected(&self.actions) {
+                                if let Some(msg) = self.palette.invoke_selected(&self.pal_table) {
                                     return self.update(msg);
                                 }
                             }
-                            _ if self.palette_focus => {}
-                            _ => self.palette.apply_press(&press, 5),
+                            icedtea::key::Press::ArrowUp
+                            | icedtea::key::Press::ArrowDown
+                            | icedtea::key::Press::PageUp
+                            | icedtea::key::Press::PageDown
+                            | icedtea::key::Press::Home
+                            | icedtea::key::Press::End => {
+                                self.palette.apply_press(&press, 5);
+                            }
+                            _ => {}
                         }
                     } else if self.page == "table" {
                         let (r, c) = press.step_cell(
@@ -3259,16 +3302,21 @@ impl Gallery {
                 return self.update(Message::DialogOpen(false));
             }
             Message::PaletteQuery(q) => {
-                self.palette.set_query(&self.actions, q);
+                self.palette.set_query(&self.pal_table, q);
                 self.palette_focus = true;
             }
             Message::PalettePick(i) => {
                 self.palette_focus = true;
-                if let Some(action) = self.palette.results(&self.actions).get(i) {
+                if let Some(action) = self.palette.results(&self.pal_table).get(i) {
+                    let id = action.id.as_str().to_string();
                     if let Some(msg) = action.invoke() {
+                        self.palette.remember(id);
                         return self.update(msg);
                     }
                 }
+            }
+            Message::PalRan(name) => {
+                self.pal_ran = format!("{} {name}", self.catalog.t("pal.ran"));
             }
             Message::AskLine => {
                 self.palette.ask("go.line", "Line");
@@ -3281,7 +3329,7 @@ impl Gallery {
             }
             Message::PaletteApply => {
                 if let Some(p) = self.palette.answer() {
-                    self.note = format!("{} → {}", p.action, p.value);
+                    self.pal_ran = format!("{} → {}", p.action, p.value);
                 }
             }
             Message::TableHScroll(x) => self.table_cols.set_h_scroll(x),
@@ -6592,13 +6640,14 @@ impl Gallery {
                 }
             }
             "palette" => {
-                let res = self.palette.results(&self.actions);
+                let res = self.palette.results(&self.pal_table);
                 column![
                     widget::meta(
                         self.catalog.t("pal.hint"),
                         tok,
                         named("pal-job", Role::Status),
                     ),
+                    widget::meta(&self.pal_ran, tok, named("pal-ran", Role::Status)),
                     container(pattern::command_palette_view(
                         self.palette.query(),
                         self.catalog.t("pal.placeholder"),
@@ -7430,6 +7479,26 @@ mod tests {
         assert_eq!(g.query, "in");
         assert!(g.prefs_query.is_empty());
         assert!(!icedtea::pattern::filter_prefs(&g.prefs, &g.prefs_query).is_empty());
+    }
+
+    #[test]
+    fn palette_page_invokes_the_public_constructor() {
+        let src = include_str!("main.rs");
+        let page = src
+            .split("named(\"pal-job\"")
+            .nth(1)
+            .unwrap()
+            .split("\"inspector\" =>")
+            .next()
+            .unwrap();
+        assert_eq!(page.matches("command_palette_view(").count(), 1);
+        let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
+        g.page = "palette";
+        let _ = g.update(super::Message::PaletteQuery("no".into()));
+        assert_eq!(g.palette.results(&g.pal_table)[0].title, "Notes");
+        assert!(g.palette.results(&g.pal_table)[0].icon.is_some());
+        let _ = g.update(super::Message::PalettePick(0));
+        assert!(g.pal_ran.contains("Notes"));
     }
 
     #[test]

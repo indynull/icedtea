@@ -425,6 +425,40 @@ pub fn tab_style(
     }
 }
 
+/// Selected command-palette row (wash, not a filled button).
+pub fn palette_hit(
+    tok: Tokens,
+    selected: bool,
+) -> impl Fn(&iced::Theme, button::Status) -> button::Style {
+    move |_theme, status| {
+        let s = tok.scheme();
+        let state = button_status(status);
+        let bg = if selected {
+            s.secondary_container
+        } else {
+            match state {
+                ControlState::Hovered | ControlState::Pressed => hover_fill(tok),
+                _ => Color::TRANSPARENT,
+            }
+        };
+        button::Style {
+            background: Some(Background::Color(bg)),
+            text_color: if selected {
+                s.on_secondary_container
+            } else {
+                s.on_surface
+            },
+            border: Border {
+                color: Color::TRANSPARENT,
+                width: 0.0,
+                radius: component_radius(tok, Component::Button),
+            },
+            shadow: Shadow::default(),
+            snap: false,
+        }
+    }
+}
+
 /// Active tab underbar (3dp primary). Separate from the label button.
 pub fn tab_indicator(tok: Tokens) -> container::Style {
     let s = tok.scheme();

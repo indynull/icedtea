@@ -20,7 +20,7 @@
 use iced::widget::{button, column, container, mouse_area, row, text, Column, Row, Space, Stack};
 use iced::{Alignment, Element, Length, Padding, Point, Size};
 
-use crate::a11y::{A11y, Role};
+use crate::a11y::{self, A11y, Role};
 use crate::action::{Action, ActionTable};
 use crate::collection::Tabs;
 use crate::i18n::{order, Catalog, Direction};
@@ -32,8 +32,8 @@ use crate::theme::Tokens;
 use crate::typo;
 use crate::variant::Variant;
 use crate::widget::{
-    dismiss_button, group_box, label, meta, tab_bar, themed_button, themed_scroll,
-    themed_text_input, CardFace, FieldOpts,
+    dismiss_button, group_box, icon_svg, label, meta, search_input, tab_bar, themed_button,
+    themed_scroll, themed_text_input, CardFace, FieldOpts,
 };
 
 /// Group actions by the id prefix before `.` (`file.save` → `file`).
@@ -312,7 +312,9 @@ pub fn status_bar<'a, M: Clone + 'a>(
 /// Fuzzy find over the action table.
 ///
 /// Pass `CommandPalette::results`. An empty query lists favorites,
-/// then recent, then the rest. `prompt` paints the parameter field.
+/// then recent. `prompt` paints the parameter field. Enter on the
+/// query invokes the highlighted row (`on_pick(selected)`). A row
+/// shows the action's icon, title, tooltip, and shortcut when set.
 ///
 ///
 /// ```
@@ -356,24 +358,19 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let t = crate::motion::visual(progress, tok.reduced_motion);
     let paint = tok.fade(t);
+    let dir = paint.direction;
     let mut list = Column::new().spacing(2);
     for (i, a) in results.iter().enumerate() {
-        list = list.push(themed_button(
-            a.title.clone(),
+        list = list.push(palette_hit(
+            a,
+            i == selected,
             a.enabled.then(|| on_pick(i)),
             paint,
-            if i == selected {
-                Variant::Primary
-            } else {
-                Variant::Ghost
-            },
-            Icons::NONE,
-            A11y::new(a.title.clone(), Role::MenuItem)
-                .with_checked(i == selected)
-                .with_disabled(!a.enabled),
+            dir,
         ));
     }
     let n = results.len();
+    let submit = (!results.is_empty() && selected < results.len()).then(|| on_pick(selected));
     let field: Element<'a, M> = if let Some(p) = prompt {
         column![
             meta(
@@ -395,18 +392,23 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
         .spacing(6)
         .into()
     } else {
-        themed_text_input(
-            placeholder,
+        search_input(
             query,
             on_query,
-            None,
-            FieldOpts::NONE,
+            submit,
             paint,
-            A11y::new("palette-query", Role::TextBox),
+            A11y::new(placeholder, Role::TextBox),
             Some(iced::widget::Id::new("palette-query")),
         )
     };
-    let hits: Element<'a, M> = if n > 12 {
+    let hits: Element<'a, M> = if n == 0 {
+        let empty = if query.trim().is_empty() {
+            "Favorites and recent appear here."
+        } else {
+            "No matching commands"
+        };
+        meta(empty, paint, A11y::new("palette-empty", Role::Status))
+    } else if n > 8 {
         container(themed_scroll(
             list.into(),
             paint,
@@ -415,15 +417,15 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
             None,
             None::<fn(_) -> M>,
         ))
-        .height(Length::Fixed(260.0))
+        .height(Length::Fixed(280.0))
         .into()
     } else {
         list.into()
     };
     let panel = container(column![field, hits].spacing(tok.density.gap()))
         .padding(tok.density.inset())
-        .width(480)
-        .max_height(360.0)
+        .width(560)
+        .max_height(420.0)
         .style(move |_| style::fade_face(style::raised_card(tok), t));
     crate::motion::overlay(
         panel.into(),
@@ -431,6 +433,67 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
         crate::motion::Slide::Down,
         tok,
         A11y::new("palette", Role::Menu),
+    )
+}
+
+fn palette_hit<'a, M: Clone + 'a>(
+    action: &Action<M>,
+    selected: bool,
+    on_pick: Option<M>,
+    tok: Tokens,
+    dir: Direction,
+) -> Element<'a, M> {
+    let s = tok.scheme();
+    let title = text(action.title.clone()).size(tok.body());
+    let mut lead: Vec<Element<'a, M>> = Vec::new();
+    if let Some(ic) = action.icon {
+        lead.push(icon_svg(
+            ic,
+            tok,
+            A11y::new(action.title.clone(), Role::Image),
+        ));
+    }
+    let mut col = Column::new().spacing(2);
+    col = col.push(title);
+    if let Some(tip) = &action.tooltip {
+        col = col.push(
+            text(tip.clone())
+                .size(tok.meta())
+                .color(s.on_surface_variant),
+        );
+    }
+    lead.push(col.into());
+    let mut trail: Vec<Element<'a, M>> = Vec::new();
+    if let Some(sc) = &action.shortcut {
+        trail.push(
+            text(sc.to_string())
+                .size(tok.meta())
+                .color(s.on_surface_variant)
+                .into(),
+        );
+    }
+    let mut line = Row::new()
+        .spacing(tok.density.gap())
+        .align_y(Alignment::Center);
+    for el in order(dir, lead) {
+        line = line.push(el);
+    }
+    line = line.push(Space::new().width(Length::Fill));
+    for el in order(dir, trail) {
+        line = line.push(el);
+    }
+    let mut b = button(line)
+        .padding(tok.density.inset())
+        .width(Length::Fill)
+        .style(style::palette_hit(tok, selected));
+    if let Some(msg) = on_pick {
+        b = b.on_press(msg);
+    }
+    a11y::attach(
+        b.into(),
+        &A11y::new(action.title.clone(), Role::MenuItem)
+            .with_checked(selected)
+            .with_disabled(!action.enabled),
     )
 }
 
@@ -2130,6 +2193,8 @@ mod tests {
         );
         let _ = style::tab_style(tok, true)(&theme, iced::widget::button::Status::Active);
         let _ = style::tab_style(tok, false)(&theme, iced::widget::button::Status::Hovered);
+        let _ = style::palette_hit(tok, true)(&theme, iced::widget::button::Status::Active);
+        let _ = style::palette_hit(tok, false)(&theme, iced::widget::button::Status::Hovered);
         let _ = style::search_style(tok)(
             &theme,
             iced::widget::text_input::Status::Focused { is_hovered: false },
@@ -2280,7 +2345,7 @@ mod tests {
             .next()
             .unwrap();
         assert!(!palette_src.contains("A11y::new(query"));
-        assert!(palette_src.contains("A11y::new(\"palette-query\""));
+        assert!(palette_src.contains("Id::new(\"palette-query\""));
         let pref_src = src
             .split("pub fn preferences_page")
             .nth(1)
@@ -2617,6 +2682,38 @@ mod tests {
             tok,
         );
         paint(&mut pal_mid);
+        let mut notes = ActionTable::new();
+        notes.insert(Action::new("app.notes", "Notes", ()).with_icon(Icon::Document));
+        let notes_res: Vec<&Action<()>> = notes.iter().collect();
+        let mut el: Element<'_, ()> = command_palette_view(
+            "no",
+            "Search",
+            &notes_res,
+            0,
+            |_| (),
+            |_| (),
+            None,
+            |_| (),
+            None,
+            1.0,
+            tok,
+        );
+        paint(&mut el);
+        let none: Vec<&Action<()>> = Vec::new();
+        let mut miss: Element<'_, ()> = command_palette_view(
+            "zzz",
+            "Search",
+            &none,
+            0,
+            |_| (),
+            |_| (),
+            None,
+            |_| (),
+            None,
+            1.0,
+            tok,
+        );
+        paint(&mut miss);
         let body = lab("x");
         let scene = lab("s");
         let mut sheet_mid: Element<'_, ()> =
