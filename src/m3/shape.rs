@@ -71,29 +71,33 @@ pub enum Component {
     Shell,
     /// Tab *label* is flush; active indicator is a separate underbar.
     Tab,
+    /// Exclusive in-pane segment (joined strip). Flush; not a stadium.
+    Segment,
 }
 
 /// How constructors pick a corner from [`Component`].
 ///
 /// Default is [`Self::Desktop`] (every family 0 dp). Apps that want
-/// Material corners, or one radius on every control, set this on
-/// [`crate::theme::Tokens`].
+/// Material corners, or one radius on rounded families, set this on
+/// [`crate::theme::Tokens`]. Flush chrome (tabs, app bars, banners,
+/// exclusive segments) stays shape None under every policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum ShapePolicy {
     /// Every family is M3 None (0 dp). Desktop default.
     #[default]
     Desktop,
-    /// Extra-small (4 dp) on every family.
+    /// Extra-small (4 dp) on rounded families. Flush chrome stays None.
     Tight,
-    /// Medium (12 dp) on every family.
+    /// Medium (12 dp) on rounded families. Flush chrome stays None.
+    /// Checkbox stays extra-small so the box is not a circle.
     Soft,
-    /// Full pill on buttons, chips, badges, search, and tracks. Cards,
-    /// menus, fields, dialogs, toasts, and tooltips stay boxes. Banners
-    /// and app bars stay flush.
+    /// Full stadium on buttons, chips, badges, search, and tracks.
+    /// Cards, menus, fields, dialogs, toasts, and tooltips stay boxes.
+    /// Tabs, app bars, banners, and exclusive segments stay flush.
     Pill,
     /// Documented Material map (buttons extra-small, chips and badges
     /// small, cards medium, toasts and tooltips extra-small, dialogs
-    /// and search extra-large, tracks full, app bars flush).
+    /// and search extra-large, tracks full, flush chrome None).
     Material,
 }
 
@@ -107,24 +111,43 @@ impl Component {
     pub fn shape_for(self, policy: ShapePolicy) -> Shape {
         match policy {
             ShapePolicy::Desktop => Shape::None,
-            ShapePolicy::Tight => Shape::ExtraSmall,
-            ShapePolicy::Soft => Shape::Medium,
+            ShapePolicy::Tight => {
+                if self.is_flush() {
+                    Shape::None
+                } else {
+                    Shape::ExtraSmall
+                }
+            }
+            ShapePolicy::Soft => {
+                if self.is_flush() {
+                    Shape::None
+                } else if matches!(self, Self::Checkbox) {
+                    Shape::ExtraSmall
+                } else {
+                    Shape::Medium
+                }
+            }
             ShapePolicy::Pill => self.pill_shape(),
             ShapePolicy::Material => self.material_shape(),
         }
     }
 
+    /// Tabs, app bars, banners, and exclusive segments stay rectangular.
+    pub fn is_flush(self) -> bool {
+        matches!(
+            self,
+            Self::AppBar | Self::Shell | Self::Tab | Self::Banner | Self::Segment
+        )
+    }
+
     fn pill_shape(self) -> Shape {
         match self {
             Self::Button | Self::Chip | Self::Badge | Self::Search | Self::Track => Shape::Full,
-            Self::AppBar | Self::Shell | Self::Tab | Self::Banner => Shape::None,
-            Self::Field
-            | Self::Checkbox
-            | Self::Card
-            | Self::Menu
-            | Self::Dialog
-            | Self::Toast
-            | Self::Tooltip => Shape::Medium,
+            Self::AppBar | Self::Shell | Self::Tab | Self::Banner | Self::Segment => Shape::None,
+            Self::Checkbox => Shape::ExtraSmall,
+            Self::Field | Self::Card | Self::Menu | Self::Dialog | Self::Toast | Self::Tooltip => {
+                Shape::Medium
+            }
         }
     }
 
@@ -140,7 +163,7 @@ impl Component {
             Self::Card => Shape::Medium,
             Self::Dialog | Self::Search => Shape::ExtraLarge,
             Self::Track => Shape::Full,
-            Self::AppBar | Self::Shell | Self::Tab | Self::Banner => Shape::None,
+            Self::AppBar | Self::Shell | Self::Tab | Self::Banner | Self::Segment => Shape::None,
         }
     }
 
@@ -221,13 +244,24 @@ mod tests {
             Component::AppBar,
             Component::Shell,
             Component::Tab,
+            Component::Segment,
         ] {
             assert_eq!(c.shape(), Shape::None, "{c:?}");
             assert_eq!(c.shape().dp(), 0.0);
             assert_eq!(std::hint::black_box(c.radius()).top_left, 0.0);
             assert_eq!(c.shape_for(ShapePolicy::Desktop), Shape::None);
-            assert_eq!(c.shape_for(ShapePolicy::Tight), Shape::ExtraSmall);
-            assert_eq!(c.shape_for(ShapePolicy::Soft), Shape::Medium);
+            if c.is_flush() {
+                assert_eq!(c.shape_for(ShapePolicy::Tight), Shape::None, "{c:?}");
+                assert_eq!(c.shape_for(ShapePolicy::Soft), Shape::None, "{c:?}");
+                assert_eq!(c.shape_for(ShapePolicy::Pill), Shape::None, "{c:?}");
+                assert_eq!(c.shape_for(ShapePolicy::Material), Shape::None, "{c:?}");
+            } else if matches!(c, Component::Checkbox) {
+                assert_eq!(c.shape_for(ShapePolicy::Tight), Shape::ExtraSmall);
+                assert_eq!(c.shape_for(ShapePolicy::Soft), Shape::ExtraSmall);
+            } else {
+                assert_eq!(c.shape_for(ShapePolicy::Tight), Shape::ExtraSmall, "{c:?}");
+                assert_eq!(c.shape_for(ShapePolicy::Soft), Shape::Medium, "{c:?}");
+            }
         }
         assert_eq!(Component::Button.shape_for(ShapePolicy::Pill), Shape::Full);
         assert_eq!(Component::Chip.shape_for(ShapePolicy::Pill), Shape::Full);
@@ -246,12 +280,13 @@ mod tests {
         assert_eq!(Component::Field.shape_for(ShapePolicy::Pill), Shape::Medium);
         assert_eq!(
             Component::Checkbox.shape_for(ShapePolicy::Pill),
-            Shape::Medium
+            Shape::ExtraSmall
         );
         assert_eq!(Component::AppBar.shape_for(ShapePolicy::Pill), Shape::None);
         assert_eq!(Component::Shell.shape_for(ShapePolicy::Pill), Shape::None);
         assert_eq!(Component::Tab.shape_for(ShapePolicy::Pill), Shape::None);
         assert_eq!(Component::Banner.shape_for(ShapePolicy::Pill), Shape::None);
+        assert_eq!(Component::Segment.shape_for(ShapePolicy::Pill), Shape::None);
         assert_eq!(Component::Search.shape_for(ShapePolicy::Pill), Shape::Full);
         assert_eq!(Component::Track.shape_for(ShapePolicy::Pill), Shape::Full);
         assert_eq!(
@@ -304,6 +339,10 @@ mod tests {
         );
         assert_eq!(Component::Tab.shape_for(ShapePolicy::Material), Shape::None);
         assert_eq!(
+            Component::Segment.shape_for(ShapePolicy::Material),
+            Shape::None
+        );
+        assert_eq!(
             Component::Banner.shape_for(ShapePolicy::Material),
             Shape::None
         );
@@ -320,5 +359,38 @@ mod tests {
             4.0
         );
         assert_eq!(ShapePolicy::default(), ShapePolicy::Desktop);
+    }
+
+    #[test]
+    fn flush_chrome_stays_none_on_every_policy() {
+        for c in [
+            Component::Tab,
+            Component::AppBar,
+            Component::Shell,
+            Component::Banner,
+            Component::Segment,
+        ] {
+            assert!(c.is_flush(), "{c:?}");
+            for policy in [
+                ShapePolicy::Desktop,
+                ShapePolicy::Tight,
+                ShapePolicy::Soft,
+                ShapePolicy::Pill,
+                ShapePolicy::Material,
+            ] {
+                assert_eq!(c.shape_for(policy), Shape::None, "{c:?} {policy:?}");
+                assert_eq!(c.radius_for(policy).top_left, 0.0, "{c:?} {policy:?}");
+            }
+        }
+        assert!(!Component::Button.is_flush());
+        assert!(!Component::Chip.is_flush());
+        assert_eq!(Component::Button.shape_for(ShapePolicy::Pill), Shape::Full);
+        assert_eq!(Component::Chip.shape_for(ShapePolicy::Pill), Shape::Full);
+        assert_eq!(Component::Search.shape_for(ShapePolicy::Pill), Shape::Full);
+        assert_eq!(Component::Track.shape_for(ShapePolicy::Pill), Shape::Full);
+        assert_ne!(
+            Component::Segment.shape_for(ShapePolicy::Pill),
+            Component::Button.shape_for(ShapePolicy::Pill)
+        );
     }
 }

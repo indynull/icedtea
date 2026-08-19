@@ -26,6 +26,10 @@
 
 - `themed_pick_list` uses iced's handle in the trailing band, so a
   press on the mark opens the menu.
+- Tab labels, banners, app bars, and exclusive segments stay
+  rectangular under Tight, Soft, and Pill. Segment cells are not
+  independent stadiums. Disclosure, menu, search, and suggest rows
+  use the Menu family; list checks use Checkbox.
 - Command palette Enter on the query invokes the highlighted row.
   Empty query lists favorites, then recent.
 - `themed_scroll` uses iced's 60 px wheel line and keeps a short wheel

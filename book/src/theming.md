@@ -13,7 +13,8 @@ Washes use scheme state layers (`hover_fill` / `pressed_fill`). Desktop
 control corners are M3 shape **None** unless
 [`Tokens::with_shape`](https://docs.rs/icedtea/latest/icedtea/theme/struct.Tokens.html#method.with_shape)
 selects Tight, Soft, Pill, or the Material component map
-(see [foundations](./m3-foundations.md)).
+(see [foundations](./m3-foundations.md)). Tabs, app bars, banners,
+and exclusive segments stay flush under every policy.
 Type size is the M3 scale times
 [`Tokens::font_scale`](https://docs.rs/icedtea/latest/icedtea/theme/struct.Tokens.html#method.with_font_scale)
 (1.0 by default). Shadows follow

@@ -231,7 +231,7 @@ pub fn command_bar<'a, M: Clone + 'a>(
             .color(tok.scheme().on_surface);
         let mut b = button(face)
             .padding([2.0, tok.density.gap()])
-            .style(style::button_style(tok, Variant::Ghost));
+            .style(style::joined_button_style(tok, Variant::Ghost));
         if let Some(m) = a.invoke() {
             b = b.on_press(m);
         }
@@ -1763,7 +1763,7 @@ pub fn context_menu<'a, M: Clone + 'a>(
             ]))
             .width(Length::Fill)
             .height(Length::Fixed(context_row_h(paint.density)))
-            .style(style::button_style(paint, Variant::Ghost));
+            .style(style::menu_item_style(paint));
         if let Some(m) = a11y.apply_message(a.invoke()) {
             row = row.on_press(m);
         }
@@ -2830,6 +2830,22 @@ mod tests {
             .unwrap();
         assert!(cm_src.contains("align_start(tok.direction)"));
         assert!(cm_src.contains("tok.body()"));
+        assert!(cm_src.contains("menu_item_style"));
+        assert!(!cm_src.contains("button_style"));
+        let pill = tok.with_shape(crate::m3::ShapePolicy::Pill);
+        let mut cm_pill = context_menu(
+            table.iter().cloned(),
+            iced::Point::new(12.0, 20.0),
+            vp,
+            (),
+            1.0,
+            pill,
+        );
+        paint(&mut cm_pill);
+        let theme = crate::theme::iced_theme("dark", pill);
+        let row = style::menu_item_style(pill)(&theme, iced::widget::button::Status::Hovered);
+        assert_ne!(row.border.radius.top_left, crate::m3::Shape::Full.dp());
+        assert_eq!(row.border.radius.top_left, crate::m3::Shape::Medium.dp());
         let card = context_card_size(table.iter().count(), vp, tok.density);
         let row_w = menu_row_width(&mut cm);
         let row_msg = format!("menu row {row_w} should fill the {card:?} card");

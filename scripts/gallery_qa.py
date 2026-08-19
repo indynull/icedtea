@@ -482,6 +482,18 @@ DEFAULT_INTERACT: list[dict[str, str]] = [
         "expect": "Outlined and Elevated faces; icon-plus-label; toggle-icon; vertical slider; Accept and Notify on",
     },
     {
+        "match": "controls:",
+        "name": "controls-shape-pill",
+        "script": "shape Pill\n",
+        "expect": "buttons stadium; exclusive segments joined rectangles, not independent pills",
+    },
+    {
+        "match": "Tabs, accordion",
+        "name": "sections-shape-pill",
+        "script": "shape Pill\n",
+        "expect": "tab labels rectangular with underbar; not stadiums",
+    },
+    {
         "match": "fields:",
         "name": "search-submit",
         "script": "query icedtea\nsearch-go\n",

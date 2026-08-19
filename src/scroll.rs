@@ -208,7 +208,7 @@ where
     ) {
         let bounds = layout.bounds();
         let scheme = self.tok.scheme();
-        let rail_r = self.tok.radius(crate::m3::shape::Component::Button);
+        let rail_r = self.tok.radius(crate::m3::shape::Component::Track);
         renderer.fill_quad(
             renderer::Quad {
                 bounds,
@@ -857,7 +857,7 @@ where
         let state = tree.state.downcast_ref::<ThemedScrollState>();
         let rail_bounds = rail_layout.bounds();
         let scheme = self.tok.scheme();
-        let rail_r = self.tok.radius(crate::m3::shape::Component::Button);
+        let rail_r = self.tok.radius(crate::m3::shape::Component::Track);
         renderer.fill_quad(
             renderer::Quad {
                 bounds: rail_bounds,

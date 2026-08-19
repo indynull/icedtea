@@ -377,7 +377,7 @@ pub fn hyperlink<'a, M: Clone + 'a>(
     let title = a11y.apply_name(title);
     let mut b = button(text(title).size(tok.body()).color(tok.scheme().primary))
         .padding(0)
-        .style(style::button_style(tok, Variant::Ghost));
+        .style(style::joined_button_style(tok, Variant::Ghost));
     if let Some(m) = a11y.apply_message(Some(msg)) {
         b = b.on_press(m);
     }
@@ -853,7 +853,7 @@ fn indeterminate_box_face(tok: Tokens) -> iced::widget::container::Style {
     st.border = iced::border::Border {
         color: s.primary,
         width: 2.0,
-        radius: tok.radius(crate::m3::shape::Component::Field),
+        radius: tok.radius(crate::m3::shape::Component::Checkbox),
     };
     st
 }
@@ -913,10 +913,7 @@ pub fn segmented_button<'a, M: Clone + 'a>(
             .padding(face_pad)
             .width(Length::Shrink)
             .height(height)
-            .style(style::button_style(
-                tok,
-                if on { Variant::Primary } else { Variant::Quiet },
-            ));
+            .style(style::segment_style(tok, on));
         if !a11y.disabled {
             b = b.on_press(on_select(*i));
         }
@@ -966,21 +963,24 @@ pub fn button_group<'a, M: Clone + 'a>(
             );
         }
         let icons = cell.icon.map(Icons::leading).unwrap_or(Icons::NONE);
-        let face = themed_button_sized(
-            cell.label.clone(),
-            if a11y.disabled {
-                None
-            } else {
-                Some(on_press(*i))
-            },
-            tok,
-            Variant::Quiet,
-            icons,
-            Length::Shrink,
-            Length::Fixed(control_height(tok)),
-            A11y::button(cell.label.clone()).with_disabled(a11y.disabled),
-        );
-        r = r.push(face);
+        let label = cell.label.clone();
+        let face: Element<'a, M> = if icons == Icons::NONE {
+            text(label.clone()).size(tok.body()).into()
+        } else {
+            icon_label(label.clone(), icons, tok)
+        };
+        let mut b = button(face)
+            .padding(pad(tok))
+            .width(Length::Shrink)
+            .height(Length::Fixed(control_height(tok)))
+            .style(style::joined_button_style(tok, Variant::Quiet));
+        if !a11y.disabled {
+            b = b.on_press(on_press(*i));
+        }
+        r = r.push(a11y::attach(
+            b.into(),
+            &A11y::button(label).with_disabled(a11y.disabled),
+        ));
     }
     a11y::attach(
         container(r)
@@ -2014,14 +2014,15 @@ pub fn suggest_field<'a, M: Clone + 'a>(
     )]
     .spacing(2);
     for (i, s) in suggestions.iter().enumerate() {
-        col = col.push(themed_button(
-            s.clone(),
-            a11y.apply_message(Some(on_pick(i))),
-            tok,
-            Variant::Ghost,
-            Icons::NONE,
-            A11y::new(s.clone(), Role::ListItem).with_disabled(a11y.disabled),
-        ));
+        let row_a11y = A11y::new(s.clone(), Role::ListItem).with_disabled(a11y.disabled);
+        let mut b = button(text(s.clone()).size(tok.body()))
+            .padding(pad(tok))
+            .width(Length::Fill)
+            .style(style::menu_item_style(tok));
+        if let Some(m) = row_a11y.apply_message(Some(on_pick(i))) {
+            b = b.on_press(m);
+        }
+        col = col.push(a11y::attach(b.into(), &row_a11y));
     }
     a11y::attach(col.into(), &a11y)
 }
@@ -2622,7 +2623,7 @@ pub fn search_view<'a, M: Clone + 'a>(
             )
             .padding(pad(tok))
             .width(Length::Fill)
-            .style(style::button_style(tok, Variant::Ghost));
+            .style(style::menu_item_style(tok));
             if let Some(m) = hit_a11y.apply_message(if a11y.disabled {
                 None
             } else {
@@ -4149,7 +4150,7 @@ pub fn rule_h<'a, M: 'a>(tok: Tokens, a11y: A11y) -> Element<'a, M> {
 pub fn dismiss_button<'a, M: Clone + 'a>(msg: M, tok: Tokens, a11y: A11y) -> Element<'a, M> {
     let mut b = button(icon_svg(Icon::Close, tok, A11y::new("close", Role::Image)))
         .padding(4)
-        .style(style::button_style(tok, Variant::Ghost));
+        .style(style::joined_button_style(tok, Variant::Ghost));
     if let Some(m) = a11y.apply_message(Some(msg)) {
         b = b.on_press(m);
     }
@@ -4948,7 +4949,7 @@ fn row_slot_face<'a, M: Clone + 'a>(
                         st.border = iced::border::Border {
                             color: s.outline,
                             width: 2.0,
-                            radius: tok.radius(crate::m3::shape::Component::Field),
+                            radius: tok.radius(crate::m3::shape::Component::Checkbox),
                         };
                         st
                     }
@@ -6088,7 +6089,7 @@ fn tree_twisty<'a, M: Clone + 'a>(
     let face = text(mark).size(tok.body()).color(tok.scheme().on_surface);
     let mut b = button(face)
         .padding(Padding::from((gap(tok) / 2.0).max(4.0)))
-        .style(style::button_style(tok, Variant::Ghost));
+        .style(style::joined_button_style(tok, Variant::Ghost));
     if let Some(m) = a11y.apply_message(msg) {
         b = b.on_press(m);
     }
@@ -6440,7 +6441,7 @@ fn disclosure_header<'a, M: Clone + 'a>(
     let mut b = button(face)
         .padding(inset)
         .width(Length::Fill)
-        .style(style::button_style(tok, Variant::Ghost));
+        .style(style::menu_item_style(tok));
     if let Some(m) = a11y.apply_message(msg) {
         b = b.on_press(m);
     }
@@ -12969,6 +12970,195 @@ mod tests {
         let limits = Limits::new(Size::ZERO, Size::new(240.0, 80.0));
         let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
         node.size().height
+    }
+
+    #[test]
+    fn segmented_button_uses_flush_segment_face() {
+        let src = include_str!("widget.rs")
+            .split("pub fn segmented_button")
+            .nth(1)
+            .unwrap()
+            .split("pub fn button_group")
+            .next()
+            .unwrap();
+        assert!(src.contains("segment_style"));
+        assert!(!src.contains("button_style"));
+        let group = include_str!("widget.rs")
+            .split("pub fn button_group")
+            .nth(1)
+            .unwrap()
+            .split("pub fn icon_button")
+            .next()
+            .unwrap();
+        assert!(group.contains("joined_button_style"));
+        let tok = named("dark")
+            .tokens
+            .with_shape(crate::m3::ShapePolicy::Pill);
+        let mut el: Element<'_, usize> = segmented_button(
+            ["Day", "Week"],
+            0,
+            |i| i,
+            tok,
+            ControlSize::Default,
+            A11y::new("Range", Role::Group),
+        );
+        draw_once(&mut el);
+        let pill_tab = named("dark")
+            .tokens
+            .with_shape(crate::m3::ShapePolicy::Pill);
+        let tabs = Tabs::new(["One", "Two"]);
+        let mut bar: Element<'_, usize> = tab_bar(
+            &tabs,
+            |i| i,
+            |_| 99,
+            480.0,
+            false,
+            pill_tab,
+            A11y::new("tabs", Role::Tab),
+        );
+        draw_once(&mut bar);
+        assert_eq!(
+            crate::m3::shape::Component::Tab.shape_for(crate::m3::ShapePolicy::Pill),
+            crate::m3::shape::Shape::None
+        );
+        assert_eq!(
+            crate::m3::shape::Component::Segment.shape_for(crate::m3::ShapePolicy::Pill),
+            crate::m3::shape::Shape::None
+        );
+    }
+
+    #[test]
+    fn disclosure_search_and_list_check_use_menu_or_checkbox_family() {
+        let src = include_str!("widget.rs");
+        let header = src
+            .split("fn disclosure_header")
+            .nth(1)
+            .unwrap()
+            .split("pub fn accordion_view")
+            .next()
+            .unwrap();
+        assert!(header.contains("menu_item_style"));
+        assert!(!header.contains("button_style"));
+        let search = src
+            .split("pub fn search_view")
+            .nth(1)
+            .unwrap()
+            .split("pub fn themed_pick_list")
+            .next()
+            .unwrap();
+        assert!(search.contains("menu_item_style"));
+        let suggest = src
+            .split("pub fn suggest_field")
+            .nth(1)
+            .unwrap()
+            .split("pub fn password_input")
+            .next()
+            .unwrap();
+        assert!(suggest.contains("menu_item_style"));
+        let twisty = src
+            .split("fn tree_twisty")
+            .nth(1)
+            .unwrap()
+            .split("fn tree_line")
+            .next()
+            .unwrap();
+        assert!(twisty.contains("joined_button_style"));
+        assert!(!twisty.contains("style::button_style"));
+        let slot = src
+            .split("RowSlot::Check")
+            .nth(1)
+            .unwrap()
+            .split("fn row_slot_el")
+            .next()
+            .unwrap();
+        assert!(slot.contains("Component::Checkbox"));
+        assert!(!slot.contains("Component::Field"));
+
+        let pill = named("dark")
+            .tokens
+            .with_shape(crate::m3::ShapePolicy::Pill);
+        let acc = Accordion { open: Some(0) };
+        let mut accordion: Element<'_, usize> = accordion_view(
+            &["Files".into()],
+            vec![label("body", pill, A11y::new("body", Role::Status))],
+            &acc,
+            1.0,
+            |i| i,
+            pill,
+            A11y::new("acc", Role::Group),
+        );
+        draw_once(&mut accordion);
+        fn query_len(s: String) -> usize {
+            s.len()
+        }
+        assert_eq!(query_len("q".into()), 1);
+        let mut search_el: Element<'_, usize> = search_view(
+            "q",
+            ["Inbox", "Sent"],
+            query_len,
+            |i| i,
+            None,
+            "No matches",
+            pill,
+            A11y::new("find", Role::Group),
+        );
+        draw_once(&mut search_el);
+        let hits = ["Save".into(), "Open".into()];
+        let mut suggest_el: Element<'_, usize> = suggest_field(
+            "cmd",
+            "save",
+            query_len,
+            &hits,
+            |i| i,
+            pill,
+            A11y::new("suggest", Role::Group),
+        );
+        draw_once(&mut suggest_el);
+        let tree = TreeNode::branch(1, "src", vec![TreeNode::leaf(2, "lib.rs")]);
+        let mut tree_el: Element<'_, usize> = tree_view(
+            &tree,
+            Some(2),
+            None,
+            |_| 0,
+            |_| 0,
+            TreeFace::Files,
+            pill,
+            A11y::new("tree", Role::Tree),
+        );
+        draw_once(&mut tree_el);
+        let check_only = VecList {
+            items: vec![crate::collection::ListRow::new("root")
+                .with_leading(crate::collection::RowSlot::Check(false))],
+        };
+        let mut list_el: Element<'_, usize> = list_view(
+            &check_only,
+            &Sel::Single(0),
+            |c| c.id,
+            pill,
+            VisibleWindow::new(200.0),
+            32.0,
+            2,
+            |_| 0,
+            "No rows",
+            |_| pill.scheme().on_surface_variant,
+            None,
+            RowFace::FLUSH,
+            |_| 0,
+            A11y::new("mail", Role::List),
+        );
+        draw_once(&mut list_el);
+        assert_eq!(
+            pill.radius(crate::m3::shape::Component::Checkbox).top_left,
+            crate::m3::Shape::ExtraSmall.dp()
+        );
+        assert_ne!(
+            pill.radius(crate::m3::shape::Component::Checkbox).top_left,
+            pill.radius(crate::m3::shape::Component::Field).top_left
+        );
+        assert_ne!(
+            crate::m3::shape::Component::Menu.shape_for(crate::m3::ShapePolicy::Pill),
+            crate::m3::shape::Component::Button.shape_for(crate::m3::ShapePolicy::Pill)
+        );
     }
 
     #[test]

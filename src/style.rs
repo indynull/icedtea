@@ -451,9 +451,66 @@ pub fn palette_hit(
             border: Border {
                 color: Color::TRANSPARENT,
                 width: 0.0,
-                radius: component_radius(tok, Component::Button),
+                radius: component_radius(tok, Component::Menu),
             },
             shadow: Shadow::default(),
+            snap: false,
+        }
+    }
+}
+
+/// List, menu, and disclosure row. Menu family; not a Button stadium.
+pub fn menu_item_style(tok: Tokens) -> impl Fn(&iced::Theme, button::Status) -> button::Style {
+    move |_theme, status| {
+        let (bg, fg, mut border, shadow) = button_face(tok, Variant::Ghost, button_status(status));
+        border.radius = component_radius(tok, Component::Menu);
+        button::Style {
+            background: Some(Background::Color(bg)),
+            text_color: fg,
+            border,
+            shadow,
+            snap: false,
+        }
+    }
+}
+
+/// Exclusive in-pane segment. Flush corners; selected wash, not a stadium.
+pub fn segment_style(
+    tok: Tokens,
+    selected: bool,
+) -> impl Fn(&iced::Theme, button::Status) -> button::Style {
+    move |_theme, status| {
+        let variant = if selected {
+            Variant::Primary
+        } else {
+            Variant::Quiet
+        };
+        let (bg, fg, mut border, shadow) = button_face(tok, variant, button_status(status));
+        border.radius = component_radius(tok, Component::Segment);
+        button::Style {
+            background: Some(Background::Color(bg)),
+            text_color: fg,
+            border,
+            shadow,
+            snap: false,
+        }
+    }
+}
+
+/// Related action in a button group. Flush cell; the group outline
+/// carries the Button family radius.
+pub fn joined_button_style(
+    tok: Tokens,
+    variant: Variant,
+) -> impl Fn(&iced::Theme, button::Status) -> button::Style {
+    move |_theme, status| {
+        let (bg, fg, mut border, shadow) = button_face(tok, variant, button_status(status));
+        border.radius = component_radius(tok, Component::Segment);
+        button::Style {
+            background: Some(Background::Color(bg)),
+            text_color: fg,
+            border,
+            shadow,
             snap: false,
         }
     }
@@ -608,7 +665,7 @@ pub fn overlay_menu_style(tok: Tokens) -> impl Fn(&iced::Theme) -> overlay_menu:
             background: Background::Color(s.surface_container),
             border: Border {
                 width: 1.0,
-                radius: component_radius(tok, Component::Field),
+                radius: component_radius(tok, Component::Menu),
                 color: s.outline_variant,
             },
             text_color: s.on_surface,
@@ -655,7 +712,7 @@ pub fn checkbox_style(tok: Tokens) -> impl Fn(&iced::Theme, checkbox::Status) ->
             border: Border {
                 color: border_c,
                 width: 2.0,
-                radius: component_radius(tok, Component::Field),
+                radius: component_radius(tok, Component::Checkbox),
             },
             text_color: Some(if disabled {
                 layer_on(s.surface, s.on_surface, 0.38)
@@ -803,14 +860,14 @@ pub fn scroll_style(tok: Tokens) -> impl Fn(&iced::Theme, scrollable::Status) ->
             border: Border {
                 color: Color::TRANSPARENT,
                 width: 0.0,
-                radius: component_radius(tok, Component::Button),
+                radius: component_radius(tok, Component::Track),
             },
             scroller: scrollable::Scroller {
                 background: Background::Color(s.outline),
                 border: Border {
                     color: Color::TRANSPARENT,
                     width: 0.0,
-                    radius: component_radius(tok, Component::Button),
+                    radius: component_radius(tok, Component::Track),
                 },
             },
         };
@@ -1071,6 +1128,58 @@ mod tests {
         assert_ne!(
             crate::m3::shape::Component::Toast.shape_for(crate::m3::ShapePolicy::Pill),
             crate::m3::shape::Component::Button.shape_for(crate::m3::ShapePolicy::Pill)
+        );
+    }
+
+    #[test]
+    fn tab_and_segment_stay_flush_under_every_shape_policy() {
+        let tok = named("dark").tokens;
+        for policy in [
+            crate::m3::ShapePolicy::Desktop,
+            crate::m3::ShapePolicy::Tight,
+            crate::m3::ShapePolicy::Soft,
+            crate::m3::ShapePolicy::Pill,
+            crate::m3::ShapePolicy::Material,
+        ] {
+            let t = tok.with_shape(policy);
+            let th = crate::theme::iced_theme("dark", t);
+            let tab = tab_style(t, true)(&th, button::Status::Active);
+            assert_eq!(tab.border.radius.top_left, 0.0);
+            let seg = segment_style(t, true)(&th, button::Status::Active);
+            assert_eq!(seg.border.radius.top_left, 0.0);
+            let joined = joined_button_style(t, Variant::Quiet)(&th, button::Status::Active);
+            assert_eq!(joined.border.radius.top_left, 0.0);
+            let hit = palette_hit(t, true)(&th, button::Status::Active);
+            if policy == crate::m3::ShapePolicy::Pill {
+                assert_eq!(hit.border.radius.top_left, crate::m3::Shape::Medium.dp());
+                assert_ne!(
+                    hit.border.radius.top_left,
+                    crate::m3::shape::Component::Button.shape_for(policy).dp()
+                );
+            }
+            if policy == crate::m3::ShapePolicy::Desktop {
+                assert_eq!(hit.border.radius.top_left, 0.0);
+            }
+        }
+        let pill = tok.with_shape(crate::m3::ShapePolicy::Pill);
+        let ptheme = crate::theme::iced_theme("dark", pill);
+        let btn = button_style(pill, Variant::Primary)(&ptheme, button::Status::Active);
+        assert_eq!(btn.border.radius.top_left, crate::m3::Shape::Full.dp());
+        let tab = tab_style(pill, false)(&ptheme, button::Status::Active);
+        assert_eq!(tab.border.radius.top_left, 0.0);
+        let menu = menu_item_style(pill)(&ptheme, button::Status::Hovered);
+        assert_eq!(menu.border.radius.top_left, crate::m3::Shape::Medium.dp());
+        assert_ne!(menu.border.radius.top_left, crate::m3::Shape::Full.dp());
+        let box_st = checkbox_style(pill)(&ptheme, checkbox::Status::Active { is_checked: false });
+        assert_eq!(
+            box_st.border.radius.top_left,
+            crate::m3::Shape::ExtraSmall.dp()
+        );
+        assert_ne!(
+            box_st.border.radius.top_left,
+            crate::m3::shape::Component::Field
+                .shape_for(crate::m3::ShapePolicy::Pill)
+                .dp()
         );
     }
 
