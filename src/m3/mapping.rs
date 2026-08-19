@@ -138,6 +138,11 @@ pub const MAP: &[MapRow] = &[
         fate: Fate::Map,
     },
     MapRow {
+        id: "form",
+        m3: "Text fields (form)",
+        fate: Fate::Map,
+    },
+    MapRow {
         id: "number",
         m3: "Text field",
         fate: Fate::Map,

@@ -4,6 +4,9 @@
 
 ### Feature
 
+- `form_group` walks Tab and Shift+Tab among mixed fields and wraps.
+  The first text field can take focus on mount. Space activates the
+  focused checkbox, radio, pick, chips, or segmented row.
 - Chrome icons and tree folder/file marks use Material Symbols Sharp
   (Apache 2.0). See `NOTICE`.
 - `Icon` covers Fyne's theme-icon jobs (window, edit, file, mail,

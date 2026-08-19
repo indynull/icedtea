@@ -154,6 +154,24 @@ current face.
 
 Pass `A11y`.
 
+### Form
+
+**`form`** — A labeled field group that owns Tab.
+
+Constructor: [`widget::form_group`](https://docs.rs/icedtea/latest/icedtea/widget/fn.form_group.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[icedtea](https://crates.io/crates/icedtea)
+
+Tab and Shift+Tab walk the rows and wrap. The first text field can
+take iced focus on mount when that row is `active` and carries an
+`Id`. Space activates the focused non-text row. Pick lists, chips,
+checkboxes, radios, and segmented buttons sit in the same order.
+`layout::form` only stacks the pairs. The application owns values,
+messages, and `active`.
+
+Pass `A11y`.
+
 ### Number
 
 **`number`** — Edit a numeric value with step buttons.

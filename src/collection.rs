@@ -1242,6 +1242,9 @@ mod tests {
         let mut sel = Selection::None;
         assert!(!sel.contains(0));
         assert!(sel.primary().is_none());
+        sel.toggle_multi(3);
+        assert_eq!(sel, Selection::Multi(vec![3]));
+        sel = Selection::None;
         sel.apply_item_click(ItemClick {
             id: 4,
             button: ItemButton::Primary,

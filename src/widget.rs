@@ -2747,6 +2747,383 @@ where
     a11y::attach(el, &a11y)
 }
 
+/// Next form row after Tab (`backward` is Shift+Tab). Wraps both ends.
+///
+/// ```
+/// use icedtea::widget::form_tab;
+/// assert_eq!(form_tab(0, false, 3), 1);
+/// assert_eq!(form_tab(2, false, 3), 0);
+/// assert_eq!(form_tab(0, true, 3), 2);
+/// ```
+pub fn form_tab(active: usize, backward: bool, len: usize) -> usize {
+    crate::focus::rove(active, if backward { -1 } else { 1 }, len)
+}
+
+/// One label plus control in [`form_group`].
+///
+/// Pass [`FormRow::with_focus`] when the control is a text field or
+/// textarea that already has that iced `Id` (so Tab can focus it).
+pub struct FormRow<'a, M> {
+    pub label: String,
+    pub field: Element<'a, M>,
+    pub focus_id: Option<Id>,
+}
+
+impl<'a, M> FormRow<'a, M> {
+    pub fn new(label: impl Into<String>, field: Element<'a, M>) -> Self {
+        Self {
+            label: label.into(),
+            field,
+            focus_id: None,
+        }
+    }
+
+    pub fn with_focus(mut self, id: impl Into<Id>) -> Self {
+        self.focus_id = Some(id.into());
+        self
+    }
+}
+
+/// Form group that owns Tab and Shift+Tab among mixed fields.
+///
+/// `layout::form` only stacks label/field rows. This constructor walks
+/// those rows: Tab and Shift+Tab wrap, and the first text field takes
+/// iced focus on mount. Space activates the focused non-text row
+/// (checkbox, radio, pick, chips, segmented). Pick lists, chips,
+/// checkboxes, radios, and segmented buttons sit in the same order.
+/// The application owns values, messages, and `active`.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::i18n::Direction;
+/// use icedtea::theme;
+/// use icedtea::widget::{self, FormRow};
+/// let tok = theme::named("dark").tokens;
+/// let name_id = icedtea::iced::widget::Id::new("name");
+/// let on_name = |s| s;
+/// let on_tab = |i| format!("{i}");
+/// let _: icedtea::Element<'_, String> = widget::form_group(
+///     [FormRow::new(
+///         "Name",
+///         widget::themed_text_input(
+///             "Name",
+///             "",
+///             on_name,
+///             None,
+///             widget::FieldOpts::NONE,
+///             tok,
+///             A11y::new("Name", Role::TextBox),
+///             Some(name_id.clone()),
+///         ),
+///     )
+///     .with_focus(name_id)],
+///     0,
+///     on_tab,
+///     tok,
+///     Direction::Ltr,
+///     A11y::new("compose", Role::Group),
+/// );
+/// ```
+pub fn form_group<'a, M: Clone + 'a>(
+    rows: impl IntoIterator<Item = FormRow<'a, M>>,
+    active: usize,
+    on_active: impl Fn(usize) -> M + 'a,
+    tok: Tokens,
+    dir: crate::i18n::Direction,
+    a11y: A11y,
+) -> Element<'a, M> {
+    let rows: Vec<FormRow<'a, M>> = rows.into_iter().collect();
+    let ids: Vec<Option<Id>> = rows.iter().map(|r| r.focus_id.clone()).collect();
+    let n = rows.len();
+    let active = if n == 0 { 0 } else { active.min(n - 1) };
+    let pairs = rows.into_iter().enumerate().map(|(i, row)| {
+        let lab = label(
+            row.label,
+            tok,
+            A11y::new(format!("form-label-{i}"), Role::Header),
+        );
+        let field = container(row.field)
+            .width(Length::Fill)
+            .style(move |_| form_active_frame(tok, i == active));
+        (lab, field.into())
+    });
+    let content = crate::layout::form(pairs, tok.density.gap() as u32, dir);
+    a11y::attach(
+        FormGroup {
+            content,
+            ids,
+            active,
+            on_active: std::rc::Rc::new(on_active),
+            dir,
+        }
+        .into(),
+        &a11y,
+    )
+}
+
+fn form_active_frame(tok: Tokens, active: bool) -> iced::widget::container::Style {
+    let s = tok.scheme();
+    iced::widget::container::Style {
+        border: iced::Border {
+            color: if active {
+                s.primary
+            } else {
+                Color::TRANSPARENT
+            },
+            width: if active { 2.0 } else { 0.0 },
+            radius: tok.radius(crate::m3::shape::Component::Field),
+        },
+        ..iced::widget::container::Style::default()
+    }
+}
+
+struct FormGroup<'a, Message> {
+    content: Element<'a, Message>,
+    ids: Vec<Option<Id>>,
+    active: usize,
+    on_active: std::rc::Rc<dyn Fn(usize) -> Message + 'a>,
+    dir: crate::i18n::Direction,
+}
+
+fn form_field_at(
+    layout: Layout<'_>,
+    active: usize,
+    dir: crate::i18n::Direction,
+) -> Option<Layout<'_>> {
+    let row = layout.children().nth(active)?;
+    match dir {
+        crate::i18n::Direction::Ltr => row.children().nth(1),
+        crate::i18n::Direction::Rtl => row.children().next(),
+    }
+}
+
+#[derive(Default)]
+struct FormGroupState {
+    mounted: bool,
+}
+
+fn form_apply_focus<M>(
+    content: &mut Element<'_, M>,
+    tree: &mut Tree,
+    layout: Layout<'_>,
+    renderer: &iced::Renderer,
+    id: Option<&Id>,
+) {
+    if let Some(id) = id {
+        let mut op = iced::advanced::widget::operation::focusable::focus::<()>(id.clone());
+        content
+            .as_widget_mut()
+            .operate(&mut tree.children[0], layout, renderer, &mut op);
+    } else {
+        let mut op = iced::advanced::widget::operation::focusable::unfocus::<()>();
+        content
+            .as_widget_mut()
+            .operate(&mut tree.children[0], layout, renderer, &mut op);
+    }
+}
+
+impl<'a, Message: Clone> Widget<Message, iced::Theme, iced::Renderer> for FormGroup<'a, Message> {
+    fn tag(&self) -> tree::Tag {
+        tree::Tag::of::<FormGroupState>()
+    }
+
+    fn state(&self) -> tree::State {
+        tree::State::new(FormGroupState::default())
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.content)]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_ref(&self.content));
+    }
+
+    fn size(&self) -> iced::Size<Length> {
+        self.content.as_widget().size()
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        self.content
+            .as_widget_mut()
+            .layout(&mut tree.children[0], renderer, limits)
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        renderer: &iced::Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &iced::Rectangle,
+    ) {
+        let state = tree.state.downcast_mut::<FormGroupState>();
+        if !state.mounted {
+            state.mounted = true;
+            form_apply_focus(
+                &mut self.content,
+                tree,
+                layout,
+                renderer,
+                self.ids.get(self.active).and_then(|id| id.as_ref()),
+            );
+        }
+        if let Event::Keyboard(keyboard::Event::KeyPressed { key, modifiers, .. }) = event {
+            if matches!(key, keyboard::Key::Named(keyboard::key::Named::Tab)) {
+                let next = form_tab(self.active, modifiers.shift(), self.ids.len());
+                if next != self.active {
+                    shell.publish((self.on_active)(next));
+                }
+                form_apply_focus(
+                    &mut self.content,
+                    tree,
+                    layout,
+                    renderer,
+                    self.ids.get(next).and_then(|id| id.as_ref()),
+                );
+                shell.capture_event();
+                return;
+            }
+            if matches!(key, keyboard::Key::Named(keyboard::key::Named::Space))
+                && !modifiers.control()
+                && !modifiers.alt()
+                && self
+                    .ids
+                    .get(self.active)
+                    .and_then(|id| id.as_ref())
+                    .is_none()
+            {
+                if let Some(field) = form_field_at(layout, self.active, self.dir) {
+                    let b = field.bounds();
+                    let x = match self.dir {
+                        crate::i18n::Direction::Ltr => b.x + 12.0,
+                        crate::i18n::Direction::Rtl => b.x + b.width - 12.0,
+                    };
+                    let cursor = iced::mouse::Cursor::Available(iced::Point::new(x, b.center_y()));
+                    let press =
+                        Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left));
+                    let release = Event::Mouse(iced::mouse::Event::ButtonReleased(
+                        iced::mouse::Button::Left,
+                    ));
+                    self.content.as_widget_mut().update(
+                        &mut tree.children[0],
+                        &press,
+                        layout,
+                        cursor,
+                        renderer,
+                        clipboard,
+                        shell,
+                        viewport,
+                    );
+                    self.content.as_widget_mut().update(
+                        &mut tree.children[0],
+                        &release,
+                        layout,
+                        cursor,
+                        renderer,
+                        clipboard,
+                        shell,
+                        viewport,
+                    );
+                    shell.capture_event();
+                    return;
+                }
+            }
+        }
+        self.content.as_widget_mut().update(
+            &mut tree.children[0],
+            event,
+            layout,
+            cursor,
+            renderer,
+            clipboard,
+            shell,
+            viewport,
+        );
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut iced::Renderer,
+        theme: &iced::Theme,
+        style: &iced::advanced::renderer::Style,
+        layout: Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        viewport: &iced::Rectangle,
+    ) {
+        self.content.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            layout,
+            cursor,
+            viewport,
+        );
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &iced::Renderer,
+        operation: &mut dyn iced::advanced::widget::Operation,
+    ) {
+        self.content
+            .as_widget_mut()
+            .operate(&mut tree.children[0], layout, renderer, operation);
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        viewport: &iced::Rectangle,
+        renderer: &iced::Renderer,
+    ) -> iced::mouse::Interaction {
+        self.content.as_widget().mouse_interaction(
+            &tree.children[0],
+            layout,
+            cursor,
+            viewport,
+            renderer,
+        )
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &iced::Renderer,
+        viewport: &iced::Rectangle,
+        translation: iced::Vector,
+    ) -> Option<iced::advanced::overlay::Element<'b, Message, iced::Theme, iced::Renderer>> {
+        self.content.as_widget_mut().overlay(
+            &mut tree.children[0],
+            layout,
+            renderer,
+            viewport,
+            translation,
+        )
+    }
+}
+
+impl<'a, Message: Clone + 'a> From<FormGroup<'a, Message>> for Element<'a, Message> {
+    fn from(value: FormGroup<'a, Message>) -> Self {
+        Self::new(value)
+    }
+}
+
 /// Civil date (no timezone).
 ///
 /// ```
@@ -12111,7 +12488,7 @@ mod tests {
         assert!(src.contains("tok.meta()"));
         assert!(src.contains("tok.body()"));
         assert!(src.contains("size.pad()"));
-                assert!(src.contains("pick_list::Handle::Arrow"));
+        assert!(src.contains("pick_list::Handle::Arrow"));
         assert!(!src.contains("pick_list::Handle::None"));
         assert!(!src.contains("pick_chevron"));
         assert!(src.contains("pick_mark_pad"));
@@ -12254,6 +12631,335 @@ mod tests {
             !pick_press_overlay(value, true),
             "press on a disabled pick must not open the overlay",
         );
+    }
+
+    fn sample_form(active: usize) -> (Element<'static, usize>, iced::widget::Id) {
+        let tok = named("dark").tokens;
+        let name_id = iced::widget::Id::new("form-name");
+        let on_tab = |i| i;
+        let el = form_group(
+            [
+                FormRow::new(
+                    "Name",
+                    themed_text_input(
+                        "Name",
+                        "Ada",
+                        |_| 99usize,
+                        None,
+                        FieldOpts::NONE,
+                        tok,
+                        A11y::new("Name", Role::TextBox),
+                        Some(name_id.clone()),
+                    ),
+                )
+                .with_focus(name_id.clone()),
+                FormRow::new(
+                    "Theme",
+                    themed_pick_list(
+                        ["nord", "dark"],
+                        Some("nord"),
+                        |_| 99usize,
+                        tok,
+                        ControlSize::Default,
+                        A11y::new("Theme", Role::ComboBox),
+                    ),
+                ),
+                FormRow::new(
+                    "Ok",
+                    themed_checkbox(
+                        "Ok",
+                        false,
+                        |_| 99usize,
+                        tok,
+                        A11y::new("Ok", Role::Checkbox),
+                    ),
+                ),
+                FormRow::new(
+                    "Kind",
+                    themed_radio(
+                        "A",
+                        0u8,
+                        Some(0),
+                        |_| 99usize,
+                        tok,
+                        A11y::new("A", Role::Radio),
+                    ),
+                ),
+                FormRow::new(
+                    "Tags",
+                    filter_chips(
+                        &["a".into(), "b".into()],
+                        &[true, false],
+                        |_| 99usize,
+                        tok,
+                        A11y::new("Tags", Role::Group),
+                    ),
+                ),
+                FormRow::new(
+                    "Range",
+                    segmented_button(
+                        ["Day", "Week"],
+                        0,
+                        |_| 99usize,
+                        tok,
+                        ControlSize::Default,
+                        A11y::new("Range", Role::Group),
+                    ),
+                ),
+            ],
+            active,
+            on_tab,
+            tok,
+            crate::i18n::Direction::Ltr,
+            A11y::new("compose", Role::Group),
+        );
+        (el, name_id)
+    }
+
+    fn pump_form_key(el: &mut Element<'_, usize>, shift: bool) -> Vec<usize> {
+        pump_form_named(el, iced::keyboard::key::Named::Tab, shift)
+    }
+
+    fn pump_form_named(
+        el: &mut Element<'_, usize>,
+        named: iced::keyboard::key::Named,
+        shift: bool,
+    ) -> Vec<usize> {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::keyboard;
+        use iced::mouse;
+        use iced::{Event, Font, Pixels, Point, Rectangle, Size};
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(400.0, 400.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let viewport = Rectangle::new(Point::ORIGIN, Size::new(400.0, 400.0));
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(named),
+                    modified_key: keyboard::Key::Named(named),
+                    physical_key: keyboard::key::Physical::Unidentified(
+                        keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: keyboard::Location::Standard,
+                    modifiers: if shift {
+                        keyboard::Modifiers::SHIFT
+                    } else {
+                        keyboard::Modifiers::empty()
+                    },
+                    text: None,
+                    repeat: false,
+                }),
+                layout,
+                mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        messages
+    }
+
+    fn form_name_focused(el: &mut Element<'_, usize>, name_id: iced::widget::Id) -> bool {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::operation::{focusable::Focusable, Operation};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+        struct IsFocused {
+            target: iced::widget::Id,
+            hit: bool,
+        }
+        impl Operation<()> for IsFocused {
+            fn focusable(
+                &mut self,
+                id: Option<&iced::widget::Id>,
+                _bounds: iced::Rectangle,
+                state: &mut dyn Focusable,
+            ) {
+                if id.is_some_and(|id| *id == self.target) {
+                    self.hit = state.is_focused();
+                }
+            }
+            fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<()>)) {
+                operate(self);
+            }
+        }
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(400.0, 400.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let mut messages = Vec::<usize>::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            el.as_widget_mut().update(
+                &mut tree,
+                &iced::Event::Mouse(iced::mouse::Event::CursorMoved {
+                    position: iced::Point::new(4.0, 4.0),
+                }),
+                layout,
+                iced::mouse::Cursor::Available(iced::Point::new(4.0, 4.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &iced::Rectangle::new(iced::Point::ORIGIN, Size::new(400.0, 400.0)),
+            );
+        }
+        let mut op = IsFocused {
+            target: name_id,
+            hit: false,
+        };
+        el.as_widget_mut()
+            .operate(&mut tree, layout, &renderer, &mut op);
+        op.hit
+    }
+
+    #[test]
+    fn form_group_tabs_wraps_mixed_fields_and_focuses_first_text() {
+        assert_eq!(form_tab(0, false, 6), 1);
+        assert_eq!(form_tab(5, false, 6), 0);
+        assert_eq!(form_tab(0, true, 6), 5);
+        let (mut el, name_id) = sample_form(0);
+        must(
+            form_name_focused(&mut el, name_id.clone()),
+            "first text field must take focus on mount",
+        );
+        let (mut el, _) = sample_form(0);
+        assert_eq!(pump_form_key(&mut el, false), vec![1]);
+        let (mut el, _) = sample_form(1);
+        assert_eq!(pump_form_key(&mut el, false), vec![2]);
+        let (mut el, _) = sample_form(5);
+        assert_eq!(pump_form_key(&mut el, false), vec![0]);
+        let (mut el, _) = sample_form(0);
+        assert_eq!(pump_form_key(&mut el, true), vec![5]);
+        let (mut el, _) = sample_form(2);
+        assert_eq!(pump_form_key(&mut el, true), vec![1]);
+        let (mut el, _) = sample_form(2);
+        assert_eq!(
+            pump_form_named(&mut el, iced::keyboard::key::Named::Space, false),
+            vec![99]
+        );
+        let tok = named("dark").tokens;
+        let mut lone: Element<'_, usize> = themed_text_input(
+            "Name",
+            "Ada",
+            |_| 99usize,
+            None,
+            FieldOpts::NONE,
+            tok,
+            A11y::new("Name", Role::TextBox),
+            None,
+        );
+        let lone_h = layout_size(&mut lone, iced::Size::new(400.0, 80.0)).height;
+        let (mut form, _) = sample_form(1);
+        let form_field_h = form_idle_field_height(&mut form);
+        must(
+            (form_field_h - lone_h).abs() <= 1.0,
+            format!("idle form field {form_field_h} must match lone field {lone_h}"),
+        );
+        drive_tree(&mut el, iced::Size::new(400.0, 400.0));
+        let mut empty: Element<'_, usize> = form_group(
+            [],
+            0,
+            |i| i,
+            tok,
+            crate::i18n::Direction::Ltr,
+            A11y::new("empty", Role::Group),
+        );
+        assert!(pump_form_key(&mut empty, false).is_empty());
+        let name_id = iced::widget::Id::new("solo");
+        let mut solo: Element<'_, usize> = form_group(
+            [FormRow::new(
+                "Name",
+                themed_text_input(
+                    "Name",
+                    "",
+                    |_| 99usize,
+                    None,
+                    FieldOpts::NONE,
+                    tok,
+                    A11y::new("Name", Role::TextBox),
+                    Some(name_id.clone()),
+                ),
+            )
+            .with_focus(name_id)],
+            0,
+            |i| i,
+            tok,
+            crate::i18n::Direction::Ltr,
+            A11y::new("solo", Role::Group),
+        );
+        assert!(pump_form_key(&mut solo, false).is_empty());
+        let src = include_str!("widget.rs")
+            .split("impl<'a, Message: Clone> Widget<Message, iced::Theme, iced::Renderer> for FormGroup")
+            .nth(1)
+            .unwrap()
+            .split("impl<'a, Message: Clone + 'a> From<FormGroup")
+            .next()
+            .unwrap();
+        assert!(src.contains("Named::Tab"));
+        assert!(src.contains("Named::Space"));
+        assert!(src.contains("capture_event"));
+        let ctor = include_str!("widget.rs")
+            .split("pub fn form_group")
+            .nth(1)
+            .unwrap()
+            .split("fn form_active_frame")
+            .next()
+            .unwrap();
+        assert!(
+            !ctor.contains(".padding(2)"),
+            "idle form rows must not grow a 2 px ring pad"
+        );
+    }
+
+    fn form_idle_field_height(el: &mut Element<'_, usize>) -> f32 {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(400.0, 400.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let mut best = 0.0_f32;
+        fn walk(layout: Layout<'_>, best: &mut f32) {
+            let kids: Vec<_> = layout.children().collect();
+            if kids.len() == 2 {
+                let field = kids
+                    .iter()
+                    .max_by(|a, b| a.bounds().width.total_cmp(&b.bounds().width))
+                    .unwrap();
+                if field.bounds().width > crate::layout::FORM_LABEL {
+                    *best = field.bounds().height;
+                    return;
+                }
+            }
+            for k in kids {
+                walk(k, best);
+            }
+        }
+        walk(layout, &mut best);
+        best
     }
 
     fn segmented_layout_height(size: ControlSize) -> f32 {

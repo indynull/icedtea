@@ -1273,6 +1273,7 @@ enum Message {
     ListFace(bool),
     TreeFace(widget::TreeFace),
     FocusName,
+    FormTab(usize),
     Secret(String),
     RevealSecret,
     CopySecret,
@@ -1370,6 +1371,7 @@ struct Gallery {
     date: DateValue,
     time: TimeValue,
     pick: String,
+    form_active: usize,
     toasts: ToastQueue,
     tabs: Tabs,
     accordion: Accordion,
@@ -1567,6 +1569,7 @@ impl Gallery {
             query: String::new(),
             prefs_query: String::new(),
             name: String::new(),
+            form_active: 0,
             secret: "hunter2".into(),
             secret_revealed: false,
             checked: true,
@@ -3304,6 +3307,7 @@ impl Gallery {
                 self.list_window.scroll = 0.0;
                 self.refresh_list_view();
             }
+            Message::FormTab(i) => self.form_active = i,
             Message::FocusName => {
                 return icedtea::iced::widget::operation::focus(icedtea::iced::widget::Id::new(
                     "gallery-name",
@@ -4467,6 +4471,100 @@ impl Gallery {
             ]
             .spacing(8)
             .into(),
+            "form" => {
+                let name_id = icedtea::iced::widget::Id::new("gallery-form-name");
+                let opts = ["nord".into(), "dark".into(), "light".into()];
+                let tags = [
+                    self.catalog.t("list.unread").to_string(),
+                    self.catalog.t("list.flagged").to_string(),
+                ];
+                column![
+                    widget::meta(
+                        self.catalog.t("field.form-hint"),
+                        tok,
+                        named("form-hint", Role::Status),
+                    ),
+                    widget::form_group(
+                        [
+                            widget::FormRow::new(
+                                self.catalog.t("hint.name"),
+                                widget::themed_text_input(
+                                    self.catalog.t("hint.name"),
+                                    &self.name,
+                                    Message::Name,
+                                    None,
+                                    widget::FieldOpts::NONE,
+                                    tok,
+                                    named("form-name", Role::TextBox),
+                                    Some(name_id.clone()),
+                                ),
+                            )
+                            .with_focus(name_id),
+                            widget::FormRow::new(
+                                self.catalog.t("field.form-severity"),
+                                widget::themed_pick_list(
+                                    opts,
+                                    Some(self.pick.clone()),
+                                    Message::Pick,
+                                    tok,
+                                    widget::ControlSize::Default,
+                                    named(&self.pick, Role::ComboBox),
+                                ),
+                            ),
+                            widget::FormRow::new(
+                                self.catalog.t("field.form-tags"),
+                                widget::filter_chips(
+                                    &tags,
+                                    &self.filter_on[..tags.len().min(self.filter_on.len())],
+                                    Message::FilterChip,
+                                    tok,
+                                    named("form-tags", Role::Group),
+                                ),
+                            ),
+                            widget::FormRow::new(
+                                String::new(),
+                                widget::themed_checkbox(
+                                    self.catalog.t("field.form-ok"),
+                                    self.checked,
+                                    Message::Check,
+                                    tok,
+                                    named("form-ok", Role::Checkbox).with_checked(self.checked),
+                                ),
+                            ),
+                            widget::FormRow::new(
+                                self.catalog.t("field.form-range"),
+                                widget::segmented_button(
+                                    [
+                                        self.catalog.t("density.default"),
+                                        self.catalog.t("density.compact"),
+                                    ],
+                                    self.segment,
+                                    Message::Segment,
+                                    tok,
+                                    widget::ControlSize::Default,
+                                    named("form-range", Role::Group),
+                                ),
+                            ),
+                        ],
+                        self.form_active,
+                        Message::FormTab,
+                        tok,
+                        self.direction,
+                        named("compose", Role::Group),
+                    ),
+                    widget::meta(
+                        format!(
+                            "{} {}",
+                            self.catalog.t("field.form-row"),
+                            self.form_active + 1
+                        ),
+                        tok,
+                        named("form-row", Role::Status),
+                    ),
+                ]
+                .spacing(8)
+                .into()
+            }
             "select" => {
                 let opts = ["nord".into(), "dark".into(), "light".into()];
                 column![
@@ -7014,6 +7112,7 @@ fn handled_ids() -> &'static [&'static str] {
         "search-view",
         "suggest",
         "select",
+        "form",
         "date",
         "time",
         "label",
