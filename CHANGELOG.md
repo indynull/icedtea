@@ -14,6 +14,8 @@
 
 ### Bug fix
 
+- `themed_pick_list` uses iced's handle in the trailing band, so a
+  press on the mark opens the menu.
 - `themed_scroll` uses iced's 60 px wheel line and keeps a short wheel
   gesture on the pane under the pointer.
 - `item_grid` tiles hug control height instead of filling the pane.

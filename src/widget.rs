@@ -68,6 +68,22 @@ fn pad(tok: Tokens) -> Padding {
     Padding::from([v as f32, h as f32])
 }
 
+/// Iced paints `Handle::Arrow` right-aligned at `width - padding.right`.
+/// A hairline end pad puts the glyph in the trailing band instead of
+/// leaving an empty pocket after the triangle.
+fn pick_mark_pad(face: Padding) -> Padding {
+    Padding {
+        top: face.top,
+        right: crate::density::GRID as f32,
+        bottom: face.bottom,
+        left: face.left,
+    }
+}
+
+fn pick_handle_size(type_px: f32) -> f32 {
+    type_px
+}
+
 fn gap(tok: Tokens) -> f32 {
     tok.density.gap()
 }
@@ -154,10 +170,6 @@ fn closed_disclosure(tok: Tokens) -> &'static str {
         Direction::Ltr => "▸",
         Direction::Rtl => "◂",
     }
-}
-
-fn pick_chevron<'a, M: 'a>(tok: Tokens) -> Element<'a, M> {
-    icon_svg(Icon::Chevron, tok, A11y::new("open", Role::Image))
 }
 
 /// Step for a continuous [`themed_slider`] range (~100 positions).
@@ -2701,20 +2713,18 @@ where
         move |t| on_select(t)
     };
     let picker = pick_list(options, selected, on_pick)
-        .handle(pick_list::Handle::None)
+        .handle(pick_list::Handle::Arrow {
+            size: Some(pick_handle_size(type_px).into()),
+        })
+        .width(Length::Fill)
         .style(style::picker_style(tok))
-        .padding(face_pad)
+        .padding(pick_mark_pad(face_pad))
         .text_size(type_px);
     let h = sized_control_height(tok, size);
-    let picker: Element<'a, M> = container(picker).height(Length::Fixed(h)).into();
-    let mut face = Row::new()
-        .spacing(4)
-        .align_y(Alignment::Center)
-        .height(Length::Fixed(h));
-    for kid in crate::i18n::order(tok.direction, [picker, pick_chevron(tok)]) {
-        face = face.push(kid);
-    }
-    let picker: Element<'a, M> = face.into();
+    let picker: Element<'a, M> = container(picker)
+        .width(Length::Fill)
+        .height(Length::Fixed(h))
+        .into();
     let el: Element<'a, M> = if opts.is_empty() {
         picker
     } else {
@@ -10291,19 +10301,7 @@ mod tests {
             Pixels::from(16u32),
         ));
         let limits = Limits::new(Size::ZERO, Size::new(240.0, 48.0));
-        let node = pick.as_widget_mut().layout(&mut tree, &renderer, &limits);
-        let layout = Layout::new(&node);
-        let origin = layout.bounds();
-        let mut boxes = Vec::new();
-        walk_bounds(layout, &mut boxes);
-        let icons: Vec<_> = boxes
-            .iter()
-            .filter(|b| (b.width - 16.0).abs() < 0.6 && (b.height - 16.0).abs() < 0.6)
-            .collect();
-        must(
-            icons.iter().any(|b| b.x - origin.x < origin.width / 2.0),
-            "RTL pick chevron must sit on the end (left) side",
-        );
+        let _ = pick.as_widget_mut().layout(&mut tree, &renderer, &limits);
         assert_eq!(closed_disclosure(tok), "◂");
 
         let titles = ["Files".into()];
@@ -12113,6 +12111,149 @@ mod tests {
         assert!(src.contains("tok.meta()"));
         assert!(src.contains("tok.body()"));
         assert!(src.contains("size.pad()"));
+                assert!(src.contains("pick_list::Handle::Arrow"));
+        assert!(!src.contains("pick_list::Handle::None"));
+        assert!(!src.contains("pick_chevron"));
+        assert!(src.contains("pick_mark_pad"));
+        assert!(src.contains("pick_handle_size(type_px)"));
+    }
+
+    #[test]
+    fn themed_pick_list_matches_field_height_without_extra_gutter() {
+        let tok = named("dark").tokens;
+        let face = pad(tok);
+        let mark = pick_mark_pad(face);
+        must(
+            mark.right <= crate::density::GRID as f32,
+            format!("pick end pad {} must be a 4 dp hairline", mark.right),
+        );
+        must(
+            mark.right < face.right,
+            format!(
+                "pick end pad {} must be tighter than field pad {}",
+                mark.right, face.right
+            ),
+        );
+        assert_eq!(mark.left, face.left);
+        assert_eq!(pick_handle_size(tok.body()), tok.body());
+        assert_eq!(pick_handle_size(tok.meta()), tok.meta());
+        let mut field: Element<'_, String> = themed_text_input(
+            "Name",
+            "nord",
+            |s| s,
+            None,
+            FieldOpts::NONE,
+            tok,
+            A11y::new("Name", Role::TextBox),
+            None,
+        );
+        let max = iced::Size::new(240.0, 80.0);
+        let field_h = layout_size(&mut field, max).height;
+        for size in [
+            ControlSize::Compact,
+            ControlSize::Default,
+            ControlSize::Comfortable,
+        ] {
+            let pick_h = pick_layout_height(size);
+            if size == ControlSize::Default {
+                must(
+                    (pick_h - field_h).abs() <= 1.0,
+                    format!("Default pick {pick_h} must match text field {field_h}"),
+                );
+            }
+            must(
+                pick_h <= field_h + f32::from(size.pad()) + 1.0,
+                format!("{size:?} pick {pick_h} must not grow a 16 px handle gutter"),
+            );
+        }
+    }
+
+    fn pick_press_overlay(at: iced::Point, disabled: bool) -> bool {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::mouse;
+        use iced::{Event, Font, Pixels, Point, Rectangle, Size};
+        let tok = named("dark").tokens;
+        let opts = ["nord", "dark"];
+        let mut a11y = A11y::new("theme", Role::ComboBox);
+        if disabled {
+            a11y = a11y.with_disabled(true);
+        }
+        let mut el: Element<'_, &str> =
+            themed_pick_list(opts, Some("nord"), |s| s, tok, ControlSize::Default, a11y);
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(240.0, 48.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let viewport = Rectangle::new(Point::ORIGIN, Size::new(240.0, 48.0));
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(at),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        if disabled {
+            assert!(messages.is_empty());
+        }
+        let open = el
+            .as_widget_mut()
+            .overlay(&mut tree, layout, &renderer, &viewport, iced::Vector::ZERO)
+            .is_some();
+        open
+    }
+
+    #[test]
+    fn themed_pick_list_press_on_value_and_chevron_opens_menu() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Point, Size};
+        let tok = named("dark").tokens;
+        let opts = ["nord", "dark"];
+        let mut el: Element<'_, &str> = themed_pick_list(
+            opts,
+            Some("nord"),
+            |s| s,
+            tok,
+            ControlSize::Default,
+            A11y::new("theme", Role::ComboBox),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(240.0, 48.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let origin = layout.bounds();
+        let value = Point::new(origin.x + 20.0, origin.center_y());
+        let mark = Point::new(origin.x + origin.width - 8.0, origin.center_y());
+        must(
+            pick_press_overlay(value, false),
+            "press on the value must open the pick overlay",
+        );
+        must(
+            pick_press_overlay(mark, false),
+            "press on the chevron must open the pick overlay",
+        );
+        must(
+            !pick_press_overlay(value, true),
+            "press on a disabled pick must not open the overlay",
+        );
     }
 
     fn segmented_layout_height(size: ControlSize) -> f32 {
