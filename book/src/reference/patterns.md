@@ -177,9 +177,10 @@ Constructor: [`pattern::command_palette_view`](https://docs.rs/icedtea/latest/ic
 [icedtea](https://crates.io/crates/icedtea)
 
 `CommandPalette` owns the query and hits. Empty query shows
-favorites, then recent. A row paints the action's icon, title,
-tooltip, and shortcut when set. `progress` fades and slides the
-panel. See [Overlay windows](../overlay-windows.md).
+favorites, then recent. Pass [`PaletteOpts`](https://docs.rs/icedtea/latest/icedtea/palette/struct.PaletteOpts.html)
+for group headings, row face, empty omit, size, and highlight.
+A nested page or `ask` keeps the query field. `progress` fades and
+slides the panel. See [Overlay windows](../overlay-windows.md).
 
 ### Main window
 

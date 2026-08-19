@@ -57,6 +57,9 @@ pub struct Action<M> {
     pub message: M,
     pub context: Option<String>,
     pub sequence: Option<Vec<Shortcut>>,
+    pub section: Option<String>,
+    pub keywords: Vec<String>,
+    pub children: Vec<String>,
 }
 
 impl<M: Clone> Action<M> {
@@ -72,6 +75,9 @@ impl<M: Clone> Action<M> {
             message,
             context: None,
             sequence: None,
+            section: None,
+            keywords: Vec::new(),
+            children: Vec::new(),
         }
     }
 
@@ -113,6 +119,21 @@ impl<M: Clone> Action<M> {
         self
     }
 
+    pub fn with_section(mut self, section: impl Into<String>) -> Self {
+        self.section = Some(section.into());
+        self
+    }
+
+    pub fn with_keywords(mut self, words: impl IntoIterator<Item = impl Into<String>>) -> Self {
+        self.keywords = words.into_iter().map(Into::into).collect();
+        self
+    }
+
+    pub fn with_children(mut self, ids: impl IntoIterator<Item = impl Into<String>>) -> Self {
+        self.children = ids.into_iter().map(Into::into).collect();
+        self
+    }
+
     /// Message when enabled.
     pub fn invoke(&self) -> Option<M> {
         self.enabled.then(|| self.message.clone())
@@ -125,6 +146,10 @@ impl<M: Clone> Action<M> {
         if let Some(tip) = &self.tooltip {
             s.push(' ');
             s.push_str(tip);
+        }
+        for word in &self.keywords {
+            s.push(' ');
+            s.push_str(word);
         }
         s
     }
@@ -236,6 +261,8 @@ mod tests {
             .with_tooltip("Write file")
             .with_checked(false);
         assert!(save.search_blob().contains("Save"));
+        let aliased = Action::new("file.save", "Save", 1u8).with_keywords(["write", "w"]);
+        assert!(aliased.search_blob().contains("write"));
         assert_eq!(save.invoke(), Some(1));
         table.insert(save.clone());
         table.insert(save);

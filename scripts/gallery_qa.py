@@ -570,6 +570,18 @@ DEFAULT_INTERACT: list[dict[str, str]] = [
         "script": "sort 0\n",
         "expect": "Name column sorted; checks moved with their rows",
     },
+    {
+        "match": "command palette",
+        "name": "palette-omit",
+        "script": "pal-omit true\n",
+        "expect": "field-only idle; hits region omitted",
+    },
+    {
+        "match": "command palette",
+        "name": "palette-spotlight",
+        "script": "pal-query save\n",
+        "expect": "Save hit after omit idle",
+    },
 ]
 
 

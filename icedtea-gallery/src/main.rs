@@ -12,7 +12,7 @@ use icedtea::collection::{
     Accordion, ListModel, ListRow, RowSlot, Selection, TableModel, Tabs, TreeNode, VecList,
     VisibleWindow, OVERSCAN,
 };
-use icedtea::i18n::{Catalog, Direction, Locale};
+use icedtea::i18n::{order, Catalog, Direction, Locale};
 use icedtea::iced::widget::text_editor::Content;
 use icedtea::iced::widget::{button, column, container, mouse_area, row, text, Space};
 use icedtea::iced::{Alignment, Length, Padding, Subscription, Theme};
@@ -24,7 +24,7 @@ use icedtea::density::DensityName;
 use icedtea::icon::{Icon, Icons};
 use icedtea::m3::{ElevationPolicy, ShapePolicy};
 use icedtea::nav::NavStack;
-use icedtea::palette::CommandPalette;
+use icedtea::palette::{CommandPalette, EmptyHits, PaletteFace, PaletteGroup, PaletteOpts};
 use icedtea::pattern::{self, PrefGroup, RailDest};
 use icedtea::shortcut::Shortcut;
 use icedtea::theme::{self, Appearance, OsChrome, ThemeCatalog, Tokens};
@@ -1097,6 +1097,29 @@ fn parse_inject_line(line: &str) -> Option<Message> {
         "sort" => Some(Message::Sort(parts.next()?.parse().ok()?)),
         "group" => Some(Message::GroupPress(parts.next()?.parse().ok()?)),
         "query" => Some(Message::Query(parts.next()?.to_string())),
+        "pal-query" | "pal_query" => Some(Message::PaletteQuery(parts.next()?.to_string())),
+        "pal-face" | "pal_face" => {
+            let v = parts.next()?.to_ascii_lowercase();
+            Some(Message::PaletteFace(match v.as_str() {
+                "compact" => PaletteFace::Compact,
+                "detail" => PaletteFace::Detail,
+                _ => PaletteFace::Default,
+            }))
+        }
+        "pal-group" | "pal_group" => {
+            let v = parts.next()?.to_ascii_lowercase();
+            Some(Message::PaletteGroup(match v.as_str() {
+                "none" | "flat" => PaletteGroup::None,
+                "prefix" => PaletteGroup::Prefix,
+                _ => PaletteGroup::Section,
+            }))
+        }
+        "pal-omit" | "pal_omit" => Some(Message::PaletteOmit(parts.next()? == "true")),
+        "pal-highlight" | "pal_highlight" => {
+            Some(Message::PaletteHighlight(parts.next()? != "false"))
+        }
+        "pal-pick" | "pal_pick" => Some(Message::PalettePick(parts.next()?.parse().ok()?)),
+        "pal-back" | "pal_back" => Some(Message::PaletteBack),
         "icon-query" | "icon_query" => Some(Message::IconQuery(parts.next()?.to_string())),
         "copy-icon" | "copy_icon" => Some(Message::CopyIcon(parts.next()?.to_string())),
         "search-go" | "search_go" => Some(Message::SearchGo),
@@ -1166,21 +1189,37 @@ fn main() -> icedtea::iced::Result {
     )
 }
 
+fn dir_row<'a>(
+    dir: Direction,
+    kids: impl IntoIterator<Item = Element<'a, Message>>,
+) -> icedtea::iced::widget::Row<'a, Message> {
+    let mut r = icedtea::iced::widget::Row::new().spacing(12);
+    for el in order(dir, kids) {
+        r = r.push(el);
+    }
+    r
+}
+
 fn pal_table() -> ActionTable<Message> {
     let mut t = ActionTable::new();
     t.insert(
         Action::new("app.notes", "Notes", Message::PalRan("Notes".into()))
-            .with_icon(Icon::Document),
+            .with_icon(Icon::Document)
+            .with_section("Apps"),
     );
     t.insert(
         Action::new("file.save", "Save", Message::PalRan("Save".into()))
             .with_icon(Icon::Save)
-            .with_shortcut(Shortcut::parse("ctrl+s").unwrap()),
+            .with_shortcut(Shortcut::parse("ctrl+s").unwrap())
+            .with_section("File")
+            .with_keywords(["write"]),
     );
     t.insert(
-        Action::new("app.files", "Files", Message::PalRan("Files".into())).with_icon(Icon::Folder),
+        Action::new("app.files", "Files", Message::PalRan("Files".into()))
+            .with_icon(Icon::Folder)
+            .with_section("Apps"),
     );
-    t.insert(Action::new("go.line", "Go to line", Message::AskLine));
+    t.insert(Action::new("go.line", "Go to line", Message::AskLine).with_section("Nav"));
     t.insert(
         Action::new(
             "media.reel",
@@ -1188,7 +1227,20 @@ fn pal_table() -> ActionTable<Message> {
             Message::PalRan("Demo reel".into()),
         )
         .with_icon(Icon::FileVideo)
-        .with_tooltip("videos/reel.mp4"),
+        .with_tooltip("videos/reel.mp4")
+        .with_section("Media"),
+    );
+    t.insert(
+        Action::new("theme", "Theme", Message::PalRan("Theme".into()))
+            .with_icon(Icon::Contrast)
+            .with_section("View")
+            .with_children(["theme.light", "theme.dark"]),
+    );
+    t.insert(
+        Action::new("theme.light", "Light", Message::PalRan("Light".into())).with_section("View"),
+    );
+    t.insert(
+        Action::new("theme.dark", "Dark", Message::PalRan("Dark".into())).with_section("View"),
     );
     t
 }
@@ -1295,6 +1347,11 @@ enum Message {
     PalettePick(usize),
     PalettePrompt(String),
     PaletteApply,
+    PaletteFace(PaletteFace),
+    PaletteGroup(PaletteGroup),
+    PaletteOmit(bool),
+    PaletteHighlight(bool),
+    PaletteBack,
     AskLine,
     PalRan(String),
     TableHScroll(f32),
@@ -1484,6 +1541,10 @@ struct Gallery {
     palette_focus: bool,
     pal_table: ActionTable<Message>,
     pal_ran: String,
+    pal_face: PaletteFace,
+    pal_group: PaletteGroup,
+    pal_omit: bool,
+    pal_highlight: bool,
     reduced_motion: bool,
     dialog_open: bool,
     dialog_anim: icedtea::iced::Animation<bool>,
@@ -1589,9 +1650,8 @@ impl Gallery {
         let pal_table = pal_table();
         let mut palette = CommandPalette::new();
         palette.open();
-        for a in pal_table.iter() {
-            palette.pin_favorite(a.id.as_str());
-        }
+        palette.pin_favorite("app.notes");
+        palette.pin_favorite("file.save");
         palette.set_query(&pal_table, "");
         let md = MarkdownDoc::parse(samples::MARKDOWN);
         let md_heads = md.headings();
@@ -1812,6 +1872,10 @@ impl Gallery {
             palette_focus: true,
             pal_table,
             pal_ran: String::new(),
+            pal_face: PaletteFace::Default,
+            pal_group: PaletteGroup::Section,
+            pal_omit: false,
+            pal_highlight: true,
             reduced_motion: false,
             dialog_open: true,
             dialog_anim: icedtea::motion::overlay_animation(true, false),
@@ -2030,6 +2094,37 @@ impl Gallery {
                 a.title = cat.t(key).to_string();
             }
         }
+        for (id, key) in [
+            ("app.notes", "pal.notes"),
+            ("file.save", "pal.save"),
+            ("app.files", "pal.files"),
+            ("go.line", "pal.go-line"),
+            ("media.reel", "pal.reel"),
+            ("theme", "pal.theme"),
+            ("theme.light", "pal.light"),
+            ("theme.dark", "pal.dark"),
+        ] {
+            if let Some(a) = self.pal_table.get_mut(id) {
+                a.title = cat.t(key).to_string();
+            }
+        }
+        if let Some(a) = self.pal_table.get_mut("file.save") {
+            a.keywords = vec![cat.t("pal.write").to_string()];
+        }
+        for (id, key) in [
+            ("app.notes", "pal.sec.apps"),
+            ("app.files", "pal.sec.apps"),
+            ("file.save", "pal.sec.file"),
+            ("go.line", "pal.sec.nav"),
+            ("media.reel", "pal.sec.media"),
+            ("theme", "pal.sec.view"),
+            ("theme.light", "pal.sec.view"),
+            ("theme.dark", "pal.sec.view"),
+        ] {
+            if let Some(a) = self.pal_table.get_mut(id) {
+                a.section = Some(cat.t(key).to_string());
+            }
+        }
         if let Some(a) = self.actions.get_mut("file.new") {
             a.message = Message::Note(cat.t("note.new-file").to_string());
         }
@@ -2039,6 +2134,7 @@ impl Gallery {
         if let Some(a) = self.actions.get_mut("edit.redo") {
             a.message = Message::Note(cat.t("note.nothing-redo").to_string());
         }
+        self.palette.refresh(&self.pal_table);
     }
 
     fn look_strip(&self, tok: Tokens) -> Element<'_, Message> {
@@ -3219,8 +3315,23 @@ impl Gallery {
                     if self.page == "palette" {
                         match press {
                             icedtea::key::Press::Enter => {
-                                if let Some(msg) = self.palette.invoke_selected(&self.pal_table) {
+                                let i = self.palette.selected();
+                                let id = self
+                                    .palette
+                                    .results(&self.pal_table)
+                                    .get(i)
+                                    .map(|a| a.id.as_str().to_string());
+                                if let Some(msg) = self.palette.activate(&self.pal_table, i) {
+                                    if let Some(id) = id {
+                                        self.palette.remember(id);
+                                    }
                                     return self.update(msg);
+                                }
+                            }
+                            icedtea::key::Press::Escape => {
+                                if self.palette.page().is_some() {
+                                    self.palette.pop_page();
+                                    self.palette.refresh(&self.pal_table);
                                 }
                             }
                             icedtea::key::Press::ArrowUp
@@ -3307,13 +3418,25 @@ impl Gallery {
             }
             Message::PalettePick(i) => {
                 self.palette_focus = true;
-                if let Some(action) = self.palette.results(&self.pal_table).get(i) {
-                    let id = action.id.as_str().to_string();
-                    if let Some(msg) = action.invoke() {
+                if let Some(id) = self
+                    .palette
+                    .results(&self.pal_table)
+                    .get(i)
+                    .map(|a| a.id.as_str().to_string())
+                {
+                    if let Some(msg) = self.palette.activate(&self.pal_table, i) {
                         self.palette.remember(id);
                         return self.update(msg);
                     }
                 }
+            }
+            Message::PaletteFace(face) => self.pal_face = face,
+            Message::PaletteGroup(group) => self.pal_group = group,
+            Message::PaletteOmit(on) => self.pal_omit = on,
+            Message::PaletteHighlight(on) => self.pal_highlight = on,
+            Message::PaletteBack => {
+                self.palette.pop_page();
+                self.palette.refresh(&self.pal_table);
             }
             Message::PalRan(name) => {
                 self.pal_ran = format!("{} {name}", self.catalog.t("pal.ran"));
@@ -6640,14 +6763,135 @@ impl Gallery {
                 }
             }
             "palette" => {
-                let res = self.palette.results(&self.pal_table);
-                column![
-                    widget::meta(
-                        self.catalog.t("pal.hint"),
+                let stored = self.palette.results(&self.pal_table);
+                let spotlight = self.pal_omit
+                    && self.palette.query().trim().is_empty()
+                    && self.palette.page().is_none();
+                let res: Vec<&Action<Message>> = if spotlight { Vec::new() } else { stored };
+                let mut opts = PaletteOpts::new();
+                opts.face = self.pal_face;
+                opts.group = self.pal_group;
+                opts.highlight = self.pal_highlight;
+                opts.page = self.palette.page();
+                opts.favorite_count = self.palette.favorite_hit_count();
+                opts.favorites_label = self.catalog.t("pal.favorites");
+                opts.recent_label = self.catalog.t("pal.recent");
+                opts.empty_idle = if self.pal_omit {
+                    EmptyHits::Omit
+                } else {
+                    EmptyHits::Copy(self.catalog.t("pal.empty-idle"))
+                };
+                opts.empty_miss = EmptyHits::Copy(self.catalog.t("pal.empty-miss"));
+                let dir = tok.direction;
+                let faces = dir_row(
+                    dir,
+                    [
+                        widget::themed_radio(
+                            self.catalog.t("pal.face.default"),
+                            PaletteFace::Default,
+                            Some(self.pal_face),
+                            Message::PaletteFace,
+                            tok,
+                            named("pal-face-default", Role::Radio)
+                                .with_checked(self.pal_face == PaletteFace::Default),
+                        ),
+                        widget::themed_radio(
+                            self.catalog.t("pal.face.compact"),
+                            PaletteFace::Compact,
+                            Some(self.pal_face),
+                            Message::PaletteFace,
+                            tok,
+                            named("pal-face-compact", Role::Radio)
+                                .with_checked(self.pal_face == PaletteFace::Compact),
+                        ),
+                        widget::themed_radio(
+                            self.catalog.t("pal.face.detail"),
+                            PaletteFace::Detail,
+                            Some(self.pal_face),
+                            Message::PaletteFace,
+                            tok,
+                            named("pal-face-detail", Role::Radio)
+                                .with_checked(self.pal_face == PaletteFace::Detail),
+                        ),
+                    ],
+                );
+                let groups = dir_row(
+                    dir,
+                    [
+                        widget::themed_radio(
+                            self.catalog.t("pal.group.none"),
+                            PaletteGroup::None,
+                            Some(self.pal_group),
+                            Message::PaletteGroup,
+                            tok,
+                            named("pal-group-none", Role::Radio)
+                                .with_checked(self.pal_group == PaletteGroup::None),
+                        ),
+                        widget::themed_radio(
+                            self.catalog.t("pal.group.section"),
+                            PaletteGroup::Section,
+                            Some(self.pal_group),
+                            Message::PaletteGroup,
+                            tok,
+                            named("pal-group-section", Role::Radio)
+                                .with_checked(self.pal_group == PaletteGroup::Section),
+                        ),
+                        widget::themed_radio(
+                            self.catalog.t("pal.group.prefix"),
+                            PaletteGroup::Prefix,
+                            Some(self.pal_group),
+                            Message::PaletteGroup,
+                            tok,
+                            named("pal-group-prefix", Role::Radio)
+                                .with_checked(self.pal_group == PaletteGroup::Prefix),
+                        ),
+                    ],
+                );
+                let toggles = dir_row(
+                    dir,
+                    [
+                        widget::themed_checkbox(
+                            self.catalog.t("pal.omit"),
+                            self.pal_omit,
+                            Message::PaletteOmit,
+                            tok,
+                            named("pal-omit", Role::Checkbox).with_checked(self.pal_omit),
+                        ),
+                        widget::themed_checkbox(
+                            self.catalog.t("pal.highlight"),
+                            self.pal_highlight,
+                            Message::PaletteHighlight,
+                            tok,
+                            named("pal-highlight", Role::Checkbox).with_checked(self.pal_highlight),
+                        ),
+                    ],
+                );
+                let mut knobs = column![faces, groups, toggles].spacing(8);
+                if self.palette.page().is_some() {
+                    knobs = knobs.push(widget::themed_button(
+                        self.catalog.t("pal.back"),
+                        Some(Message::PaletteBack),
                         tok,
-                        named("pal-job", Role::Status),
-                    ),
-                    widget::meta(&self.pal_ran, tok, named("pal-ran", Role::Status)),
+                        icedtea::variant::Variant::Quiet,
+                        icedtea::icon::Icons::NONE,
+                        named("pal-back", Role::Button),
+                    ));
+                }
+                let mut page = column![widget::meta(
+                    self.catalog.t("pal.hint"),
+                    tok,
+                    named("pal-job", Role::Status),
+                ),]
+                .spacing(12);
+                if !self.pal_ran.is_empty() {
+                    page = page.push(widget::meta(
+                        &self.pal_ran,
+                        tok,
+                        named("pal-ran", Role::Status),
+                    ));
+                }
+                page = page.push(knobs);
+                page.push(
                     container(pattern::command_palette_view(
                         self.palette.query(),
                         self.catalog.t("pal.placeholder"),
@@ -6659,12 +6903,12 @@ impl Gallery {
                         Message::PalettePrompt,
                         Some(Message::PaletteApply),
                         Self::anim_progress(&self.palette_anim),
+                        opts,
                         tok,
                     ))
                     .width(Length::Fill)
                     .center_x(Length::Fill),
-                ]
-                .spacing(12)
+                )
                 .into()
             }
 
@@ -7499,6 +7743,12 @@ mod tests {
         assert!(g.palette.results(&g.pal_table)[0].icon.is_some());
         let _ = g.update(super::Message::PalettePick(0));
         assert!(g.pal_ran.contains("Notes"));
+        let _ = g.update(super::Message::PaletteOmit(true));
+        let _ = g.update(super::Message::PaletteQuery("write".into()));
+        assert!(g.pal_omit);
+        assert_eq!(g.palette.query(), "write");
+        assert_eq!(g.palette.results(&g.pal_table)[0].id.as_str(), "file.save");
+        let _ = g.view();
     }
 
     #[test]
@@ -7929,6 +8179,34 @@ mod tests {
             super::parse_inject_line("reduce-motion true"),
             Some(super::Message::ReduceMotion(true))
         ));
+        assert!(matches!(
+            super::parse_inject_line("pal-omit true"),
+            Some(super::Message::PaletteOmit(true))
+        ));
+        assert!(matches!(
+            super::parse_inject_line("pal-query write"),
+            Some(super::Message::PaletteQuery(q)) if q == "write"
+        ));
+        assert!(matches!(
+            super::parse_inject_line("pal-face compact"),
+            Some(super::Message::PaletteFace(super::PaletteFace::Compact))
+        ));
+        assert!(matches!(
+            super::parse_inject_line("pal-group prefix"),
+            Some(super::Message::PaletteGroup(super::PaletteGroup::Prefix))
+        ));
+        assert!(matches!(
+            super::parse_inject_line("pal-highlight false"),
+            Some(super::Message::PaletteHighlight(false))
+        ));
+        assert!(matches!(
+            super::parse_inject_line("pal-pick 0"),
+            Some(super::Message::PalettePick(0))
+        ));
+        assert!(matches!(
+            super::parse_inject_line("pal-back"),
+            Some(super::Message::PaletteBack)
+        ));
         assert!(super::parse_inject_line("# comment").is_none());
         assert!(super::parse_inject_line("unknown x").is_none());
 
@@ -7944,6 +8222,8 @@ mod tests {
             "code-wrap false",
             "pick 0",
             "rail 1",
+            "pal-omit true",
+            "pal-query write",
         ] {
             if let Some(msg) = super::parse_inject_line(line) {
                 let _ = g.update(msg);
@@ -7956,6 +8236,8 @@ mod tests {
         assert_eq!(g.query, "icedtea");
         assert_eq!(g.search_sent, "icedtea");
         assert!(!g.code_wrap);
+        assert!(g.pal_omit);
+        assert_eq!(g.palette.query(), "write");
         assert_eq!(g.rail, 1);
         assert_eq!(g.note, "Rail 1");
     }

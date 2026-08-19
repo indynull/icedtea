@@ -7,6 +7,11 @@
 - `form_group` walks Tab and Shift+Tab among mixed fields and wraps.
   The first text field can take focus on mount. Space activates the
   focused checkbox, radio, pick, chips, or segmented row.
+- `command_palette_view` takes `PaletteOpts` for group headings, row
+  face, empty omit, panel size, highlight, and leading or trailing
+  slots. The query field stays visible with a nested page or `ask`.
+- `Action` carries `section`, `keywords`, and `children`.
+- `CommandPalette` opens a child page and accepts a rank override.
 - Command palette rows paint the action's icon, title, tooltip, and
   shortcut when those fields are set.
 - Chrome icons and tree folder/file marks use Material Symbols Sharp

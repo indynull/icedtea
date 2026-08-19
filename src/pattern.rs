@@ -17,13 +17,15 @@
 //! let _ = cat;
 //! ```
 
-use iced::widget::{button, column, container, mouse_area, row, text, Column, Row, Space, Stack};
+use iced::widget::{
+    button, column, container, mouse_area, rich_text, row, span, text, Column, Row, Space, Stack,
+};
 use iced::{Alignment, Element, Length, Padding, Point, Size};
 
 use crate::a11y::{self, A11y, Role};
 use crate::action::{Action, ActionTable};
 use crate::collection::Tabs;
-use crate::i18n::{order, Catalog, Direction};
+use crate::i18n::{align_start, order, Catalog, Direction};
 use crate::icon::{Icon, Icons};
 use crate::layout;
 use crate::nav::NavStack;
@@ -311,14 +313,15 @@ pub fn status_bar<'a, M: Clone + 'a>(
 
 /// Fuzzy find over the action table.
 ///
-/// Pass `CommandPalette::results`. An empty query lists favorites,
-/// then recent. `prompt` paints the parameter field. Enter on the
-/// query invokes the highlighted row (`on_pick(selected)`). A row
-/// shows the action's icon, title, tooltip, and shortcut when set.
+/// Pass `CommandPalette::results` and [`crate::palette::PaletteOpts`]. An empty query
+/// lists favorites, then recent. The query field stays up when a nested
+/// page or `ask` parameter is showing. Enter on the query invokes the
+/// highlighted row (`on_pick(selected)`).
 ///
 ///
 /// ```
 /// use icedtea::action::{Action, ActionTable};
+/// use icedtea::palette::PaletteOpts;
 /// use icedtea::pattern;
 /// use icedtea::theme;
 /// let tok = theme::named("dark").tokens;
@@ -339,6 +342,7 @@ pub fn status_bar<'a, M: Clone + 'a>(
 ///     |_s| (),
 ///     None,
 ///     1.0,
+///     PaletteOpts::new(),
 ///     tok,
 /// );
 /// ```
@@ -354,78 +358,113 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
     on_prompt: impl Fn(String) -> M + 'a,
     on_done: Option<M>,
     progress: f32,
+    opts: crate::palette::PaletteOpts<'a, M>,
     tok: Tokens,
 ) -> Element<'a, M> {
     let t = crate::motion::visual(progress, tok.reduced_motion);
     let paint = tok.fade(t);
     let dir = paint.direction;
+    let idle = query.trim().is_empty();
     let mut list = Column::new().spacing(2);
+    let mut last_heading: Option<String> = None;
     for (i, a) in results.iter().enumerate() {
+        if let Some(heading) = palette_heading(a, i, idle, &opts) {
+            if last_heading.as_deref() != Some(heading.as_str()) {
+                list = list.push(palette_group_heading(heading.clone(), paint, dir));
+                last_heading = Some(heading);
+            }
+        }
         list = list.push(palette_hit(
             a,
             i == selected,
             a.enabled.then(|| on_pick(i)),
+            query,
+            &opts,
             paint,
             dir,
         ));
     }
     let n = results.len();
     let submit = (!results.is_empty() && selected < results.len()).then(|| on_pick(selected));
-    let field: Element<'a, M> = if let Some(p) = prompt {
-        column![
+    let query_field = search_input(
+        query,
+        on_query,
+        submit,
+        paint,
+        A11y::new(placeholder, Role::TextBox),
+        Some(iced::widget::Id::new("palette-query")),
+    );
+    let mut fields = Column::new().spacing(6).align_x(align_start(dir));
+    fields = fields.push(query_field);
+    if let Some(page) = opts.page {
+        fields = fields.push(meta(
+            page.title.clone(),
+            paint,
+            A11y::new(page.title.clone(), Role::Header),
+        ));
+    }
+    if let Some(p) = prompt {
+        fields = fields.push(
+            column![
+                meta(
+                    p.label.clone(),
+                    paint,
+                    A11y::new(p.label.clone(), Role::Status)
+                ),
+                themed_text_input(
+                    p.label.as_str(),
+                    &p.value,
+                    on_prompt,
+                    on_done,
+                    FieldOpts::NONE,
+                    paint,
+                    A11y::new("palette-arg", Role::TextBox),
+                    Some(iced::widget::Id::new("palette-arg")),
+                ),
+            ]
+            .spacing(6),
+        );
+    }
+    let empty_kind = if idle {
+        opts.empty_idle
+    } else {
+        opts.empty_miss
+    };
+    let hits: Option<Element<'a, M>> = if n == 0 {
+        empty_kind.text(!idle).map(|copy| {
             meta(
-                p.label.clone(),
+                copy.to_string(),
                 paint,
-                A11y::new(p.label.clone(), Role::Status)
-            ),
-            themed_text_input(
-                p.label.as_str(),
-                &p.value,
-                on_prompt,
-                on_done,
-                FieldOpts::NONE,
+                A11y::new("palette-empty", Role::Status),
+            )
+        })
+    } else if n > opts.scroll_after {
+        Some(
+            container(themed_scroll(
+                list.into(),
                 paint,
-                A11y::new("palette-arg", Role::TextBox),
-                Some(iced::widget::Id::new("palette-arg")),
-            ),
-        ]
-        .spacing(6)
-        .into()
-    } else {
-        search_input(
-            query,
-            on_query,
-            submit,
-            paint,
-            A11y::new(placeholder, Role::TextBox),
-            Some(iced::widget::Id::new("palette-query")),
+                A11y::new("palette-list", Role::List),
+                false,
+                None,
+                None::<fn(_) -> M>,
+            ))
+            .height(Length::Fixed(opts.scroll_height))
+            .into(),
         )
-    };
-    let hits: Element<'a, M> = if n == 0 {
-        let empty = if query.trim().is_empty() {
-            "Favorites and recent appear here."
-        } else {
-            "No matching commands"
-        };
-        meta(empty, paint, A11y::new("palette-empty", Role::Status))
-    } else if n > 8 {
-        container(themed_scroll(
-            list.into(),
-            paint,
-            A11y::new("palette-list", Role::List),
-            false,
-            None,
-            None::<fn(_) -> M>,
-        ))
-        .height(Length::Fixed(280.0))
-        .into()
     } else {
-        list.into()
+        Some(list.into())
     };
-    let panel = container(column![field, hits].spacing(tok.density.gap()))
+    let mut body = column![fields]
+        .spacing(tok.density.gap())
+        .align_x(align_start(dir));
+    if let Some(hits) = hits {
+        body = body.push(hits);
+    }
+    let panel = container(body)
         .padding(tok.density.inset())
-        .width(560)
-        .max_height(420.0)
+        .width(opts.width)
+        .max_height(opts.max_height)
+        .align_x(align_start(dir))
         .style(move |_| style::fade_face(style::raised_card(tok), t));
     crate::motion::overlay(
         panel.into(),
@@ -436,17 +475,74 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
     )
 }
 
-fn palette_hit<'a, M: Clone + 'a>(
+fn palette_heading<M>(
     action: &Action<M>,
-    selected: bool,
-    on_pick: Option<M>,
+    index: usize,
+    idle: bool,
+    opts: &crate::palette::PaletteOpts<'_, M>,
+) -> Option<String> {
+    if idle && opts.favorite_count > 0 && opts.group != crate::palette::PaletteGroup::None {
+        return Some(if index < opts.favorite_count {
+            opts.favorites_label.to_string()
+        } else {
+            opts.recent_label.to_string()
+        });
+    }
+    match opts.group {
+        crate::palette::PaletteGroup::None => None,
+        crate::palette::PaletteGroup::Section => action.section.clone(),
+        crate::palette::PaletteGroup::Prefix => Some(
+            action
+                .id
+                .as_str()
+                .split('.')
+                .next()
+                .unwrap_or("app")
+                .to_string(),
+        ),
+    }
+}
+
+fn palette_group_heading<'a, M: Clone + 'a>(
+    label: String,
     tok: Tokens,
     dir: Direction,
 ) -> Element<'a, M> {
     let s = tok.scheme();
-    let title = text(action.title.clone()).size(tok.body());
+    a11y::attach(
+        container(
+            text(label.clone())
+                .size(tok.meta())
+                .color(s.on_surface_variant),
+        )
+        .padding(tok.density.inset())
+        .width(Length::Fill)
+        .align_x(align_start(dir))
+        .into(),
+        &A11y::new(label, Role::Header),
+    )
+}
+
+fn palette_hit<'a, M: Clone + 'a>(
+    action: &Action<M>,
+    selected: bool,
+    on_pick: Option<M>,
+    query: &str,
+    opts: &crate::palette::PaletteOpts<'a, M>,
+    tok: Tokens,
+    dir: Direction,
+) -> Element<'a, M> {
+    use crate::palette::PaletteFace;
+    let s = tok.scheme();
+    let title: Element<'a, M> = if opts.highlight && !query.trim().is_empty() {
+        palette_title_highlight(action.title.as_str(), query, tok)
+    } else {
+        text(action.title.clone()).size(tok.body()).into()
+    };
     let mut lead: Vec<Element<'a, M>> = Vec::new();
-    if let Some(ic) = action.icon {
+    if let Some(slot) = opts.leading {
+        lead.push(slot(action, tok));
+    } else if let Some(ic) = action.icon {
         lead.push(icon_svg(
             ic,
             tok,
@@ -455,16 +551,42 @@ fn palette_hit<'a, M: Clone + 'a>(
     }
     let mut col = Column::new().spacing(2);
     col = col.push(title);
-    if let Some(tip) = &action.tooltip {
-        col = col.push(
-            text(tip.clone())
-                .size(tok.meta())
-                .color(s.on_surface_variant),
-        );
+    let show_tip = match opts.face {
+        PaletteFace::Compact => false,
+        PaletteFace::Default | PaletteFace::Detail => true,
+    };
+    if show_tip {
+        if let Some(tip) = &action.tooltip {
+            col = col.push(
+                text(tip.clone())
+                    .size(tok.meta())
+                    .color(s.on_surface_variant),
+            );
+        }
+    }
+    if opts.face == PaletteFace::Detail {
+        if let Some(section) = &action.section {
+            col = col.push(
+                text(section.clone())
+                    .size(tok.meta())
+                    .color(s.on_surface_variant),
+            );
+        }
+        match action.checked {
+            Some(true) => {
+                col = col.push(text("✓").size(tok.meta()).color(s.on_surface_variant));
+            }
+            Some(false) => {
+                col = col.push(text("○").size(tok.meta()).color(s.on_surface_variant));
+            }
+            None => {}
+        }
     }
     lead.push(col.into());
     let mut trail: Vec<Element<'a, M>> = Vec::new();
-    if let Some(sc) = &action.shortcut {
+    if let Some(slot) = opts.trailing {
+        trail.push(slot(action, tok));
+    } else if let Some(sc) = &action.shortcut {
         trail.push(
             text(sc.to_string())
                 .size(tok.meta())
@@ -475,15 +597,18 @@ fn palette_hit<'a, M: Clone + 'a>(
     let mut line = Row::new()
         .spacing(tok.density.gap())
         .align_y(Alignment::Center);
-    for el in order(dir, lead) {
+    let mut parts = lead;
+    parts.push(Space::new().width(Length::Fill).into());
+    parts.extend(trail);
+    for el in order(dir, parts) {
         line = line.push(el);
     }
-    line = line.push(Space::new().width(Length::Fill));
-    for el in order(dir, trail) {
-        line = line.push(el);
-    }
+    let pad = match opts.face {
+        PaletteFace::Compact => (tok.density.inset() - 2.0).max(4.0),
+        PaletteFace::Default | PaletteFace::Detail => tok.density.inset(),
+    };
     let mut b = button(line)
-        .padding(tok.density.inset())
+        .padding(pad)
         .width(Length::Fill)
         .style(style::palette_hit(tok, selected));
     if let Some(msg) = on_pick {
@@ -495,6 +620,76 @@ fn palette_hit<'a, M: Clone + 'a>(
             .with_checked(selected)
             .with_disabled(!action.enabled),
     )
+}
+
+fn palette_title_highlight<'a, M: Clone + 'a>(
+    title: &str,
+    query: &str,
+    tok: Tokens,
+) -> Element<'a, M> {
+    let s = tok.scheme();
+    let ranges = match_ranges(query, title);
+    if ranges.is_empty() {
+        return text(title.to_string()).size(tok.body()).into();
+    }
+    let chars: Vec<char> = title.chars().collect();
+    let mut spans: Vec<iced::advanced::text::Span<'static, (), iced::Font>> = Vec::new();
+    let mut at = 0usize;
+    for (start, end) in ranges {
+        if start > at {
+            let chunk: String = chars[at..start].iter().collect();
+            spans.push(span(chunk).size(tok.body()).color(s.on_surface));
+        }
+        let chunk: String = chars[start..end].iter().collect();
+        spans.push(span(chunk).size(tok.body()).color(s.primary));
+        at = end;
+    }
+    if at < chars.len() {
+        let chunk: String = chars[at..].iter().collect();
+        spans.push(span(chunk).size(tok.body()).color(s.on_surface));
+    }
+    rich_text(spans).into()
+}
+
+/// Character ranges in `title` that match `query` (substring, else fuzzy).
+pub(crate) fn match_ranges(query: &str, title: &str) -> Vec<(usize, usize)> {
+    let q = query.trim();
+    if q.is_empty() {
+        return Vec::new();
+    }
+    let title_l: String = title.to_ascii_lowercase();
+    let q_l = q.to_ascii_lowercase();
+    if let Some(byte) = title_l.find(&q_l) {
+        let start = title_l[..byte].chars().count();
+        return vec![(start, start + q.chars().count())];
+    }
+    let tchars: Vec<char> = title_l.chars().collect();
+    let qchars: Vec<char> = q_l.chars().collect();
+    let mut qi = 0;
+    let mut ranges = Vec::new();
+    let mut run: Option<(usize, usize)> = None;
+    for (i, ch) in tchars.iter().enumerate() {
+        if qi < qchars.len() && *ch == qchars[qi] {
+            match run {
+                Some((start, end)) if end == i => run = Some((start, i + 1)),
+                _ => {
+                    if let Some(r) = run.take() {
+                        ranges.push(r);
+                    }
+                    run = Some((i, i + 1));
+                }
+            }
+            qi += 1;
+        }
+    }
+    if let Some(r) = run {
+        ranges.push(r);
+    }
+    if qi == qchars.len() {
+        ranges
+    } else {
+        Vec::new()
+    }
 }
 
 /// Centered empty or error state.
@@ -2441,6 +2636,7 @@ mod tests {
             |_| (),
             None,
             1.0,
+            crate::palette::PaletteOpts::new(),
             tok,
         );
         let dead_res: Vec<&Action<()>> = disabled.iter().collect();
@@ -2455,6 +2651,7 @@ mod tests {
             |_| (),
             None,
             1.0,
+            crate::palette::PaletteOpts::new(),
             tok,
         );
         // Long hit lists scroll inside a fixed height (n > 12).
@@ -2560,6 +2757,7 @@ mod tests {
             |_| (),
             None,
             1.0,
+            crate::palette::PaletteOpts::new(),
             tok,
         );
         paint(&mut pal);
@@ -2574,6 +2772,7 @@ mod tests {
             |_| (),
             None,
             1.0,
+            crate::palette::PaletteOpts::new(),
             tok,
         );
         paint(&mut many_pal);
@@ -2593,6 +2792,7 @@ mod tests {
             |_| (),
             Some(()),
             1.0,
+            crate::palette::PaletteOpts::new(),
             tok,
         );
         paint(&mut asked);
@@ -2679,6 +2879,7 @@ mod tests {
             |_| (),
             None,
             0.4,
+            crate::palette::PaletteOpts::new(),
             tok,
         );
         paint(&mut pal_mid);
@@ -2696,6 +2897,7 @@ mod tests {
             |_| (),
             None,
             1.0,
+            crate::palette::PaletteOpts::new(),
             tok,
         );
         paint(&mut el);
@@ -2711,6 +2913,7 @@ mod tests {
             |_| (),
             None,
             1.0,
+            crate::palette::PaletteOpts::new(),
             tok,
         );
         paint(&mut miss);
@@ -2953,5 +3156,251 @@ mod tests {
         assert!(on_row.contains(&Msg::Save), "{save_msg}");
         let dismiss_msg = format!("row press must not be dismiss-only, got {on_row:?}");
         assert!(!on_row.iter().all(|m| *m == Msg::Dismiss), "{dismiss_msg}");
+    }
+
+    fn layout_palette(
+        query: &str,
+        results: &[&Action<()>],
+        prompt: Option<&crate::palette::Prompt>,
+        opts: crate::palette::PaletteOpts<'_, ()>,
+        tok: crate::theme::Tokens,
+    ) -> iced::advanced::layout::Node {
+        use iced::advanced::layout::Limits;
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+        let mut el: Element<'_, ()> = command_palette_view(
+            query,
+            "Search",
+            results,
+            0,
+            |_| (),
+            |_| (),
+            prompt,
+            |_| (),
+            prompt.and(Some(())),
+            1.0,
+            opts,
+            tok,
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        el.as_widget_mut().layout(
+            &mut tree,
+            &renderer,
+            &Limits::new(Size::ZERO, Size::new(800.0, 800.0)),
+        )
+    }
+
+    fn tree_max_height(node: &iced::advanced::layout::Node) -> f32 {
+        node.children()
+            .iter()
+            .map(tree_max_height)
+            .fold(node.bounds().height, f32::max)
+    }
+
+    #[test]
+    fn command_palette_view_keeps_query_with_page_and_ask() {
+        let src = include_str!("pattern.rs");
+        let pal = src
+            .split("pub fn command_palette_view")
+            .nth(1)
+            .unwrap()
+            .split("fn palette_heading")
+            .next()
+            .unwrap();
+        assert!(pal.contains("search_input("), "{pal}");
+        assert!(pal.contains("if let Some(p) = prompt"), "{pal}");
+        assert!(pal.contains("opts.page"), "{pal}");
+        assert!(pal.find("search_input(").unwrap() < pal.find("if let Some(p) = prompt").unwrap());
+
+        let tok = crate::theme::named("dark").tokens;
+        let mut table = ActionTable::new();
+        table.insert(Action::new("file.save", "Save", ()));
+        let hits: Vec<&Action<()>> = table.iter().collect();
+        let page = crate::palette::PalettePage {
+            action: "theme".into(),
+            title: "Theme".into(),
+        };
+        let ask = crate::palette::Prompt {
+            action: "go.line".into(),
+            label: "Line".into(),
+            value: "12".into(),
+        };
+        let mut opts = crate::palette::PaletteOpts::new();
+        opts.page = Some(&page);
+        let node = layout_palette("", &hits, Some(&ask), opts, tok);
+        assert!(tree_max_height(&node) > 40.0);
+        let src_fn = include_str!("pattern.rs");
+        let body = src_fn
+            .split("pub fn command_palette_view")
+            .nth(1)
+            .unwrap()
+            .split("fn palette_heading")
+            .next()
+            .unwrap();
+        assert!(body.contains("Id::new(\"palette-query\""));
+        assert!(body.contains("Id::new(\"palette-arg\""));
+    }
+
+    #[test]
+    fn command_palette_view_groups_and_omit_idle() {
+        let tok = crate::theme::named("dark").tokens;
+        let mut table = ActionTable::new();
+        table.insert(Action::new("file.save", "Save", ()).with_section("File"));
+        table.insert(Action::new("view.zoom", "Zoom", ()).with_section("View"));
+        let hits: Vec<&Action<()>> = table.iter().collect();
+        let mut opts = crate::palette::PaletteOpts::new();
+        opts.favorite_count = 1;
+        opts.group = crate::palette::PaletteGroup::Section;
+        let grouped = layout_palette("", &hits, None, opts, tok);
+        assert!(tree_max_height(&grouped) > 40.0);
+        let mut prefix = crate::palette::PaletteOpts::new();
+        prefix.group = crate::palette::PaletteGroup::Prefix;
+        let _ = layout_palette("z", &hits, None, prefix, tok);
+        let mut flat = crate::palette::PaletteOpts::new();
+        flat.group = crate::palette::PaletteGroup::None;
+        let _ = layout_palette("", &hits, None, flat, tok);
+        let mut scrolled = crate::palette::PaletteOpts::new();
+        scrolled.scroll_after = 0;
+        scrolled.scroll_height = 280.0;
+        let scrolled_node = layout_palette("", &hits, None, scrolled, tok);
+        fn node_has_height(node: &iced::advanced::layout::Node, h: f32) -> bool {
+            if (node.bounds().height - h).abs() < 0.5 {
+                return true;
+            }
+            node.children().iter().any(|c| node_has_height(c, h))
+        }
+        assert!(node_has_height(&scrolled_node, 280.0));
+
+        let none: Vec<&Action<()>> = Vec::new();
+        let mut blank = crate::palette::PaletteOpts::new();
+        blank.empty_idle = crate::palette::EmptyHits::Copy("");
+        let _ = layout_palette("", &none, None, blank, tok);
+        let mut copy = crate::palette::PaletteOpts::new();
+        copy.empty_idle = crate::palette::EmptyHits::Copy("Idle list");
+        let _ = layout_palette("", &none, None, copy, tok);
+        let mut omit = crate::palette::PaletteOpts::new();
+        omit.empty_idle = crate::palette::EmptyHits::Omit;
+        let idle = layout_palette("", &none, None, omit, tok);
+        let miss_opts = crate::palette::PaletteOpts::new();
+        let miss = layout_palette("zzz", &none, None, miss_opts, tok);
+        assert!(tree_max_height(&idle) < tree_max_height(&miss));
+
+        let src = include_str!("pattern.rs");
+        assert!(src.contains("palette_group_heading"));
+        assert!(super::match_ranges("sa", "Save").contains(&(0, 2)));
+        assert_eq!(super::match_ranges("sv", "Save").len(), 2);
+        assert!(super::match_ranges("", "Save").is_empty());
+        assert_eq!(super::match_ranges("ave", "Save"), vec![(1, 4)]);
+        assert!(super::match_ranges("qq", "Save").is_empty());
+    }
+
+    #[test]
+    fn command_palette_view_hit_row_follows_direction() {
+        use crate::shortcut::Shortcut;
+        let ltr = crate::theme::named("dark").tokens;
+        let rtl = ltr.with_direction(crate::i18n::Direction::Rtl);
+        let mut table = ActionTable::new();
+        table.insert(
+            Action::new("file.save", "Save", ())
+                .with_icon(Icon::Save)
+                .with_shortcut(Shortcut::parse("ctrl+s").unwrap()),
+        );
+        let hits: Vec<&Action<()>> = table.iter().collect();
+        let ltr_n = layout_palette("", &hits, None, crate::palette::PaletteOpts::new(), ltr);
+        let rtl_n = layout_palette("", &hits, None, crate::palette::PaletteOpts::new(), rtl);
+        fn first_wide_row(
+            node: &iced::advanced::layout::Node,
+        ) -> Option<&iced::advanced::layout::Node> {
+            let kids = node.children();
+            let mixed = kids.len() >= 3 && node.bounds().width >= 200.0 && {
+                let widths: Vec<f32> = kids.iter().map(|c| c.bounds().width).collect();
+                widths.iter().any(|w| *w < 40.0) && widths.iter().any(|w| *w > 80.0)
+            };
+            if mixed {
+                Some(node)
+            } else {
+                kids.iter().find_map(first_wide_row)
+            }
+        }
+        let ltr_row = first_wide_row(&ltr_n).expect("ltr hit row");
+        let rtl_row = first_wide_row(&rtl_n).expect("rtl hit row");
+        let ltr_kids: Vec<_> = ltr_row.children().iter().map(|c| c.bounds().x).collect();
+        let rtl_kids: Vec<_> = rtl_row.children().iter().map(|c| c.bounds().x).collect();
+        assert!(ltr_kids.first() < ltr_kids.last());
+        assert!(rtl_kids.first() < rtl_kids.last());
+        let src = include_str!("pattern.rs");
+        let hit = src
+            .split("fn palette_hit")
+            .nth(1)
+            .unwrap()
+            .split("fn palette_title_highlight")
+            .next()
+            .unwrap();
+        assert!(hit.contains("parts.extend(trail)"));
+        assert!(hit.contains("order(dir, parts)"));
+        let head = src
+            .split("fn palette_group_heading")
+            .nth(1)
+            .unwrap()
+            .split("fn palette_hit")
+            .next()
+            .unwrap();
+        assert!(head.contains("align_start(dir)"));
+    }
+
+    #[test]
+    fn command_palette_view_face_and_slots_change_row() {
+        let tok = crate::theme::named("dark").tokens;
+        let mut table = ActionTable::new();
+        table.insert(
+            Action::new("file.save", "Save", ())
+                .with_icon(Icon::Save)
+                .with_tooltip("Write")
+                .with_section("File")
+                .with_checked(true),
+        );
+        table.insert(
+            Action::new("file.open", "Open", ())
+                .with_section("File")
+                .with_checked(false),
+        );
+        table.insert(Action::new("file.close", "Close", ()).with_section("File"));
+        let hits: Vec<&Action<()>> = table.iter().collect();
+        let mut compact = crate::palette::PaletteOpts::new();
+        compact.face = crate::palette::PaletteFace::Compact;
+        let mut detail = crate::palette::PaletteOpts::new();
+        detail.face = crate::palette::PaletteFace::Detail;
+        fn extra(a: &Action<()>, tok: crate::theme::Tokens) -> Element<'static, ()> {
+            crate::widget::meta(
+                a.section.clone().unwrap_or_default(),
+                tok,
+                A11y::new("slot", Role::Status),
+            )
+        }
+        detail.trailing = Some(extra);
+        detail.leading = Some(extra);
+        let c = layout_palette("sa", &hits, None, compact, tok);
+        let d = layout_palette("zz", &hits, None, detail, tok);
+        let mut mid = crate::palette::PaletteOpts::new();
+        mid.highlight = true;
+        let _ = layout_palette("ave", &hits, None, mid.clone(), tok);
+        let _ = layout_palette("sv", &hits, None, mid, tok);
+        assert!(tree_max_height(&d) > tree_max_height(&c));
+        let src = include_str!("pattern.rs");
+        let hit = src
+            .split("fn palette_hit")
+            .nth(1)
+            .unwrap()
+            .split("fn palette_title_highlight")
+            .next()
+            .unwrap();
+        assert!(hit.contains("PaletteFace::Compact"), "{hit}");
+        assert!(hit.contains("opts.leading"), "{hit}");
+        assert!(hit.contains("opts.trailing"), "{hit}");
+        assert!(hit.contains("action.checked"), "{hit}");
     }
 }

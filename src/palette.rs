@@ -2,6 +2,113 @@
 
 use crate::action::{Action, ActionTable};
 use crate::fuzzy;
+use crate::theme::Tokens;
+use iced::Element;
+
+/// How each palette row is painted.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PaletteFace {
+    #[default]
+    Default,
+    Compact,
+    Detail,
+}
+
+/// How hit rows are grouped.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PaletteGroup {
+    None,
+    #[default]
+    Section,
+    Prefix,
+}
+
+/// Empty-list copy, or omit the hits region.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum EmptyHits<'a> {
+    #[default]
+    Default,
+    Omit,
+    Copy(&'a str),
+}
+
+impl<'a> EmptyHits<'a> {
+    pub const IDLE: &'static str = "Favorites and recent appear here.";
+    pub const MISS: &'static str = "No matching commands";
+
+    /// `None` means omit the hits region (Spotlight idle, or empty Copy).
+    pub fn text(self, miss: bool) -> Option<&'a str> {
+        match self {
+            Self::Default => Some(if miss { Self::MISS } else { Self::IDLE }),
+            Self::Omit => None,
+            Self::Copy("") => None,
+            Self::Copy(s) => Some(s),
+        }
+    }
+}
+
+/// Nested page currently open in the palette.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PalettePage {
+    pub action: String,
+    pub title: String,
+}
+
+/// Optional leading or trailing row chrome (clones labels; `'static` paint).
+pub type PaletteSlot<M> = fn(&Action<M>, Tokens) -> Element<'static, M>;
+
+/// Constructor knobs for [`crate::pattern::command_palette_view`].
+#[derive(Clone)]
+pub struct PaletteOpts<'a, M> {
+    pub face: PaletteFace,
+    pub group: PaletteGroup,
+    pub highlight: bool,
+    pub page: Option<&'a PalettePage>,
+    pub empty_idle: EmptyHits<'a>,
+    pub empty_miss: EmptyHits<'a>,
+    pub width: f32,
+    pub max_height: f32,
+    pub scroll_after: usize,
+    pub scroll_height: f32,
+    pub favorite_count: usize,
+    pub favorites_label: &'a str,
+    pub recent_label: &'a str,
+    pub leading: Option<PaletteSlot<M>>,
+    pub trailing: Option<PaletteSlot<M>>,
+}
+
+impl<'a, M> PaletteOpts<'a, M> {
+    pub const DEFAULT_WIDTH: f32 = 560.0;
+    pub const DEFAULT_MAX_HEIGHT: f32 = 420.0;
+    pub const DEFAULT_SCROLL_AFTER: usize = 8;
+    pub const DEFAULT_SCROLL_HEIGHT: f32 = 280.0;
+
+    pub fn new() -> Self {
+        Self {
+            face: PaletteFace::Default,
+            group: PaletteGroup::Section,
+            highlight: true,
+            page: None,
+            empty_idle: EmptyHits::Default,
+            empty_miss: EmptyHits::Default,
+            width: Self::DEFAULT_WIDTH,
+            max_height: Self::DEFAULT_MAX_HEIGHT,
+            scroll_after: Self::DEFAULT_SCROLL_AFTER,
+            scroll_height: Self::DEFAULT_SCROLL_HEIGHT,
+            favorite_count: 0,
+            favorites_label: "Favorites",
+            recent_label: "Recent",
+            leading: None,
+            trailing: None,
+        }
+    }
+}
+
+impl<M> Default for PaletteOpts<'static, M> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// Palette query + filtered results.
 ///
@@ -25,6 +132,7 @@ pub struct CommandPalette {
     pub recent: Vec<String>,
     pub favorites: Vec<String>,
     pub prompt: Option<Prompt>,
+    pages: Vec<PalettePage>,
 }
 
 /// Parameter the palette asks for after a command (go to line, rename).
@@ -51,7 +159,41 @@ impl CommandPalette {
             recent: Vec::new(),
             favorites: Vec::new(),
             prompt: None,
+            pages: Vec::new(),
         }
+    }
+
+    pub fn page(&self) -> Option<&PalettePage> {
+        self.pages.last()
+    }
+
+    pub fn push_page(&mut self, action: impl Into<String>, title: impl Into<String>) {
+        self.pages.push(PalettePage {
+            action: action.into(),
+            title: title.into(),
+        });
+        self.query.clear();
+        self.selected = 0;
+        self.hits.clear();
+    }
+
+    pub fn pop_page(&mut self) -> Option<PalettePage> {
+        let page = self.pages.pop()?;
+        self.query.clear();
+        self.selected = 0;
+        self.hits.clear();
+        Some(page)
+    }
+
+    /// Favorites that are in the current idle hit list.
+    pub fn favorite_hit_count(&self) -> usize {
+        if !self.query.trim().is_empty() || self.page().is_some() {
+            return 0;
+        }
+        self.favorites
+            .iter()
+            .filter(|id| self.hits.iter().any(|h| h == *id))
+            .count()
     }
 
     pub fn ask(&mut self, action: impl Into<String>, label: impl Into<String>) {
@@ -93,6 +235,8 @@ impl CommandPalette {
         self.query.clear();
         self.selected = 0;
         self.hits.clear();
+        self.pages.clear();
+        self.prompt = None;
     }
 
     pub fn close(&mut self) {
@@ -104,31 +248,71 @@ impl CommandPalette {
         self.refresh(table);
     }
 
+    pub fn set_query_with<M, F>(
+        &mut self,
+        table: &ActionTable<M>,
+        query: impl Into<String>,
+        rank: F,
+    ) where
+        M: Clone,
+        F: Fn(&str, &Action<M>) -> Option<u32>,
+    {
+        self.query = query.into();
+        self.refresh_with(table, Some(rank));
+    }
+
     pub fn refresh<M: Clone>(&mut self, table: &ActionTable<M>) {
-        if self.query.trim().is_empty() {
-            let mut hits = Vec::new();
-            for id in self.favorites.iter().chain(self.recent.iter()) {
-                if table.get(id).is_some_and(|a| a.enabled) && !hits.iter().any(|h| h == id) {
-                    hits.push(id.clone());
-                }
-            }
-            self.hits = hits;
-        } else {
-            let blobs: Vec<(String, String)> = table
-                .iter()
-                .filter(|a| a.enabled)
-                .map(|a| (a.id.0.clone(), a.search_blob()))
-                .collect();
-            let ranked = fuzzy::rank(&self.query, blobs.iter().map(|(_, b)| b.as_str()));
-            self.hits = ranked
-                .into_iter()
-                .filter_map(|blob| {
-                    blobs
+        self.refresh_with(table, None::<fn(&str, &Action<M>) -> Option<u32>>);
+    }
+
+    pub fn refresh_with<M, F>(&mut self, table: &ActionTable<M>, rank: Option<F>)
+    where
+        M: Clone,
+        F: Fn(&str, &Action<M>) -> Option<u32>,
+    {
+        let scoped: Vec<&Action<M>> = if let Some(page) = self.pages.last() {
+            table
+                .get(&page.action)
+                .map(|parent| {
+                    parent
+                        .children
                         .iter()
-                        .find(|(_, b)| b == blob)
-                        .map(|(id, _)| id.clone())
+                        .filter_map(|id| table.get(id))
+                        .filter(|a| a.enabled)
+                        .collect()
+                })
+                .unwrap_or_default()
+        } else {
+            table.iter().filter(|a| a.enabled).collect()
+        };
+
+        if self.query.trim().is_empty() {
+            if self.pages.last().is_some() {
+                self.hits = scoped.iter().map(|a| a.id.0.clone()).collect();
+            } else {
+                let mut hits = Vec::new();
+                for id in self.favorites.iter().chain(self.recent.iter()) {
+                    if table.get(id).is_some_and(|a| a.enabled) && !hits.iter().any(|h| h == id) {
+                        hits.push(id.clone());
+                    }
+                }
+                self.hits = hits;
+            }
+        } else {
+            let q = self.query.as_str();
+            let mut scored: Vec<(u32, usize, String)> = scoped
+                .iter()
+                .enumerate()
+                .filter_map(|(i, a)| {
+                    let score = match rank.as_ref() {
+                        Some(f) => f(q, a)?,
+                        None => fuzzy::score(q, &a.search_blob())?,
+                    };
+                    Some((score, i, a.id.0.clone()))
                 })
                 .collect();
+            scored.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
+            self.hits = scored.into_iter().map(|(_, _, id)| id).collect();
         }
         if self.selected >= self.hits.len() {
             self.selected = 0;
@@ -172,6 +356,18 @@ impl CommandPalette {
     pub fn invoke_selected<M: Clone>(&self, table: &ActionTable<M>) -> Option<M> {
         let id = self.hits.get(self.selected)?;
         table.invoke(id)
+    }
+
+    /// Open a child page when the row has children; otherwise invoke.
+    pub fn activate<M: Clone>(&mut self, table: &ActionTable<M>, index: usize) -> Option<M> {
+        let id = self.hits.get(index)?.clone();
+        let action = table.get(&id)?;
+        if !action.children.is_empty() {
+            self.push_page(id, action.title.clone());
+            self.refresh(table);
+            return None;
+        }
+        action.invoke()
     }
 }
 
@@ -285,5 +481,116 @@ mod tests {
         assert_eq!(hit.icon, Some(Icon::FileVideo));
         assert_eq!(hit.tooltip.as_deref(), Some("videos/reel.mp4"));
         assert_eq!(pal.invoke_selected(&table), Some(22));
+    }
+
+    #[test]
+    fn search_blob_is_title_id_and_tooltip() {
+        let a = Action::new("file.save", "Save", 1u8)
+            .with_tooltip("Write file")
+            .with_context("editor");
+        let blob = a.search_blob();
+        assert!(blob.contains("Save"));
+        assert!(blob.contains("file.save"));
+        assert!(blob.contains("Write file"));
+        assert!(!blob.contains("editor"));
+    }
+
+    #[test]
+    fn refresh_ranks_enabled_actions_without_using_context() {
+        let mut table = ActionTable::new();
+        table.insert(Action::new("file.save", "Save", 1u8).with_context("editor"));
+        table.insert(Action::new("view.zoom", "Zoom", 2u8).with_context("canvas"));
+        let mut pal = CommandPalette::new();
+        pal.set_query(&table, "z");
+        let hits = pal.results(&table);
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].id.as_str(), "view.zoom");
+        pal.set_query(&table, "save");
+        assert_eq!(pal.results(&table)[0].id.as_str(), "file.save");
+    }
+
+    #[test]
+    fn empty_query_is_a_flat_favorites_then_recent_list() {
+        let mut table = ActionTable::new();
+        table.insert(Action::new("file.save", "Save", 1u8));
+        table.insert(Action::new("file.quit", "Quit", 2u8));
+        table.insert(Action::new("view.zoom", "Zoom", 3u8));
+        let mut pal = CommandPalette::new();
+        pal.pin_favorite("view.zoom");
+        pal.remember("file.quit");
+        pal.remember("file.save");
+        pal.set_query(&table, "");
+        let ids: Vec<_> = pal.results(&table).iter().map(|a| a.id.as_str()).collect();
+        assert_eq!(ids, ["view.zoom", "file.save", "file.quit"]);
+        assert_eq!(pal.favorite_hit_count(), 1);
+    }
+
+    #[test]
+    fn keyword_query_ranks_aliased_action() {
+        let mut table = ActionTable::new();
+        table.insert(Action::new("file.save", "Save", 1u8).with_keywords(["write"]));
+        table.insert(Action::new("file.quit", "Quit", 2u8));
+        let mut pal = CommandPalette::new();
+        pal.set_query(&table, "write");
+        assert_eq!(pal.results(&table)[0].id.as_str(), "file.save");
+    }
+
+    #[test]
+    fn custom_rank_overrides_fuzzy_order() {
+        let mut table = ActionTable::new();
+        table.insert(Action::new("file.save", "Save", 1u8));
+        table.insert(Action::new("file.quit", "Quit", 2u8));
+        let mut pal = CommandPalette::new();
+        pal.set_query(&table, "s");
+        assert_eq!(pal.results(&table)[0].id.as_str(), "file.save");
+        pal.set_query_with(&table, "s", |_, a| {
+            if a.id.as_str() == "file.quit" {
+                Some(100)
+            } else {
+                Some(1)
+            }
+        });
+        assert_eq!(pal.results(&table)[0].id.as_str(), "file.quit");
+        pal.set_query(&table, "s");
+        assert_eq!(pal.results(&table)[0].id.as_str(), "file.save");
+    }
+
+    #[test]
+    fn activate_opens_child_page_and_keeps_query_path() {
+        let mut table = ActionTable::new();
+        table.insert(
+            Action::new("theme", "Theme", 0u8).with_children(["theme.light", "theme.dark"]),
+        );
+        table.insert(Action::new("theme.light", "Light", 1u8));
+        table.insert(Action::new("theme.dark", "Dark", 2u8));
+        let mut pal = CommandPalette::new();
+        pal.set_query(&table, "theme");
+        assert!(pal.activate(&table, 0).is_none());
+        assert_eq!(pal.page().unwrap().title, "Theme");
+        let kids: Vec<_> = pal.results(&table).iter().map(|a| a.id.as_str()).collect();
+        assert_eq!(kids, ["theme.light", "theme.dark"]);
+        pal.set_query(&table, "da");
+        assert_eq!(pal.activate(&table, 0), Some(2));
+        pal.pop_page();
+        assert!(pal.page().is_none());
+        assert!(pal.pop_page().is_none());
+        pal.set_query(&table, "theme");
+        assert_eq!(pal.favorite_hit_count(), 0);
+        pal.push_page("theme", "Theme");
+        pal.refresh(&table);
+        assert_eq!(pal.favorite_hit_count(), 0);
+    }
+
+    #[test]
+    fn empty_hits_and_opts_defaults() {
+        use crate::palette::{EmptyHits, PaletteOpts};
+        assert_eq!(EmptyHits::Default.text(false), Some(EmptyHits::IDLE));
+        assert_eq!(EmptyHits::Default.text(true), Some(EmptyHits::MISS));
+        assert_eq!(EmptyHits::Omit.text(false), None);
+        assert_eq!(EmptyHits::Copy("").text(false), None);
+        assert_eq!(EmptyHits::Copy("None found").text(true), Some("None found"));
+        let opts = PaletteOpts::<()>::default();
+        assert_eq!(opts.width, PaletteOpts::<()>::DEFAULT_WIDTH);
+        assert_eq!(opts.scroll_after, PaletteOpts::<()>::DEFAULT_SCROLL_AFTER);
     }
 }
