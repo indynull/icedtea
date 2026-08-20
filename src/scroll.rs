@@ -206,44 +206,62 @@ where
         _cursor: mouse::Cursor,
         _viewport: &Rectangle,
     ) {
-        let bounds = layout.bounds();
-        let scheme = self.tok.scheme();
-        let rail_r = self.tok.radius(crate::m3::shape::Component::Track);
-        renderer.fill_quad(
-            renderer::Quad {
-                bounds,
-                border: iced::Border {
-                    color: Color::TRANSPARENT,
-                    width: 0.0,
-                    radius: rail_r,
-                },
-                ..renderer::Quad::default()
-            },
-            Background::Color(scheme.surface_container_low),
-        );
-        let (off, len) = thumb(self.content, self.viewport, self.scroll, bounds.height);
-        if len <= 0.0 {
-            return;
-        }
-        let thumb_bounds = Rectangle {
-            x: bounds.x,
-            y: bounds.y + off,
-            width: bounds.width,
-            height: len,
-        };
-        renderer.fill_quad(
-            renderer::Quad {
-                bounds: thumb_bounds,
-                border: iced::Border {
-                    color: Color::TRANSPARENT,
-                    width: 0.0,
-                    radius: rail_r,
-                },
-                ..renderer::Quad::default()
-            },
-            Background::Color(scheme.outline),
+        fill_rail(
+            renderer,
+            layout.bounds(),
+            self.content,
+            self.viewport,
+            self.scroll,
+            self.tok,
         );
     }
+}
+
+/// Paint the end-side rail from a live pixel offset.
+pub(crate) fn fill_rail<R: iced::advanced::Renderer>(
+    renderer: &mut R,
+    bounds: Rectangle,
+    content: f32,
+    viewport: f32,
+    scroll: f32,
+    tok: Tokens,
+) {
+    let scheme = tok.scheme();
+    let rail_r = tok.radius(crate::m3::shape::Component::Track);
+    renderer.fill_quad(
+        renderer::Quad {
+            bounds,
+            border: iced::Border {
+                color: Color::TRANSPARENT,
+                width: 0.0,
+                radius: rail_r,
+            },
+            ..renderer::Quad::default()
+        },
+        Background::Color(scheme.surface_container_low),
+    );
+    let (off, len) = thumb(content, viewport, scroll, bounds.height);
+    if len <= 0.0 {
+        return;
+    }
+    let thumb_bounds = Rectangle {
+        x: bounds.x,
+        y: bounds.y + off,
+        width: bounds.width,
+        height: len,
+    };
+    renderer.fill_quad(
+        renderer::Quad {
+            bounds: thumb_bounds,
+            border: iced::Border {
+                color: Color::TRANSPARENT,
+                width: 0.0,
+                radius: rail_r,
+            },
+            ..renderer::Quad::default()
+        },
+        Background::Color(scheme.outline),
+    );
 }
 
 impl<'a, Message: 'a> From<ScrollRail<'a, Message>> for Element<'a, Message> {
@@ -260,13 +278,19 @@ impl<'a, Message: 'a> From<ScrollRail<'a, Message>> for Element<'a, Message> {
 /// uses `Renderer::with_layer`, the same scissor path as scrollable.
 pub struct ClipLayer<'a, Message> {
     content: Element<'a, Message>,
+    shift: f32,
 }
 
 impl<'a, Message> ClipLayer<'a, Message> {
     pub fn new(content: impl Into<Element<'a, Message>>) -> Self {
         Self {
             content: content.into(),
+            shift: 0.0,
         }
+    }
+
+    pub(crate) fn set_shift(&mut self, y: f32) {
+        self.shift = y;
     }
 }
 
@@ -280,13 +304,7 @@ impl<'a, Message> Widget<Message, iced::Theme, iced::Renderer> for ClipLayer<'a,
     }
 
     fn size(&self) -> Size<Length> {
-        // Follow the child: list panes are Fill×Fill; table unfrozen
-        // strips are Fill×Shrink. Never force Fill height on a table row.
-        self.content.as_widget().size()
-    }
-
-    fn size_hint(&self) -> Size<Length> {
-        self.content.as_widget().size_hint()
+        Size::new(Length::Fill, Length::Fill)
     }
 
     fn layout(
@@ -295,35 +313,21 @@ impl<'a, Message> Widget<Message, iced::Theme, iced::Renderer> for ClipLayer<'a,
         renderer: &iced::Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
-        let hint = self.content.as_widget().size();
-        let max = limits.max();
-        let mut child_max = max;
-        if matches!(hint.width, Length::Fill) && max.width.is_finite() {
-            child_max.width = max.width;
-        } else if matches!(hint.width, Length::Fill) && !max.width.is_finite() {
-            child_max.width = 1.0;
-        }
-        if matches!(hint.height, Length::Fill) && max.height.is_finite() {
-            child_max.height = max.height;
-        } else if matches!(hint.height, Length::Fill) && !max.height.is_finite() {
-            child_max.height = 1.0;
-        }
-        let child_limits = layout::Limits::new(Size::ZERO, child_max);
-        let child =
-            self.content
-                .as_widget_mut()
-                .layout(&mut tree.children[0], renderer, &child_limits);
-        let size = limits.resolve(hint.width, hint.height, child.size());
-        if (size.width - child.size().width).abs() > 0.5
-            || (size.height - child.size().height).abs() > 0.5
-        {
-            let child = self.content.as_widget_mut().layout(
+        let size = limits.resolve(Length::Fill, Length::Fill, Size::ZERO);
+        let child_w = if size.width.is_finite() && size.width > 0.0 {
+            size.width
+        } else {
+            1.0
+        };
+        let child = self
+            .content
+            .as_widget_mut()
+            .layout(
                 &mut tree.children[0],
                 renderer,
-                &layout::Limits::new(Size::ZERO, size),
-            );
-            return layout::Node::with_children(size, vec![child]);
-        }
+                &layout::Limits::new(Size::ZERO, Size::new(child_w, f32::INFINITY)),
+            )
+            .move_to(Point::new(0.0, self.shift));
         layout::Node::with_children(size, vec![child])
     }
 
@@ -433,7 +437,7 @@ impl<'a, Message: 'a> From<ClipLayer<'a, Message>> for Element<'a, Message> {
     }
 }
 
-const RAIL_GAP: f32 = 4.0;
+pub(crate) const RAIL_GAP: f32 = 4.0;
 
 struct ThemedScrollState {
     scroll: f32,
@@ -936,7 +940,7 @@ mod tests {
         let body = src.split("#[cfg(test)]").next().unwrap();
         assert!(body.contains("with_layer"));
         assert!(body.contains("struct ClipLayer"));
-        assert!(body.contains("self.content.as_widget().size()"));
+        assert!(body.contains("f32::INFINITY"));
         assert!(body.contains("let child_min = Size::new(pane_w, 0.0)"));
     }
 
@@ -1093,14 +1097,15 @@ mod tests {
             Widget::<(), iced::Theme, iced::Renderer>::size(&clip)
         );
 
-        // Shrink child: clip follows content size (table row path).
+        // Pane fills the parent; the child may be taller (overscan).
         let shrink = text("row").size(14);
         let mut clip2 = ClipLayer::new(shrink);
         let mut tree2 = Tree::new(&clip2 as &dyn Widget<(), iced::Theme, iced::Renderer>);
         let node2 = Widget::<(), iced::Theme, iced::Renderer>::layout(
             &mut clip2, &mut tree2, &renderer, &limits,
         );
-        assert!(node2.size().height > 0.0 && node2.size().height < 120.0);
+        assert!((node2.size().height - 120.0).abs() < 0.5);
+        assert!((node2.size().width - 200.0).abs() < 0.5);
 
         // Infinite parent max: Fill child collapses to 1px probe then resolve.
         let fill = container(Space::new().width(Length::Fill).height(Length::Fill))

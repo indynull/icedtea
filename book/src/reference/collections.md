@@ -10,8 +10,12 @@ Lists, tables, trees, tabs, expanders, and pages.
 
 Each constructor takes `A11y` unless noted. iced 0.14 publishes the widget id only.
 
-`VisibleWindow.scroll` is the only list and table offset. The rail and
-the wheel write it. Variable-height rows use `row_offsets` /
+`VisibleWindow.scroll` is the only list and table offset. The clip
+keeps the live pixel value. The rail and the wheel write it.
+`on_scroll` fires when the mounted range changes or the scroll hits
+an edge. An incoming window with a different mounted range (filter,
+page, session) moves the clip; a stale pixel copy of the same range
+does not. Variable-height rows use `row_offsets` /
 `visible_range_var`. `scroll_id` names the list clip pane.
 
 ### List
@@ -26,8 +30,7 @@ Constructor: [`widget::list_view`](https://docs.rs/icedtea/latest/icedtea/widget
 `empty` is the copy when the model has no rows. Selection stays on
 indices. A row press is [`ItemClick`](https://docs.rs/icedtea/latest/icedtea/collection/struct.ItemClick.html):
 shift+primary extends, Command/Ctrl+primary toggles, secondary on a
-selected row keeps the selection. Disabled drops row messages. `on_scroll` reports the window
-after a wheel or rail move. Pass `RowHeights::PerRow` for variable
+selected row keeps the selection. Disabled drops row messages. Pass `RowHeights::PerRow` for variable
 row heights (`visible_range_var`). `RowFace::Flush` is one clipped
 line. `RowFace::Card` is a surface, wrapped title, and an optional
 3px meter. `ListModel::leading` / `trailing` paint `RowSlot::Icon`,
