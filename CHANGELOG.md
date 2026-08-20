@@ -2,11 +2,16 @@
 
 ## Unreleased
 
+## 0.12.1 — 2026-08-20
+
 ### Bug fix
 
 - `virtual_clip` keeps the pixel offset in widget state. Wheel and
   rail moves that do not change the mounted range redraw only.
   `on_scroll` fires when the range changes or the scroll hits an edge.
+- An incoming `VisibleWindow` with a different mounted range (filter,
+  page, session) still moves the clip. A stale pixel copy of the same
+  range does not.
 
 ## 0.12.0 — 2026-08-19
 
