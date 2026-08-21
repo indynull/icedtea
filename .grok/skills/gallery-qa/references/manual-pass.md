@@ -60,7 +60,9 @@ page — nothing else should have changed unless the demo says so.
 
 - Idle shows **rows** (not empty first paint).
 - Scroll with wheel: rows stay **inside** the list pane; no paint over
-  filters, headers, or sibling demos.
+  filters, headers, or sibling demos. Agent: move onto the pane, then
+  `xdotool click --repeat 16 --delay 30 5` (5 = down, 4 = up).
+  `just gallery-qa --live-clip` runs that on List and Table.
 - Select a row: selection visible; keyboard if supported.
 - Filters / pagination: change **which data** is shown (dead chrome = fail).
 - Expand card / expander: open body text visible, height grows.

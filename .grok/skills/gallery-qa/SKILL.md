@@ -29,6 +29,7 @@ clip, dead overflow, empty first paint, or stub demos from the gallery.
 ```bash
 just gallery-qa --interact                   # full tour + inject
 just gallery-qa --interact --beats 0,8       # iterate a fix
+just gallery-qa --live-clip                  # real mouse wheel on List + Table
 just gallery-qa --locale ar --beats 8,9,12,19,20  # RTL; SCORE.md vs references/rtl.md
 just gallery-qa --backend host --interact    # fonts / OS chrome
 just gallery-gif                             # after layout, nav clip, or public chrome
@@ -50,6 +51,11 @@ Shots land under `tmp/gallery-qa/<timestamp>/` (or `--out DIR`).
 4. **Inject ≠ pointer.** Inject proves `update`. Scroll clip, slider
    drag, menu/flyout, and pick-list open need live pass or a real
    unit/layout test that calls the shipped constructor.
+   **Wheel:** `xdotool mousemove X Y` onto the pane, then
+   `xdotool click --repeat N --delay 30 5` (button 5 down, 4 up).
+   Do not use `mousemove --sync` on Xephyr (it hangs).
+   `just gallery-qa --live-clip` is that pass for List and Table.
+   A `ListScroll` inject is not a wheel.
 5. **Prove what you claim.** Xephyr ≠ macOS type. Do not call a font
    path done without a host/Mac pass when those files changed.
 6. **No fake evidence.** No `image_gen` UI, no hand-edited PNGs.

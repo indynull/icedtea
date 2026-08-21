@@ -325,6 +325,10 @@ exact command and result you ran.
   `SCORE.md` free of broken rows against
   `.grok/skills/gallery-qa/references/rtl.md`. Leftover-English
   source denylist is not the bar.
+  Always prove list/clip wheel with a real mouse wheel
+  (`just gallery-qa --live-clip`: `xdotool mousemove` onto the pane,
+  then `click --repeat N --delay 30 5`). Never treat inject or
+  `on_scroll` as wheel proof.
 - Continuous integration (`.github/workflows/ci.yml`) runs lint and
   docs on Ubuntu at Rust 1.89. The test job on Linux, macOS, and
   Windows at 1.89 is `cargo llvm-cov --workspace --all-features` and

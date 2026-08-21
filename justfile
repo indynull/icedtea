@@ -58,6 +58,7 @@ book-serve:
 # Gallery QA (Xephyr tour shots). Skill: .grok/skills/gallery-qa/SKILL.md
 #   just gallery-qa
 #   just gallery-qa --interact --beats 0,8
+#   just gallery-qa --live-clip
 #   just gallery-qa --locale ar --beats 8,9,12,19,20
 gallery-qa *args:
     python3 scripts/gallery_qa.py {{args}}

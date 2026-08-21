@@ -14,6 +14,7 @@ Does not commit. Does not invent screenshots.
 
   just gallery-qa
   just gallery-qa --interact --beats 0,8
+  just gallery-qa --live-clip
   just gallery-gif     # ship assets/gallery.gif for README/book only
   just book-stills     # recapture handbook stills into book/src/images/
 """
@@ -316,6 +317,78 @@ def pointer_clear_hover(display: str) -> None:
         _run(["xdotool", "mousemove", "8", "8"], env=env, timeout=1.0)
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
         pass
+
+
+def window_frame(display: str, wid: str) -> tuple[int, int, int, int]:
+    """Absolute X, Y, width, height of the managed frame."""
+    env = os.environ.copy()
+    env["DISPLAY"] = display
+    geo = _run(["xwininfo", "-id", wid], env=env, timeout=3.0)
+    abs_x = abs_y = width = height = None
+    for line in geo.stdout.splitlines():
+        s = line.strip()
+        if s.startswith("Absolute upper-left X:"):
+            abs_x = int(s.split(":")[-1].strip())
+        elif s.startswith("Absolute upper-left Y:"):
+            abs_y = int(s.split(":")[-1].strip())
+        elif s.startswith("Width:"):
+            width = int(s.split(":")[-1].strip())
+        elif s.startswith("Height:"):
+            height = int(s.split(":")[-1].strip())
+    if None in (abs_x, abs_y, width, height):
+        raise RuntimeError(f"xwininfo failed for {wid}: {geo.stdout[:200]}")
+    return abs_x, abs_y, width, height
+
+
+def xdotool(display: str, *args: str, timeout: float = 4.0) -> subprocess.CompletedProcess[str]:
+    env = os.environ.copy()
+    env["DISPLAY"] = display
+    env.pop("WAYLAND_DISPLAY", None)
+    return _run(["xdotool", *args], env=env, timeout=timeout)
+
+
+def wheel_at(
+    display: str,
+    x: int,
+    y: int,
+    *,
+    clicks: int = 16,
+    down: bool = True,
+    delay_ms: int = 30,
+) -> None:
+    """Send a real mouse wheel. Button 5 is down, 4 is up.
+
+    Move onto the pane first. A nested scroller under the pointer takes
+    the event; inject or `update` is not wheel proof.
+    """
+    button = "5" if down else "4"
+    xdotool(display, "mousemove", str(x), str(y))
+    xdotool(
+        display,
+        "click",
+        "--repeat",
+        str(clicks),
+        "--delay",
+        str(delay_ms),
+        button,
+    )
+
+
+def click_at(display: str, x: int, y: int) -> None:
+    xdotool(display, "mousemove", str(x), str(y))
+    xdotool(display, "click", "1")
+
+
+def key_repeat(display: str, key: str, times: int, delay_ms: int = 40) -> None:
+    xdotool(
+        display,
+        "key",
+        "--repeat",
+        str(times),
+        "--delay",
+        str(delay_ms),
+        key,
+    )
 
 
 def capture_window(display: str, wid: str, dest: Path) -> dict:
@@ -1280,6 +1353,119 @@ def write_rtl_score(out: Path, rows: list[dict]) -> bool:
     return not broken
 
 
+def live_clip_pass(
+    root: Path,
+    out: Path,
+    *,
+    release: bool,
+    no_build: bool,
+    backend: str,
+    display_num: int | None,
+    screen_w: int,
+    screen_h: int,
+    client_w: int,
+    client_h: int,
+) -> int:
+    """Wheel and key the List and Table clips. Shots under out/shots/."""
+    shots = out / "shots"
+    work = out / "work"
+    shots.mkdir(parents=True, exist_ok=True)
+    work.mkdir(parents=True, exist_ok=True)
+    if not no_build:
+        build_gallery(root, release)
+    binary = resolve_binary(root, release)
+    nested = NestedDisplay(
+        backend=backend,
+        width=screen_w,
+        height=screen_h,
+        display_num=display_num,
+        host_display=os.environ.get("DISPLAY"),
+    )
+    display = nested.start()
+    env = os.environ.copy()
+    env["DISPLAY"] = display
+    env.pop("WAYLAND_DISPLAY", None)
+    env["ICEDTEA_GALLERY_TOUR"] = "1"
+    cmdfile = work / "tour.cmd"
+    ackfile = work / "tour.ack"
+    inject = work / "inject"
+    env["ICEDTEA_GALLERY_TOUR_CMD"] = str(cmdfile)
+    env["ICEDTEA_GALLERY_TOUR_ACK"] = str(ackfile)
+    env["ICEDTEA_GALLERY_INJECT"] = str(inject)
+    for p in (cmdfile, ackfile, inject):
+        if p.exists():
+            p.unlink()
+    proc = subprocess.Popen(
+        [str(binary)],
+        cwd=root,
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    try:
+        def goto(beat: int) -> None:
+            cmdfile.write_text(f"{beat}\n", encoding="utf-8")
+            if not wait_file(ackfile, lambda t: t.strip() == str(beat), timeout_s=20.0):
+                raise SystemExit(f"gallery did not ack beat {beat}")
+            time.sleep(0.5)
+
+        goto(9)
+        wid = find_window_id(display, proc.pid)
+        place_window(display, wid, 40, 48, client_w, client_h)
+        time.sleep(0.3)
+        xdotool(display, "windowactivate", wid)
+        fx, fy, _fw, _fh = window_frame(display, wid)
+        # Content right of the nav (~360). Virtual column is upper;
+        # list_view sits under the in-page Search / All radios.
+        vc_x, vc_y = fx + 920, fy + 360
+        list_x, list_y = fx + 920, fy + 700
+        list_search_x, list_search_y = fx + 560, fy + 580
+        table_x, table_y = fx + 920, fy + 360
+
+        capture_window(display, wid, shots / "list-00-idle.png")
+        wheel_at(display, vc_x, vc_y, clicks=18, down=True)
+        time.sleep(0.45)
+        capture_window(display, wid, shots / "list-01-vc-wheel.png")
+        wheel_at(display, list_x, list_y, clicks=20, down=True)
+        time.sleep(0.45)
+        capture_window(display, wid, shots / "list-02-list-wheel.png")
+        click_at(display, list_x, list_y)
+        time.sleep(0.1)
+        key_repeat(display, "Down", 16)
+        time.sleep(0.45)
+        capture_window(display, wid, shots / "list-03-arrow-down.png")
+        click_at(display, list_search_x, list_search_y)
+        time.sleep(0.15)
+        xdotool(display, "type", "--delay", "20", "xyzzy")
+        time.sleep(0.55)
+        capture_window(display, wid, shots / "list-04-filter.png")
+
+        goto(12)
+        time.sleep(0.4)
+        capture_window(display, wid, shots / "table-00-idle.png")
+        click_at(display, table_x, table_y)
+        time.sleep(0.15)
+        wheel_at(display, table_x, table_y, clicks=20, down=True)
+        time.sleep(0.45)
+        capture_window(display, wid, shots / "table-01-wheel.png")
+        click_at(display, table_x, table_y)
+        time.sleep(0.1)
+        key_repeat(display, "Down", 16)
+        time.sleep(0.45)
+        capture_window(display, wid, shots / "table-02-arrow-down.png")
+        print(f"live-clip shots {shots}", file=sys.stderr)
+        return 0
+    finally:
+        if proc.poll() is None:
+            proc.send_signal(signal.SIGTERM)
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+        nested.stop()
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
@@ -1327,6 +1513,11 @@ def main() -> int:
         default=None,
         help="Inject language LANG before shots (ar, ur for right-to-left)",
     )
+    ap.add_argument(
+        "--live-clip",
+        action="store_true",
+        help="Xephyr wheel/key pass on List and Table (real xdotool wheel)",
+    )
     args = ap.parse_args()
 
     for cmd in ("wmctrl", "import", "xwininfo", "identify"):
@@ -1342,6 +1533,22 @@ def main() -> int:
     shots.mkdir(parents=True, exist_ok=True)
     work = out / "work"
     work.mkdir(parents=True, exist_ok=True)
+
+    if args.live_clip:
+        if not _which("xdotool"):
+            raise SystemExit("missing xdotool (needed for --live-clip wheel)")
+        return live_clip_pass(
+            root,
+            out,
+            release=args.release,
+            no_build=args.no_build,
+            backend=args.backend,
+            display_num=args.display_num,
+            screen_w=args.screen_w,
+            screen_h=args.screen_h,
+            client_w=args.client_w,
+            client_h=args.client_h,
+        )
 
     if not args.no_build:
         build_gallery(root, args.release)
