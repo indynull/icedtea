@@ -1628,12 +1628,13 @@ def record_gif_demo(
 
     def send_inject(script: str) -> None:
         if inject is None:
-            return
+            raise SystemExit("demo inject file is missing")
         ack = inject.with_suffix(".ack")
         if ack.exists():
             ack.unlink()
         inject.write_text(script, encoding="utf-8")
-        wait_file(ack, lambda t: t.strip() != "", timeout_s=3.0)
+        if not wait_file(ack, lambda t: t.strip() != "", timeout_s=3.0):
+            raise SystemExit(f"gallery did not ack inject {script!r}")
 
     def show(text: str) -> None:
         caps.set(text)
@@ -1641,22 +1642,24 @@ def record_gif_demo(
 
     try:
         goto(page="controls")
-        show("Themed buttons fire Actions")
+        send_inject("note Primary\n")
+        show("Primary writes Primary on the status bar")
         glide_to(display, primary_x, primary_y, ms=420)
         click_at(display, primary_x, primary_y)
         time.sleep(1.4)
 
         goto(page="fields")
-        show("The search field filters hits as you type")
+        send_inject("query in\nsearch-go\n")
+        show("Search filters Inbox as you type")
         glide_to(display, search_x, search_y, ms=420)
         click_at(display, search_x, search_y)
         time.sleep(0.2)
         xdotool(display, "type", "--delay", "80", "in")
-        send_inject("query in\n")
         time.sleep(1.6)
 
         goto(page="list")
-        show("A virtual list scrolls thousands of rows")
+        send_inject("list 4\n")
+        show("A virtual list selects a row in a thousand")
         glide_to(display, vc_x, vc_y, ms=420)
         wheel_at(display, vc_x, vc_y, clicks=10, down=True, delay_ms=50)
         time.sleep(0.6)
@@ -1665,6 +1668,7 @@ def record_gif_demo(
         time.sleep(1.4)
 
         goto(page="table")
+        send_inject("table 3\n")
         show("The table keeps Name in view while you scroll")
         glide_to(display, table_x, table_y, ms=420)
         click_at(display, table_x, table_y)
@@ -1673,15 +1677,16 @@ def record_gif_demo(
         time.sleep(1.5)
 
         goto(page="palette")
+        send_inject("pal-query save\n")
         show("The command palette filters the Action table")
         glide_to(display, pal_x, pal_y, ms=420)
         click_at(display, pal_x, pal_y)
         time.sleep(0.2)
         xdotool(display, "type", "--delay", "80", "save")
-        send_inject("pal-query save\n")
         time.sleep(1.8)
 
         goto(light=True)
+        send_inject("appearance light\n")
         show("Light and dark share the same color roles")
         time.sleep(2.0)
         caps.close()

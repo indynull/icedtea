@@ -607,7 +607,7 @@ fi
 # Encode the live grab (not %d.png stills) and burn step captions.
 ffmpeg -y -hide_banner -loglevel error \
   -i "$workdir/live.mkv" \
-  -vf "subtitles=$workdir/captions.srt:fontsdir=${caption_dir}:force_style='FontName=${caption_name},FontSize=32,Bold=1,PlayResY=${fh},PrimaryColour=&H00B2DBEB,OutlineColour=&H0021201D,BorderStyle=1,Outline=2,Shadow=1,MarginV=24',split[s0][s1];[s0]palettegen=max_colors=192:stats_mode=single[p];[s1][p]paletteuse=dither=sierra2_4a" \
+  -vf "subtitles=$workdir/captions.srt:fontsdir=${caption_dir}:force_style='FontName=${caption_name},FontSize=32,Bold=1,PlayResY=${fh},PrimaryColour=&H00B2DBEB,OutlineColour=&H0021201D,BorderStyle=1,Outline=2,Shadow=1,MarginV=56',split[s0][s1];[s0]palettegen=max_colors=192:stats_mode=single[p];[s1][p]paletteuse=dither=sierra2_4a" \
   -loop 0 "$dest"
 cp -f "$dest" "$book"
 

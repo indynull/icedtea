@@ -655,6 +655,10 @@ fn page_label<'a>(page: &str, cat: &'a Catalog) -> &'a str {
     }
 }
 
+fn demo_primary_action() -> Action<Message> {
+    Action::new("demo.primary", "Primary", Message::Note("Primary".into()))
+}
+
 fn variant_label(v: Variant, cat: &Catalog) -> &str {
     match v {
         Variant::Primary => cat.t("variant.primary"),
@@ -1127,6 +1131,26 @@ fn parse_inject_line(line: &str) -> Option<Message> {
         "code-wrap" | "code_wrap" => Some(Message::CodeWrap(parts.next()? == "true")),
         "pick" => Some(Message::SearchPick(parts.next()?.parse().ok()?)),
         "rail" => Some(Message::Rail(parts.next()?.parse().ok()?)),
+        "note" => {
+            let text = line
+                .trim()
+                .strip_prefix("note")
+                .map(str::trim)
+                .filter(|s| !s.is_empty())?;
+            Some(Message::Note(text.to_string()))
+        }
+        "appearance" => {
+            let v = parts.next()?.to_ascii_lowercase();
+            Some(Message::Appearance(if v == "light" {
+                Appearance::Light
+            } else {
+                Appearance::Dark
+            }))
+        }
+        "table" => Some(Message::TableCell(
+            icedtea::collection::ItemClick::primary(parts.next()?.parse().ok()?),
+            0,
+        )),
         _ => None,
     }
 }
@@ -3921,7 +3945,11 @@ impl Gallery {
         let mut col = column![
             title_el,
             widget::meta(
-                page_job(self.page, &self.catalog),
+                if self.note.is_empty() {
+                    page_job(self.page, &self.catalog).to_string()
+                } else {
+                    format!("{} · {}", page_job(self.page, &self.catalog), self.note)
+                },
                 tok,
                 named("page-job", Role::Status),
             ),
@@ -4013,9 +4041,14 @@ impl Gallery {
                     let mut row_on = row![].spacing(8);
                     for v in chunk {
                         let name = variant_label(*v, &self.catalog);
+                        let press = if *v == Variant::Primary {
+                            demo_primary_action().invoke()
+                        } else {
+                            Some(Message::Note(name.into()))
+                        };
                         row_on = row_on.push(widget::themed_button(
                             name,
-                            Some(Message::Note(name.into())),
+                            press,
                             tok,
                             *v,
                             Icons::NONE,
@@ -8171,6 +8204,21 @@ mod tests {
             Some(super::Message::Rail(1))
         ));
         assert!(matches!(
+            super::parse_inject_line("note Primary"),
+            Some(super::Message::Note(s)) if s == "Primary"
+        ));
+        assert!(matches!(
+            super::parse_inject_line("appearance light"),
+            Some(super::Message::Appearance(
+                icedtea::theme::Appearance::Light
+            ))
+        ));
+        assert!(matches!(
+            super::parse_inject_line("table 3"),
+            Some(super::Message::TableCell(c, 0))
+                if c == icedtea::collection::ItemClick::primary(3)
+        ));
+        assert!(matches!(
             super::parse_inject_line("dialog false"),
             Some(super::Message::DialogOpen(false))
         ));
@@ -8259,6 +8307,39 @@ mod tests {
         assert_eq!(g.palette.query(), "write");
         assert_eq!(g.rail, 1);
         assert_eq!(g.note, "Rail 1");
+    }
+
+    #[test]
+    fn gallery_demo_beats_update_painted_state() {
+        let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
+        assert_eq!(g.note, "");
+        let press = super::demo_primary_action()
+            .invoke()
+            .expect("demo.primary Action");
+        let _ = g.update(press);
+        assert_eq!(g.note, "Primary");
+
+        for line in [
+            "note Primary",
+            "query in",
+            "search-go",
+            "list 4",
+            "table 3",
+            "pal-query save",
+            "appearance light",
+        ] {
+            let msg = super::parse_inject_line(line).unwrap_or_else(|| panic!("{line}"));
+            let _ = g.update(msg);
+        }
+        assert_eq!(g.note, "Primary");
+        assert_eq!(g.query, "in");
+        assert_eq!(g.search_sent, "in");
+        assert_eq!(g.list_sel.primary(), Some(4));
+        assert_eq!(g.sel.primary(), Some(3));
+        assert_eq!(g.table_cursor, (3, 0));
+        assert_eq!(g.palette.query(), "save");
+        assert_eq!(g.palette.results(&g.pal_table)[0].id.as_str(), "file.save");
+        assert_eq!(g.appearance, icedtea::theme::Appearance::Light);
     }
 
     #[test]
