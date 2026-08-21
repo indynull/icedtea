@@ -98,8 +98,8 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   progress; keep text, digits, checkmarks, media controls, logos,
   and size pairs (`1920x1080`) unflipped. Arabic, Urdu, and Persian
   clocks use Eastern digits; Hebrew uses 123. Bar:
-  `.grok/skills/gallery-qa/references/rtl.md` (Firefox RTL
-  Guidelines + Microsoft bidirectional / FlowDirection).
+  `.grok/skills/gallery-qa/references/rtl.md` (SCORE map; sources
+  `firefox-rtl.md`, `ms-bidi.md`, `ms-flowdirection.md`).
 - Never Fill+align `text` inside an iced 0.14 `button` (drops
   right-to-left glyphs). Shrink the title or wrap shrink text in a
   fill container.
@@ -328,7 +328,8 @@ exact command and result you ran.
   and must float a tiled window first.
   Locale proof is `just gallery-qa --locale ar` (and `ur`) with
   `SCORE.md` free of broken rows against
-  `.grok/skills/gallery-qa/references/rtl.md`. Leftover-English
+  `.grok/skills/gallery-qa/references/rtl.md` (and the downloaded
+  Firefox / Microsoft pages next to it). Leftover-English
   source denylist is not the bar.
   Always prove list/clip wheel with a real mouse wheel
   (`just gallery-qa --live-clip`: `xdotool mousemove` onto the pane,

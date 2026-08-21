@@ -8,7 +8,8 @@ Default Xephyr + metacity. Tour protocol + optional inject scripts.
 Writes shots/, steps.jsonl, timings.json, CAPTURE.md under --out.
 With --locale ar|ur also writes SCORE.md and exits non-zero if a
 Firefox/Microsoft direction beat is broken (see
-.grok/skills/gallery-qa/references/rtl.md). Leftover-English is
+.grok/skills/gallery-qa/references/rtl.md and the downloaded
+Firefox / Microsoft pages next to it). Leftover-English is
 one row, not the bar.
 Does not commit. Does not invent screenshots.
 
@@ -1333,7 +1334,7 @@ def write_rtl_score(out: Path, rows: list[dict]) -> bool:
         "# Direction gallery QA score",
         "",
         "Bar: `.grok/skills/gallery-qa/references/rtl.md`",
-        "(Firefox RTL Guidelines + Microsoft bidirectional / FlowDirection).",
+        "Sources: `firefox-rtl.md`, `ms-bidi.md`, `ms-flowdirection.md`.",
         "broken = fail the command.",
         "",
         "| Check | Score | Detail |",

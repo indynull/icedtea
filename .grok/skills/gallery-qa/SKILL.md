@@ -23,7 +23,9 @@ clip, dead overflow, empty first paint, or stub demos from the gallery.
 
 **Capture:** `scripts/gallery_qa.py` via `just gallery-qa`.  
 **Score:** `references/rubric.md`.  
-**Direction:** `references/rtl.md` (Firefox + Microsoft).  
+**Direction:** `references/rtl.md` (SCORE map). Sources:
+`references/firefox-rtl.md`, `references/ms-bidi.md`,
+`references/ms-flowdirection.md`.  
 **Live walk:** `references/manual-pass.md`.
 
 ```bash
@@ -145,7 +147,10 @@ Only if a second grab is still the previous page is the gallery stuck.
 
 - `references/rubric.md` — what counts as broken/ugly  
 - `references/m3-trailing-icon.md` — pick / menu / list trailing mark  
-- `references/rtl.md` — Firefox + Microsoft direction beats  
+- `references/rtl.md` — SCORE map  
+- `references/firefox-rtl.md` — Firefox RTL Guidelines  
+- `references/ms-bidi.md` — Microsoft bidirectional design  
+- `references/ms-flowdirection.md` — Microsoft FlowDirection / layout  
 - `references/manual-pass.md` — pointer / live protocol  
 - `scripts/gallery_qa.py` — capture harness  
 - `AGENTS.md` — library contract  

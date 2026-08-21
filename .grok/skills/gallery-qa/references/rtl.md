@@ -1,13 +1,13 @@
 # Direction and locale
 
-Score gallery locales against this list. It is Firefox
-[RTL Guidelines](https://firefox-source-docs.mozilla.org/code-quality/coding-style/rtl_guidelines.html)
-(what to flip, what to keep, how to test) plus Microsoft
-[Design for bidirectional text](https://learn.microsoft.com/en-us/windows/apps/design/globalizing/design-for-bidi-text)
-and
-[adjust layout / FlowDirection](https://learn.microsoft.com/en-us/windows/apps/design/globalizing/adjust-layout-and-fonts--and-support-rtl)
-(the window is one direction). Mixed strings follow
-[Unicode UAX #9](https://www.unicode.org/reports/tr9/).
+Score gallery locales against the downloaded sources, then this map.
+
+| Source | File | Job |
+| --- | --- | --- |
+| Firefox RTL Guidelines | [`firefox-rtl.md`](firefox-rtl.md) | What to flip, what to keep, LTR islands + `match-parent`, `dir=auto`, testing (punctuation, digits, Tab/arrows, code semicolon) |
+| Microsoft Design for bidirectional text | [`ms-bidi.md`](ms-bidi.md) | One-direction window, mixed text, long-block alignment exception, parentheses / BPA, Unicode direction markers |
+| Microsoft Adjust layout / FlowDirection | [`ms-flowdirection.md`](ms-flowdirection.md) | FlowDirection on the root (not auto from the OS), `LayoutDirection` qualifier, dynamic layout, image mirroring |
+| Unicode UAX #9 | <https://www.unicode.org/reports/tr9/> | Mixed-string direction (not copied; the report is large) |
 
 `just gallery-qa --locale ar` (and `ur`) writes `SCORE.md` and exits
 non-zero on any **broken** row. Leftover-English greps are one row,
@@ -16,36 +16,37 @@ not the bar. Do not walk languages by eye.
 ## Window direction (Microsoft)
 
 The window is one `Tokens.direction` / FlowDirection. Nav, collections,
-button groups, tabs, dialogs, and chrome rows share it.
+button groups, tabs, dialogs, and chrome rows share it. Set it from
+`Boot` / `Prepared::direction`. It does not follow the OS by itself
+([ms-flowdirection.md](ms-flowdirection.md)).
 
 - Start/end for chrome: `i18n::order`, `align_start`, `align_end`,
   `inline_pad`. iced `Alignment::Start` is physical left.
-- Time moves toward start: forward is left in RTL, back is right.
+- Time moves toward start: forward is left in RTL, back is right
+  ([firefox-rtl.md](firefox-rtl.md) opening; [ms-bidi.md](ms-bidi.md)
+  typographic grid).
 - Mixed-script labels: string direction from the text (UAX #9);
   chrome alignment from the window.
+- Long body blocks (more than two or three lines of five or more
+  words) may align opposite the window so the reader can track
+  ([ms-bidi.md](ms-bidi.md) music-app bio).
 
-## Flip (Firefox)
+## Flip / keep / islands (Firefox)
 
-- Icons and motion that point (back/forward, progress)
-- Icons that imply text direction or on-screen location
-- Collapsed twisties (keep them unflipped inside an LTR island)
-- Field adornments to the opposite inline side
-- Navigation and dialog action order (`i18n::order`)
+Read the lists in [firefox-rtl.md](firefox-rtl.md) (What to mirror /
+What NOT to mirror / LTR text inside RTL contexts). icedtea bindings:
 
-## Keep (Firefox)
-
-- Text and numbers; icons that contain text or numbers
-- Symmetric marks (close, star); checkmarks
-- Video and audio transport
-- Product logos
-- Size pairs (`1920x1080`) and unit order (`10 px`)
-
-## Left-to-right islands (Firefox)
-
-Force left-to-right for paths, full URLs, code and code containers,
-preference keys, telephone numbers, and usernames/passwords (unless
-the field is a right-to-left value). Keep the island aligned to the
-parent start (Firefox `text-align: match-parent`).
+- Flip: directional icons and motion, twisties (unless the island is
+  LTR), field adornments to the opposite inline side, nav and dialog
+  action order (`i18n::order`).
+- Keep: text and numbers, text-or-number icons, symmetric marks,
+  checkmarks, media transport, logos, size pairs (`1920x1080`), unit
+  order (`10 px`).
+- Force LTR for paths, full URLs, code and code containers, preference
+  keys, telephone numbers, and usernames/passwords (unless the field
+  is a right-to-left value). Keep the island aligned to the parent
+  start (Firefox `text-align: match-parent`). Do not use logical
+  start/end *on the island* — start becomes physical left.
 
 ## Digits (Firefox testing)
 
