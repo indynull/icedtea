@@ -32,7 +32,7 @@ just gallery-qa --interact --beats 0,8       # iterate a fix
 just gallery-qa --live-clip                  # real mouse wheel on List + Table
 just gallery-qa --locale ar --beats 8,9,12,19,20  # RTL; SCORE.md vs references/rtl.md
 just gallery-qa --backend host --interact    # fonts / OS chrome
-just gallery-gif                             # after layout, nav clip, or public chrome
+just gallery-gif                             # live pointer demo after layout / chrome
 ```
 
 Shots land under `tmp/gallery-qa/<timestamp>/` (or `--out DIR`).
@@ -84,10 +84,10 @@ Shots land under `tmp/gallery-qa/<timestamp>/` (or `--out DIR`).
 5. When no broken remains and every known ugly is fixed: `just check`
    (or targeted tests + full check before release claim).
 6. Recapture the published tour (`just gallery-gif`) after a gallery
-   layout, nav-clip, or public-chrome change. Score **that file**
-   (sticky Search at scrolled sidebar beats), not only `tmp/gallery-qa/`
-   shots. A source fix whose published tour still shows the old paint
-   is **broken**.
+   layout, nav-clip, or public-chrome change. That file is a live
+   pointer demo, not a catalog walk. Score **that file** (cursor,
+   wheel, typed text), not only `tmp/gallery-qa/` shots. A source fix
+   whose published tour still shows the old paint is **broken**.
 7. Commit fixes. Working tree clean for the work you finished.
 
 Narrow change: shot-pass affected beats + one neighbor for rhythm; live

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Chore
+
+- `just gallery-gif` records a live pointer demo (click, type, wheel)
+  for the README and handbook tour.
+
 ## 0.13.0 — 2026-08-21
 
 ### Feature

@@ -15,7 +15,7 @@ Does not commit. Does not invent screenshots.
   just gallery-qa
   just gallery-qa --interact --beats 0,8
   just gallery-qa --live-clip
-  just gallery-gif     # ship assets/gallery.gif for README/book only
+  just gallery-gif     # live pointer demo into assets/ + book/
   just book-stills     # recapture handbook stills into book/src/images/
 """
 
@@ -1466,6 +1466,232 @@ def live_clip_pass(
         nested.stop()
 
 
+# Catalog page order plus the extra tour beats in icedtea-gallery.
+_TOUR_PAGES = (
+    "controls",
+    "fields",
+    "readout",
+    "type",
+    "markdown",
+    "code",
+    "image",
+    "selectable",
+    "list",
+    "log",
+    "grid",
+    "table",
+    "tree",
+    "sections",
+    "theme",
+    "colors",
+    "keys",
+    "marks",
+    "chrome-rows",
+    "feedback",
+    "dialogs",
+    "list-detail",
+    "inspector",
+    "workspace",
+    "navigation",
+    "tab-view",
+    "preferences",
+    "about",
+    "status-page",
+    "palette",
+    "main-window",
+    "motion",
+    "expand-motion",
+)
+_TOUR_EXTRAS = {"code": 1, "motion": 3, "expand-motion": 1}
+
+
+def tour_index(*, page: str | None = None, light: bool = False) -> int:
+    """0-based tour beat. Matches `tour_beat` in icedtea-gallery."""
+    n = 0
+    light_at = _TOUR_PAGES.index("theme") + 1
+    for i in range(len(_TOUR_PAGES) + 1):
+        if i == light_at:
+            cur = "theme"
+            is_light = True
+        else:
+            cur = _TOUR_PAGES[i] if i < light_at else _TOUR_PAGES[i - 1]
+            is_light = False
+        if light and is_light:
+            return n
+        if page is not None and cur == page and not is_light:
+            return n
+        n += 1 + _TOUR_EXTRAS.get(cur, 0)
+    raise KeyError(page or "light")
+
+
+def _assert_tour_index() -> None:
+    if tour_index(page="list") != 9:
+        raise SystemExit(f"list beat drifted: {tour_index(page='list')}")
+    if tour_index(page="table") != 12:
+        raise SystemExit(f"table beat drifted: {tour_index(page='table')}")
+
+
+def _srt_stamp(seconds: float) -> str:
+    h = int(seconds // 3600)
+    m = int((seconds % 3600) // 60)
+    sec = seconds - h * 3600 - m * 60
+    return f"{h:02d}:{m:02d}:{sec:06.3f}".replace(".", ",")
+
+
+def _mouse_xy(display: str) -> tuple[int, int]:
+    r = xdotool(display, "getmouselocation", "--shell")
+    x = y = 0
+    for line in r.stdout.splitlines():
+        if line.startswith("X="):
+            x = int(line.split("=", 1)[1])
+        elif line.startswith("Y="):
+            y = int(line.split("=", 1)[1])
+    return x, y
+
+
+def glide_to(display: str, x: int, y: int, *, ms: int = 280) -> None:
+    """Move the pointer in steps so the live grab shows the path."""
+    x0, y0 = _mouse_xy(display)
+    steps = max(6, ms // 20)
+    for i in range(1, steps + 1):
+        xi = int(x0 + (x - x0) * i / steps)
+        yi = int(y0 + (y - y0) * i / steps)
+        xdotool(display, "mousemove", str(xi), str(yi))
+        time.sleep(0.02)
+
+
+class _Captions:
+    def __init__(self, path: Path, t0: float) -> None:
+        self.path = path
+        self.t0 = t0
+        self.n = 0
+        self.last_t = 0.0
+        self.last_cap = ""
+        self.path.write_text("", encoding="utf-8")
+
+    def _now(self) -> float:
+        return time.time() - self.t0
+
+    def _append(self, start: float, end: float, text: str) -> None:
+        self.n += 1
+        block = (
+            f"{self.n}\n{_srt_stamp(start)} --> {_srt_stamp(end)}\n{text}\n\n"
+        )
+        with self.path.open("a", encoding="utf-8") as fh:
+            fh.write(block)
+
+    def set(self, text: str) -> None:
+        now = self._now()
+        if self.last_cap:
+            self._append(self.last_t, now, self.last_cap)
+            self.last_t = now
+        else:
+            self.last_t = 0.0
+        self.last_cap = text
+
+    def close(self) -> None:
+        now = max(self._now(), self.last_t + 0.2)
+        if self.last_cap:
+            self._append(self.last_t, now, self.last_cap)
+            self.last_cap = ""
+
+
+def record_gif_demo(
+    display: str,
+    wid: str,
+    cmdfile: Path,
+    ackfile: Path,
+    srt: Path,
+    t0: float,
+    inject: Path | None = None,
+) -> int:
+    """Live pointer demo for `just gallery-gif`. Gallery must already be up."""
+    _assert_tour_index()
+    xdotool(display, "windowactivate", wid)
+    time.sleep(0.15)
+    fx, fy, _fw, _fh = window_frame(display, wid)
+    # Client: look strip + page title sit above hosts. Nav is ~500 wide.
+    primary_x, primary_y = fx + 560, fy + 240
+    search_x, search_y = fx + 640, fy + 280
+    vc_x, vc_y = fx + 920, fy + 400
+    list_x, list_y = fx + 920, fy + 760
+    table_x, table_y = fx + 920, fy + 400
+    pal_x, pal_y = fx + 900, fy + 370
+    caps = _Captions(srt, t0)
+
+    def goto(page: str | None = None, *, light: bool = False) -> None:
+        beat = tour_index(page=page, light=light)
+        cmdfile.write_text(f"{beat}\n", encoding="utf-8")
+        if not wait_file(ackfile, lambda t: t.strip() == str(beat), timeout_s=20.0):
+            raise SystemExit(f"gallery did not ack beat {beat}")
+        time.sleep(0.7)
+
+    def send_inject(script: str) -> None:
+        if inject is None:
+            return
+        ack = inject.with_suffix(".ack")
+        if ack.exists():
+            ack.unlink()
+        inject.write_text(script, encoding="utf-8")
+        wait_file(ack, lambda t: t.strip() != "", timeout_s=3.0)
+
+    def show(text: str) -> None:
+        caps.set(text)
+        time.sleep(0.8)
+
+    try:
+        goto(page="controls")
+        show("Themed buttons fire Actions")
+        glide_to(display, primary_x, primary_y, ms=420)
+        click_at(display, primary_x, primary_y)
+        time.sleep(1.4)
+
+        goto(page="fields")
+        show("The search field filters hits as you type")
+        glide_to(display, search_x, search_y, ms=420)
+        click_at(display, search_x, search_y)
+        time.sleep(0.2)
+        xdotool(display, "type", "--delay", "80", "in")
+        send_inject("query in\n")
+        time.sleep(1.6)
+
+        goto(page="list")
+        show("A virtual list scrolls thousands of rows")
+        glide_to(display, vc_x, vc_y, ms=420)
+        wheel_at(display, vc_x, vc_y, clicks=10, down=True, delay_ms=50)
+        time.sleep(0.6)
+        glide_to(display, list_x, list_y, ms=380)
+        click_at(display, list_x, list_y)
+        time.sleep(1.4)
+
+        goto(page="table")
+        show("The table keeps Name in view while you scroll")
+        glide_to(display, table_x, table_y, ms=420)
+        click_at(display, table_x, table_y)
+        time.sleep(0.2)
+        wheel_at(display, table_x, table_y, clicks=12, down=True, delay_ms=50)
+        time.sleep(1.5)
+
+        goto(page="palette")
+        show("The command palette filters the Action table")
+        glide_to(display, pal_x, pal_y, ms=420)
+        click_at(display, pal_x, pal_y)
+        time.sleep(0.2)
+        xdotool(display, "type", "--delay", "80", "save")
+        send_inject("pal-query save\n")
+        time.sleep(1.8)
+
+        goto(light=True)
+        show("Light and dark share the same color roles")
+        time.sleep(2.0)
+        caps.close()
+    except Exception:
+        caps.close()
+        raise
+    print(f"gallery-gif: wrote {srt} ({caps.n} captions)", file=sys.stderr)
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
@@ -1518,7 +1744,38 @@ def main() -> int:
         action="store_true",
         help="Xephyr wheel/key pass on List and Table (real xdotool wheel)",
     )
+    ap.add_argument(
+        "--record-demo",
+        action="store_true",
+        help="Drive the live pointer demo (gallery already running)",
+    )
+    ap.add_argument("--wid", default=None, help="Window id for --record-demo")
+    ap.add_argument("--cmd", type=Path, default=None, help="Tour cmd file")
+    ap.add_argument("--ack", type=Path, default=None, help="Tour ack file")
+    ap.add_argument("--srt", type=Path, default=None, help="Caption file to write")
+    ap.add_argument("--t0", type=float, default=None, help="Epoch start of the live grab")
+    ap.add_argument("--inject", type=Path, default=None, help="Inject file for --record-demo")
     args = ap.parse_args()
+
+    if args.record_demo:
+        if not _which("xdotool"):
+            raise SystemExit("missing xdotool (needed for --record-demo)")
+        display = os.environ.get("DISPLAY")
+        if not display:
+            raise SystemExit("DISPLAY is not set")
+        if args.wid is None or args.cmd is None or args.ack is None:
+            raise SystemExit("--record-demo needs --wid --cmd --ack --srt --t0")
+        if args.srt is None or args.t0 is None:
+            raise SystemExit("--record-demo needs --wid --cmd --ack --srt --t0")
+        return record_gif_demo(
+            display,
+            args.wid,
+            args.cmd,
+            args.ack,
+            args.srt,
+            args.t0,
+            inject=args.inject,
+        )
 
     for cmd in ("wmctrl", "import", "xwininfo", "identify"):
         if not _which(cmd):

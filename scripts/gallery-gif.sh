@@ -13,7 +13,7 @@ if [[ -z "${DISPLAY:-}" ]]; then
   echo "gallery-gif: DISPLAY is not set" >&2
   exit 1
 fi
-for cmd in ffmpeg xwininfo wmctrl import python3 xprop; do
+for cmd in ffmpeg xwininfo wmctrl import python3 xprop xdotool; do
   if ! command -v "$cmd" >/dev/null; then
     echo "gallery-gif: missing $cmd" >&2
     exit 1
@@ -464,12 +464,15 @@ trap cleanup EXIT
 lenfile="$workdir/tour_len"
 cmdfile="$workdir/cmd"
 ackfile="$workdir/ack"
+inject="$workdir/inject"
 printf '0\n' >"$cmdfile"
+: >"$inject"
 
 ICEDTEA_GALLERY_TOUR=1 \
   ICEDTEA_GALLERY_TOUR_LEN_FILE="$lenfile" \
   ICEDTEA_GALLERY_TOUR_CMD="$cmdfile" \
   ICEDTEA_GALLERY_TOUR_ACK="$ackfile" \
+  ICEDTEA_GALLERY_INJECT="$inject" \
   "$bin" &
 pid=$!
 
@@ -532,26 +535,31 @@ if ! png_ok "$workdir/probe.png"; then
 fi
 echo "gallery-gif: probe $(identify -format '%wx%h' "$workdir/probe.png")"
 
-caption_font=""
-for f in \
-  /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf \
-  /usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf; do
-  if [[ -f "$f" ]]; then
-    caption_font=$f
-    break
-  fi
+caption_name=""
+caption_dir=""
+for query in \
+  "FiraCode Nerd Font Propo:style=Bold" \
+  "FiraCode Nerd Font:style=Bold" \
+  "FuraCode Nerd Font:style=Bold" \
+  "Fira Sans:style=Bold"; do
+  file="$(fc-match -f '%{file}' "$query" 2>/dev/null || true)"
+  family="$(fc-match -f '%{family}' "$query" 2>/dev/null || true)"
+  family="${family%%,*}"
+  case "$family" in
+    Fira*|Fura*)
+      if [[ -n "$file" && -f "$file" ]]; then
+        caption_name=$family
+        caption_dir="$(dirname "$file")"
+        break
+      fi
+      ;;
+  esac
 done
-if [[ -z "$caption_font" ]]; then
-  echo "gallery-gif: no caption font (DejaVu or Liberation Bold)" >&2
+if [[ -z "$caption_name" || -z "$caption_dir" ]]; then
+  echo "gallery-gif: need Fira or Fura (fc-match)" >&2
   exit 1
 fi
-
-srt_stamp() {
-  python3 -c 'import sys
-s=float(sys.argv[1])
-h=int(s//3600); m=int((s%3600)//60); sec=s-h*3600-m*60
-print("%02d:%02d:%06.3f" % (h, m, sec))' "$1" | tr '.' ','
-}
+echo "gallery-gif: caption font=$caption_name dir=$caption_dir"
 
 frame_geom "$wid" || exit 1
 # libx264 needs even dimensions.
@@ -573,71 +581,18 @@ if ! kill -0 "$grab_pid" 2>/dev/null; then
   exit 1
 fi
 t0="$(date +%s.%N)"
-: >"$workdir/captions.srt"
-srt_i=0
-last_srt_t="0.000"
-last_cap=""
 
-# 0-based beats. Script seeks; gallery does not auto-advance or wrap.
-for i in $(seq 0 $((pages - 1))); do
-  printf '%s\n' "$i" >"$cmdfile"
-  ack=""
-  for _ in $(seq 1 80); do
-    if [[ -f "$ackfile" ]]; then
-      ack="$(tr -d '[:space:]' <"$ackfile")"
-      if [[ "$ack" == "$i" ]]; then
-        break
-      fi
-    fi
-    ack=""
-    sleep 0.05
-  done
-  if [[ "$ack" != "$i" ]]; then
-    echo "gallery-gif: gallery did not acknowledge beat $i" >&2
-    kill "$grab_pid" 2>/dev/null || true
-    exit 1
-  fi
-  apply_host_chrome "$wid"
-  cap="$(tr -d '\r' <"${ackfile}.caption" 2>/dev/null || true)"
-  if [[ -z "$cap" ]]; then
-    cap="Beat $i"
-  fi
-  now="$(date +%s.%N)"
-  now_s="$(awk -v a="$now" -v b="$t0" 'BEGIN { printf "%.3f", a-b }')"
-  if [[ -n "$last_cap" ]]; then
-    srt_i=$((srt_i + 1))
-    {
-      echo "$srt_i"
-      echo "$(srt_stamp "$last_srt_t") --> $(srt_stamp "$now_s")"
-      echo "$last_cap"
-      echo
-    } >>"$workdir/captions.srt"
-  fi
-  last_srt_t="$now_s"
-  last_cap="$cap"
-  hold_file="${ackfile}.hold"
-  hold_beat=""
-  if [[ -f "$hold_file" ]]; then
-    hold_beat="$(tr -d '[:space:]' <"$hold_file")"
-  fi
-  if [[ "$hold_beat" =~ ^[1-9][0-9]*$ ]]; then
-    sleep "$(awk "BEGIN { print ($hold_beat / 1000) + 0.85 }")"
-  elif [[ -f "${ackfile}.face" ]] && [[ "$(tr -d '[:space:]' <"${ackfile}.face")" == "light" ]]; then
-    sleep 1.2
-  else
-    sleep 0.95
-  fi
-done
-now="$(date +%s.%N)"
-now_s="$(awk -v a="$now" -v b="$t0" 'BEGIN { printf "%.3f", a-b }')"
-if [[ -n "$last_cap" ]]; then
-  srt_i=$((srt_i + 1))
-  {
-    echo "$srt_i"
-    echo "$(srt_stamp "$last_srt_t") --> $(srt_stamp "$now_s")"
-    echo "$last_cap"
-    echo
-  } >>"$workdir/captions.srt"
+# Directed pointer demo. Catalog stills stay on `just gallery-qa`.
+if ! python3 "$root/scripts/gallery_qa.py" --record-demo \
+  --wid "$wid" \
+  --cmd "$cmdfile" \
+  --ack "$ackfile" \
+  --srt "$workdir/captions.srt" \
+  --t0 "$t0" \
+  --inject "$inject"; then
+  echo "gallery-gif: demo script failed" >&2
+  kill "$grab_pid" 2>/dev/null || true
+  exit 1
 fi
 
 sleep 0.25
@@ -652,7 +607,7 @@ fi
 # Encode the live grab (not %d.png stills) and burn step captions.
 ffmpeg -y -hide_banner -loglevel error \
   -i "$workdir/live.mkv" \
-  -vf "subtitles=$workdir/captions.srt:force_style='FontName=DejaVu Sans,FontSize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000,BorderStyle=3,Outline=1,Shadow=0,MarginV=28',split[s0][s1];[s0]palettegen=max_colors=192:stats_mode=single[p];[s1][p]paletteuse=dither=sierra2_4a" \
+  -vf "subtitles=$workdir/captions.srt:fontsdir=${caption_dir}:force_style='FontName=${caption_name},FontSize=32,Bold=1,PlayResY=${fh},PrimaryColour=&H00B2DBEB,OutlineColour=&H0021201D,BorderStyle=1,Outline=2,Shadow=1,MarginV=24',split[s0][s1];[s0]palettegen=max_colors=192:stats_mode=single[p];[s1][p]paletteuse=dither=sierra2_4a" \
   -loop 0 "$dest"
 cp -f "$dest" "$book"
 
@@ -664,4 +619,4 @@ if (( gif_w < min_w || gif_h < min_h )); then
   exit 1
 fi
 
-echo "gallery-gif: wrote $dest and $book (${gif_wh}, $(wc -c <"$dest") bytes, $pages beats, tiler=$tiler)"
+echo "gallery-gif: wrote $dest and $book (${gif_wh}, $(wc -c <"$dest") bytes, pointer demo, tiler=$tiler)"

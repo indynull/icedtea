@@ -313,9 +313,11 @@ exact command and result you ran.
 - Gallery launch: if a display is present, start
   `cargo run -p icedtea-gallery` and confirm iced starts without panic.
   A timeout after a clean start is a successful smoke. Compile + unit
-  tests if there is no display. `just gallery-gif` records the tour
-  into `assets/gallery.gif` and `book/src/gallery.gif` inside Xephyr
-  and burns a step caption on each frame. Always re-record in the same
+  tests if there is no display. `just gallery-gif` records a short
+  live pointer demo (click, type, wheel) into `assets/gallery.gif`
+  and `book/src/gallery.gif` inside Xephyr and burns a step caption
+  on each beat. Always set those captions in Fira or Fura at subtitle
+  size (outline, not a full-width slab). Always re-record in the same
   change when a public widget, pattern, or gallery page behavior ships
   or changes (not only shell chrome). Continuous integration does not
   record. Do not hand-edit those GIF files. Read the stills, not the

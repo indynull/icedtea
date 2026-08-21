@@ -63,7 +63,7 @@ book-serve:
 gallery-qa *args:
     python3 scripts/gallery_qa.py {{args}}
 
-# Ship README/book tour GIF only (captioned frames into assets/ + book/).
+# Ship README/book tour GIF: live pointer demo (click, type, wheel).
 # ICEDTEA_GALLERY_ISOLATED=0 uses the current display.
 gallery-gif:
     bash scripts/gallery-gif.sh
