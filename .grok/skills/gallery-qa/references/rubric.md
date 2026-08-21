@@ -152,6 +152,10 @@ bar. Do not walk languages by eye.
   keeps 123. Code, paths, and URLs stay left-to-right (`ltr-islands`).
 - Painted chrome is the locale fill. Leftover English on those
   labels is **broken** (`leftover-src`, `copy`, `copy-keys`).
+- Chrome stays one line (menu, look strip, toolbar, nav, buttons,
+  chips, tabs). Mid-word wrap is **broken** (`wrap-chrome`).
+  Markdown, code wrap-on, card titles, expand / job / hint, and
+  status copy wrap on purpose.
 - Tab/arrow order and mixed-string islands in live fields: live
   pass (`manual-pass.md`).
 

@@ -126,7 +126,7 @@ unless they ask for a written audit.
 | `--release` | Snappier paint |
 | `--no-build` | Binary already current |
 | `--settle-ms` | Slow GPU |
-| `--locale ar` | Arabic/Urdu; `SCORE.md` fails on any `references/rtl.md` beat (not leftover-English only) |
+| `--locale ar` | Arabic/Urdu; `SCORE.md` fails on any `references/rtl.md` beat (not leftover-English only), including chrome wrap |
 
 Inject table: `DEFAULT_INTERACT` in `scripts/gallery_qa.py`. After-inject
 state must be **visible on screen**. A match is a **token**, not a

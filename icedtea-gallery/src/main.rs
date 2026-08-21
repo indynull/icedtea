@@ -42,6 +42,30 @@ fn btn(name: &str) -> A11y {
     A11y::button(name)
 }
 
+/// Look-strip picks are a chrome row, not a filling field. Size the
+/// face to the longest option so a Fill pick cannot crush the label.
+fn look_pick_width(options: &[String], current: &str, tok: Tokens) -> f32 {
+    let size = tok.body();
+    let rtl_or_wide = current.chars().any(|c| {
+        matches!(
+            c,
+            '\u{0590}'..='\u{08FF}'
+                | '\u{2E80}'..='\u{9FFF}'
+                | '\u{FB1D}'..='\u{FDFF}'
+                | '\u{FE70}'..='\u{FEFF}'
+        )
+    });
+    let em = if rtl_or_wide { size } else { size * 0.62 };
+    let letters = options
+        .iter()
+        .map(|s| s.chars().count())
+        .chain(std::iter::once(current.chars().count()))
+        .max()
+        .unwrap_or(4) as f32;
+    (letters * em + icedtea::m3::density::TRAILING_ICON as f32 + tok.density.inset() * 2.0 + 8.0)
+        .clamp(96.0, 260.0)
+}
+
 fn fill_lazy_folder(node: &mut TreeNode, id: u64, label: &str) {
     if node.id == id && node.dir && node.expanded && node.children.is_empty() {
         node.children.push(TreeNode::leaf(id * 10, label));
@@ -2198,15 +2222,18 @@ impl Gallery {
             _ => "English",
         };
         let pick = |label: &str, options: Vec<String>, current: &str, on: fn(String) -> Message| {
+            let w = look_pick_width(&options, current, tok);
             let lab: Element<'_, Message> = widget::meta(label, tok, named(label, Role::Status));
-            let list: Element<'_, Message> = widget::themed_pick_list(
+            let list: Element<'_, Message> = container(widget::themed_pick_list(
                 options,
                 Some(current.to_string()),
                 on,
                 tok,
                 widget::ControlSize::Default,
                 named(label, Role::ComboBox),
-            );
+            ))
+            .width(Length::Fixed(w))
+            .into();
             let mut r = icedtea::iced::widget::Row::new()
                 .spacing(8)
                 .align_y(Alignment::Center);
@@ -2228,14 +2255,20 @@ impl Gallery {
                     tok,
                     named("theme", Role::Status),
                 ),
-                widget::themed_pick_list(
+                container(widget::themed_pick_list(
                     self.themes.names(),
                     Some(self.theme.clone()),
                     Message::Theme,
                     tok,
                     widget::ControlSize::Default,
                     named(&self.theme, Role::ComboBox),
-                ),
+                ))
+                .width(Length::Fixed(look_pick_width(
+                    &self.themes.names(),
+                    &self.theme,
+                    tok,
+                )))
+                .into(),
                 widget::meta(
                     if icedtea::theme::named(&self.theme).dark {
                         self.catalog.t("look.dark")

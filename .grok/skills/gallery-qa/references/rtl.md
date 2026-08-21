@@ -68,6 +68,17 @@ locales are `ar` and `ur`.
   physical left. Live pass (`manual-pass.md`).
 - Code stays left-to-right (semicolon on the right of `padding: 20px`).
 
+## Wrap
+
+Chrome stays one line: menu titles, look-strip labels and picks,
+toolbar, nav items, buttons, chips, tabs. A mid-word wrap (`عرض`
+split across two lines) is **broken**. `wrap-chrome` scans the menu
+and look-strip bands on every idle shot.
+
+These surfaces wrap on purpose: markdown, code with wrap on, list
+card titles, expand / accordion / dialog body, job and hint lines,
+status-page copy.
+
 ## SCORE rows
 
 | Rule | How SCORE fails |
@@ -77,6 +88,7 @@ locales are `ar` and `ur`.
 | Twisties / pick on the end | `layout-chevron` / `rtl_pick` |
 | Button groups and checks | `layout-controls` / `rtl_checkbox` |
 | Titles paint (no empty pads) | `layout-button-face` / `rtl_themed_button`; `faces-controls` |
+| Chrome stays one line | `wrap-chrome` |
 | Eastern digits on ar/ur clocks | `digits-eastern` |
 | Code/path/URL stay LTR | `ltr-islands` |
 | Locale fill | `leftover-src`; `copy`; `copy-keys` |

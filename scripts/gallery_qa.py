@@ -789,6 +789,14 @@ def write_capture_md(
 RTL_RAIL_PAGES = frozenset({"list", "tree", "log", "feedback"})
 RTL_ALIGN_PAGES = frozenset({"list", "tree", "sections", "tabs-accordion-expander"})
 
+# Single-line chrome bands (y0, y1) on a 1600×900 gallery window.
+# Body wrap (markdown, code wrap-on, cards, job/hint) is expected.
+CHROME_WRAP_BANDS = (
+    ("menu", 0, 34),
+    ("look-theme", 34, 70),
+    ("look-density", 70, 110),
+)
+
 # Painted demo / chrome English that must go through catalog fill.
 # Matched in icedtea-gallery/src/main.rs before the test module.
 LEFTOVER_ENGLISH = (
@@ -870,6 +878,99 @@ def _column_midgray(im, x0: int, x1: int, y0: int, y1: int) -> int:
             if 48.0 <= lum <= 130.0:
                 n += 1
     return n
+
+
+def _band_is_ink(px, w: int, y0: int, y1: int):
+    """Light ink on a dark band, dark ink on a light band."""
+    acc = n = 0
+    step = max(1, w // 80)
+    for x in range(0, w, step):
+        for y in range(y0, y1, 2):
+            r, g, b = px[x, y]
+            acc += 0.299 * r + 0.587 * g + 0.114 * b
+            n += 1
+    mean = acc / max(n, 1)
+    if mean >= 140.0:
+        return lambda lum: lum < 90.0
+    return lambda lum: lum > 150.0
+
+
+def wrap_islands(
+    path: Path,
+    y0: int,
+    y1: int,
+    *,
+    min_w: int = 5,
+    max_w: int = 72,
+    min_gap: int = 8,
+) -> list[tuple[int, int]]:
+    """Narrow two-baseline ink in a single-line band (a wrapped word)."""
+    from PIL import Image
+
+    im = Image.open(path).convert("RGB")
+    w, _h = im.size
+    px = im.load()
+    is_ink = _band_is_ink(px, w, y0, y1)
+
+    def lum(x: int, y: int) -> float:
+        r, g, b = px[x, y]
+        return 0.299 * r + 0.587 * g + 0.114 * b
+
+    two = [False] * w
+    for x in range(w):
+        ink = [is_ink(lum(x, y)) for y in range(y0, y1)]
+        runs: list[tuple[int, int]] = []
+        i = 0
+        while i < len(ink):
+            if ink[i]:
+                j = i
+                while j < len(ink) and ink[j]:
+                    j += 1
+                runs.append((i, j))
+                i = j
+            else:
+                i += 1
+        two[x] = any(b[0] - a[1] >= min_gap for a, b in zip(runs, runs[1:]))
+    out: list[tuple[int, int]] = []
+    x = 0
+    while x < w:
+        if not two[x]:
+            x += 1
+            continue
+        a = x
+        while x < w and two[x]:
+            x += 1
+        while x + 2 < w and not two[x] and (two[x + 1] or two[x + 2]):
+            x += 1
+            while x < w and two[x]:
+                x += 1
+        b = x
+        if min_w <= (b - a) < max_w:
+            out.append((a, b))
+    return out
+
+
+def score_wrap_shots(steps: list[dict], out: Path) -> list[dict]:
+    """Fail when menu or look-strip text wraps. Body wrap is expected."""
+    hits: list[str] = []
+    for s in steps:
+        if s.get("kind") != "idle" or s.get("shot") is None:
+            continue
+        shot = out / s["shot"]
+        if not shot.is_file():
+            continue
+        page = s.get("page") or "shot"
+        for band, y0, y1 in CHROME_WRAP_BANDS:
+            for a, b in wrap_islands(shot, y0, y1):
+                hits.append(f"{page}:{band} x={a}-{b}")
+    return [
+        {
+            "name": "wrap-chrome",
+            "title": "chrome stays one line (menu, look strip)",
+            "score": "ok" if not hits else "broken",
+            "detail": "none" if not hits else "; ".join(hits[:8]),
+        }
+    ]
 
 
 def rail_side(path: Path) -> str:
@@ -1895,7 +1996,7 @@ def main() -> int:
                 inject_script(injectfile, f"language {args.locale}\n")
             except TimeoutError as exc:
                 raise SystemExit(f"locale inject failed: {exc}") from exc
-            time.sleep(max(0.45, args.settle_ms / 1000.0))
+            time.sleep(max(0.9, args.settle_ms / 1000.0))
         boot_ms = _now_ms() - t_boot0
 
         # Parse --beats
@@ -2155,6 +2256,7 @@ def main() -> int:
                 file=sys.stderr,
             )
             score_rows = run_rtl_source_checks(root)
+            score_rows.extend(score_wrap_shots(steps, out))
             if locale in {"ar", "ur", "fa", "he"}:
                 score_rows.extend(score_rtl_shots(steps, out))
             score_ok = write_rtl_score(out, score_rows)
@@ -2241,6 +2343,24 @@ def _self_check() -> None:
         raise SystemExit("eastern_digit_problems must fail without Rtl map")
     if eastern_digit_problems("Direction::Rtl '٠' '٩'"):
         raise SystemExit("eastern_digit_problems false positive")
+    wrap_on = tmp / "wrap-on.png"
+    img = Image.new("RGB", (400, 80), (20, 20, 20))
+    for x in range(200, 220):
+        for y in range(8, 12):
+            img.putpixel((x, y), (230, 230, 230))
+        for y in range(24, 28):
+            img.putpixel((x, y), (230, 230, 230))
+    img.save(wrap_on)
+    if not wrap_islands(wrap_on, 0, 34):
+        raise SystemExit("wrap_islands must flag a stacked chrome title")
+    wrap_off = tmp / "wrap-off.png"
+    img = Image.new("RGB", (400, 80), (20, 20, 20))
+    for x in range(40, 90):
+        for y in range(14, 20):
+            img.putpixel((x, y), (230, 230, 230))
+    img.save(wrap_off)
+    if wrap_islands(wrap_off, 0, 34):
+        raise SystemExit("wrap_islands false positive on one line")
     root = Path(__file__).resolve().parents[1]
     hits = leftover_english_in_gallery(root)
     if hits:

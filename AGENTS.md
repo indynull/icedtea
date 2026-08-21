@@ -99,7 +99,8 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   and size pairs (`1920x1080`) unflipped. Arabic, Urdu, and Persian
   clocks use Eastern digits; Hebrew uses 123. Bar:
   `.grok/skills/gallery-qa/references/rtl.md` (SCORE map; sources
-  `firefox-rtl.md`, `ms-bidi.md`, `ms-flowdirection.md`).
+  `firefox-rtl.md`, `ms-bidi.md`, `ms-flowdirection.md`). Chrome
+  stays one line; markdown, code wrap-on, cards, and job/hint wrap.
 - Never Fill+align `text` inside an iced 0.14 `button` (drops
   right-to-left glyphs). Shrink the title or wrap shrink text in a
   fill container.

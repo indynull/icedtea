@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Bug fix
+
+- `menu_bar` titles stay one line for Arabic and Hebrew headings.
+- The gallery look strip sizes picks to the option so RTL labels
+  keep their gap.
+
 ### Chore
 
 - `just gallery-gif` records a live pointer demo (click, type, wheel)

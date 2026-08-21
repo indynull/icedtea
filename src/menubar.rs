@@ -73,13 +73,32 @@ fn is_wide(c: char) -> bool {
     )
 }
 
+/// Arabic / Hebrew (and related) letters sit near one em on a UI sans.
+fn is_arabic_or_hebrew(c: char) -> bool {
+    matches!(
+        c,
+        '\u{0590}'..='\u{05FF}'
+            | '\u{0600}'..='\u{06FF}'
+            | '\u{0750}'..='\u{077F}'
+            | '\u{08A0}'..='\u{08FF}'
+            | '\u{FB1D}'..='\u{FDFF}'
+            | '\u{FE70}'..='\u{FEFF}'
+    )
+}
+
 /// Approximate advance for a sans label at `size` (logical pixels).
 ///
-/// Latin sits near `0.62` em. Wide CJK / kana / hangul sit near one em
-/// so a two-character heading (`文件`, `保存`) does not wrap in the title.
+/// Latin sits near `0.62` em. Wide CJK / kana / hangul, and Arabic /
+/// Hebrew, sit near one em so a heading (`文件`, `عرض`) does not wrap.
 pub fn text_advance(s: &str, size: f32) -> f32 {
     s.chars()
-        .map(|c| if is_wide(c) { size } else { size * 0.62 })
+        .map(|c| {
+            if is_wide(c) || is_arabic_or_hebrew(c) {
+                size
+            } else {
+                size * 0.62
+            }
+        })
         .sum()
 }
 
@@ -313,7 +332,7 @@ where
                 align_x: text::Alignment::Default,
                 align_y: alignment::Vertical::Center,
                 shaping: text::Shaping::default(),
-                wrapping: text::Wrapping::default(),
+                wrapping: text::Wrapping::None,
             },
             Point::new(bounds.x + self.padding.left, bounds.center_y()),
             self.tok.scheme().on_surface,
@@ -627,6 +646,26 @@ mod tests {
         assert!(text_advance("文件", size) > 2.0 * size * 0.62, "{latin}");
         assert!(file_cjk.width >= pad.x() + size * 2.0);
         assert!(text_advance("保存", size) >= size * 2.0);
+        let arabic = "عرض";
+        assert!(
+            text_advance(arabic, size) >= size * 3.0,
+            "Arabic menu titles need one em per letter so they stay one line"
+        );
+        assert!(
+            title_extents(arabic, pad, size, 18.0).width >= pad.x() + size * 3.0,
+            "عرض title box must fit three Arabic letters"
+        );
+        let draw = include_str!("menubar.rs")
+            .split("fn draw(")
+            .nth(1)
+            .unwrap()
+            .split("fn overlay(")
+            .next()
+            .unwrap();
+        assert!(
+            draw.contains("Wrapping::None"),
+            "menu titles must not wrap (iced default is Word)"
+        );
         for ch in [
             '\u{A960}',
             '한',
