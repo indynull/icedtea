@@ -1,7 +1,8 @@
 # Sortable table
 
-A virtualized table. `VisibleWindow.scroll` is the only offset. Sort
-and scroll write application state.
+A virtualized table. The clip owns the pixel offset. Sort writes
+application state. `on_scroll` reports the mounted range. Jump with
+`scroll_to` on `scroll_id`. `on_h_scroll` moves the unfrozen strip.
 
 ```rust
 use icedtea::a11y::{A11y, Role};
@@ -49,6 +50,7 @@ impl App {
             Message::Sort,
             Message::Scroll,
             |_| 0.0,
+            None,
             |_| (),
             tok,
             A11y::new("files", Role::Table),
@@ -58,5 +60,8 @@ impl App {
 ```
 
 `ColumnLayout` holds widths, display order, and `frozen` leading
-columns. `on_sort`, `on_scroll`, and `on_h_scroll` must land in
-`update` or the table will not move.
+columns. `on_sort` and `on_h_scroll` land in `update`. `on_scroll`
+stores `start..end` for the next `view`. Pass `scroll_id` when the
+application calls `scroll_to`. Change `scroll_id` when the row set
+is a different table. Selecting a row outside the viewport moves
+the clip.

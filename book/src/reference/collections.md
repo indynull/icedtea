@@ -10,13 +10,16 @@ Lists, tables, trees, tabs, expanders, and pages.
 
 Each constructor takes `A11y` unless noted. iced 0.14 publishes the widget id only.
 
-`VisibleWindow.scroll` is the only list and table offset. The clip
-keeps the live pixel value. The rail and the wheel write it.
-`on_scroll` fires when the mounted range changes or the scroll hits
-an edge. An incoming window with a different mounted range (filter,
-page, session) moves the clip; a stale pixel copy of the same range
-does not. Variable-height rows use `row_offsets` /
-`visible_range_var`. `scroll_id` names the list clip pane.
+The clip owns the list and table pixel offset. The rail and the
+wheel write it. `on_scroll` fires when the mounted range changes or
+the scroll arrives at 0 or max. Pass `start..end` back so `view`
+builds that range. Jump with `scroll_to` on `scroll_id`. A new
+selection that sits
+outside the viewport moves the clip so that row is in view. Change
+`scroll_id` when the row set is a different list (filter, page,
+session) so the clip remounts at 0. Variable-height rows use
+`row_offsets` / `visible_range_var`. `scroll_id` names the clip
+pane on `list_view`, `virtual_column`, and `data_table`.
 
 ### List
 
@@ -97,7 +100,8 @@ Constructor: [`widget::data_table`](https://docs.rs/icedtea/latest/icedtea/widge
 the column.
 `on_sort` is the header click. `ColumnLayout` order is scroll order;
 `frozen` keeps the first *n* columns in view. `on_h_scroll` moves
-the rest. `TableSource::row_checked` plus `on_check` paint a leading
+the rest. `scroll_id` names the body clip for `scroll_to`.
+`TableSource::row_checked` plus `on_check` paint a leading
 checkbox column. Empty rows still paint headers.
 
 Pass `A11y`.

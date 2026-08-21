@@ -52,9 +52,9 @@ use crate::scroll::{fill_rail, ClipLayer, ThemedScroll, RAIL_GAP};
 use crate::a11y::{self, A11y, Role};
 use crate::chrome::SCROLL_RAIL_WIDTH;
 use crate::collection::{
-    page_range, range_if_changed, virtual_pads, window_after_scroll, window_after_scroll_var,
-    Accordion, ItemButton, ItemClick, ListModel, RowFace, RowHeights, Selection, Tabs, TreeNode,
-    VisibleWindow,
+    page_range, range_if_changed, scroll_to_show, virtual_pads, window_after_scroll,
+    window_after_scroll_var, Accordion, ItemButton, ItemClick, ListModel, RowFace, RowHeights,
+    Selection, Tabs, TreeNode, VisibleWindow,
 };
 use crate::i18n::Direction;
 use crate::icon::{Glyph, Icon, Icons};
@@ -5009,7 +5009,10 @@ pub fn log_view<'a, M: Clone + 'a>(
 }
 
 /// Clip pane + rail. Pixel offset lives in widget state. `on_scroll`
-/// fires when the mounted range changes or the scroll hits an edge.
+/// fires when the mounted range changes or the scroll arrives at an
+/// edge. `prev.start..prev.end` is the last published range for this
+/// `view` build. Jump with `scroll_to`.
+/// A pixel-only move redraws; a range change relayouts.
 #[allow(clippy::too_many_arguments)]
 fn virtual_clip<'a, M, F, G>(
     prev: VisibleWindow,
@@ -5027,15 +5030,7 @@ where
     F: Fn(VisibleWindow) -> M + Copy + 'a,
     G: Fn(VisibleWindow) -> Column<'a, M> + 'a,
 {
-    let win = clip_window(
-        prev,
-        prev.scroll,
-        prev.viewport.max(1.0),
-        heights,
-        len,
-        overscan,
-        cover,
-    );
+    let win = rows_window(prev, heights, len, overscan, cover);
     VirtualClip {
         rows: clip_rows(rows(win)),
         build: Box::new(rows),
@@ -5054,6 +5049,45 @@ where
 
 fn clip_rows<'a, M: 'a>(col: Column<'a, M>) -> ClipLayer<'a, M> {
     ClipLayer::new(container(col).width(crate::layout::FILL))
+}
+
+/// Range used to instantiate rows for this `view`. Uses the last
+/// published `start..end` when the application stored `on_scroll`.
+/// An empty range (`VisibleWindow::new`) builds from offset 0.
+/// The clip owns the live pixel offset.
+fn rows_window(
+    prev: VisibleWindow,
+    heights: RowHeights<'_>,
+    len: usize,
+    overscan: usize,
+    cover: Option<usize>,
+) -> VisibleWindow {
+    if prev.end > prev.start {
+        let mut start = prev.start.min(len);
+        let mut end = prev.end.min(len).max(start);
+        if let Some(c) = cover {
+            if c < len {
+                start = start.min(c);
+                end = end.max(c.saturating_add(1)).min(len);
+            }
+        }
+        VisibleWindow {
+            start,
+            end,
+            scroll: 0.0,
+            viewport: prev.viewport,
+        }
+    } else {
+        clip_window(
+            prev,
+            0.0,
+            prev.viewport.max(1.0),
+            heights,
+            len,
+            overscan,
+            cover,
+        )
+    }
 }
 
 fn clip_window(
@@ -5091,12 +5125,12 @@ struct VirtualClip<'a, Message> {
 
 struct VirtualClipState {
     scroll: f32,
-    seeded: bool,
+    /// Scroll baked into the last `layout` (ClipLayer shift).
+    laid_scroll: f32,
     last: VisibleWindow,
-    /// Last `VisibleWindow` the application passed in. A later `view`
-    /// with the same range and scroll is a stale copy; a different
-    /// range is a filter / page / session jump.
-    prev_seen: Option<VisibleWindow>,
+    last_ready: bool,
+    cover: Option<usize>,
+    cover_ready: bool,
     dragging: Option<f32>,
     content_h: f32,
     viewport_h: f32,
@@ -5107,13 +5141,31 @@ impl Default for VirtualClipState {
     fn default() -> Self {
         Self {
             scroll: 0.0,
-            seeded: false,
+            laid_scroll: 0.0,
             last: VisibleWindow::new(0.0),
-            prev_seen: None,
+            last_ready: false,
+            cover: None,
+            cover_ready: false,
             dragging: None,
             content_h: 0.0,
             viewport_h: 0.0,
             pending: false,
+        }
+    }
+}
+
+impl VirtualClipState {
+    fn paint_delta(&self) -> f32 {
+        self.laid_scroll - self.scroll
+    }
+
+    fn cursor_for_laid(&self, cursor: mouse::Cursor) -> mouse::Cursor {
+        let dy = self.paint_delta();
+        match cursor.position() {
+            Some(p) if dy.abs() > f32::EPSILON => {
+                mouse::Cursor::Available(Point::new(p.x, p.y - dy))
+            }
+            _ => cursor,
         }
     }
 }
@@ -5201,16 +5253,22 @@ impl<'a, Message: 'a> VirtualClip<'a, Message> {
         shell: &mut Shell<'_, Message>,
     ) {
         let max = (self.heights.total(self.len) - viewport).max(0.0);
+        let prev = state.scroll;
         let y = y.clamp(0.0, max);
         state.scroll = y;
         let next = self.window_at(y, viewport);
-        let at_edge = y <= f32::EPSILON || (max - y) <= f32::EPSILON;
-        if range_if_changed(state.last, next).is_some() || at_edge {
+        let range_changed = range_if_changed(state.last, next).is_some();
+        let arrived_top = y <= f32::EPSILON && prev > f32::EPSILON;
+        let arrived_end =
+            max > f32::EPSILON && (max - y) <= f32::EPSILON && (max - prev) > f32::EPSILON;
+        if range_changed || arrived_top || arrived_end {
             state.last = next;
             shell.publish((self.on_scroll)(next));
         }
         state.pending = false;
-        shell.invalidate_layout();
+        if range_changed {
+            shell.invalidate_layout();
+        }
         shell.request_redraw();
     }
 }
@@ -5257,25 +5315,29 @@ impl<'a, Message: 'a> Widget<Message, iced::Theme, iced::Renderer> for VirtualCl
         let max = (self.heights.total(self.len) - viewport).max(0.0);
         let scroll = {
             let state = tree.state.downcast_mut::<VirtualClipState>();
-            if !state.seeded {
-                state.scroll = self.prev.scroll.clamp(0.0, max);
-                state.seeded = true;
-                state.last = self.window_at(state.scroll, viewport);
-                state.prev_seen = Some(self.prev);
-            } else {
-                state.scroll = state.scroll.clamp(0.0, max);
-                let incoming = self.window_at(self.prev.scroll, viewport);
-                let live = self.window_at(state.scroll, viewport);
-                let app_changed = state.prev_seen.is_none_or(|seen| {
-                    seen.start != self.prev.start
-                        || seen.end != self.prev.end
-                        || (seen.scroll - self.prev.scroll).abs() > f32::EPSILON
-                });
-                if app_changed && (live.start != incoming.start || live.end != incoming.end) {
-                    state.scroll = incoming.scroll.clamp(0.0, max);
-                    state.last = incoming;
+            state.scroll = state.scroll.clamp(0.0, max);
+            if !state.cover_ready {
+                state.cover = self.cover;
+                state.cover_ready = true;
+            } else if state.cover != self.cover {
+                state.cover = self.cover;
+                if let Some(i) = self.cover {
+                    if i < self.len {
+                        let y = scroll_to_show(
+                            state.scroll,
+                            viewport,
+                            self.heights.offset(i),
+                            self.heights.at(i),
+                        );
+                        state.scroll = y.clamp(0.0, max);
+                        state.pending = true;
+                    }
                 }
-                state.prev_seen = Some(self.prev);
+            }
+            state.laid_scroll = state.scroll;
+            if !state.last_ready {
+                state.last = self.window_at(state.scroll, viewport);
+                state.last_ready = true;
             }
             state.content_h = self.heights.total(self.len);
             state.viewport_h = viewport;
@@ -5421,11 +5483,12 @@ impl<'a, Message: 'a> Widget<Message, iced::Theme, iced::Renderer> for VirtualCl
             _ => {}
         }
         if !shell.is_event_captured() {
+            let laid_cursor = state.cursor_for_laid(cursor);
             self.rows.update(
                 &mut tree.children[0],
                 event,
                 rows_layout,
-                cursor,
+                laid_cursor,
                 renderer,
                 clipboard,
                 shell,
@@ -5444,6 +5507,7 @@ impl<'a, Message: 'a> Widget<Message, iced::Theme, iced::Renderer> for VirtualCl
         cursor: mouse::Cursor,
         viewport: &Rectangle,
     ) {
+        let state = tree.state.downcast_ref::<VirtualClipState>();
         let bounds = layout.bounds();
         let mut kids = layout.children();
         let rows_layout = kids.next().expect("virtual rows");
@@ -5453,19 +5517,21 @@ impl<'a, Message: 'a> Widget<Message, iced::Theme, iced::Renderer> for VirtualCl
             Size::new(rows_layout.bounds().width, bounds.height),
         );
         if let Some(clipped) = pane.intersection(viewport) {
+            let dy = state.paint_delta();
             renderer.with_layer(clipped, |renderer| {
-                self.rows.draw(
-                    &tree.children[0],
-                    renderer,
-                    theme,
-                    style,
-                    rows_layout,
-                    cursor,
-                    &clipped,
-                );
+                renderer.with_translation(iced::Vector::new(0.0, dy), |renderer| {
+                    self.rows.draw(
+                        &tree.children[0],
+                        renderer,
+                        theme,
+                        style,
+                        rows_layout,
+                        state.cursor_for_laid(cursor),
+                        &clipped,
+                    );
+                });
             });
         }
-        let state = tree.state.downcast_ref::<VirtualClipState>();
         fill_rail(
             renderer,
             rail_layout.bounds(),
@@ -5509,8 +5575,13 @@ impl<'a, Message: 'a> Widget<Message, iced::Theme, iced::Renderer> for VirtualCl
                 };
             }
         }
-        self.rows
-            .mouse_interaction(&tree.children[0], rows_layout, cursor, viewport, renderer)
+        self.rows.mouse_interaction(
+            &tree.children[0],
+            rows_layout,
+            state.cursor_for_laid(cursor),
+            viewport,
+            renderer,
+        )
     }
 }
 
@@ -5764,9 +5835,14 @@ fn card_row<'a, M: 'a>(
 /// [`collection::expand_card_heights`](crate::collection::expand_card_heights)
 /// (or any per-row slice), keep a [`VisibleWindow`], and build each
 /// mounted index. The clip keeps the pixel offset; `on_scroll` fires
-/// when the mounted range changes or the scroll hits an edge. This
-/// reuses list windowing (overscan, rail, wheel); it is not a second
-/// list model — title/meta lists stay on [`list_view`].
+/// when the mounted range changes or the scroll arrives at 0 or max.
+/// Pass `window.start..window.end` so `view` can build the last
+/// published range. Jump with `scroll_to`
+/// on `scroll_id`. A new `cover` index that sits outside the viewport
+/// moves the clip so that row is in view. Change `scroll_id` when the
+/// row set is a different list so the clip remounts at 0. This reuses
+/// list windowing (overscan, rail, wheel); it is not a second list
+/// model — title/meta lists stay on [`list_view`].
 ///
 ///
 /// ```
@@ -6114,16 +6190,21 @@ impl<'a, Message: 'a> From<CapturePress<'a, Message>> for Element<'a, Message> {
 /// A virtualized row list.
 ///
 /// `empty` is the copy when `model` has no rows. `meta_color` paints
-/// the second line. `scroll` is the only offset. The clip keeps the
-/// live pixel value; the rail and the wheel write it. Uniform rows
+/// the second line. The clip keeps the live pixel offset; the rail
+/// and the wheel write it. Uniform rows
 /// sit at `i * row_h - scroll`. Variable
 /// rows use [`RowHeights::PerRow`] and [`crate::collection::visible_window_var`].
 /// `face` is [`RowFace::Flush`] (clipped line) or [`RowFace::Card`]
 /// (wrapped title, 2px gap, optional meter). The clip keeps the pixel
 /// offset; `on_scroll` fires when the mounted range changes or the
-/// scroll hits an edge. An incoming window with a different mounted
-/// range (filter, page, session) moves the clip; a stale pixel copy
-/// of the same range does not. `scroll_id` names the clip pane. The
+/// scroll arrives at 0 or max. A wheel while parked at an end does
+/// not publish. Pass `window.start..window.end` so `view` can build
+/// the last published range. Jump with
+/// `scroll_to` on `scroll_id`. A new selection that sits outside the
+/// viewport moves the clip so that row is in view. A later wheel with
+/// the same selection leaves the offset alone. Change `scroll_id` when
+/// the row set is a different list (filter, page, session) so the clip
+/// remounts at 0. `scroll_id` names the clip pane. The
 /// 24px rail sits beside it. `ListModel::indent` insets
 /// the row from start. `RowSlot::Text` paints a small badge.
 ///
@@ -6367,9 +6448,13 @@ pub fn item_grid<'a, M: Clone + 'a>(
 /// A virtualized table. Last column fills.
 ///
 /// `on_cell` is an [`ItemClick`] (row) plus the column. `on_sort` is
-/// the header click. Empty
-/// rows still paint headers. `columns.frozen` stays in view;
-/// `on_h_scroll` is the unfrozen strip.
+/// the header click. Empty rows still paint headers. `columns.frozen`
+/// stays in view; `on_h_scroll` is the unfrozen strip. The clip owns
+/// the vertical offset. Pass `window.start..window.end` so `view` can
+/// build the last published range.
+/// `scroll_id` names the clip for `scroll_to`. A new selection that
+/// sits outside the viewport moves the clip so that row is in view.
+/// Change `scroll_id` when the row set is a different table.
 ///
 ///
 /// ```
@@ -6411,6 +6496,7 @@ pub fn item_grid<'a, M: Clone + 'a>(
 ///     on_sort,
 ///     on_scroll,
 ///     on_h_scroll,
+///     None,
 ///     Msg::Check,
 ///     tok,
 ///     A11y::new("table", Role::Table),
@@ -6429,6 +6515,7 @@ pub fn data_table<'a, M, T>(
     on_sort: impl Fn(usize) -> M + Copy + 'a,
     on_scroll: impl Fn(VisibleWindow) -> M + Copy + 'a,
     on_h_scroll: impl Fn(f32) -> M + Copy + 'a,
+    scroll_id: Option<Id>,
     on_check: impl Fn(usize) -> M + Copy + 'a,
     tok: Tokens,
     a11y: A11y,
@@ -6526,7 +6613,7 @@ where
                 overscan,
                 cover,
                 on_scroll,
-                None,
+                scroll_id,
                 tok,
                 move |win| {
                     let mut body = Column::new().spacing(0);
@@ -7386,6 +7473,24 @@ mod tests {
         if !ok {
             panic!("{msg}");
         }
+    }
+
+    fn jump_clip(
+        el: &mut Element<'_, VisibleWindow>,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        layout: Layout<'_>,
+        id: Id,
+        y: f32,
+    ) {
+        let mut op = operation::scrollable::scroll_to::<()>(
+            id,
+            operation::scrollable::AbsoluteOffset {
+                x: None,
+                y: Some(y),
+            },
+        );
+        el.as_widget_mut().operate(tree, layout, renderer, &mut op);
     }
 
     #[test]
@@ -8828,6 +8933,7 @@ mod tests {
             |_| (),
             |_| (),
             |_| (),
+            None,
             |_| (),
             tok,
             role("table", Role::Table),
@@ -8858,6 +8964,7 @@ mod tests {
             |_| (),
             |_| (),
             |_| (),
+            None,
             |_| (),
             tok,
             role("table", Role::Table),
@@ -9747,6 +9854,7 @@ mod tests {
             |_| (),
             |_| (),
             |_| (),
+            None,
             |_| (),
             tok,
             role("table", Role::Table),
@@ -9765,6 +9873,7 @@ mod tests {
             |_| (),
             |_| (),
             |_| (),
+            None,
             |_| (),
             tok,
             role("table", Role::Table).with_disabled(true),
@@ -10874,6 +10983,7 @@ mod tests {
             |_| 0,
             |_| 0,
             |_| 0,
+            None,
             |i| i,
             tok,
             A11y::new("checks", Role::Table),
@@ -11057,6 +11167,7 @@ mod tests {
             |_| window,
             |w| w,
             |_| window,
+            None,
             |_| window,
             tok,
             A11y::new("table", Role::Table),
@@ -11565,7 +11676,7 @@ mod tests {
         };
         let row_h = 20.0;
         let viewport = 200.0;
-        let window = crate::collection::visible_window(2.0, viewport, row_h, 80, 4, Some(0));
+        let window = crate::collection::visible_window(0.0, viewport, row_h, 80, 4, Some(0));
         let start = window.start;
         let end = window.end;
         let mut el: Element<'_, VisibleWindow> = list_view(
@@ -11603,7 +11714,7 @@ mod tests {
         let (thumb_y, thumb_h) = crate::collection::scroller_span(
             content,
             viewport,
-            window.scroll,
+            0.0,
             rb.height,
             crate::chrome::SCROLL_HANDLE_MIN,
         );
@@ -11684,7 +11795,7 @@ mod tests {
         };
         let row_h = 20.0;
         let viewport = 200.0;
-        let window = crate::collection::visible_window(4.0, viewport, row_h, 80, 4, None);
+        let window = crate::collection::visible_window(0.0, viewport, row_h, 80, 4, None);
         let mut el: Element<'_, VisibleWindow> = list_view(
             &list,
             &Sel::None,
@@ -11751,6 +11862,26 @@ mod tests {
         must(
             messages.iter().any(|w| w.scroll <= f32::EPSILON),
             "wheel onto the top edge must publish for paging",
+        );
+        messages.clear();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::WheelScrolled {
+                    delta: mouse::ScrollDelta::Lines { x: 0.0, y: 1.0 },
+                }),
+                layout,
+                mouse::Cursor::Available(over),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+        }
+        must(
+            messages.is_empty(),
+            "a second wheel while parked at 0 must not publish",
         );
         messages.clear();
         let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
@@ -11874,10 +12005,12 @@ mod tests {
     }
 
     #[test]
-    fn list_view_takes_incoming_window_when_range_resets() {
+    fn list_view_ignores_an_incoming_scroll_reset() {
+        use iced::advanced::clipboard;
         use iced::advanced::layout::{Layout, Limits};
         use iced::advanced::widget::Tree;
-        use iced::{Font, Pixels, Size};
+        use iced::mouse;
+        use iced::{Event, Font, Pixels, Point, Rectangle, Size};
 
         let tok = named("dark").tokens;
         let row_h = 20.0;
@@ -11888,15 +12021,13 @@ mod tests {
                 .map(|i| crate::collection::ListRow::new(format!("r{i}")))
                 .collect(),
         };
-        let deep = crate::collection::visible_window(200.0, viewport, row_h, n, 4, None);
         let top = crate::collection::visible_window(0.0, viewport, row_h, n, 4, None);
-        must(deep.start > 0, "fixture must start past the first rows");
         let mut el: Element<'_, VisibleWindow> = list_view(
             &list,
             &Sel::None,
-            |_| deep,
+            |_| top,
             tok,
-            deep,
+            top,
             row_h,
             4,
             |w| w,
@@ -11904,7 +12035,7 @@ mod tests {
             |_| tok.muted,
             None,
             RowFace::FLUSH,
-            |_| deep,
+            |_| top,
             A11y::new("list", Role::List),
         );
         let mut tree = Tree::new(el.as_widget());
@@ -11913,7 +12044,32 @@ mod tests {
             Pixels::from(16u32),
         ));
         let limits = Limits::new(Size::ZERO, Size::new(320.0, viewport));
-        let _ = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let origin = layout.bounds();
+        let over = Point::new(origin.x + 20.0, origin.center_y());
+        let vp = Rectangle::new(Point::ORIGIN, Size::new(320.0, viewport));
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::WheelScrolled {
+                    delta: mouse::ScrollDelta::Pixels { x: 0.0, y: -200.0 },
+                }),
+                layout,
+                mouse::Cursor::Available(over),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+        }
+        must(
+            messages.iter().any(|w| w.start > 0),
+            "200px must remount a later window",
+        );
         el = list_view(
             &list,
             &Sel::None,
@@ -11942,8 +12098,234 @@ mod tests {
             .map(|b| b.y - origin.y)
             .collect();
         must(
-            rows.iter().any(|y| y.abs() < 1.0),
-            format!("a range reset must jump the clip to the incoming window, got {rows:?}"),
+            rows.iter().any(|y| *y < -1.0),
+            format!("incoming scroll 0 must not reset widget scroll, got {rows:?}"),
+        );
+    }
+
+    #[test]
+    fn list_view_scroll_to_jumps_the_clip() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+
+        let tok = named("dark").tokens;
+        let row_h = 20.0;
+        let viewport = 200.0;
+        let n = 80;
+        let list = VecList {
+            items: (0..n)
+                .map(|i| crate::collection::ListRow::new(format!("r{i}")))
+                .collect(),
+        };
+        let top = crate::collection::visible_window(0.0, viewport, row_h, n, 4, None);
+        let id = Id::from("list-jump");
+        let mut el: Element<'_, VisibleWindow> = list_view(
+            &list,
+            &Sel::None,
+            |_| top,
+            tok,
+            top,
+            row_h,
+            4,
+            |w| w,
+            "Empty",
+            |_| tok.muted,
+            Some(id.clone()),
+            RowFace::FLUSH,
+            |_| top,
+            A11y::new("list", Role::List),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(320.0, viewport));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        jump_clip(&mut el, &mut tree, &renderer, layout, id, 200.0);
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let origin = layout.bounds();
+        let mut boxes = Vec::new();
+        walk_bounds(layout, &mut boxes);
+        let rows: Vec<f32> = boxes
+            .iter()
+            .filter(|b| (b.height - row_h).abs() < 0.6 && b.width > 40.0)
+            .map(|b| b.y - origin.y)
+            .collect();
+        must(
+            rows.iter().any(|y| y.abs() < 1.0) && rows.iter().any(|y| *y < -1.0),
+            format!("scroll_to(200) must remount with a row at the clip top, got {rows:?}"),
+        );
+    }
+
+    #[test]
+    fn list_view_moves_the_clip_when_the_covered_row_leaves_the_viewport() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+
+        let tok = named("dark").tokens;
+        let row_h = 20.0;
+        let viewport = 200.0;
+        let n = 80;
+        let list = VecList {
+            items: (0..n)
+                .map(|i| crate::collection::ListRow::new(format!("r{i}")))
+                .collect(),
+        };
+        let top = crate::collection::visible_window(0.0, viewport, row_h, n, 4, Some(0));
+        let deep = crate::collection::visible_window(0.0, viewport, row_h, n, 4, Some(30));
+        let mut el: Element<'_, VisibleWindow> = list_view(
+            &list,
+            &Sel::Single(0),
+            |_| top,
+            tok,
+            top,
+            row_h,
+            4,
+            |w| w,
+            "Empty",
+            |_| tok.muted,
+            None,
+            RowFace::FLUSH,
+            |_| top,
+            A11y::new("list", Role::List),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(320.0, viewport));
+        let _ = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        el = list_view(
+            &list,
+            &Sel::Single(30),
+            |_| deep,
+            tok,
+            deep,
+            row_h,
+            4,
+            |w| w,
+            "Empty",
+            |_| tok.muted,
+            None,
+            RowFace::FLUSH,
+            |_| deep,
+            A11y::new("list", Role::List),
+        );
+        el.as_widget().diff(&mut tree);
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let origin = layout.bounds();
+        let mut boxes = Vec::new();
+        walk_bounds(layout, &mut boxes);
+        let rows: Vec<f32> = boxes
+            .iter()
+            .filter(|b| (b.height - row_h).abs() < 0.6 && b.width > 40.0)
+            .map(|b| b.y - origin.y)
+            .collect();
+        must(
+            rows.iter().any(|y| *y < -1.0),
+            format!("selecting row 30 must scroll it into view, got {rows:?}"),
+        );
+    }
+
+    #[test]
+    fn list_view_keeps_scroll_when_the_cover_is_unchanged() {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::mouse;
+        use iced::{Event, Font, Pixels, Point, Rectangle, Size};
+
+        let tok = named("dark").tokens;
+        let row_h = 20.0;
+        let viewport = 200.0;
+        let n = 80;
+        let list = VecList {
+            items: (0..n)
+                .map(|i| crate::collection::ListRow::new(format!("r{i}")))
+                .collect(),
+        };
+        let top = crate::collection::visible_window(0.0, viewport, row_h, n, 4, Some(0));
+        let mut el: Element<'_, VisibleWindow> = list_view(
+            &list,
+            &Sel::Single(0),
+            |_| top,
+            tok,
+            top,
+            row_h,
+            4,
+            |w| w,
+            "Empty",
+            |_| tok.muted,
+            None,
+            RowFace::FLUSH,
+            |_| top,
+            A11y::new("list", Role::List),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(320.0, viewport));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let origin = layout.bounds();
+        let over = Point::new(origin.x + 20.0, origin.center_y());
+        let vp = Rectangle::new(Point::ORIGIN, Size::new(320.0, viewport));
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::WheelScrolled {
+                    delta: mouse::ScrollDelta::Pixels { x: 0.0, y: -200.0 },
+                }),
+                layout,
+                mouse::Cursor::Available(over),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+        }
+        el = list_view(
+            &list,
+            &Sel::Single(0),
+            |_| top,
+            tok,
+            top,
+            row_h,
+            4,
+            |w| w,
+            "Empty",
+            |_| tok.muted,
+            None,
+            RowFace::FLUSH,
+            |_| top,
+            A11y::new("list", Role::List),
+        );
+        el.as_widget().diff(&mut tree);
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let origin = layout.bounds();
+        let mut boxes = Vec::new();
+        walk_bounds(layout, &mut boxes);
+        let rows: Vec<f32> = boxes
+            .iter()
+            .filter(|b| (b.height - row_h).abs() < 0.6 && b.width > 40.0)
+            .map(|b| b.y - origin.y)
+            .collect();
+        must(
+            rows.iter().any(|y| *y < -1.0),
+            format!("same cover after a wheel must not reset scroll, got {rows:?}"),
         );
     }
 
@@ -12046,7 +12428,8 @@ mod tests {
                 .map(|i| crate::collection::ListRow::new(format!("r{i}")))
                 .collect(),
         };
-        let window = crate::collection::visible_window(scroll, viewport, row_h, n, overscan, None);
+        let window = crate::collection::visible_window(0.0, viewport, row_h, n, overscan, None);
+        let id = Id::from("list-paint");
         let mut el: Element<'_, VisibleWindow> = list_view(
             &list,
             &Sel::None,
@@ -12058,7 +12441,7 @@ mod tests {
             |w| w,
             "Empty",
             |_| tok.muted,
-            None,
+            Some(id.clone()),
             RowFace::FLUSH,
             |_| window,
             A11y::new("list", Role::List),
@@ -12069,6 +12452,9 @@ mod tests {
             Pixels::from(16u32),
         ));
         let limits = Limits::new(Size::ZERO, Size::new(320.0, viewport));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        jump_clip(&mut el, &mut tree, &renderer, layout, id, scroll);
         let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
         let layout = Layout::new(&node);
         let origin = layout.bounds();
@@ -12294,6 +12680,7 @@ mod tests {
                 |_| (),
                 |_| (),
                 |_| (),
+                None,
                 |_| (),
                 tok,
                 A11y::new("pin", Role::Table),
@@ -12343,6 +12730,7 @@ mod tests {
             |_| 0.0,
             |_| 0.0,
             |x| x,
+            None,
             |_| 0.0,
             tok,
             A11y::new("pin-h", Role::Table),
@@ -12413,6 +12801,7 @@ mod tests {
             |_| (),
             |_| (),
             |_| (),
+            None,
             |_| (),
             tok,
             A11y::new("zebra", Role::Table).with_disabled(true),
@@ -12439,6 +12828,7 @@ mod tests {
             |_| (),
             |_| (),
             |_| (),
+            None,
             |_| (),
             tok,
             A11y::new("empty-table", Role::Table),
@@ -12893,9 +13283,11 @@ mod tests {
 
     #[test]
     fn data_table_paints_each_row_at_index_times_height_minus_scroll() {
+        use iced::advanced::clipboard;
         use iced::advanced::layout::{Layout, Limits};
         use iced::advanced::widget::Tree;
-        use iced::{Font, Pixels, Size};
+        use iced::mouse;
+        use iced::{Event, Font, Pixels, Point, Rectangle, Size};
 
         let tok = named("dark").tokens;
         let row_h = 20.0;
@@ -12911,7 +13303,7 @@ mod tests {
             checks: Vec::new(),
         };
         let widths = crate::collection::ColumnLayout::new(vec![80.0]);
-        let window = crate::collection::visible_window(scroll, viewport, row_h, n, overscan, None);
+        let window = crate::collection::visible_window(0.0, viewport, row_h, n, overscan, None);
         let mut el: Element<'_, VisibleWindow> = data_table(
             &table,
             &Sel::None,
@@ -12925,6 +13317,7 @@ mod tests {
             |_| window,
             |w| w,
             |_| window,
+            None,
             |_| window,
             tok,
             A11y::new("table", Role::Table),
@@ -12935,6 +13328,28 @@ mod tests {
             Pixels::from(16u32),
         ));
         let limits = Limits::new(Size::ZERO, Size::new(320.0, viewport));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let origin = layout.bounds();
+        let over = Point::new(origin.x + 20.0, origin.y + origin.height * 0.65);
+        let vp = Rectangle::new(Point::ORIGIN, Size::new(320.0, viewport));
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::WheelScrolled {
+                    delta: mouse::ScrollDelta::Pixels { x: 0.0, y: -scroll },
+                }),
+                layout,
+                mouse::Cursor::Available(over),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+        }
         let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
         let layout = Layout::new(&node);
         let mut boxes = Vec::new();
@@ -15074,6 +15489,7 @@ mod tests {
             on_sort,
             on_scroll,
             on_h_scroll,
+            None,
             on_check,
             tok,
             A11y::new("table", Role::Table),

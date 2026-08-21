@@ -6,7 +6,10 @@ pub const OVERSCAN: usize = 4;
 /// Visible row window for a virtualized list or table.
 ///
 /// `start..end` are mounted indices (overscan and cover already applied).
-/// `scroll` is the live pixel offset. The rail is a view of that number.
+/// Pass them back into the constructor so `view` builds that range.
+/// `scroll` is the last offset `on_scroll` reported. The clip owns
+/// the live pixels. Jump with `scroll_to` on the constructor's
+/// `scroll_id`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct VisibleWindow {
     pub start: usize,
@@ -118,6 +121,26 @@ pub fn range_if_changed(prev: VisibleWindow, next: VisibleWindow) -> Option<Visi
         Some(next)
     } else {
         None
+    }
+}
+
+/// Pixel offset that keeps `[row_top, row_top + row_h)` in the viewport.
+///
+/// ```
+/// use icedtea::collection::scroll_to_show;
+/// assert_eq!(scroll_to_show(0.0, 200.0, 0.0, 20.0), 0.0);
+/// assert_eq!(scroll_to_show(0.0, 200.0, 400.0, 20.0), 220.0);
+/// assert_eq!(scroll_to_show(400.0, 200.0, 0.0, 20.0), 0.0);
+/// ```
+pub fn scroll_to_show(scroll: f32, viewport: f32, row_top: f32, row_h: f32) -> f32 {
+    let viewport = viewport.max(0.0);
+    let row_h = row_h.max(0.0);
+    if row_top < scroll {
+        row_top.max(0.0)
+    } else if row_top + row_h > scroll + viewport {
+        (row_top + row_h - viewport).max(0.0)
+    } else {
+        scroll.max(0.0)
     }
 }
 
@@ -1202,6 +1225,10 @@ mod tests {
         .is_some());
         assert_eq!(VisibleWindow::default().viewport, 240.0);
         assert_eq!(VisibleWindow::new(100.0).range(), 0..0);
+        assert_eq!(scroll_to_show(0.0, 200.0, 0.0, 20.0), 0.0);
+        assert_eq!(scroll_to_show(0.0, 200.0, 400.0, 20.0), 220.0);
+        assert_eq!(scroll_to_show(400.0, 200.0, 0.0, 20.0), 0.0);
+        assert_eq!(scroll_to_show(100.0, 200.0, 120.0, 20.0), 100.0);
         struct Titles(&'static [&'static str]);
         impl ListModel for Titles {
             fn len(&self) -> usize {
