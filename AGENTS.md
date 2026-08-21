@@ -316,8 +316,11 @@ exact command and result you ran.
   tests if there is no display. `just gallery-gif` records a short
   live pointer demo (click, type, wheel) into `assets/gallery.gif`
   and `book/src/gallery.gif` inside Xephyr and burns a step caption
-  on each beat. Always set those captions in Fira or Fura at subtitle
-  size (outline, not a full-width slab). Always re-record in the same
+  on each beat. Always set those captions in Fira or Fura at 32 bold
+  (outline, not a full-width slab). Each caption names the widget, the
+  action, and the result visible on that beat. The demo injects the
+  same message the click is supposed to send. Never insert a tour-only
+  Action into the chrome `ActionTable`. Always re-record in the same
   change when a public widget, pattern, or gallery page behavior ships
   or changes (not only shell chrome). Continuous integration does not
   record. Do not hand-edit those GIF files. Read the stills, not the

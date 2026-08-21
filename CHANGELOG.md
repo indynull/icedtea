@@ -5,7 +5,8 @@
 ### Chore
 
 - `just gallery-gif` records a live pointer demo (click, type, wheel)
-  for the README and handbook tour.
+  for the README and handbook tour. Primary invokes an Action; the
+  status and job line show the press.
 
 ## 0.13.0 — 2026-08-21
 

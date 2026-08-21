@@ -48,6 +48,9 @@ page — nothing else should have changed unless the demo says so.
 
 - Split **overflow** chevron opens a real menu; items invoke; menu dismisses.
 - Primary and overflow **same height**, aligned.
+- Enabled **Primary** invokes `demo_primary_action` (`Note("Primary")`).
+  Status and the page job line show `Primary`. A press that leaves
+  only the page title is a fail.
 - Slider drags across the range (not stuck at 0).
 - Toggle buttons do not flip unrelated checkboxes.
 
@@ -142,6 +145,7 @@ Batch pure density/alignment uglies after the broken set is green.
 2. Confirm each fixed defect is gone in the new shots (or live recheck).
 3. Commit library/demo fixes; do not commit harness PNGs. Recapture the
    published tour with `just gallery-gif` when gallery layout, nav clip,
-   or public chrome changed. Score that file for sticky-header bleed
-   (Search and other headers above a scrolled list), not only the
+   or public chrome changed. Score that file for the painted result of
+   each beat (status `Primary`, Inbox after `in`, selected list row,
+   frozen Name, palette `save`, light canvas), not only the
    `tmp/gallery-qa/` shots.
