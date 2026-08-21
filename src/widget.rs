@@ -12005,6 +12005,131 @@ mod tests {
     }
 
     #[test]
+    fn list_view_maps_cursor_across_an_unlaid_pixel_scroll() {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::renderer::Style;
+        use iced::advanced::widget::Tree;
+        use iced::mouse;
+        use iced::{Event, Font, Pixels, Point, Rectangle, Size, Theme};
+
+        #[derive(Clone, Debug, PartialEq)]
+        enum Ev {
+            Scroll(VisibleWindow),
+            Pick(usize),
+        }
+
+        let tok = named("dark").tokens;
+        let list = VecList {
+            items: (0..80)
+                .map(|i| crate::collection::ListRow::new(format!("r{i}")))
+                .collect(),
+        };
+        let row_h = 20.0;
+        let viewport = 200.0;
+        let window = crate::collection::visible_window(0.0, viewport, row_h, 80, 4, None);
+        let mut el: Element<'_, Ev> = list_view(
+            &list,
+            &Sel::None,
+            |c| Ev::Pick(c.id),
+            tok,
+            window,
+            row_h,
+            4,
+            Ev::Scroll,
+            "Empty",
+            |_| tok.muted,
+            None,
+            RowFace::FLUSH,
+            Ev::Pick,
+            A11y::new("list", Role::List),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let mut renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(320.0, viewport));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let origin = layout.bounds();
+        let over = Point::new(origin.x + 40.0, origin.center_y());
+        let vp = Rectangle::new(Point::ORIGIN, Size::new(320.0, viewport));
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::WheelScrolled {
+                    delta: mouse::ScrollDelta::Pixels { x: 0.0, y: -8.0 },
+                }),
+                layout,
+                mouse::Cursor::Available(over),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+        }
+        must(messages.is_empty(), "pixel wheel must not publish");
+        let hover = Point::new(origin.x + 40.0, origin.y + 15.0);
+        let _ = el.as_widget().mouse_interaction(
+            &tree,
+            layout,
+            mouse::Cursor::Available(hover),
+            &vp,
+            &renderer,
+        );
+        el.as_widget().draw(
+            &tree,
+            &mut renderer,
+            &Theme::Dark,
+            &Style::default(),
+            layout,
+            mouse::Cursor::Available(hover),
+            &vp,
+        );
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(hover),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+        }
+        must(
+            messages.iter().any(|e| matches!(e, Ev::Pick(1))),
+            format!("unlaid 8px scroll must map y+15 onto row 1, got {messages:?}"),
+        );
+        messages.clear();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::WheelScrolled {
+                    delta: mouse::ScrollDelta::Pixels { x: 0.0, y: -200.0 },
+                }),
+                layout,
+                mouse::Cursor::Available(over),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+        }
+        must(
+            messages.iter().any(|e| matches!(e, Ev::Scroll(_))),
+            format!("a remounting wheel after the unlaid click must publish, got {messages:?}"),
+        );
+    }
+
+    #[test]
     fn list_view_ignores_an_incoming_scroll_reset() {
         use iced::advanced::clipboard;
         use iced::advanced::layout::{Layout, Limits};
