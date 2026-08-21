@@ -523,12 +523,13 @@ fn scene_card<'a>(child: Element<'a, Message>, tok: Tokens) -> Element<'a, Messa
 }
 
 fn page_fills(page: &str) -> bool {
-    // "list" scrolls: virtual-column + list + pagination share one page;
-    // Fill clips the list to a one-row strip under the expand cards.
+    // List: title and job stay put. Virtual column and list_view keep
+    // Fixed clip heights so Fill does not crush them into one row.
     matches!(
         page,
         "code"
             | "tree"
+            | "list"
             | "list-detail"
             | "table"
             | "log"
@@ -3716,6 +3717,22 @@ impl Gallery {
         }
     }
 
+    fn list_clip_id(&self) -> icedtea::iced::widget::Id {
+        if self.page == "list-detail" {
+            icedtea::iced::widget::Id::from("gallery-list-detail")
+        } else {
+            let bucket = match self.list_bucket {
+                ListBucket::All => "all",
+                ListBucket::Unread => "unread",
+                ListBucket::Flagged => "flagged",
+            };
+            icedtea::iced::widget::Id::from(format!(
+                "gallery-list-{bucket}-{}-{}",
+                self.list_page, self.list_filter
+            ))
+        }
+    }
+
     fn reveal_nav(&mut self) -> Task<Message> {
         let y = (nav_offset(
             self.page,
@@ -5531,7 +5548,7 @@ impl Gallery {
                     Message::ListScroll,
                     self.catalog.t("list.empty"),
                     move |_| tok.scheme().on_surface_variant,
-                    Some(icedtea::iced::widget::Id::from("gallery-list")),
+                    Some(self.list_clip_id()),
                     if self.list_card {
                         icedtea::collection::RowFace::Card {
                             meter: Some(list_meter as fn(usize) -> f32),
@@ -5660,6 +5677,7 @@ impl Gallery {
                     Message::Sort,
                     Message::TableScroll,
                     Message::TableHScroll,
+                    Some(icedtea::iced::widget::Id::from("gallery-table")),
                     Message::TableCheck,
                     tok,
                     named("table", Role::Table),
