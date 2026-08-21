@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.13.0 — 2026-08-21
+
+### Feature
+
+- `data_table` takes `scroll_id` so `scroll_to` jumps the body clip.
+
+### Bug fix
+
+- `virtual_clip` keeps the pixel offset in widget state. Constructors
+  use `VisibleWindow` `start..end` for the `view` row build. Jumps
+  use `scroll_to`. A new list identity uses a new `scroll_id`.
+- `virtual_clip` `on_scroll` fires when the mounted range changes or
+  the offset arrives at 0 or max.
+- A pixel-only wheel or rail move on `virtual_clip` redraws. Layout
+  runs when the mounted range changes.
+- A new cover or selection that sits outside the viewport moves the
+  clip so that row is in view.
+
 ## 0.12.1 — 2026-08-20
 
 ### Bug fix
