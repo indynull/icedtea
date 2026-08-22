@@ -6,11 +6,12 @@
 
 Default Xephyr + metacity. Tour protocol + optional inject scripts.
 Writes shots/, steps.jsonl, timings.json, CAPTURE.md under --out.
-With --locale ar|ur also writes SCORE.md and exits non-zero if a
-Firefox/Microsoft direction beat is broken (see
-.grok/skills/gallery-qa/references/rtl.md and the downloaded
-Firefox / Microsoft pages next to it). Leftover-English is
-one row, not the bar.
+With --locale LANG (or comma list, or all) also writes SCORE.md
+and exits non-zero if a Firefox/Microsoft direction beat is
+broken (see .grok/skills/gallery-qa/references/rtl.md and the
+downloaded Firefox / Microsoft pages next to it). Locale proof
+is every gallery fill language: en, vi, ja, zh, ar, ur, he.
+Leftover-English is one row, not the bar.
 Does not commit. Does not invent screenshots.
 
   just gallery-qa
@@ -301,6 +302,9 @@ def find_window_id(display: str, pid: int, timeout_s: float = 20.0) -> str:
 def place_window(display: str, wid: str, x: int, y: int, w: int, h: int) -> None:
     env = os.environ.copy()
     env["DISPLAY"] = display
+    if _which("swaymsg"):
+        dec = int(wid, 16) if str(wid).lower().startswith("0x") else int(wid)
+        _run(["swaymsg", f"[id={dec}] floating enable"], check=False)
     _run(
         ["wmctrl", "-i", "-r", wid, "-b", "remove,maximized_vert,maximized_horz"],
         env=env,
@@ -973,6 +977,22 @@ def score_wrap_shots(steps: list[dict], out: Path) -> list[dict]:
     ]
 
 
+def _best_midgray_col(
+    im, x0: int, x1: int, y0: int, y1: int, *, span: int = 12
+) -> tuple[int, int]:
+    """(x, count) of the strongest midgray column in [x0, x1)."""
+    best_x = x0
+    best_n = -1
+    x = x0
+    while x + span <= x1:
+        n = _column_midgray(im, x, x + span, y0, y1)
+        if n > best_n:
+            best_n = n
+            best_x = x
+        x += 4
+    return best_x, best_n
+
+
 def rail_side(path: Path) -> str:
     """Return left, right, or none for the vertical rail in a window shot."""
     from PIL import Image
@@ -981,32 +1001,31 @@ def rail_side(path: Path) -> str:
     w, h = im.size
     if w < 200 or h < 200:
         return "none"
-    # Drop the look strip / title and the status bar; drop the RTL nav
-    # column on the right (~320px).
+    # Drop the look strip / title and the status bar.
     y0, y1 = min(170, h // 3), h - 36
-    nav = 340 if w >= 1200 else 0
-    # Drop the card's far edge next to the nav; that hairline is not the rail.
-    edge = 80 if w >= 1200 else 0
-    x_left, x_right = 36, max(37, w - nav - edge)
+    x_left = 36
+    x_right = w - 36
+    if w >= 1200:
+        # RTL nav sits on the right. The sash is a tall midgray column;
+        # crop just inside it so the selected-card start edge cannot win.
+        sash_x, sash_n = _best_midgray_col(im, int(w * 0.55), w, y0, y1)
+        if sash_n >= 1200:
+            x_right = min(x_right, sash_x - 8)
+        else:
+            x_right = max(37, w - 340 - 80)
     if y1 - y0 < 80 or x_right - x_left < 80:
         return "none"
-    span = 12
-    best_x = x_left
-    best_n = -1
-    x = x_left
-    while x + span <= x_right:
-        n = _column_midgray(im, x, x + span, y0, y1)
-        if n > best_n:
-            best_n = n
-            best_x = x
-        x += 4
-    if best_n <= 0:
-        return "none"
-    width = x_right - x_left
-    rel = (best_x - x_left) / width
-    if rel < 0.28:
+    gutter = min(120, max(48, (x_right - x_left) // 6))
+    _, left_n = _best_midgray_col(im, x_left, x_left + gutter, y0, y1)
+    _, right_n = _best_midgray_col(
+        im, max(x_left, x_right - gutter), x_right, y0, y1
+    )
+    # End-side gutter first. A card face in the middle of the pane is
+    # not the rail (list page selected-card start edge is mid-right).
+    min_n = 80
+    if left_n >= min_n:
         return "left"
-    if rel > 0.72:
+    if right_n >= min_n:
         return "right"
     return "none"
 
@@ -1686,6 +1705,117 @@ _TOUR_PAGES = (
 )
 _TOUR_EXTRAS = {"code": 1, "motion": 3, "expand-motion": 1}
 
+# Gallery catalog fill languages (`copy.rs` every_locale).
+GALLERY_LOCALES = ("en", "vi", "ja", "zh", "ar", "ur", "he")
+RTL_SCORE_LOCALES = frozenset({"ar", "ur", "fa", "he"})
+
+
+def parse_locales(raw: str | None) -> list[str] | None:
+    """None = English, no SCORE. `all` = every gallery fill language."""
+    if raw is None:
+        return None
+    parts = [
+        p.strip().casefold().split("-", 1)[0]
+        for p in raw.split(",")
+        if p.strip()
+    ]
+    if not parts:
+        raise SystemExit("--locale is empty")
+    if parts == ["all"]:
+        return list(GALLERY_LOCALES)
+    unknown = [p for p in parts if p not in GALLERY_LOCALES]
+    if unknown:
+        raise SystemExit(
+            "unknown locale "
+            + ", ".join(unknown)
+            + "; want "
+            + ", ".join(GALLERY_LOCALES)
+            + " or all"
+        )
+    return parts
+
+
+def score_one_locale(
+    root: Path,
+    locale: str,
+    steps: list[dict],
+    dest: Path,
+    *,
+    src_rows: list[dict],
+) -> bool:
+    """Write dest/SCORE.md. Return True when no row is broken."""
+    extra = ", rails, start-align, faces" if locale in RTL_SCORE_LOCALES else ""
+    print(f"scoring {locale} (references/rtl.md){extra}", file=sys.stderr)
+    rows = list(src_rows)
+    rows.extend(score_wrap_shots(steps, dest))
+    if locale in RTL_SCORE_LOCALES:
+        rows.extend(score_rtl_shots(steps, dest))
+    ok = write_rtl_score(dest, rows)
+    print(f"wrote {dest / 'SCORE.md'} ok={ok}", file=sys.stderr)
+    return ok
+
+
+def run_all_locales(args: argparse.Namespace, locales: list[str]) -> int:
+    """One gallery boot per fill language. Writes out/<lang>/ plus out/SCORE.md."""
+    root = _repo_root()
+    out = args.out
+    if out is None:
+        out = root / "tmp" / "gallery-qa" / _utc_stamp()
+    out = out.resolve()
+    out.mkdir(parents=True, exist_ok=True)
+    if not args.no_build:
+        build_gallery(root, args.release)
+    cmd = [
+        sys.executable,
+        str(Path(__file__).resolve()),
+        "--backend",
+        args.backend,
+        "--no-build",
+        "--beats",
+        args.beats,
+        "--settle-ms",
+        str(args.settle_ms),
+        "--client-w",
+        str(args.client_w),
+        "--client-h",
+        str(args.client_h),
+        "--screen-w",
+        str(args.screen_w),
+        "--screen-h",
+        str(args.screen_h),
+    ]
+    if args.interact:
+        cmd.append("--interact")
+    if args.release:
+        cmd.append("--release")
+    if args.display_num is not None:
+        cmd.extend(["--display-num", str(args.display_num)])
+    results: list[tuple[str, int]] = []
+    for loc in locales:
+        dest = out / loc
+        print(f"=== locale {loc} -> {dest} ===", file=sys.stderr)
+        r = subprocess.run([*cmd, "--locale", loc, "--out", str(dest)], check=False)
+        results.append((loc, r.returncode))
+        if r.returncode not in (0, 3):
+            break
+    lines = [
+        "# Gallery locale score",
+        "",
+        "Every gallery fill language.",
+        "",
+        "| Locale | Exit |",
+        "| --- | --- |",
+    ]
+    for loc, code in results:
+        lines.append(f"| {loc} | {code} |")
+    broken = [loc for loc, code in results if code != 0]
+    lines.extend(["", f"broken locales: {len(broken)}", ""])
+    (out / "SCORE.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"wrote {out / 'SCORE.md'} broken={len(broken)}", file=sys.stderr)
+    if broken:
+        return 3 if all(c in (0, 3) for _, c in results) else results[-1][1]
+    return 0
+
 
 def tour_index(*, page: str | None = None, light: bool = False) -> int:
     """0-based tour beat. Matches `tour_beat` in icedtea-gallery."""
@@ -1924,7 +2054,8 @@ def main() -> int:
     ap.add_argument(
         "--locale",
         default=None,
-        help="Inject language LANG before shots (ar, ur for right-to-left)",
+        help="Inject language before shots: LANG, comma list, or all "
+        "(en,vi,ja,zh,ar,ur,he). Writes SCORE.md per language.",
     )
     ap.add_argument(
         "--live-clip",
@@ -1977,6 +2108,14 @@ def main() -> int:
     shots.mkdir(parents=True, exist_ok=True)
     work = out / "work"
     work.mkdir(parents=True, exist_ok=True)
+
+    locales = parse_locales(args.locale)
+    if locales is not None and len(locales) > 1:
+        if args.book:
+            raise SystemExit("--book takes one language")
+        if args.live_clip:
+            raise SystemExit("--live-clip takes one language")
+        return run_all_locales(args, locales)
 
     if args.live_clip:
         if not _which("xdotool"):
@@ -2326,22 +2465,8 @@ def main() -> int:
         capture_ok = all(s.get("error") is None for s in steps)
         locale = (args.locale or "").split("-", 1)[0].casefold()
         if locale:
-            print(
-                "scoring direction beats (references/rtl.md)"
-                + (
-                    ", rails, start-align, faces"
-                    if locale in {"ar", "ur", "fa", "he"}
-                    else ""
-                ),
-                file=sys.stderr,
-            )
-            score_rows = run_rtl_source_checks(root)
-            score_rows.extend(score_wrap_shots(steps, out))
-            if locale in {"ar", "ur", "fa", "he"}:
-                score_rows.extend(score_rtl_shots(steps, out))
-            score_ok = write_rtl_score(out, score_rows)
-            print(f"wrote {out / 'SCORE.md'} ok={score_ok}", file=sys.stderr)
-            if not score_ok:
+            src_rows = run_rtl_source_checks(root)
+            if not score_one_locale(root, locale, steps, out, src_rows=src_rows):
                 return 3
         return 0 if capture_ok else 2
     finally:
@@ -2460,6 +2585,12 @@ def _self_check() -> None:
     visual = visual_map_hits(root)
     if visual:
         raise SystemExit(f"visual map: {visual}")
+    if parse_locales(None) is not None:
+        raise SystemExit("parse_locales(None) must be None")
+    if parse_locales("all") != list(GALLERY_LOCALES):
+        raise SystemExit("parse_locales all must be every fill language")
+    if parse_locales("ar,he") != ["ar", "he"]:
+        raise SystemExit("parse_locales comma list")
 
 
 if __name__ == "__main__":

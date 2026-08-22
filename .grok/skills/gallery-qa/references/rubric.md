@@ -129,10 +129,11 @@ Call out if only inject is green:
 Bar: `references/rtl.md` (Firefox RTL Guidelines + Microsoft
 bidirectional / FlowDirection). Mixed strings: Unicode UAX #9.
 
-Score on a right-to-left locale beat (`just gallery-qa --locale ar`
-or `ur`). That command writes `SCORE.md` and **exits non-zero** if
-any row is **broken**. Leftover-English greps are one row, not the
-bar. Do not walk languages by eye.
+Score every gallery fill language (`just gallery-qa --locale all`:
+`en`, `vi`, `ja`, `zh`, `ar`, `ur`, `he`). That command writes
+`SCORE.md` per language and **exits non-zero** if any row is
+**broken**. Leftover-English greps are one row, not the bar. Do not
+walk languages by eye. Do not skip a fill language.
 
 - Window is one direction. Chrome uses start/end (`i18n::order`,
   `align_start`). Physical `Alignment::Left` / `Right` in constructors

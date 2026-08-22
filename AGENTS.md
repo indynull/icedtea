@@ -328,11 +328,13 @@ exact command and result you ran.
   record. Do not hand-edit those GIF files. Read the stills, not the
   animation. `ICEDTEA_GALLERY_ISOLATED=0` records on the current display
   and must float a tiled window first.
-  Locale proof is `just gallery-qa --locale ar` (and `ur`) with
-  `SCORE.md` free of broken rows against
+  Locale proof is `just gallery-qa --locale all` — every gallery
+  fill language (`en`, `vi`, `ja`, `zh`, `ar`, `ur`, `he`) — with
+  each `SCORE.md` free of broken rows against
   `.grok/skills/gallery-qa/references/rtl.md` (and the downloaded
-  Firefox / Microsoft pages next to it). Leftover-English
-  source denylist is not the bar.
+  Firefox / Microsoft pages next to it). Never only `ar` / `ur`.
+  Leftover-English source denylist is not the bar. When they name
+  a Sway workspace, use `--backend host` on that workspace.
   Always prove list/clip wheel with a real mouse wheel
   (`just gallery-qa --live-clip`: `xdotool mousemove` onto the pane,
   then `click --repeat N --delay 30 5`). Never treat inject or

@@ -9,9 +9,10 @@ Score gallery locales against the downloaded sources, then this map.
 | Microsoft Adjust layout / FlowDirection | [`ms-flowdirection.md`](ms-flowdirection.md) | FlowDirection on the root (not auto from the OS), `LayoutDirection` qualifier, dynamic layout, image mirroring |
 | Unicode UAX #9 | <https://www.unicode.org/reports/tr9/> | Mixed-string direction (not copied; the report is large) |
 
-`just gallery-qa --locale ar` (and `ur`) writes `SCORE.md` and exits
-non-zero on any **broken** row. Leftover-English greps are one row,
-not the bar. Do not walk languages by eye.
+`just gallery-qa --locale all` writes `SCORE.md` per fill language
+(`en`, `vi`, `ja`, `zh`, `ar`, `ur`, `he`) and exits non-zero on any
+**broken** row. Leftover-English greps are one row, not the bar. Do
+not walk languages by eye. Do not skip a fill language.
 
 ## Window direction (Microsoft)
 
@@ -57,8 +58,8 @@ What NOT to mirror / LTR text inside RTL contexts). icedtea bindings:
 
 Western digits on Arabic, Urdu, or Persian **painted numbers** are
 **broken** (clocks, progress percents, remaining time, list range).
-`ClockDigits::map_str` is the one map. Hebrew uses 123. Gallery
-SCORE locales are `ar`, `ur`, and `he`.
+`ClockDigits::map_str` is the one map. Hebrew uses 123. Gallery SCORE runs every fill language;
+right-to-left shot rows fire on `ar`, `ur`, and `he`.
 
 Linear progress and other time motion fill from the **start** edge
 (right in RTL). `progress` orders fill portions with `i18n::order`.

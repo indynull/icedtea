@@ -33,8 +33,8 @@ clip, dead overflow, empty first paint, or stub demos from the gallery.
 just gallery-qa --interact                   # full tour + inject
 just gallery-qa --interact --beats 0,8       # iterate a fix
 just gallery-qa --live-clip                  # real mouse wheel on List + Table
-just gallery-qa --locale ar --beats 8,9,12,19,20  # RTL; SCORE.md vs references/rtl.md
-just gallery-qa --locale he --beats 0,1           # Hebrew; Western digits on RTL
+just gallery-qa --locale all                 # every fill language (en vi ja zh ar ur he)
+just gallery-qa --locale ar --beats 8,9,12,19,20  # one language while iterating
 just gallery-qa --backend host --interact    # fonts / OS chrome
 just gallery-gif                             # live pointer demo (click, type, wheel + inject)
 ```
@@ -97,8 +97,9 @@ Shots land under `tmp/gallery-qa/<timestamp>/` (or `--out DIR`).
 ## Loop (do this)
 
 1. Capture: `just gallery-qa --interact` (release if paint is slow).
-   Locale cut: also `just gallery-qa --locale ar` and `--locale ur`
-   (and `--locale he` when Hebrew chrome changed).
+   Locale cut: `just gallery-qa --locale all` — every gallery fill
+   language (`en`, `vi`, `ja`, `zh`, `ar`, `ur`, `he`). Never a subset.
+   Host pass: `--backend host` on the Sway workspace they name.
 2. For **every** idle shot: `read_file` the `visual.md` still, then
    the QA `shots/*.png`. Score with the rubric and the still’s
    must-show line. After-inject shots too. Do not stop at nav/list.
@@ -143,7 +144,7 @@ unless they ask for a written audit.
 | `--release` | Snappier paint |
 | `--no-build` | Binary already current |
 | `--settle-ms` | Slow GPU |
-| `--locale ar` | Arabic/Urdu; `SCORE.md` fails on any `references/rtl.md` beat (not leftover-English only), including chrome wrap |
+| `--locale all` | Every fill language; each writes `SCORE.md`. `all` is the locale bar. One `LANG` or a comma list is for iterating a fix |
 
 Inject table: `DEFAULT_INTERACT` in `scripts/gallery_qa.py`. After-inject
 state must be **visible on screen**. A match is a **token**, not a
