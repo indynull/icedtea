@@ -156,6 +156,13 @@ bar. Do not walk languages by eye.
   chips, tabs). Mid-word wrap is **broken** (`wrap-chrome`).
   Markdown, code wrap-on, card titles, expand / job / hint, and
   status copy wrap on purpose.
+- Linear progress and time motion fill from the **start** edge.
+  A left-growing bar on `ar` / `ur` / `he` is **broken**.
+- Arabic/Urdu/Persian painted numbers (progress, clocks, ranges)
+  use Eastern digits. Hardcoded `25%` / `60%` on those locales is
+  **broken**. Hebrew keeps 123.
+- Control rows that mirror use `i18n::order`. A physical
+  left-to-right `row!` of actions on an RTL page is **broken**.
 - Tab/arrow order and mixed-string islands in live fields: live
   pass (`manual-pass.md`).
 

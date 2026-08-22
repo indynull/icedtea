@@ -55,10 +55,13 @@ What NOT to mirror / LTR text inside RTL contexts). icedtea bindings:
 | Hebrew | 123 |
 | Arabic, Urdu, Persian | ٠١٢٣٤٥٦٧٨٩ |
 
-Western digits on Arabic, Urdu, or Persian clocks are **broken**.
-`ClockDigits::for_lang` picks the set: Arabic, Urdu, and Persian
-use Eastern; Hebrew uses 123. Gallery SCORE locales are `ar`, `ur`,
-and `he`.
+Western digits on Arabic, Urdu, or Persian **painted numbers** are
+**broken** (clocks, progress percents, remaining time, list range).
+`ClockDigits::map_str` is the one map. Hebrew uses 123. Gallery
+SCORE locales are `ar`, `ur`, and `he`.
+
+Linear progress and other time motion fill from the **start** edge
+(right in RTL). `progress` orders fill portions with `i18n::order`.
 
 ## Punctuation and keys (Firefox testing)
 
@@ -84,13 +87,16 @@ status-page copy.
 
 | Rule | How SCORE fails |
 | --- | --- |
+| Still + must-show per page | `visual-map` |
 | Start/end chrome | `physical-align`; `layout-align` / `rtl_tree`; `align-*` text mass |
 | Rails and lists on the end | `layout-rails` / `rtl_rails`; `rail-*` on list, tree, log, feedback |
 | Twisties / pick on the end | `layout-chevron` / `rtl_pick` |
 | Button groups and checks | `layout-controls` / `rtl_checkbox` |
 | Titles paint (no empty pads) | `layout-button-face` / `rtl_themed_button`; `faces-controls` |
 | Chrome stays one line | `wrap-chrome` |
-| Eastern digits on ar/ur clocks | `digits-eastern` |
+| Painted numbers on ar/ur/fa | `digits-eastern` (`ClockDigits::map_str`, `progress_label`) |
+| Progress fill from start | `layout-progress` / `rtl_progress` |
+| Readout percent row | `gallery-readout-order` |
 | Code/path/URL stay LTR | `ltr-islands` |
 | Locale fill | `leftover-src`; `copy`; `copy-keys` |
 

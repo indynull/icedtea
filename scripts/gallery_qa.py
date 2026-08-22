@@ -1075,12 +1075,77 @@ def eastern_digit_problems(body: str) -> list[str]:
 
 
 def eastern_digit_hits(root: Path) -> list[str]:
-    """Rtl clocks map Western digits to Eastern Arabic (Firefox ar/ur/fa)."""
+    """Painted numbers on ar/ur/fa use Eastern digits (not only clocks)."""
+    hits: list[str] = []
+    i18n = _production_src(root / "src" / "i18n.rs")
+    if "fn map_str" not in i18n:
+        hits.append("missing ClockDigits::map_str")
+    if "'٠'" not in i18n or "'٩'" not in i18n:
+        hits.append("map_str missing Eastern Arabic digits")
     src = _production_src(root / "src" / "widget.rs")
     if "fn clock_digits" not in src or "fn time_colon" not in src:
-        return ["missing clock_digits"]
-    body = src.split("fn clock_digits", 1)[1].split("fn time_colon", 1)[0]
-    return eastern_digit_problems(body)
+        hits.append("missing clock_digits")
+    else:
+        body = src.split("fn clock_digits", 1)[1].split("fn time_colon", 1)[0]
+        if "map_str" not in body:
+            hits.append("clock_digits skips map_str")
+    if "pub fn progress_label" not in src:
+        hits.append("missing progress_label")
+    else:
+        body = src.split("pub fn progress_label", 1)[1].split("fn progress_weights", 1)[0]
+        if "map_str" not in body and "ClockDigits" not in body:
+            hits.append("progress_label skips locale digits")
+    return hits
+
+
+def gallery_readout_hits(root: Path) -> list[str]:
+    """Readout percent buttons must order by direction and map digits."""
+    src = (root / "icedtea-gallery" / "src" / "main.rs").read_text(encoding="utf-8")
+    if '"progress" =>' not in src or '"progress-ring"' not in src:
+        return ["missing progress page arm"]
+    arm = src.split('"progress" =>', 1)[1].split('"progress-ring"', 1)[0]
+    hits: list[str] = []
+    if "map_str" not in arm:
+        hits.append("percent buttons skip ClockDigits::map_str")
+    if "i18n::order" not in arm and "order(" not in arm:
+        hits.append("percent buttons skip i18n::order")
+    if 'themed_button(\n                            "25%"' in arm or '"25%"' in arm and "map_str" not in arm:
+        hits.append("hardcoded 25% button")
+    return hits
+
+
+def visual_map_hits(root: Path) -> list[str]:
+    """Every tour page has a visual.md row and a still PNG (or a page-still note)."""
+    path = root / ".grok" / "skills" / "gallery-qa" / "references" / "visual.md"
+    if not path.is_file():
+        return ["missing references/visual.md"]
+    md = path.read_text(encoding="utf-8")
+    if "## Stills" not in md:
+        return ["visual.md missing ## Stills"]
+    rows: dict[str, str] = {}
+    for line in md.split("## Stills", 1)[1].splitlines():
+        if not line.startswith("|") or line.startswith("| Page") or line.startswith("| ---"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) < 3 or not cells[0]:
+            continue
+        rows[cells[0]] = cells[1]
+    hits: list[str] = []
+    for page in _TOUR_PAGES:
+        if page not in rows:
+            hits.append(f"missing visual.md row: {page}")
+            continue
+        still = rows[page]
+        if still.startswith("`") and still.endswith("`"):
+            still_path = root / still.strip("`")
+            if not still_path.is_file():
+                hits.append(f"missing still {still} for {page}")
+        elif "page still" not in still.casefold():
+            hits.append(f"visual.md {page} still is not a path or page-still note")
+    extra = set(rows) - set(_TOUR_PAGES)
+    if extra:
+        hits.append("visual.md extra pages: " + ", ".join(sorted(extra)))
+    return hits
 
 
 def leftover_english_in_gallery(root: Path) -> list[str]:
@@ -1129,6 +1194,11 @@ def run_rtl_source_checks(root: Path) -> list[dict]:
     leftover = leftover_english_in_gallery(root)
     rows: list[dict] = [
         _src_row(
+            "visual-map",
+            "every tour page has a still + must-show",
+            visual_map_hits(root),
+        ),
+        _src_row(
             "leftover-src",
             "leftover English in gallery source",
             leftover,
@@ -1145,8 +1215,13 @@ def run_rtl_source_checks(root: Path) -> list[dict]:
         ),
         _src_row(
             "digits-eastern",
-            "Arabic/Urdu clocks use Eastern digits",
+            "Arabic/Urdu painted numbers use Eastern digits",
             eastern_digit_hits(root),
+        ),
+        _src_row(
+            "gallery-readout-order",
+            "readout percent row follows direction and digits",
+            gallery_readout_hits(root),
         ),
     ]
     checks = [
@@ -1174,6 +1249,11 @@ def run_rtl_source_checks(root: Path) -> list[dict]:
             "layout-button-face",
             ["cargo", "test", "-p", "icedtea", "--lib", "rtl_themed_button"],
             "themed button keeps a right-to-left title",
+        ),
+        (
+            "layout-progress",
+            ["cargo", "test", "-p", "icedtea", "--lib", "rtl_progress"],
+            "progress fill starts at the start edge",
         ),
         (
             "copy",
@@ -2374,6 +2454,12 @@ def _self_check() -> None:
     digits = eastern_digit_hits(root)
     if digits:
         raise SystemExit(f"Eastern digits: {digits}")
+    readout = gallery_readout_hits(root)
+    if readout:
+        raise SystemExit(f"gallery readout: {readout}")
+    visual = visual_map_hits(root)
+    if visual:
+        raise SystemExit(f"visual map: {visual}")
 
 
 if __name__ == "__main__":

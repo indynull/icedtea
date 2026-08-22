@@ -34,6 +34,8 @@ pub enum ClockDigits {
 }
 
 impl ClockDigits {
+    const EASTERN: [char; 10] = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+
     /// Digit set for a BCP 47 primary language.
     pub fn for_lang(lang: &str) -> Self {
         let primary = lang
@@ -45,6 +47,22 @@ impl ClockDigits {
             "ar" | "fa" | "ur" => Self::Eastern,
             _ => Self::Western,
         }
+    }
+
+    /// Map ASCII 0-9 in `s` onto this set. Other characters stay.
+    pub fn map_str(self, s: &str) -> String {
+        if self != Self::Eastern {
+            return s.to_string();
+        }
+        s.chars()
+            .map(|c| {
+                if let Some(d) = c.to_digit(10) {
+                    Self::EASTERN[d as usize]
+                } else {
+                    c
+                }
+            })
+            .collect()
     }
 }
 
@@ -411,6 +429,8 @@ mod tests {
         assert_eq!(ClockDigits::for_lang("fa-IR"), ClockDigits::Eastern);
         assert_eq!(ClockDigits::for_lang("ur"), ClockDigits::Eastern);
         assert_eq!(ClockDigits::for_lang("en"), ClockDigits::Western);
+        assert_eq!(ClockDigits::Eastern.map_str("40% · 1 min"), "٤٠% · ١ min");
+        assert_eq!(ClockDigits::Western.map_str("40%"), "40%");
         assert_eq!(direction_for("fa-IR"), Direction::Rtl);
         assert_eq!(direction_for("ur"), Direction::Rtl);
         assert_eq!(direction_for(""), Direction::Ltr);

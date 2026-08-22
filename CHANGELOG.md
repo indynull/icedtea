@@ -8,6 +8,8 @@
 
 ### Bug fix
 
+- `progress` fills from the start edge. `progress_label` maps digits
+  with `ClockDigits`.
 - Clock faces pick Eastern or Western digits from the language, so
   Hebrew keeps 123 on a right-to-left window.
 - `menu_bar` titles stay one line for Arabic and Hebrew headings.

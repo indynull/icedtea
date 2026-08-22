@@ -1658,12 +1658,19 @@ pub fn range_slider<'a, M: Clone + 'a>(
 }
 
 /// Percent line, with optional remaining-time text.
-pub fn progress_label(value: f32, remaining: Option<&str>) -> String {
+///
+/// `digits` maps ASCII 0-9 (Arabic/Urdu/Persian Eastern; Hebrew 123).
+pub fn progress_label(
+    value: f32,
+    remaining: Option<&str>,
+    digits: crate::i18n::ClockDigits,
+) -> String {
     let pct = (value.clamp(0.0, 1.0) * 100.0).round() as i32;
-    match remaining {
+    let raw = match remaining {
         Some(r) if !r.is_empty() => format!("{pct}% · {r}"),
         _ => format!("{pct}%"),
-    }
+    };
+    digits.map_str(&raw)
 }
 
 fn progress_weights(value: f32, buffer: Option<f32>) -> (u16, u16, u16) {
@@ -1690,7 +1697,7 @@ fn progress_weights(value: f32, buffer: Option<f32>) -> (u16, u16, u16) {
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let copy = widget::progress_label(0.4, Some("12s"));
+/// let copy = widget::progress_label(0.4, Some("12s"), icedtea::i18n::ClockDigits::Western);
 /// let _: icedtea::Element<'_, ()> = widget::progress(
 ///     0.4,
 ///     Some(0.7),
@@ -1744,7 +1751,7 @@ pub fn progress<'a, M: 'a>(
             (rest, s.surface_container_highest, s.on_surface),
         ]
     };
-    for (w, fill, ink) in segs {
+    for (w, fill, ink) in crate::i18n::order(tok.direction, segs) {
         if w > 0 {
             parts = parts.push(seg(w, fill, ink));
         }
@@ -3579,16 +3586,7 @@ impl TimeValue {
 
 /// Arabic/Urdu/Persian clocks use Eastern digits; Hebrew uses 123.
 fn clock_digits(n: impl Into<u32>, digits: crate::i18n::ClockDigits) -> String {
-    let n = n.into();
-    let western = format!("{n:02}");
-    if digits != crate::i18n::ClockDigits::Eastern {
-        return western;
-    }
-    const EASTERN: [char; 10] = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-    western
-        .bytes()
-        .map(|b| EASTERN[(b - b'0') as usize])
-        .collect()
+    digits.map_str(&format!("{:02}", n.into()))
 }
 
 fn time_colon<'a, M: 'a>(tok: Tokens) -> Element<'a, M> {
@@ -8233,8 +8231,18 @@ mod tests {
             tok,
             role("prc", Role::Progress).with_value("0.5"),
         );
-        assert_eq!(progress_label(0.5, None), "50%");
-        assert_eq!(progress_label(0.5, Some("1 min")), "50% · 1 min");
+        assert_eq!(
+            progress_label(0.5, None, crate::i18n::ClockDigits::Western),
+            "50%"
+        );
+        assert_eq!(
+            progress_label(0.5, Some("1 min"), crate::i18n::ClockDigits::Western),
+            "50% · 1 min"
+        );
+        assert_eq!(
+            progress_label(0.4, Some("1 min"), crate::i18n::ClockDigits::Eastern),
+            "٤٠% · ١ min"
+        );
         let _: Element<'_, ()> = image_slot(
             ImageSlot::Ready {
                 handle: iced::widget::image::Handle::from_bytes(TEST_PNG),
@@ -11375,6 +11383,57 @@ mod tests {
         assert!(!line_src.contains("themed_button"));
         assert!(line_src.contains("TreeFace::Files"));
         assert!(line_src.contains("gap(tok)"));
+    }
+
+    #[test]
+    fn rtl_progress_fills_from_the_start() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+
+        let src = include_str!("widget.rs")
+            .split("pub fn progress<'a, M: 'a>(")
+            .nth(1)
+            .unwrap()
+            .split("pub fn ring_angles")
+            .next()
+            .unwrap();
+        must(
+            src.contains("i18n::order(tok.direction"),
+            "progress must order fill portions by Tokens.direction",
+        );
+        let tok = named("dark")
+            .tokens
+            .with_direction(crate::i18n::Direction::Rtl);
+        let mut el: Element<'_, ()> = progress(
+            0.4,
+            None,
+            None,
+            false,
+            tok,
+            A11y::new("p", Role::Progress).with_value("0.4"),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(200.0, 40.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let origin = layout.bounds();
+        let mut boxes = Vec::new();
+        walk_bounds(layout, &mut boxes);
+        let segs: Vec<_> = boxes
+            .iter()
+            .filter(|b| (b.height - 8.0).abs() < 0.6 && b.width > 20.0)
+            .copied()
+            .collect();
+        must(
+            segs.iter()
+                .any(|b| b.x - origin.x > origin.width * 0.45 && b.width > origin.width * 0.25),
+            format!("RTL progress fill must sit on the start (right), segs={segs:?}"),
+        );
     }
 
     #[test]

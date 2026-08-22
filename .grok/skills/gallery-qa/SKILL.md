@@ -23,6 +23,7 @@ clip, dead overflow, empty first paint, or stub demos from the gallery.
 
 **Capture:** `scripts/gallery_qa.py` via `just gallery-qa`.  
 **Score:** `references/rubric.md`.  
+**Stills:** `references/visual.md` (book still + must-show per page).  
 **Direction:** `references/rtl.md` (SCORE map). Sources:
 `references/firefox-rtl.md`, `references/ms-bidi.md`,
 `references/ms-flowdirection.md`.  
@@ -81,11 +82,26 @@ Shots land under `tmp/gallery-qa/<timestamp>/` (or `--out DIR`).
 10. **Idle must show the constructor under review.** Shared pages pack
     unpublished or changed hosts above the fold (`pack_at` / catalog
     order). A look-strip neighbor is not a Fields/select score.
+11. **Compare to the still.** For every idle shot, `read_file` the
+    still in `references/visual.md`, then the QA shot. Skip no page
+    class (readout, motion, chrome). Locale shots use the same still
+    plus `rtl.md` (progress from start, Eastern digits on ar/ur, wrap,
+    start/end order).
+12. **New or changed paint updates the still map.** Adding a catalog
+    constructor or page, or changing how one looks, recaptures that
+    book still and rewrites the `visual.md` row in the same change.
+    SCORE `visual-map` is **broken** if a tour page has no row or the
+    still PNG is gone. If SCORE can fail on the new look, add that
+    check in `gallery_qa.py` too.
 
 ## Loop (do this)
 
 1. Capture: `just gallery-qa --interact` (release if paint is slow).
-2. `read_file` **every** `shots/*.png`. Score with the rubric.
+   Locale cut: also `just gallery-qa --locale ar` and `--locale ur`
+   (and `--locale he` when Hebrew chrome changed).
+2. For **every** idle shot: `read_file` the `visual.md` still, then
+   the QA `shots/*.png`. Score with the rubric and the still’s
+   must-show line. After-inject shots too. Do not stop at nav/list.
 3. For each **broken** / clear **ugly**: implement the fix, run cheap
    tests on touched modules, recapture affected beats, re-read shots.
 4. Full cut / pre-release: also run the **live pass**
@@ -146,6 +162,7 @@ Only if a second grab is still the previous page is the gallery stuck.
 
 ## Related
 
+- `references/visual.md` — still + must-show per page  
 - `references/rubric.md` — what counts as broken/ugly  
 - `references/m3-trailing-icon.md` — pick / menu / list trailing mark  
 - `references/rtl.md` — SCORE map  

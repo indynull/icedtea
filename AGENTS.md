@@ -137,7 +137,7 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   mixed-size `Rich` — that breaks layout and selection paint. Full
   document copy is `copy_text` on `MarkdownDoc::source`. Contract:
   `select` module rustdoc. Gallery demos only public constructors.
-- Always recapture handbook stills with `just book-stills` in the same change when the painted constructor or chrome in a published still changes. Never hand-edit those PNGs or generate them.
+- Always recapture handbook stills with `just book-stills` in the same change when the painted constructor or chrome in a published still changes. Update `.grok/skills/gallery-qa/references/visual.md` in that change (still path + idle must-show). Never hand-edit those PNGs or generate them.
 - Never put tour GIFs, handbook stills, or `book/` in the crate `include`. Icons and `assets/themes/catalog.json` are compiled in. `gallery.gif` stays in git for README; the guide is GitHub Pages. crates.io cap is 10 MiB.
 - Always drop `target/llvm-cov-target` after a passing local coverage
   run. `just clean` is `cargo clean`. Only `just cov` and the test jobs

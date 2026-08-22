@@ -4337,7 +4337,7 @@ impl Gallery {
                         named("value", Role::Slider).with_value(self.value.to_string()),
                     ),
                     widget::meta(
-                        widget::progress_label(self.value, None),
+                        widget::progress_label(self.value, None, tok.clock_digits),
                         tok,
                         named("slider-value", Role::Status),
                     ),
@@ -4464,35 +4464,36 @@ impl Gallery {
             ),
             "progress" => {
                 let shown = self.shown_progress();
-                let copy = widget::progress_label(shown, Some(self.catalog.t("prog.min")));
+                let digits = tok.clock_digits;
+                let copy = widget::progress_label(shown, Some(self.catalog.t("prog.min")), digits);
+                let near = |a: f32, b: f32| (a - b).abs() < 0.02;
+                let pct_btn = |label: &str, to: f32, name: &str| {
+                    widget::themed_button(
+                        digits.map_str(label),
+                        Some(Message::Slide(to)),
+                        tok,
+                        if near(shown, to) {
+                            Variant::Primary
+                        } else {
+                            Variant::Quiet
+                        },
+                        Icons::NONE,
+                        btn(name),
+                    )
+                };
+                let mut pct_row = icedtea::iced::widget::Row::new().spacing(8);
+                for kid in icedtea::i18n::order(
+                    tok.direction,
+                    [
+                        pct_btn("25%", 0.25, "p25"),
+                        pct_btn("60%", 0.6, "p60"),
+                        pct_btn(self.catalog.t("prog.full"), 1.0, "p100"),
+                    ],
+                ) {
+                    pct_row = pct_row.push(kid);
+                }
                 column![
-                    row![
-                        widget::themed_button(
-                            "25%",
-                            Some(Message::Slide(0.25)),
-                            tok,
-                            Variant::Quiet,
-                            Icons::NONE,
-                            btn("p25"),
-                        ),
-                        widget::themed_button(
-                            "60%",
-                            Some(Message::Slide(0.6)),
-                            tok,
-                            Variant::Quiet,
-                            Icons::NONE,
-                            btn("p60"),
-                        ),
-                        widget::themed_button(
-                            self.catalog.t("prog.full"),
-                            Some(Message::Slide(1.0)),
-                            tok,
-                            Variant::Primary,
-                            Icons::NONE,
-                            btn("p100"),
-                        ),
-                    ]
-                    .spacing(8),
+                    pct_row,
                     widget::progress(
                         shown,
                         Some((shown + 0.2).min(1.0)),
@@ -4517,7 +4518,7 @@ impl Gallery {
                 let shown = self.shown_progress();
                 widget::progress_ring(
                     shown,
-                    Some(&widget::progress_label(shown, None)),
+                    Some(&widget::progress_label(shown, None, tok.clock_digits)),
                     tok,
                     named("ring", Role::Progress).with_value(shown.to_string()),
                 )
@@ -5518,14 +5519,18 @@ impl Gallery {
                     LIST_PER_PAGE,
                 );
                 let count = if self.list_matched == 0 {
-                    format!("0 / {}", self.list_all.len())
+                    tok.clock_digits
+                        .map_str(&format!("0 / {}", self.list_all.len()))
                 } else {
-                    self.catalog
-                        .t("list.range")
-                        .replace("{start}", &(range.start + 1).to_string())
-                        .replace("{end}", &range.end.to_string())
-                        .replace("{total}", &self.list_matched.to_string())
-                        .replace("{page}", &(self.list_page + 1).to_string())
+                    tok.clock_digits.map_str(
+                        &self
+                            .catalog
+                            .t("list.range")
+                            .replace("{start}", &(range.start + 1).to_string())
+                            .replace("{end}", &range.end.to_string())
+                            .replace("{total}", &self.list_matched.to_string())
+                            .replace("{page}", &(self.list_page + 1).to_string()),
+                    )
                 };
                 let filters = container(
                     column![
