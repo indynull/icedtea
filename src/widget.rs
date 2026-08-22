@@ -3578,11 +3578,10 @@ impl TimeValue {
 }
 
 /// Arabic/Urdu/Persian clocks use Eastern digits; Hebrew uses 123.
-/// `Direction::Rtl` maps to Eastern.
-fn clock_digits(n: impl Into<u32>, dir: Direction) -> String {
+fn clock_digits(n: impl Into<u32>, digits: crate::i18n::ClockDigits) -> String {
     let n = n.into();
     let western = format!("{n:02}");
-    if dir != Direction::Rtl {
+    if digits != crate::i18n::ClockDigits::Eastern {
         return western;
     }
     const EASTERN: [char; 10] = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
@@ -3638,9 +3637,9 @@ pub fn time_picker<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let v = value.clamp();
     let hour = if clock.hour12 {
-        clock_digits(v.hour12(), tok.direction)
+        clock_digits(v.hour12(), tok.clock_digits)
     } else {
-        clock_digits(v.hour, tok.direction)
+        clock_digits(v.hour, tok.clock_digits)
     };
     let mut row = Row::new().spacing(4).align_y(Alignment::Center);
     row = row.push(themed_button(
@@ -3653,7 +3652,7 @@ pub fn time_picker<'a, M: Clone + 'a>(
     ));
     row = row.push(time_colon(tok));
     row = row.push(themed_button(
-        clock_digits(v.minute, tok.direction),
+        clock_digits(v.minute, tok.clock_digits),
         a11y.apply_message(Some(on_field(TimeField::Minute))),
         tok,
         Variant::Quiet,
@@ -3663,7 +3662,7 @@ pub fn time_picker<'a, M: Clone + 'a>(
     if clock.seconds {
         row = row.push(time_colon(tok));
         row = row.push(themed_button(
-            clock_digits(v.second, tok.direction),
+            clock_digits(v.second, tok.clock_digits),
             a11y.apply_message(Some(on_field(TimeField::Second))),
             tok,
             Variant::Quiet,
@@ -11460,13 +11459,17 @@ mod tests {
             .next()
             .unwrap();
         assert!(flush_src.contains("start_label"));
-        assert_eq!(clock_digits(9u32, crate::i18n::Direction::Rtl), "٠٩");
-        assert_eq!(clock_digits(30u32, crate::i18n::Direction::Ltr), "30");
-        assert_eq!(clock_digits(12u32, crate::i18n::Direction::Rtl), "١٢");
-        assert_eq!(clock_digits(34u32, crate::i18n::Direction::Rtl), "٣٤");
-        assert_eq!(clock_digits(56u32, crate::i18n::Direction::Rtl), "٥٦");
-        assert_eq!(clock_digits(78u32, crate::i18n::Direction::Rtl), "٧٨");
-        assert_eq!(clock_digits(0u32, crate::i18n::Direction::Rtl), "٠٠");
+        assert_eq!(clock_digits(9u32, crate::i18n::ClockDigits::Eastern), "٠٩");
+        assert_eq!(clock_digits(30u32, crate::i18n::ClockDigits::Western), "30");
+        assert_eq!(clock_digits(12u32, crate::i18n::ClockDigits::Eastern), "١٢");
+        assert_eq!(clock_digits(34u32, crate::i18n::ClockDigits::Eastern), "٣٤");
+        assert_eq!(clock_digits(56u32, crate::i18n::ClockDigits::Eastern), "٥٦");
+        assert_eq!(clock_digits(78u32, crate::i18n::ClockDigits::Eastern), "٧٨");
+        assert_eq!(clock_digits(0u32, crate::i18n::ClockDigits::Eastern), "٠٠");
+        assert_eq!(
+            clock_digits(9u32, crate::i18n::ClockDigits::for_lang("he")),
+            "09"
+        );
         let time_src = include_str!("widget.rs")
             .split("pub fn time_picker")
             .nth(1)

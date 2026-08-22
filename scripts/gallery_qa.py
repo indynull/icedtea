@@ -1067,8 +1067,8 @@ def ltr_island_hits(root: Path) -> list[str]:
 
 def eastern_digit_problems(body: str) -> list[str]:
     hits: list[str] = []
-    if "Direction::Rtl" not in body:
-        hits.append("clock_digits ignores Direction::Rtl")
+    if "ClockDigits::Eastern" not in body:
+        hits.append("clock_digits missing Eastern set")
     if "'٠'" not in body or "'٩'" not in body:
         hits.append("clock_digits missing Eastern Arabic digits")
     return hits
@@ -1199,7 +1199,7 @@ def run_rtl_source_checks(root: Path) -> list[dict]:
                 "icedtea-gallery",
                 "every_locale",
             ],
-            "six-locale catalog key fill",
+            "seven-locale catalog key fill",
         ),
     ]
     for name, cmd, title in checks:
@@ -2340,8 +2340,8 @@ def _self_check() -> None:
     if physical_needles("align_x(crate::i18n::align_start(tok.direction))"):
         raise SystemExit("physical_needles false positive on align_start")
     if not eastern_digit_problems("if dir != Direction::Ltr { western }"):
-        raise SystemExit("eastern_digit_problems must fail without Rtl map")
-    if eastern_digit_problems("Direction::Rtl '٠' '٩'"):
+        raise SystemExit("eastern_digit_problems must fail without Eastern set")
+    if eastern_digit_problems("ClockDigits::Eastern '٠' '٩'"):
         raise SystemExit("eastern_digit_problems false positive")
     wrap_on = tmp / "wrap-on.png"
     img = Image.new("RGB", (400, 80), (20, 20, 20))

@@ -2015,7 +2015,8 @@ impl Gallery {
             .with_shape(self.shape)
             .with_elevation(self.elevation)
             .with_reduced_motion(self.reduced_motion)
-            .with_direction(self.direction);
+            .with_direction(self.direction)
+            .with_clock_digits(icedtea::i18n::ClockDigits::for_lang(&self.lang));
     }
 
     fn apply_locale(&mut self) {
@@ -2219,6 +2220,7 @@ impl Gallery {
             "zh" => "中文",
             "ar" => "العربية",
             "ur" => "اردو",
+            "he" => "עברית",
             _ => "English",
         };
         let pick = |label: &str, options: Vec<String>, current: &str, on: fn(String) -> Message| {
@@ -2280,10 +2282,18 @@ impl Gallery {
                 ),
                 pick(
                     self.catalog.t("look.language"),
-                    ["English", "Tiếng Việt", "日本語", "中文", "العربية", "اردو"]
-                        .into_iter()
-                        .map(str::to_string)
-                        .collect(),
+                    [
+                        "English",
+                        "Tiếng Việt",
+                        "日本語",
+                        "中文",
+                        "العربية",
+                        "اردو",
+                        "עברית",
+                    ]
+                    .into_iter()
+                    .map(str::to_string)
+                    .collect(),
                     language,
                     Message::Language,
                 ),
@@ -2838,6 +2848,7 @@ impl Gallery {
                     "中文" | "zh" => "zh",
                     "العربية" | "ar" => "ar",
                     "اردو" | "ur" => "ur",
+                    "עברית" | "he" => "he",
                     _ => "en",
                 }
                 .to_string();
@@ -7796,8 +7807,15 @@ mod tests {
         assert_eq!(g.catalog.t("file"), "فائل");
         assert_eq!(g.direction, icedtea::i18n::Direction::Rtl);
         let _ = g.look_strip(g.tokens);
+        let _ = g.update(super::Message::Language("עברית".into()));
+        assert_eq!(g.lang, "he");
+        assert_eq!(g.catalog.t("save"), "שמירה");
+        assert_eq!(g.direction, icedtea::i18n::Direction::Rtl);
+        assert_eq!(g.tokens.clock_digits, icedtea::i18n::ClockDigits::Western);
         let _ = g.update(super::Message::Language("ar".into()));
+        assert_eq!(g.tokens.clock_digits, icedtea::i18n::ClockDigits::Eastern);
         let _ = g.update(super::Message::Language("ur".into()));
+        let _ = g.update(super::Message::Language("he".into()));
         let _ = g.look_strip(g.tokens);
     }
 
@@ -8941,6 +8959,12 @@ mod tests {
                 format!("page.{page}"),
                 "ur nav label is the key for {page}"
             );
+        }
+        let _ = g.update(super::Message::Language("עברית".into()));
+        for page in icedtea::catalog::pages() {
+            let label = super::page_label(page, &g.catalog);
+            assert!(!label.is_empty(), "he nav label empty for {page}");
+            assert_ne!(label, page, "he nav label missing fill for {page}");
         }
         let nav = src
             .split("fn catalog_nav")

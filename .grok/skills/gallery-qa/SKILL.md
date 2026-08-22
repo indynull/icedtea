@@ -33,6 +33,7 @@ just gallery-qa --interact                   # full tour + inject
 just gallery-qa --interact --beats 0,8       # iterate a fix
 just gallery-qa --live-clip                  # real mouse wheel on List + Table
 just gallery-qa --locale ar --beats 8,9,12,19,20  # RTL; SCORE.md vs references/rtl.md
+just gallery-qa --locale he --beats 0,1           # Hebrew; Western digits on RTL
 just gallery-qa --backend host --interact    # fonts / OS chrome
 just gallery-gif                             # live pointer demo (click, type, wheel + inject)
 ```

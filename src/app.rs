@@ -159,7 +159,8 @@ pub fn bootstrap_with_catalog(boot: &Boot, themes: &ThemeCatalog) -> Prepared {
         .with_font_scale(boot.font_scale)
         .with_shape(boot.shape)
         .with_elevation(boot.elevation)
-        .with_direction(boot.locale.direction);
+        .with_direction(boot.locale.direction)
+        .with_clock_digits(crate::i18n::ClockDigits::for_lang(&boot.locale.lang));
     let iced_theme = theme::iced_theme(&named.name, tokens);
     let iced_settings = Settings {
         id: Some(boot.application_id.clone()),

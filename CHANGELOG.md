@@ -2,8 +2,14 @@
 
 ## Unreleased
 
+### Feature
+
+- Gallery look strip offers Hebrew. Clocks stay on Western digits.
+
 ### Bug fix
 
+- Clock faces pick Eastern or Western digits from the language, so
+  Hebrew keeps 123 on a right-to-left window.
 - `menu_bar` titles stay one line for Arabic and Hebrew headings.
 - The gallery look strip sizes picks to the option so RTL labels
   keep their gap.

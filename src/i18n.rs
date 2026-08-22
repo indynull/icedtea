@@ -20,6 +20,34 @@ pub enum Direction {
     Rtl,
 }
 
+/// Clock face digits. Arabic, Urdu, and Persian use Eastern; Hebrew uses 123.
+///
+/// ```
+/// use icedtea::i18n::ClockDigits;
+/// assert_eq!(ClockDigits::for_lang("ar"), ClockDigits::Eastern);
+/// assert_eq!(ClockDigits::for_lang("he"), ClockDigits::Western);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClockDigits {
+    Western,
+    Eastern,
+}
+
+impl ClockDigits {
+    /// Digit set for a BCP 47 primary language.
+    pub fn for_lang(lang: &str) -> Self {
+        let primary = lang
+            .split(['-', '_'])
+            .next()
+            .unwrap_or("en")
+            .to_ascii_lowercase();
+        match primary.as_str() {
+            "ar" | "fa" | "ur" => Self::Eastern,
+            _ => Self::Western,
+        }
+    }
+}
+
 /// Application locale.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Locale {
@@ -263,6 +291,32 @@ fn chrome_strings(lang: &str) -> &'static [(&'static str, &'static str)] {
             ("density", "密度"),
             ("empty", "暂无内容"),
         ],
+        "he" => &[
+            ("ok", "אישור"),
+            ("cancel", "ביטול"),
+            ("close", "סגירה"),
+            ("save", "שמירה"),
+            ("open", "פתיחה"),
+            ("new", "חדש"),
+            ("copy", "העתקה"),
+            ("select-all", "בחירת הכל"),
+            ("delete", "מחיקה"),
+            ("preferences", "העדפות"),
+            ("about", "אודות"),
+            ("search", "חיפוש"),
+            ("command-palette", "לוח פקודות"),
+            ("back", "חזרה"),
+            ("undo", "ביטול פעולה"),
+            ("redo", "ביצוע חוזר"),
+            ("file", "קובץ"),
+            ("edit", "עריכה"),
+            ("view", "תצוגה"),
+            ("help", "עזרה"),
+            ("go", "מעבר"),
+            ("theme", "ערכת נושא"),
+            ("density", "צפיפות"),
+            ("empty", "עדיין אין כאן כלום"),
+        ],
         "ar" => &[
             ("ok", "حسناً"),
             ("cancel", "إلغاء"),
@@ -352,6 +406,11 @@ mod tests {
     fn locale_direction_and_catalog() {
         assert_eq!(direction_for("en-US"), Direction::Ltr);
         assert_eq!(direction_for("he"), Direction::Rtl);
+        assert_eq!(ClockDigits::for_lang("he"), ClockDigits::Western);
+        assert_eq!(ClockDigits::for_lang("ar"), ClockDigits::Eastern);
+        assert_eq!(ClockDigits::for_lang("fa-IR"), ClockDigits::Eastern);
+        assert_eq!(ClockDigits::for_lang("ur"), ClockDigits::Eastern);
+        assert_eq!(ClockDigits::for_lang("en"), ClockDigits::Western);
         assert_eq!(direction_for("fa-IR"), Direction::Rtl);
         assert_eq!(direction_for("ur"), Direction::Rtl);
         assert_eq!(direction_for(""), Direction::Ltr);
@@ -422,6 +481,8 @@ mod tests {
             ("ar-EG", "حفظ", "ملف", "بحث"),
             ("ur", "محفوظ کریں", "فائل", "تلاش"),
             ("ur-PK", "محفوظ کریں", "فائل", "تلاش"),
+            ("he", "שמירה", "קובץ", "חיפוש"),
+            ("he-IL", "שמירה", "קובץ", "חיפוש"),
         ] {
             assert_eq!(direction_for(tag), Direction::Rtl, "{tag}");
             let loc = Locale::new(tag);

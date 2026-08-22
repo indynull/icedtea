@@ -56,8 +56,9 @@ What NOT to mirror / LTR text inside RTL contexts). icedtea bindings:
 | Arabic, Urdu, Persian | ٠١٢٣٤٥٦٧٨٩ |
 
 Western digits on Arabic, Urdu, or Persian clocks are **broken**.
-`clock_digits` keys off `Direction` (Rtl → Eastern). Gallery SCORE
-locales are `ar` and `ur`.
+`ClockDigits::for_lang` picks the set: Arabic, Urdu, and Persian
+use Eastern; Hebrew uses 123. Gallery SCORE locales are `ar`, `ur`,
+and `he`.
 
 ## Punctuation and keys (Firefox testing)
 

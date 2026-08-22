@@ -81,6 +81,8 @@ pub struct Tokens {
     pub elevation: crate::m3::ElevationPolicy,
     /// Start side for chrome and control rows.
     pub direction: crate::i18n::Direction,
+    /// Clock face digits. Hebrew stays Western on a right-to-left window.
+    pub clock_digits: crate::i18n::ClockDigits,
     /// Exact M3 scheme. [`Self::scheme`] returns this without mixing.
     full: crate::m3::Scheme,
 }
@@ -107,6 +109,7 @@ impl From<crate::m3::Scheme> for Tokens {
             shape: crate::m3::ShapePolicy::Desktop,
             elevation: crate::m3::ElevationPolicy::Desktop,
             direction: crate::i18n::Direction::Ltr,
+            clock_digits: crate::i18n::ClockDigits::Western,
             full: s,
         }
     }
@@ -181,6 +184,7 @@ impl Tokens {
             shape: crate::m3::ShapePolicy::Desktop,
             elevation: crate::m3::ElevationPolicy::Desktop,
             direction: crate::i18n::Direction::Ltr,
+            clock_digits: crate::i18n::ClockDigits::Western,
             full: crate::m3::scheme_dark(),
         }
         .sync_full_from_aliases()
@@ -243,6 +247,12 @@ impl Tokens {
     /// Same tokens with a text direction.
     pub fn with_direction(mut self, direction: crate::i18n::Direction) -> Self {
         self.direction = direction;
+        self
+    }
+
+    /// Same tokens with a clock digit set.
+    pub fn with_clock_digits(mut self, clock_digits: crate::i18n::ClockDigits) -> Self {
+        self.clock_digits = clock_digits;
         self
     }
 
@@ -494,6 +504,7 @@ fn tokens(
         shape: crate::m3::ShapePolicy::Desktop,
         elevation: crate::m3::ElevationPolicy::Desktop,
         direction: crate::i18n::Direction::Ltr,
+        clock_digits: crate::i18n::ClockDigits::Western,
         full: crate::m3::scheme_dark(), // replaced by sync
     }
     .sync_full_from_aliases()
@@ -547,6 +558,7 @@ fn high_contrast() -> NamedTheme {
             shape: crate::m3::ShapePolicy::Desktop,
             elevation: crate::m3::ElevationPolicy::Desktop,
             direction: crate::i18n::Direction::Ltr,
+            clock_digits: crate::i18n::ClockDigits::Western,
             full: crate::m3::scheme_dark(),
         }
         .sync_full_from_aliases(),

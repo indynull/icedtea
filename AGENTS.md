@@ -97,7 +97,8 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   left-to-right islands. Flip directional icons, twisties, and
   progress; keep text, digits, checkmarks, media controls, logos,
   and size pairs (`1920x1080`) unflipped. Arabic, Urdu, and Persian
-  clocks use Eastern digits; Hebrew uses 123. Bar:
+  clocks use Eastern digits; Hebrew uses 123
+  (`ClockDigits::for_lang`). Bar:
   `.grok/skills/gallery-qa/references/rtl.md` (SCORE map; sources
   `firefox-rtl.md`, `ms-bidi.md`, `ms-flowdirection.md`). Chrome
   stays one line; markdown, code wrap-on, cards, and job/hint wrap.
