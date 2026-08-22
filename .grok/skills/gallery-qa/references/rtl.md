@@ -98,6 +98,7 @@ status-page copy.
 | Painted numbers on ar/ur/fa | `digits-eastern` (`ClockDigits::map_str`, `progress_label`) |
 | Progress fill from start | `layout-progress` / `rtl_progress` |
 | Readout percent row | `gallery-readout-order` |
+| Controls pack and slider pair | `gallery-controls-pack` |
 | Code/path/URL stay LTR | `ltr-islands` |
 | Locale fill | `leftover-src`; `copy`; `copy-keys` |
 

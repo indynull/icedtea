@@ -2247,7 +2247,7 @@ impl Gallery {
         };
         let start = icedtea::i18n::align_start(self.direction);
         let mut theme_row = icedtea::iced::widget::Row::new()
-            .spacing(8)
+            .spacing(16)
             .align_y(Alignment::Center);
         for kid in icedtea::i18n::order(
             self.direction,
@@ -3220,7 +3220,10 @@ impl Gallery {
                 self.note = format!("Rail {i}");
             }
             Message::SearchPick(i) => self.note = format!("Hit {i}"),
-            Message::GroupPress(i) => self.note = format!("Group {i}"),
+            Message::GroupPress(i) => {
+                let n = self.tokens.clock_digits.map_str(&i.to_string());
+                self.note = format!("{} {n}", self.catalog.t("note.group"));
+            }
             Message::Note(s) => self.note = s,
             Message::Pad(key) => match key {
                 "=" => self.note = format!("= {}", self.pad),
@@ -4059,13 +4062,20 @@ impl Gallery {
         };
         if let Some(id) = pack_at {
             if let Some(mid) = hosted.iter().position(|e| e.id == id) {
-                return row![
-                    stack(&hosted[..mid]).width(Length::Fill),
-                    stack(&hosted[mid..]).width(Length::Fill),
-                ]
-                .spacing(24)
-                .align_y(Alignment::Start)
-                .into();
+                let mut pack = icedtea::iced::widget::Row::new()
+                    .spacing(24)
+                    .align_y(Alignment::Start)
+                    .width(Length::Fill);
+                for kid in icedtea::i18n::order(
+                    self.direction,
+                    [
+                        stack(&hosted[..mid]).width(Length::FillPortion(1)),
+                        stack(&hosted[mid..]).width(Length::FillPortion(1)),
+                    ],
+                ) {
+                    pack = pack.push(kid);
+                }
+                return pack.into();
             }
         }
         stack(&hosted).into()
@@ -4320,45 +4330,53 @@ impl Gallery {
             ]
             .spacing(8)
             .into(),
-            "slider" => row![
-                column![
-                    widget::themed_slider(
-                        0.0..=1.0,
-                        self.value,
-                        Message::Slide,
-                        widget::SliderMarks {
-                            ticks: 5,
-                            min: "0",
-                            max: "1",
-                            thumb: self.catalog.t("slider.now"),
-                            ..widget::SliderMarks::NONE
-                        },
-                        tok,
-                        named("value", Role::Slider).with_value(self.value.to_string()),
-                    ),
-                    widget::meta(
-                        widget::progress_label(self.value, None, tok.clock_digits),
-                        tok,
-                        named("slider-value", Role::Status),
-                    ),
-                ]
-                .spacing(8)
-                .width(Length::Fill),
-                widget::themed_slider(
-                    0.0..=1.0,
-                    self.value,
-                    Message::Slide,
-                    widget::SliderMarks {
-                        vertical: true,
-                        thumb: self.catalog.t("slider.vol"),
-                        ..widget::SliderMarks::NONE
-                    },
-                    tok,
-                    named("vert", Role::Slider).with_value(self.value.to_string()),
-                ),
-            ]
-            .spacing(16)
-            .into(),
+            "slider" => {
+                let mut pair = icedtea::iced::widget::Row::new().spacing(16);
+                for kid in icedtea::i18n::order(
+                    tok.direction,
+                    [
+                        column![
+                            widget::themed_slider(
+                                0.0..=1.0,
+                                self.value,
+                                Message::Slide,
+                                widget::SliderMarks {
+                                    ticks: 5,
+                                    min: "0",
+                                    max: "1",
+                                    thumb: self.catalog.t("slider.now"),
+                                    ..widget::SliderMarks::NONE
+                                },
+                                tok,
+                                named("value", Role::Slider).with_value(self.value.to_string()),
+                            ),
+                            widget::meta(
+                                widget::progress_label(self.value, None, tok.clock_digits),
+                                tok,
+                                named("slider-value", Role::Status),
+                            ),
+                        ]
+                        .spacing(8)
+                        .width(Length::Fill)
+                        .into(),
+                        widget::themed_slider(
+                            0.0..=1.0,
+                            self.value,
+                            Message::Slide,
+                            widget::SliderMarks {
+                                vertical: true,
+                                thumb: self.catalog.t("slider.vol"),
+                                ..widget::SliderMarks::NONE
+                            },
+                            tok,
+                            named("vert", Role::Slider).with_value(self.value.to_string()),
+                        ),
+                    ],
+                ) {
+                    pair = pair.push(kid);
+                }
+                pair.into()
+            }
             "range-slider" => widget::range_slider(
                 0.0..=100.0,
                 self.range_lo,
@@ -8225,6 +8243,32 @@ mod tests {
         assert!(tree_page.contains("i18n::order"));
         assert!(tree_page.contains("align_start(self.direction)"));
         assert!(tree_page.contains("TreeFace::Files"));
+        let pack = include_str!("main.rs")
+            .split("\"controls\" => Some(\"button-group\")")
+            .nth(1)
+            .unwrap()
+            .split("stack(&hosted).into()")
+            .next()
+            .unwrap();
+        assert!(
+            pack.contains("i18n::order"),
+            "controls two-column pack must follow direction"
+        );
+        let slider = include_str!("main.rs")
+            .split("\"slider\" =>")
+            .nth(1)
+            .unwrap()
+            .split("\"range-slider\"")
+            .next()
+            .unwrap();
+        assert!(
+            slider.contains("i18n::order"),
+            "slider now/vol pair must follow direction"
+        );
+        assert!(
+            !include_str!("main.rs").contains("format!(\"Group {i}\")"),
+            "button-group note must go through catalog fill"
+        );
         assert!(matches!(
             super::parse_inject_line("md-press"),
             Some(super::Message::MdPointer(

@@ -1526,6 +1526,7 @@ pub fn themed_slider<'a, M: Clone + 'a>(
             text(marks.thumb)
                 .size(tok.meta())
                 .color(s.on_surface)
+                .align_x(crate::i18n::align_start(tok.direction))
                 .width(Length::Fill),
         );
     }
@@ -1642,12 +1643,11 @@ pub fn range_slider<'a, M: Clone + 'a>(
         A11y::new(format!("{} high", a11y.name), Role::Slider).with_disabled(a11y.disabled),
     );
     let s = tok.scheme();
+    let span = tok.clock_digits.map_str(&format!("{low:.0} – {high:.0}"));
     a11y::attach(
         column![
             lo,
-            text(format!("{low:.0} – {high:.0}"))
-                .size(tok.meta())
-                .color(s.on_surface_variant),
+            text(span).size(tok.meta()).color(s.on_surface_variant),
             hi,
         ]
         .spacing(4)
@@ -11383,6 +11383,40 @@ mod tests {
         assert!(!line_src.contains("themed_button"));
         assert!(line_src.contains("TreeFace::Files"));
         assert!(line_src.contains("gap(tok)"));
+    }
+
+    #[test]
+    fn range_slider_maps_locale_digits() {
+        let src = include_str!("widget.rs")
+            .split("pub fn range_slider")
+            .nth(1)
+            .unwrap()
+            .split("pub fn progress_label")
+            .next()
+            .unwrap();
+        must(
+            src.contains("clock_digits") && src.contains("map_str"),
+            "range_slider must map the low/high label with ClockDigits",
+        );
+        assert_eq!(
+            crate::i18n::ClockDigits::Eastern.map_str("20 – 80"),
+            "٢٠ – ٨٠"
+        );
+    }
+
+    #[test]
+    fn themed_slider_thumb_aligns_start() {
+        let src = include_str!("widget.rs")
+            .split("pub fn themed_slider")
+            .nth(1)
+            .unwrap()
+            .split("fn disabled_slider_face")
+            .next()
+            .unwrap();
+        must(
+            src.contains("align_start(tok.direction)"),
+            "slider thumb label must align to start",
+        );
     }
 
     #[test]

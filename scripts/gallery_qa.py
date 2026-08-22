@@ -804,6 +804,7 @@ CHROME_WRAP_BANDS = (
 # Painted demo / chrome English that must go through catalog fill.
 # Matched in icedtea-gallery/src/main.rs before the test module.
 LEFTOVER_ENGLISH = (
+    'format!("Group {i}")',
     "Reveal the token, then copy it.",
     "Show, then Copy.",
     "Suggest on any field. Pick fills the query.",
@@ -1114,6 +1115,30 @@ def eastern_digit_hits(root: Path) -> list[str]:
         body = src.split("pub fn progress_label", 1)[1].split("fn progress_weights", 1)[0]
         if "map_str" not in body and "ClockDigits" not in body:
             hits.append("progress_label skips locale digits")
+    if "pub fn range_slider" not in src:
+        hits.append("missing range_slider")
+    else:
+        body = src.split("pub fn range_slider", 1)[1].split("pub fn progress_label", 1)[0]
+        if "map_str" not in body and "clock_digits" not in body:
+            hits.append("range_slider skips locale digits")
+    return hits
+
+
+def gallery_controls_hits(root: Path) -> list[str]:
+    """Controls two-column pack and slider pair follow Tokens.direction."""
+    src = (root / "icedtea-gallery" / "src" / "main.rs").read_text(encoding="utf-8")
+    hits: list[str] = []
+    if '"controls" => Some("button-group")' not in src:
+        return ["missing controls pack_at"]
+    pack = src.split('"controls" => Some("button-group")', 1)[1].split("stack(&hosted).into()", 1)[0]
+    if "i18n::order" not in pack:
+        hits.append("controls pack skips i18n::order")
+    if '"slider" =>' not in src:
+        hits.append("missing slider arm")
+    else:
+        arm = src.split('"slider" =>', 1)[1].split('"range-slider"', 1)[0]
+        if "i18n::order" not in arm:
+            hits.append("slider pair skips i18n::order")
     return hits
 
 
@@ -1241,6 +1266,11 @@ def run_rtl_source_checks(root: Path) -> list[dict]:
             "gallery-readout-order",
             "readout percent row follows direction and digits",
             gallery_readout_hits(root),
+        ),
+        _src_row(
+            "gallery-controls-pack",
+            "controls pack and slider pair follow direction",
+            gallery_controls_hits(root),
         ),
     ]
     checks = [
@@ -2582,6 +2612,9 @@ def _self_check() -> None:
     readout = gallery_readout_hits(root)
     if readout:
         raise SystemExit(f"gallery readout: {readout}")
+    controls = gallery_controls_hits(root)
+    if controls:
+        raise SystemExit(f"gallery controls: {controls}")
     visual = visual_map_hits(root)
     if visual:
         raise SystemExit(f"visual map: {visual}")

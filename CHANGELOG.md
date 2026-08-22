@@ -10,6 +10,8 @@
 
 - `progress` fills from the start edge. `progress_label` maps digits
   with `ClockDigits`.
+- `range_slider` maps its low/high label with `ClockDigits`.
+- The gallery Controls pack and slider pair follow window direction.
 - Clock faces pick Eastern or Western digits from the language, so
   Hebrew keeps 123 on a right-to-left window.
 - `menu_bar` titles stay one line for Arabic and Hebrew headings.

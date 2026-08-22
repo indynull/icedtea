@@ -34,7 +34,7 @@ In the same change:
 
 | Page | Still | Idle first screen must show |
 | --- | --- | --- |
-| controls | `book/src/images/controls.png` | Named button faces + disabled row; slider; checks/radios/switch. RTL: groups use start/end order; titles one line |
+| controls | `book/src/images/controls.png` | Named button faces + disabled row; slider now+vol; checks/radios/switch; range slider under the second column. RTL: first catalog column on the start (right); slider pair start-ordered; range digits Eastern on ar/ur |
 | fields | `book/src/images/fields.png` | Search, select, form on the first screen. RTL: labels on start; search mark on start |
 | readout | `book/src/images/readout.png` | Determinate bar, buffer, percent label, ring, spinner. RTL: bar fill from start (right); ar/ur percent and remaining time use Eastern digits; percent buttons ordered from start; only the current value is Primary |
 | type | `book/src/images/content.png` | Label scale + icon grid above the fold |
