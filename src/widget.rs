@@ -15,12 +15,13 @@
 //! use icedtea::variant::Variant;
 //! use icedtea::widget;
 //! let tok = theme::named("dark").tokens;
-//! let _: icedtea::Element<'_, ()> = widget::themed_button(
+//! let _: icedtea::Element<'_, ()> = widget::button(
 //!     "Save",
 //!     Some(()),
 //!     tok,
 //!     Variant::Primary,
 //!     Icons::NONE,
+//!     widget::ButtonOpts::SHRINK,
 //!     A11y::button("Save"),
 //! );
 //! ```
@@ -37,9 +38,10 @@ use iced::widget::markdown;
 use iced::widget::scrollable::{Direction as ScrollDir, Scrollbar};
 use iced::widget::text_editor::Content;
 use iced::widget::{
-    button, checkbox, column, container, mouse_area, pick_list, progress_bar, radio, rich_text,
-    row, rule, scrollable, slider, stack, svg, text, text_editor, text_input, toggler, tooltip,
-    Column, Id, Row, Space, Stack,
+    button as iced_button, checkbox as iced_checkbox, column, container, mouse_area,
+    pick_list as iced_pick_list, progress_bar, radio as iced_radio, rich_text, row, rule,
+    scrollable, slider as iced_slider, stack, svg, text, text_editor,
+    text_input as iced_text_input, toggler, tooltip, Column, Id, Row, Space, Stack,
 };
 use iced::{
     keyboard, Alignment, Background, Color, Element, Event, Length, Padding, Point, Radians,
@@ -326,7 +328,7 @@ fn control_height(tok: Tokens) -> f32 {
 }
 
 fn sized_control_height(tok: Tokens, size: ControlSize) -> f32 {
-    // Same face as `themed_button` Shrink. Do not floor to the 48dp touch
+    // Same face as `button` Shrink. Do not floor to the 48dp touch
     // target: iced `Fixed(48)` + pad paints a 48px face, taller than
     // labeled buttons on the same page.
     let type_px = match size {
@@ -399,7 +401,7 @@ fn slider_paint_value(range: &std::ops::RangeInclusive<f32>, value: f32, rtl: bo
     }
 }
 
-/// Step for a continuous [`themed_slider`] range (~100 positions).
+/// Step for a continuous [`slider`] range (~100 positions).
 ///
 /// iced's slider defaults to step `1`, so a `0.0..=1.0` range only hits
 /// the endpoints and feels broken under drag.
@@ -612,7 +614,7 @@ pub fn hyperlink<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let title = a11y.apply_name(title);
-    let mut b = button(text(title).size(tok.body()).color(tok.scheme().primary))
+    let mut b = iced_button(text(title).size(tok.body()).color(tok.scheme().primary))
         .padding(0)
         .style(style::joined_button_style(tok, Variant::Ghost));
     if let Some(m) = a11y.apply_message(Some(msg)) {
@@ -635,47 +637,28 @@ pub fn hyperlink<'a, M: Clone + 'a>(
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let save = ();
-/// let _: icedtea::Element<'_, ()> = widget::themed_button(
+/// let _: icedtea::Element<'_, ()> = widget::button(
 ///     "Save",
 ///     Some(save),
 ///     tok,
 ///     Variant::Primary,
 ///     icedtea::icon::Icons::NONE,
+///     widget::ButtonOpts::SHRINK,
 ///     A11y::button("Save"),
 /// );
 /// ```
-pub fn themed_button<'a, M: Clone + 'a>(
-    title: impl Into<String>,
-    msg: Option<M>,
-    tok: Tokens,
-    variant: Variant,
-    icons: Icons,
-    a11y: A11y,
-) -> Element<'a, M> {
-    themed_button_sized(
-        title,
-        msg,
-        tok,
-        variant,
-        icons,
-        Length::Shrink,
-        Length::Shrink,
-        a11y,
-    )
-}
-
-/// Themed button that fills a pad cell.
 #[allow(clippy::too_many_arguments)]
-pub fn themed_button_sized<'a, M: Clone + 'a>(
+pub fn button<'a, M: Clone + 'a>(
     title: impl Into<String>,
     msg: Option<M>,
     tok: Tokens,
     variant: Variant,
     icons: Icons,
-    width: Length,
-    height: Length,
+    opts: ButtonOpts,
     a11y: A11y,
 ) -> Element<'a, M> {
+    let width = opts.width;
+    let height = opts.height;
     let label = a11y.apply_name(title);
     // Shrink the title. Fill+align on `text` inside iced `button`
     // drops right-to-left glyphs (empty colored pads).
@@ -691,7 +674,7 @@ pub fn themed_button_sized<'a, M: Clone + 'a>(
     } else {
         icon_label(label, icons, tok)
     };
-    let mut b = button(face)
+    let mut b = iced_button(face)
         .padding(pad(tok))
         .width(width)
         .height(height)
@@ -736,14 +719,16 @@ pub fn split_button<'a, M: Clone + 'a>(
     let h = control_height(tok);
     a11y::attach(
         row![
-            themed_button_sized(
+            button(
                 title.clone(),
                 primary_msg,
                 tok,
                 Variant::Primary,
                 icons,
-                Length::Shrink,
-                Length::Fixed(h),
+                ButtonOpts {
+                    width: Length::Shrink,
+                    height: Length::Fixed(h),
+                },
                 A11y::button(&title).with_disabled(a11y.disabled),
             ),
             crate::menubar::split_more(items, tok, a11y.disabled, h),
@@ -786,7 +771,7 @@ pub fn toggle_button<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let title = title.into();
     let a11y = a11y.merge_checked(pressed).merge_selected(pressed);
-    themed_button(
+    button(
         title,
         (!a11y.disabled).then_some(msg),
         tok,
@@ -796,6 +781,7 @@ pub fn toggle_button<'a, M: Clone + 'a>(
             Variant::Quiet
         },
         icons,
+        ButtonOpts::SHRINK,
         a11y,
     )
 }
@@ -813,7 +799,7 @@ pub fn toggle_button<'a, M: Clone + 'a>(
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let on_toggle = |on| on;
-/// let _: icedtea::Element<'_, bool> = widget::themed_checkbox(
+/// let _: icedtea::Element<'_, bool> = widget::checkbox(
 ///     "Accept",
 ///     true,
 ///     on_toggle,
@@ -821,7 +807,7 @@ pub fn toggle_button<'a, M: Clone + 'a>(
 ///     A11y::new("Accept", Role::Checkbox).with_checked(true),
 /// );
 /// ```
-pub fn themed_checkbox<'a, M: Clone + 'a>(
+pub fn checkbox<'a, M: Clone + 'a>(
     label_s: impl Into<String>,
     checked: bool,
     msg: impl Fn(bool) -> M + 'a,
@@ -833,7 +819,7 @@ pub fn themed_checkbox<'a, M: Clone + 'a>(
     let empty = caption.is_empty();
     let name = a11y.apply_name(caption);
     let is_on = a11y.apply_checked(checked);
-    let mut c = checkbox(is_on).style(style::checkbox_style(tok));
+    let mut c = iced_checkbox(is_on).style(style::checkbox_style(tok));
     if !a11y.disabled {
         c = c.on_toggle(msg);
     }
@@ -987,6 +973,24 @@ impl ControlSize {
     }
 }
 
+/// Size of a [`button`]. Shrink is the default control face.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ButtonOpts {
+    pub width: Length,
+    pub height: Length,
+}
+
+impl ButtonOpts {
+    pub const SHRINK: Self = Self {
+        width: Length::Shrink,
+        height: Length::Shrink,
+    };
+    pub const FILL: Self = Self {
+        width: Length::Fill,
+        height: Length::Fill,
+    };
+}
+
 /// Optional field chrome: face, prefix/suffix icons, floating label, count,
 /// and a syntax highlighter on the value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1097,7 +1101,7 @@ pub fn checkbox_indeterminate<'a, M: Clone + 'a>(
     match state {
         CheckState::Checked | CheckState::Unchecked => {
             let on = matches!(state, CheckState::Checked);
-            themed_checkbox(
+            checkbox(
                 name,
                 on,
                 move |next| msg(check_state_from_bool(next)),
@@ -1191,7 +1195,7 @@ pub fn segmented_button<'a, M: Clone + 'a>(
         } else {
             icon_label(label.clone(), icons, tok)
         };
-        let mut b = button(face)
+        let mut b = iced_button(face)
             .padding(face_pad)
             .width(Length::Shrink)
             .height(height)
@@ -1251,7 +1255,7 @@ pub fn button_group<'a, M: Clone + 'a>(
         } else {
             icon_label(label.clone(), icons, tok)
         };
-        let mut b = button(face)
+        let mut b = iced_button(face)
             .padding(pad(tok))
             .width(Length::Shrink)
             .height(Length::Fixed(control_height(tok)))
@@ -1312,7 +1316,7 @@ pub fn icon_button<'a, M: Clone + 'a>(
     size: ControlSize,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let mut b = button(icon_svg(
+    let mut b = iced_button(icon_svg(
         icon,
         tok,
         A11y::new(a11y.name.clone(), Role::Image),
@@ -1383,7 +1387,7 @@ pub fn icon_button_toggle<'a, M: Clone + 'a>(
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let on_toggle = |on| on;
-/// let _: icedtea::Element<'_, bool> = widget::themed_switch(
+/// let _: icedtea::Element<'_, bool> = widget::switch(
 ///     "Sounds",
 ///     false,
 ///     on_toggle,
@@ -1391,7 +1395,7 @@ pub fn icon_button_toggle<'a, M: Clone + 'a>(
 ///     A11y::new("Sounds", Role::Switch),
 /// );
 /// ```
-pub fn themed_switch<'a, M: Clone + 'a>(
+pub fn switch<'a, M: Clone + 'a>(
     label_s: impl Into<String>,
     on: bool,
     msg: impl Fn(bool) -> M + 'a,
@@ -1420,7 +1424,7 @@ pub fn themed_switch<'a, M: Clone + 'a>(
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let on_pick = |v| v;
-/// let _: icedtea::Element<'_, u8> = widget::themed_radio(
+/// let _: icedtea::Element<'_, u8> = widget::radio(
 ///     "A",
 ///     0u8,
 ///     Some(0),
@@ -1429,7 +1433,7 @@ pub fn themed_switch<'a, M: Clone + 'a>(
 ///     A11y::new("A", Role::Radio).with_checked(true),
 /// );
 /// ```
-pub fn themed_radio<'a, V, M: Clone + 'a>(
+pub fn radio<'a, V, M: Clone + 'a>(
     label_s: impl Into<String>,
     value: V,
     selected: Option<V>,
@@ -1454,7 +1458,7 @@ where
     }
     a11y::attach(
         labeled_control(
-            radio(String::new(), value, selected, msg)
+            iced_radio(String::new(), value, selected, msg)
                 .style(style::radio_style(tok))
                 .into(),
             name,
@@ -1499,7 +1503,7 @@ pub fn scroll_delta_x(delta: iced::mouse::ScrollDelta) -> f32 {
     }
 }
 
-/// Tick count and end labels for [`themed_slider`].
+/// Tick count and end labels for [`slider`].
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SliderMarks<'a> {
     pub ticks: usize,
@@ -1535,7 +1539,7 @@ impl SliderMarks<'static> {
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let on_change = |v| v;
-/// let _: icedtea::Element<'_, f32> = widget::themed_slider(
+/// let _: icedtea::Element<'_, f32> = widget::slider(
 ///     0.0..=1.0,
 ///     0.4,
 ///     on_change,
@@ -1544,7 +1548,7 @@ impl SliderMarks<'static> {
 ///     A11y::new("vol", Role::Slider).with_value("0.4"),
 /// );
 /// ```
-pub fn themed_slider<'a, M: Clone + 'a>(
+pub fn slider<'a, M: Clone + 'a>(
     range: std::ops::RangeInclusive<f32>,
     value: f32,
     msg: impl Fn(f32) -> M + Copy + 'a,
@@ -1578,7 +1582,7 @@ pub fn themed_slider<'a, M: Clone + 'a>(
                 .height(Length::Fill)
                 .into()
         } else {
-            slider(range.clone(), painted, on_move)
+            iced_slider(range.clone(), painted, on_move)
                 .step(step)
                 .style(style::slider_style_rail(tok, rtl_rail))
                 .width(Length::Fill)
@@ -1701,7 +1705,7 @@ pub fn range_slider<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let (low, high) = clamp_range_pair(range.clone(), low, high);
     let a11y = a11y.merge_value(format!("{low}–{high}"));
-    let lo = themed_slider(
+    let lo = slider(
         range.clone(),
         low,
         move |v| msg(range_pair_after_low(v, high)),
@@ -1709,7 +1713,7 @@ pub fn range_slider<'a, M: Clone + 'a>(
         tok,
         A11y::new(format!("{} low", a11y.name), Role::Slider).with_disabled(a11y.disabled),
     );
-    let hi = themed_slider(
+    let hi = slider(
         range,
         high,
         move |v| msg(range_pair_after_high(low, v)),
@@ -2103,7 +2107,7 @@ pub fn number_input<'a, M: Clone + 'a>(
     let shown = tok.clock_digits.map_str(&format!("{value}"));
     let zero = tok.clock_digits.map_str("0");
     let rtl = tok.direction == crate::i18n::Direction::Rtl;
-    let mut i = text_input(&zero, &shown)
+    let mut i = iced_text_input(&zero, &shown)
         .style(style::field_style(tok, false))
         .padding(pad(tok))
         .size(tok.body())
@@ -2164,7 +2168,7 @@ pub fn step_number(value: f64, step: f64, min: f64, max: f64, dir: i32) -> f64 {
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let on_input = |s| s;
-/// let _: icedtea::Element<'_, String> = widget::themed_text_input(
+/// let _: icedtea::Element<'_, String> = widget::text_input(
 ///     "Name",
 ///     "",
 ///     on_input,
@@ -2176,7 +2180,7 @@ pub fn step_number(value: f64, step: f64, min: f64, max: f64, dir: i32) -> f64 {
 /// );
 /// ```
 #[allow(clippy::too_many_arguments)]
-pub fn themed_text_input<'a, M: Clone + 'a>(
+pub fn text_input<'a, M: Clone + 'a>(
     placeholder: &str,
     value: &str,
     on_input: impl Fn(String) -> M + 'a,
@@ -2189,7 +2193,7 @@ pub fn themed_text_input<'a, M: Clone + 'a>(
     let a11y = a11y.merge_value(value.to_string());
     let outlined = matches!(opts.face, FieldFace::Outlined);
     let hide_value = field_runs_hide_value(value, opts.highlight);
-    let mut i = text_input(placeholder, value)
+    let mut i = iced_text_input(placeholder, value)
         .style(style::field_style_paint(tok, outlined, hide_value))
         .padding(pad(tok))
         .size(tok.body())
@@ -2256,7 +2260,7 @@ pub fn themed_text_input<'a, M: Clone + 'a>(
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let on_input = |s| s;
-/// let field = widget::themed_text_input(
+/// let field = widget::text_input(
 ///     "Email",
 ///     "",
 ///     on_input,
@@ -2339,7 +2343,7 @@ pub fn suggest_field<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let mut col = column![themed_text_input(
+    let mut col = column![text_input(
         placeholder,
         value,
         on_input,
@@ -2352,7 +2356,7 @@ pub fn suggest_field<'a, M: Clone + 'a>(
     .spacing(2);
     for (i, s) in suggestions.iter().enumerate() {
         let row_a11y = A11y::new(s.clone(), Role::ListItem).with_disabled(a11y.disabled);
-        let mut b = button(text(s.clone()).size(tok.body()))
+        let mut b = iced_button(text(s.clone()).size(tok.body()))
             .padding(pad(tok))
             .width(Length::Fill)
             .style(style::menu_item_style(tok));
@@ -2393,7 +2397,7 @@ pub fn password_input<'a, M: Clone + 'a>(
     a11y: A11y,
     masked: bool,
 ) -> Element<'a, M> {
-    let mut i = text_input(placeholder, value)
+    let mut i = iced_text_input(placeholder, value)
         .secure(masked)
         .style(style::field_style(tok, false))
         .padding(pad(tok))
@@ -2459,20 +2463,22 @@ pub fn secret_field<'a, M: Clone + 'a>(
         a11y.child(Role::TextBox),
         !revealed,
     );
-    let toggle = themed_button(
+    let toggle = button(
         toggle_title,
         Some(on_toggle),
         tok,
         Variant::Quiet,
         Icons::NONE,
+        ButtonOpts::SHRINK,
         A11y::button(toggle_title).with_disabled(a11y.disabled),
     );
-    let copy_btn = themed_button(
+    let copy_btn = button(
         copy.title.clone(),
         copy.invoke(),
         tok,
         Variant::Quiet,
         Icons::NONE,
+        ButtonOpts::SHRINK,
         A11y::button(copy.title.clone()).with_disabled(!copy.enabled || a11y.disabled),
     );
     let kids = crate::i18n::order(dir, [field, toggle, copy_btn]);
@@ -2552,12 +2558,13 @@ pub fn value_field<'a, M: Clone + 'a>(
     .width(Length::Fill);
     let mut kids: Vec<Element<'a, M>> = vec![label.into(), value.into()];
     if let Some(copy) = copy {
-        kids.push(themed_button(
+        kids.push(button(
             copy.title.clone(),
             copy.invoke(),
             tok,
             Variant::Quiet,
             Icons::NONE,
+            ButtonOpts::SHRINK,
             A11y::button(copy.title.clone()).with_disabled(!copy.enabled || a11y.disabled),
         ));
     }
@@ -2816,52 +2823,17 @@ pub fn editor_style(
 ///     "",
 ///     on_input,
 ///     None,
+///     None,
 ///     tok,
 ///     A11y::new("Search", Role::TextBox),
 ///     None,
 ///     &[],
 /// );
 /// ```
+///
+/// `on_clear` paints a clear mark when the value is non-empty.
 #[allow(clippy::too_many_arguments)]
 pub fn search_input<'a, M: Clone + 'a>(
-    value: &str,
-    on_input: impl Fn(String) -> M + 'a,
-    on_submit: Option<M>,
-    tok: Tokens,
-    a11y: A11y,
-    input_id: Option<Id>,
-    highlight: &[FieldRun],
-) -> Element<'a, M> {
-    search_input_clear(
-        value, on_input, None, on_submit, tok, a11y, input_id, highlight,
-    )
-}
-
-/// Search field with optional clear control when non-empty.
-///
-/// `on_clear` empties the query. When `None`, behaves like [`search_input`].
-/// `highlight` is the same syntax highlighter [`search_input`] takes.
-///
-/// ```
-/// use icedtea::a11y::{A11y, Role};
-/// use icedtea::theme;
-/// use icedtea::widget;
-/// let tok = theme::named("dark").tokens;
-/// let on_input = |s| s;
-/// let clear = String::new();
-/// let _: icedtea::Element<'_, String> = widget::search_input_clear(
-///     "q",
-///     on_input,
-///     Some(clear),
-///     None,
-///     tok,
-///     A11y::new("Search", Role::TextBox),
-///     None,
-///     &[],
-/// );
-/// ```
-#[allow(clippy::too_many_arguments)]
-pub fn search_input_clear<'a, M: Clone + 'a>(
     value: &str,
     on_input: impl Fn(String) -> M + 'a,
     on_clear: Option<M>,
@@ -2879,7 +2851,7 @@ pub fn search_input_clear<'a, M: Clone + 'a>(
     };
     let field_a11y = a11y.child(Role::TextBox).merge_value(value.to_string());
     let hide_value = field_runs_hide_value(value, highlight);
-    let mut i = text_input(&placeholder, value)
+    let mut i = iced_text_input(&placeholder, value)
         .style(style::search_style_paint(tok, hide_value))
         .padding(pad(tok))
         .size(tok.body())
@@ -3310,7 +3282,7 @@ pub fn search_view<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let hits: Vec<String> = hits.into_iter().map(Into::into).collect();
-    let field = search_input_clear(
+    let field = search_input(
         query,
         on_input,
         if a11y.disabled { None } else { on_clear },
@@ -3326,7 +3298,7 @@ pub fn search_view<'a, M: Clone + 'a>(
         let mut col = Column::new().spacing(0).width(Length::Fill);
         for (i, hit) in hits.iter().enumerate() {
             let hit_a11y = A11y::button(hit.clone()).with_disabled(a11y.disabled);
-            let mut b = button(
+            let mut b = iced_button(
                 container(
                     text(hit_a11y.apply_name(hit.clone()))
                         .size(tok.body())
@@ -3374,7 +3346,7 @@ pub fn search_view<'a, M: Clone + 'a>(
 /// let tok = theme::named("dark").tokens;
 /// let opts = ["nord", "dark"];
 /// let on_select = |name| name;
-/// let _: icedtea::Element<'_, &str> = widget::themed_pick_list(
+/// let _: icedtea::Element<'_, &str> = widget::pick_list(
 ///     opts,
 ///     Some("nord"),
 ///     on_select,
@@ -3383,7 +3355,7 @@ pub fn search_view<'a, M: Clone + 'a>(
 ///     A11y::new("theme", Role::ComboBox),
 /// );
 /// ```
-pub fn themed_pick_list<'a, T, M: Clone + 'a>(
+pub fn pick_list<'a, T, M: Clone + 'a>(
     options: impl std::borrow::Borrow<[T]> + 'a,
     selected: Option<T>,
     on_select: impl Fn(T) -> M + 'a,
@@ -3429,8 +3401,8 @@ where
         let on_select = on_select.clone();
         move |t| on_select(t)
     };
-    let picker = pick_list(options, selected, on_pick)
-        .handle(pick_list::Handle::None)
+    let picker = iced_pick_list(options, selected, on_pick)
+        .handle(iced::widget::pick_list::Handle::None)
         .width(Length::Fill)
         .style(style::picker_style(tok))
         .padding(pick_mark_pad(tok, face_pad, size))
@@ -3523,7 +3495,7 @@ impl<'a, M> FormRow<'a, M> {
 /// let _: icedtea::Element<'_, String> = widget::form_group(
 ///     [FormRow::new(
 ///         "Name",
-///         widget::themed_text_input(
+///         widget::text_input(
 ///             "Name",
 ///             "",
 ///             on_name,
@@ -3893,9 +3865,9 @@ pub fn days_in_month(year: i32, month: u32) -> u32 {
 ///     day: 10,
 /// };
 /// let _: icedtea::Element<'_, ()> =
-///     widget::date_picker(d, (), (), tok, A11y::new("date", Role::Group));
+///     widget::date_stepper(d, (), (), tok, A11y::new("date", Role::Group));
 /// ```
-pub fn date_picker<'a, M: Clone + 'a>(
+pub fn date_stepper<'a, M: Clone + 'a>(
     value: DateValue,
     on_prev: M,
     on_next: M,
@@ -3908,12 +3880,13 @@ pub fn date_picker<'a, M: Clone + 'a>(
     // the stepper; the parent start-aligns the whole control.
     a11y::attach(
         row![
-            themed_button(
+            button(
                 "<",
                 a11y.apply_message(Some(on_prev)),
                 tok,
                 Variant::Quiet,
                 Icons::NONE,
+                ButtonOpts::SHRINK,
                 A11y::button("previous-day").with_disabled(a11y.disabled),
             ),
             label(
@@ -3921,12 +3894,13 @@ pub fn date_picker<'a, M: Clone + 'a>(
                 tok,
                 a11y.child(Role::Status).with_value(shown),
             ),
-            themed_button(
+            button(
                 ">",
                 a11y.apply_message(Some(on_next)),
                 tok,
                 Variant::Quiet,
                 Icons::NONE,
+                ButtonOpts::SHRINK,
                 A11y::button("next-day").with_disabled(a11y.disabled),
             ),
         ]
@@ -4132,41 +4106,45 @@ pub fn time_picker<'a, M: Clone + 'a>(
         clock_digits(v.hour, tok.clock_digits)
     };
     let mut row = Row::new().spacing(4).align_y(Alignment::Center);
-    row = row.push(themed_button(
+    row = row.push(button(
         hour,
         a11y.apply_message(Some(on_field(TimeField::Hour))),
         tok,
         Variant::Quiet,
         Icons::NONE,
+        ButtonOpts::SHRINK,
         A11y::button("hour").with_disabled(a11y.disabled),
     ));
     row = row.push(time_colon(tok));
-    row = row.push(themed_button(
+    row = row.push(button(
         clock_digits(v.minute, tok.clock_digits),
         a11y.apply_message(Some(on_field(TimeField::Minute))),
         tok,
         Variant::Quiet,
         Icons::NONE,
+        ButtonOpts::SHRINK,
         A11y::button("minute").with_disabled(a11y.disabled),
     ));
     if clock.seconds {
         row = row.push(time_colon(tok));
-        row = row.push(themed_button(
+        row = row.push(button(
             clock_digits(v.second, tok.clock_digits),
             a11y.apply_message(Some(on_field(TimeField::Second))),
             tok,
             Variant::Quiet,
             Icons::NONE,
+            ButtonOpts::SHRINK,
             A11y::button("second").with_disabled(a11y.disabled),
         ));
     }
     if clock.hour12 {
-        row = row.push(themed_button(
+        row = row.push(button(
             if v.afternoon() { "PM" } else { "AM" },
             a11y.apply_message(Some(on_field(TimeField::Period))),
             tok,
             Variant::Quiet,
             Icons::NONE,
+            ButtonOpts::SHRINK,
             A11y::button("period").with_disabled(a11y.disabled),
         ));
     }
@@ -4292,12 +4270,13 @@ pub fn markdown_outline<'a, M: Clone + 'a>(
         let pad = 8 + u16::from(h.level.saturating_sub(1)) * 8;
         let on = selected == Some(h.index);
         col = col.push(
-            container(themed_button(
+            container(button(
                 h.title.clone(),
                 a11y.apply_message(Some(on_jump(h.index))),
                 tok,
                 if on { Variant::Quiet } else { Variant::Ghost },
                 Icons::NONE,
+                ButtonOpts::SHRINK,
                 A11y::button(h.title.clone())
                     .with_checked(on)
                     .with_disabled(a11y.disabled),
@@ -4819,12 +4798,13 @@ pub fn tooltip_rich<'a, M: Clone + 'a>(
         col = col.push(meta(body.clone(), tok, A11y::new(body, Role::Status)));
     }
     if let Some((t, m)) = action {
-        col = col.push(themed_button(
+        col = col.push(button(
             t.clone(),
             Some(m),
             tok,
             Variant::Ghost,
             Icons::NONE,
+            ButtonOpts::SHRINK,
             A11y::button(t),
         ));
     }
@@ -4861,7 +4841,7 @@ pub fn rule_h<'a, M: 'a>(tok: Tokens, a11y: A11y) -> Element<'a, M> {
 
 /// Compact square close control. Same size in toasts, tabs, and chips.
 pub fn dismiss_button<'a, M: Clone + 'a>(msg: M, tok: Tokens, a11y: A11y) -> Element<'a, M> {
-    let mut b = button(icon_svg(Icon::Close, tok, A11y::new("close", Role::Image)))
+    let mut b = iced_button(icon_svg(Icon::Close, tok, A11y::new("close", Role::Image)))
         .padding(4)
         .style(style::joined_button_style(tok, Variant::Ghost));
     if let Some(m) = a11y.apply_message(Some(msg)) {
@@ -5272,12 +5252,13 @@ pub fn banner<'a, M: Clone + 'a>(
         .spacing(inset(tok))
         .align_y(Alignment::Center);
     if let Some((t, m)) = action {
-        r = r.push(themed_button(
+        r = r.push(button(
             t.clone(),
             a11y.apply_message(Some(m)),
             tok,
             Variant::Quiet,
             Icons::NONE,
+            ButtonOpts::SHRINK,
             A11y::button(t).with_disabled(a11y.disabled),
         ));
     }
@@ -5445,7 +5426,7 @@ fn toast_style(
 /// The rail sits on the end side (`Tokens.direction`).
 /// Press and hover stay inside the pane. Move and Release continue
 /// after a press inside so a drag-select can finish outside.
-/// A nested [`themed_scroll`] under the pointer takes the wheel first.
+/// A nested [`scroll`] under the pointer takes the wheel first.
 /// Wheel lines are [`crate::chrome::SCROLL_LINE`] (60 px), same as iced.
 ///
 ///
@@ -5453,7 +5434,7 @@ fn toast_style(
 /// use icedtea::a11y::{A11y, Role};
 /// let tok = icedtea::theme::named("dark").tokens;
 /// let child = icedtea::widget::label::<()>("line", tok, A11y::new("line", Role::Status));
-/// let _: icedtea::Element<'_, ()> = icedtea::widget::themed_scroll(
+/// let _: icedtea::Element<'_, ()> = icedtea::widget::scroll(
 ///     child,
 ///     tok,
 ///     A11y::new("scroll", Role::Group),
@@ -5462,7 +5443,7 @@ fn toast_style(
 ///     None::<fn(_) -> ()>,
 /// );
 /// ```
-pub fn themed_scroll<'a, M, F>(
+pub fn scroll<'a, M, F>(
     child: Element<'a, M>,
     tok: Tokens,
     a11y: A11y,
@@ -5522,12 +5503,12 @@ pub fn log_view<'a, M: Clone + 'a>(
     let viewport = window.viewport.max(1.0);
     // Stick uses iced Anchor::End: raw offset 0 is the tail. Mount that
     // tail until on_scroll reports the reversed (visual) offset.
-    let scroll = if window.end == 0 {
+    let offset = if window.end == 0 {
         stick_scroll_snapped(n, h, viewport)
     } else {
         window.scroll.max(0.0)
     };
-    let (top, win, bot) = virtual_pads(n, h, scroll, viewport, overscan, None);
+    let (top, win, bot) = virtual_pads(n, h, offset, viewport, overscan, None);
     // Extra bottom pad so anchor_bottom max-scroll is a multiple of row_h
     // (otherwise the first visible line is a fractional band under the clip).
     let align_pad = stick_align_pad(n, h, viewport);
@@ -5556,7 +5537,7 @@ pub fn log_view<'a, M: Clone + 'a>(
         col = col.push(Space::new().height(Length::Fixed(bot + align_pad)));
     }
     let prev = window;
-    themed_scroll(
+    scroll(
         col.into(),
         tok,
         a11y,
@@ -6745,6 +6726,19 @@ impl<'a, Message: 'a> From<CapturePress<'a, Message>> for Element<'a, Message> {
     }
 }
 
+/// Window, row height, empty copy, and other extras for [`list_view`].
+pub struct ListOpts<'a, Rh, Scroll, Color, FaceH, Check> {
+    pub window: VisibleWindow,
+    pub row_h: Rh,
+    pub overscan: usize,
+    pub on_scroll: Scroll,
+    pub empty: &'a str,
+    pub meta_color: Color,
+    pub scroll_id: Option<Id>,
+    pub face: RowFace<FaceH>,
+    pub on_check: Check,
+}
+
 /// A virtualized row list.
 ///
 /// `empty` is the copy when `model` has no rows. `meta_color` paints
@@ -6785,39 +6779,48 @@ impl<'a, Message: 'a> From<CapturePress<'a, Message>> for Element<'a, Message> {
 ///     &Selection::None,
 ///     on_select,
 ///     tok,
-///     VisibleWindow::new(120.0),
-///     24.0,
-///     2,
-///     on_scroll,
-///     "No rows",
-///     |_| tok.danger,
-///     None,
-///     icedtea::collection::RowFace::FLUSH,
-///     Msg::Check,
+///     icedtea::widget::ListOpts {
+///         window: VisibleWindow::new(120.0),
+///         row_h: 24.0,
+///         overscan: 2,
+///         on_scroll,
+///         empty: "No rows",
+///         meta_color: |_| tok.danger,
+///         scroll_id: None,
+///         face: icedtea::collection::RowFace::FLUSH,
+///         on_check: Msg::Check,
+///     },
 ///     A11y::new("list", Role::List),
 /// );
 /// ```
-#[allow(clippy::too_many_arguments)]
-pub fn list_view<'a, M, L>(
+pub fn list_view<'a, M, L, Rh, Scroll, Color, FaceH, Check>(
     model: &'a L,
     selection: &'a Selection,
     on_select: impl Fn(ItemClick) -> M + Copy + 'a,
     tok: Tokens,
-    window: VisibleWindow,
-    row_h: impl Into<RowHeights<'a>>,
-    overscan: usize,
-    on_scroll: impl Fn(VisibleWindow) -> M + Copy + 'a,
-    empty: &'a str,
-    meta_color: impl Fn(usize) -> iced::Color + Copy + 'a,
-    scroll_id: Option<Id>,
-    face: RowFace<impl Fn(usize) -> f32 + Copy + 'a>,
-    on_check: impl Fn(usize) -> M + Copy + 'a,
+    opts: ListOpts<'a, Rh, Scroll, Color, FaceH, Check>,
     a11y: A11y,
 ) -> Element<'a, M>
 where
     M: Clone + 'a,
     L: ListModel + ?Sized,
+    Rh: Into<RowHeights<'a>>,
+    Scroll: Fn(VisibleWindow) -> M + Copy + 'a,
+    Color: Fn(usize) -> iced::Color + Copy + 'a,
+    FaceH: Fn(usize) -> f32 + Copy + 'a,
+    Check: Fn(usize) -> M + Copy + 'a,
 {
+    let ListOpts {
+        window,
+        row_h,
+        overscan,
+        on_scroll,
+        empty,
+        meta_color,
+        scroll_id,
+        face,
+        on_check,
+    } = opts;
     let cover = selection.primary();
     let heights = row_h.into();
     let len = model.len();
@@ -6965,7 +6968,7 @@ pub fn item_grid<'a, M: Clone + 'a>(
                 let s = labels[i].clone();
                 let on = selected == Some(i);
                 // M3: selected tile = tonal; idle = outlined so the cell reads.
-                let tile = themed_button_sized(
+                let tile = button(
                     s.clone(),
                     None,
                     tok,
@@ -6975,8 +6978,10 @@ pub fn item_grid<'a, M: Clone + 'a>(
                         Variant::Outlined
                     },
                     Icons::NONE,
-                    Length::Fill,
-                    tile_h,
+                    ButtonOpts {
+                        width: Length::Fill,
+                        height: Length::Fill,
+                    },
                     A11y::new(s.clone(), Role::ListItem)
                         .with_checked(on)
                         .with_disabled(a11y.disabled),
@@ -7115,12 +7120,13 @@ where
         let c = *c;
         let title = model.header(c).to_string();
         pin_head = pin_head.push(
-            container(themed_button(
+            container(button(
                 title.clone(),
                 a11y.apply_message(Some(on_sort(c))),
                 tok,
                 Variant::Ghost,
                 Icons::NONE,
+                ButtonOpts::SHRINK,
                 A11y::button(title).with_disabled(disabled),
             ))
             .width(col_w(c)),
@@ -7131,12 +7137,13 @@ where
         let c = *c;
         let title = model.header(c).to_string();
         rest_head = rest_head.push(
-            container(themed_button(
+            container(button(
                 title.clone(),
                 a11y.apply_message(Some(on_sort(c))),
                 tok,
                 Variant::Ghost,
                 Icons::NONE,
+                ButtonOpts::SHRINK,
                 A11y::button(title).with_disabled(disabled),
             ))
             .width(col_w(c)),
@@ -7365,7 +7372,7 @@ pub fn tree_view<'a, M: Clone + 'a>(
     }
     col = tree_push_branch(col, branch, progress, tok);
     a11y::attach(
-        themed_scroll(
+        scroll(
             col.into(),
             tok,
             A11y::new("tree-scroll", Role::Group),
@@ -7377,7 +7384,7 @@ pub fn tree_view<'a, M: Clone + 'a>(
     )
 }
 
-/// Compact disclosure mark. A full [`themed_button`] is a control face,
+/// Compact disclosure mark. A full [`button`] is a control face,
 /// too tall for a file tree row.
 fn tree_twisty<'a, M: Clone + 'a>(
     mark: &'static str,
@@ -7386,7 +7393,7 @@ fn tree_twisty<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let face = text(mark).size(tok.body()).color(tok.scheme().on_surface);
-    let mut b = button(face)
+    let mut b = iced_button(face)
         .padding(Padding::from((gap(tok) / 2.0).max(4.0)))
         .style(style::joined_button_style(tok, Variant::Ghost));
     if let Some(m) = a11y.apply_message(msg) {
@@ -7624,7 +7631,7 @@ pub fn tab_bar<'a, M: Clone + 'a>(
         for kid in crate::i18n::order(tok.direction, label_kids) {
             label_row = label_row.push(kid);
         }
-        let mut tab = button(label_row)
+        let mut tab = iced_button(label_row)
             .padding(pad(tok))
             .style(style::tab_style(tok, active && !tab_off));
         if !tab_off {
@@ -7673,7 +7680,7 @@ pub fn tab_bar<'a, M: Clone + 'a>(
             .map(|(_, t)| t.clone())
             .collect();
         if !hidden.is_empty() {
-            cells.push(themed_pick_list(
+            cells.push(pick_list(
                 hidden,
                 None,
                 tab_overflow_pick(all, on_select),
@@ -7748,7 +7755,7 @@ fn disclosure_header<'a, M: Clone + 'a>(
     for kid in crate::i18n::order(tok.direction, [title_row, mark_el]) {
         face = face.push(kid);
     }
-    let mut b = button(face)
+    let mut b = iced_button(face)
         .padding(inset)
         .width(Length::Fill)
         .style(style::menu_item_style(tok));
@@ -8006,21 +8013,23 @@ pub fn pagination<'a, M: Clone + 'a>(
     let status = format!("{}–{} / {len}", range.start, range.end);
     a11y::attach(
         row![
-            themed_button(
+            button(
                 "Prev",
                 a11y.apply_message((page > 0).then(|| on_page(page - 1))),
                 tok,
                 Variant::Quiet,
                 Icons::NONE,
+                ButtonOpts::SHRINK,
                 A11y::button("Prev").with_disabled(a11y.disabled || page == 0),
             ),
             meta(status.clone(), tok, A11y::new(status, Role::Status)),
-            themed_button(
+            button(
                 "Next",
                 a11y.apply_message((page + 1 < pages).then(|| on_page(page + 1))),
                 tok,
                 Variant::Quiet,
                 Icons::NONE,
+                ButtonOpts::SHRINK,
                 A11y::button("Next").with_disabled(a11y.disabled || page + 1 >= pages),
             ),
         ]
@@ -8389,6 +8398,7 @@ mod tests {
             "q",
             on_input,
             None,
+            None,
             tok,
             A11y::new("Search", Role::TextBox),
             None,
@@ -8434,7 +8444,7 @@ mod tests {
     fn field_highlight_paints_the_typed_value() {
         let tok = named("dark").tokens;
         let runs = [FieldRun::new(0, 3, FieldInk::Warning)];
-        let mut field: Element<'_, ()> = themed_text_input(
+        let mut field: Element<'_, ()> = text_input(
             "q",
             "AND x",
             |_| (),
@@ -8456,6 +8466,7 @@ mod tests {
             "has:goa",
             |_| (),
             None,
+            None,
             tok,
             A11y::new("Search", Role::TextBox),
             None,
@@ -8465,6 +8476,7 @@ mod tests {
         let mut empty: Element<'_, ()> = search_input(
             "",
             |_| (),
+            None,
             None,
             tok,
             A11y::new("Search", Role::TextBox),
@@ -8479,14 +8491,14 @@ mod tests {
         let tok = named("dark")
             .tokens
             .with_shape(crate::m3::ShapePolicy::Material);
-        let _: Element<'_, bool> = themed_switch(
+        let _: Element<'_, bool> = switch(
             "Sounds",
             false,
             |on| on,
             tok,
             A11y::new("Sounds", Role::Switch),
         );
-        let _: Element<'_, f32> = themed_slider(
+        let _: Element<'_, f32> = slider(
             0.0..=1.0,
             0.4,
             |v| v,
@@ -8515,37 +8527,49 @@ mod tests {
         let snippet = Content::with_text("fn");
         let _: Element<'_, ()> = code_block(&snippet, |_| (), tok, role("fn", Role::Group));
         let _: Element<'_, ()> = hyperlink("l", (), tok, role("l", Role::Link));
-        let _: Element<'_, ()> =
-            themed_button("B", Some(()), tok, Variant::Primary, Icons::NONE, btn("B"));
-        let _: Element<'_, ()> = themed_button_sized(
+        let _: Element<'_, ()> = button(
+            "B",
+            Some(()),
+            tok,
+            Variant::Primary,
+            Icons::NONE,
+            ButtonOpts::SHRINK,
+            btn("B"),
+        );
+        let _: Element<'_, ()> = button(
             "7",
             Some(()),
             tok,
             Variant::Quiet,
             Icons::NONE,
-            Length::Fill,
-            Length::Fixed(Density::default().tile() as f32),
+            ButtonOpts {
+                width: Length::Fill,
+                height: Length::Fixed(Density::default().tile() as f32),
+            },
             btn("7"),
         );
         let _: Element<'_, ()> = display_line("6 × 4 =", tok, role("expr", Role::Status));
         let _: Element<'_, ()> = figure_display("12:40", tok, role("clock", Role::Status));
         let glyph = A11y::button("Backspace");
-        let _: Element<'_, ()> = themed_button_sized(
+        let _: Element<'_, ()> = button(
             "⌫",
             Some(()),
             tok,
             Variant::Quiet,
             Icons::NONE,
-            Length::Fill,
-            Length::Fixed(48.0),
+            ButtonOpts {
+                width: Length::Fill,
+                height: Length::Fixed(48.0),
+            },
             glyph,
         );
-        let _: Element<'_, ()> = themed_button(
+        let _: Element<'_, ()> = button(
             "D",
             None,
             tok,
             Variant::Danger,
             Icons::NONE,
+            ButtonOpts::SHRINK,
             btn("D").with_disabled(true),
         );
         let _: Element<'_, i32> =
@@ -8579,30 +8603,29 @@ mod tests {
             Icons::NONE,
             btn("T").with_checked(true).with_disabled(true),
         );
-        let _: Element<'_, ()> = themed_checkbox(
+        let _: Element<'_, ()> = checkbox(
             "c",
             true,
             |_| (),
             tok,
             role("c", Role::Checkbox).with_checked(true),
         );
-        let _: Element<'_, ()> = themed_switch(
+        let _: Element<'_, ()> = switch(
             "s",
             false,
             |_| (),
             tok,
             role("s", Role::Switch).with_disabled(true),
         );
-        let _: Element<'_, ()> = themed_switch(
+        let _: Element<'_, ()> = switch(
             "s2",
             true,
             |_| (),
             tok,
             role("s2", Role::Switch).with_checked(true),
         );
-        let _: Element<'_, ()> =
-            themed_radio("r", 1u8, Some(1u8), |_| (), tok, role("r", Role::Radio));
-        let _: Element<'_, ()> = themed_radio(
+        let _: Element<'_, ()> = radio("r", 1u8, Some(1u8), |_| (), tok, role("r", Role::Radio));
+        let _: Element<'_, ()> = radio(
             "off",
             2u8,
             Some(1u8),
@@ -8610,7 +8633,7 @@ mod tests {
             tok,
             role("off", Role::Radio).with_disabled(true),
         );
-        let _: Element<'_, ()> = themed_radio(
+        let _: Element<'_, ()> = radio(
             "on",
             1u8,
             Some(1u8),
@@ -8663,7 +8686,7 @@ mod tests {
         assert_eq!(progress_weights(0.0, None), (0, 0, 100));
         assert_eq!(progress_weights(1.0, None), (100, 0, 0));
         assert_eq!(progress_weights(0.4, Some(0.7)), (40, 30, 30));
-        let _: Element<'_, ()> = themed_slider(
+        let _: Element<'_, ()> = slider(
             0.0..=1.0,
             0.5,
             |_| (),
@@ -8757,7 +8780,7 @@ mod tests {
             ControlSize::Default,
             A11y::button("c").with_disabled(true),
         );
-        let field = themed_text_input(
+        let field = text_input(
             "x",
             "",
             |_| (),
@@ -8774,7 +8797,7 @@ mod tests {
             tok,
             role("fs", Role::Group),
         );
-        let field2 = themed_text_input(
+        let field2 = text_input(
             "y",
             "v",
             |_| (),
@@ -8786,7 +8809,7 @@ mod tests {
         );
         let _: Element<'_, ()> =
             field_support(field2, Some("only"), None, tok, role("fs2", Role::Group));
-        let field3 = themed_text_input(
+        let field3 = text_input(
             "z",
             "",
             |_| (),
@@ -8833,7 +8856,7 @@ mod tests {
                 );
             }
         }
-        let _: Element<'_, ()> = search_input_clear(
+        let _: Element<'_, ()> = search_input(
             "q",
             |_| (),
             Some(()),
@@ -8843,7 +8866,7 @@ mod tests {
             None,
             &[],
         );
-        let _: Element<'_, ()> = search_input_clear(
+        let _: Element<'_, ()> = search_input(
             "",
             |_| (),
             Some(()),
@@ -8853,7 +8876,7 @@ mod tests {
             None,
             &[],
         );
-        let _: Element<'_, ()> = search_input_clear(
+        let _: Element<'_, ()> = search_input(
             "q",
             |_| (),
             None,
@@ -8960,30 +8983,38 @@ mod tests {
         assert!(ring_should_stroke(0.0, 1.0));
         assert!(!ring_should_stroke(0.0, 0.0));
         let a11y = A11y::button("Nope").with_disabled(true);
-        let _: Element<'_, ()> =
-            themed_button("Nope", Some(()), tok, Variant::Primary, Icons::NONE, a11y);
+        let _: Element<'_, ()> = button(
+            "Nope",
+            Some(()),
+            tok,
+            Variant::Primary,
+            Icons::NONE,
+            ButtonOpts::SHRINK,
+            a11y,
+        );
         let unnamed = A11y::button("");
-        let _: Element<'_, ()> = themed_button(
+        let _: Element<'_, ()> = button(
             "Shown",
             Some(()),
             tok,
             Variant::Primary,
             Icons::NONE,
+            ButtonOpts::SHRINK,
             unnamed,
         );
         let unnamed_c = A11y::new("", Role::Checkbox);
-        let _: Element<'_, ()> = themed_checkbox("box", true, |_| (), tok, unnamed_c);
+        let _: Element<'_, ()> = checkbox("box", true, |_| (), tok, unnamed_c);
         let ca = A11y::new("off", Role::Checkbox)
             .with_checked(true)
             .with_disabled(true);
-        let _: Element<'_, ()> = themed_checkbox("off", false, |_| (), tok, ca);
+        let _: Element<'_, ()> = checkbox("off", false, |_| (), tok, ca);
         let _: Element<'_, ()> = number_input(
             3.0,
             |_| (),
             tok,
             role("n", Role::SpinButton).with_value("3"),
         );
-        let _: Element<'_, ()> = themed_text_input(
+        let _: Element<'_, ()> = text_input(
             "p",
             "v",
             |_| (),
@@ -8993,7 +9024,7 @@ mod tests {
             role("v", Role::TextBox),
             Some(Id::new("name")),
         );
-        let _: Element<'_, ()> = themed_text_input(
+        let _: Element<'_, ()> = text_input(
             "p",
             "",
             |_| (),
@@ -9003,7 +9034,7 @@ mod tests {
             role("Name", Role::TextBox),
             None,
         );
-        let _: Element<'_, ()> = themed_text_input(
+        let _: Element<'_, ()> = text_input(
             "p",
             "",
             |_| (),
@@ -9104,8 +9135,16 @@ mod tests {
             Direction::Rtl,
             role("vf-off", Role::Group).with_disabled(true),
         );
-        let _: Element<'_, ()> =
-            search_input("q", |_| (), None, tok, role("q", Role::TextBox), None, &[]);
+        let _: Element<'_, ()> = search_input(
+            "q",
+            |_| (),
+            None,
+            None,
+            tok,
+            role("q", Role::TextBox),
+            None,
+            &[],
+        );
         let mut sv: Element<'_, ()> = search_view(
             "in",
             ["Inbox", "Sent"],
@@ -9185,7 +9224,7 @@ mod tests {
             role("suggest", Role::Group),
         );
         let opts = ["a".to_string(), "b".to_string()];
-        let _: Element<'_, ()> = themed_pick_list(
+        let _: Element<'_, ()> = pick_list(
             opts,
             Some("a".into()),
             |_| (),
@@ -9194,16 +9233,16 @@ mod tests {
             role("a", Role::ComboBox),
         );
         let pick_src = include_str!("widget.rs")
-            .split("pub fn themed_pick_list")
+            .split("pub fn pick_list")
             .nth(1)
             .unwrap()
-            .split("pub fn date_picker")
+            .split("pub fn date_stepper")
             .next()
             .unwrap();
         assert!(pick_src.contains("tok.meta()"));
         assert!(pick_src.contains("tok.body()"));
         assert!(pick_src.contains("text_size(type_px)"));
-        let _: Element<'_, ()> = date_picker(
+        let _: Element<'_, ()> = date_stepper(
             DateValue {
                 year: 2024,
                 month: 1,
@@ -9289,7 +9328,7 @@ mod tests {
             false,
             role("code", Role::Group),
         );
-        let _: Element<'_, ()> = search_input_clear(
+        let _: Element<'_, ()> = search_input(
             "q",
             |_| (),
             None,
@@ -9485,15 +9524,17 @@ mod tests {
             &Sel::Single(0),
             |_| (),
             tok,
-            win,
-            24.0,
-            crate::collection::OVERSCAN,
-            |_| (),
-            "Empty",
-            |_| tok.muted,
-            Some(Id::from("list-host")),
-            RowFace::FLUSH,
-            |_| (),
+            ListOpts {
+                window: win,
+                row_h: 24.0,
+                overscan: crate::collection::OVERSCAN,
+                on_scroll: |_| (),
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: Some(Id::from("list-host")),
+                face: RowFace::FLUSH,
+                on_check: |_| (),
+            },
             role("list", Role::List),
         );
         let _: Element<'_, ()> = list_view(
@@ -9501,15 +9542,17 @@ mod tests {
             &Sel::None,
             |_| (),
             tok,
-            win,
-            24.0,
-            0,
-            |_| (),
-            "No sessions",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            |_| (),
+            ListOpts {
+                window: win,
+                row_h: 24.0,
+                overscan: 0,
+                on_scroll: |_| (),
+                empty: "No sessions",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| (),
+            },
             role("list", Role::List),
         );
         let mut striped: Element<'_, ()> = list_view(
@@ -9517,21 +9560,23 @@ mod tests {
             &Sel::Single(0),
             |_| (),
             tok,
-            win,
-            24.0,
-            4,
-            |_| (),
-            "Empty",
-            |i| {
-                if i == 0 {
-                    tok.danger
-                } else {
-                    tok.muted
-                }
+            ListOpts {
+                window: win,
+                row_h: 24.0,
+                overscan: 4,
+                on_scroll: |_| (),
+                empty: "Empty",
+                meta_color: |i| {
+                    if i == 0 {
+                        tok.danger
+                    } else {
+                        tok.muted
+                    }
+                },
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| (),
             },
-            None,
-            RowFace::FLUSH,
-            |_| (),
             role("list", Role::List),
         );
         draw_once(&mut striped);
@@ -9540,15 +9585,17 @@ mod tests {
             &Sel::Single(0),
             |_| (),
             tok,
-            win,
-            24.0,
-            4,
-            |_| (),
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            |_| (),
+            ListOpts {
+                window: win,
+                row_h: 24.0,
+                overscan: 4,
+                on_scroll: |_| (),
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| (),
+            },
             role("list-sep", Role::List),
         );
         let lines = ["boot".into(), "ready".into()];
@@ -9755,7 +9802,7 @@ mod tests {
             .with_disabled(true)
             .node_id()
             .contains("button|Save|1"));
-        let _: Element<'_, ()> = themed_scroll(
+        let _: Element<'_, ()> = scroll(
             label("log", tok, role("log", Role::Status)),
             tok,
             role("scroll", Role::Group),
@@ -9763,7 +9810,7 @@ mod tests {
             None,
             None::<fn(_) -> ()>,
         );
-        let _: Element<'_, ()> = themed_scroll(
+        let _: Element<'_, ()> = scroll(
             label("body", tok, role("body", Role::Status)),
             tok,
             role("scroll", Role::Group),
@@ -9772,7 +9819,7 @@ mod tests {
             None::<fn(_) -> ()>,
         );
         let scroll_src = src
-            .split("pub fn themed_scroll")
+            .split("pub fn scroll<'")
             .nth(1)
             .unwrap()
             .split("pub fn log_view")
@@ -9784,7 +9831,7 @@ mod tests {
         );
         assert!(crate::layout::stick_to_end(80.0, 100.0, 20.0, 4.0));
         let input_src = src
-            .split("pub fn themed_text_input")
+            .split("pub fn text_input")
             .nth(1)
             .unwrap()
             .split("pub fn password_input")
@@ -9886,12 +9933,13 @@ mod tests {
         let tok = named("dark").tokens;
         let btn = |n: &str| A11y::button(n);
         let max = iced::Size::new(800.0, 400.0);
-        let mut labeled = themed_button(
+        let mut labeled = button(
             "Save",
             Some(()),
             tok,
             Variant::Primary,
             Icons::NONE,
+            ButtonOpts::SHRINK,
             btn("Save"),
         );
         let mut split = split_button(
@@ -9929,30 +9977,33 @@ mod tests {
         let role = |n: &str, r: Role| A11y::new(n, r);
         let _ = Cell::from(String::from("X"));
         let _ = Cell::from(&String::from("Y"));
-        let mut filled = themed_button(
+        let mut filled = button(
             "Save",
             Some(()),
             tok,
             Variant::Primary,
             Icons::both(Icon::Check, Icon::Chevron),
+            ButtonOpts::SHRINK,
             btn("Save"),
         );
         draw_once(&mut filled);
-        let mut outlined = themed_button(
+        let mut outlined = button(
             "Edit",
             None::<()>,
             compact,
             Variant::Outlined,
             Icons::NONE,
+            ButtonOpts::SHRINK,
             btn("Edit").with_disabled(true),
         );
         draw_once(&mut outlined);
-        let mut elevated = themed_button(
+        let mut elevated = button(
             "Open",
             Some(()),
             tok,
             Variant::Elevated,
             Icons::NONE,
+            ButtonOpts::SHRINK,
             btn("Open"),
         );
         draw_once(&mut elevated);
@@ -9992,7 +10043,7 @@ mod tests {
             max_len: Some(8),
             highlight: &[],
         };
-        let mut field = themed_text_input(
+        let mut field = text_input(
             "q",
             "hi",
             |_| (),
@@ -10010,7 +10061,7 @@ mod tests {
             max_len: Some(4),
             highlight: &[],
         };
-        let mut empty = themed_text_input(
+        let mut empty = text_input(
             "Name",
             "",
             |_| (),
@@ -10021,7 +10072,7 @@ mod tests {
             None,
         );
         draw_once(&mut empty);
-        let mut vert = themed_slider(
+        let mut vert = slider(
             0.0..=1.0,
             0.3,
             |_| (),
@@ -10034,7 +10085,7 @@ mod tests {
             role("v", Role::Slider),
         );
         draw_once(&mut vert);
-        let mut vert_off = themed_slider(
+        let mut vert_off = slider(
             0.0..=1.0,
             0.0,
             |_| (),
@@ -10210,12 +10261,13 @@ mod tests {
             crate::density::DensityName::Comfortable,
         ));
         assert!(comfy.density.pad > tok.density.pad);
-        let mut comfy_btn = themed_button(
+        let mut comfy_btn = button(
             "Wide",
             Some(()),
             comfy,
             Variant::Primary,
             Icons::NONE,
+            ButtonOpts::SHRINK,
             btn("Wide"),
         );
         draw_once(&mut comfy_btn);
@@ -10344,7 +10396,7 @@ mod tests {
             format!("default {default} must be shorter than comfortable {comfortable}"),
         );
         let max = iced::Size::new(400.0, 80.0);
-        let mut compact_btn = themed_button(
+        let mut compact_btn = button(
             "Save",
             Some(()),
             base.with_density(crate::density::Density::named(
@@ -10352,17 +10404,19 @@ mod tests {
             )),
             Variant::Primary,
             Icons::NONE,
+            ButtonOpts::SHRINK,
             A11y::button("Save"),
         );
-        let mut default_btn = themed_button(
+        let mut default_btn = button(
             "Save",
             Some(()),
             base,
             Variant::Primary,
             Icons::NONE,
+            ButtonOpts::SHRINK,
             A11y::button("Save"),
         );
-        let mut comfortable_btn = themed_button(
+        let mut comfortable_btn = button(
             "Save",
             Some(()),
             base.with_density(crate::density::Density::named(
@@ -10370,6 +10424,7 @@ mod tests {
             )),
             Variant::Primary,
             Icons::NONE,
+            ButtonOpts::SHRINK,
             A11y::button("Save"),
         );
         let hc = layout_size(&mut compact_btn, max).height;
@@ -10378,12 +10433,12 @@ mod tests {
         assert!(hc < hd, "compact button {hc} < default {hd}");
         assert!(hd < hh, "default button {hd} < comfortable {hh}");
         let slider_fn = include_str!("widget.rs")
-            .split("pub fn themed_slider")
+            .split("pub fn slider<'")
             .nth(1)
             .unwrap();
         assert_eq!(
             slider_fn
-                .matches(".style(style::slider_style(tok))")
+                .matches(".style(style::slider_style_rail(tok")
                 .count(),
             2
         );
@@ -10556,15 +10611,17 @@ mod tests {
             &Sel::Single(0),
             |_| (),
             tok,
-            VisibleWindow::new(80.0),
-            24.0,
-            2,
-            |_| (),
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            |_| (),
+            ListOpts {
+                window: VisibleWindow::new(80.0),
+                row_h: 24.0,
+                overscan: 2,
+                on_scroll: |_| (),
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| (),
+            },
             role("list", Role::List),
         );
         draw_once(&mut lv);
@@ -10574,15 +10631,17 @@ mod tests {
             &Sel::None,
             |_| (),
             tok,
-            VisibleWindow::new(80.0),
-            24.0,
-            2,
-            |_| (),
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            |_| (),
+            ListOpts {
+                window: VisibleWindow::new(80.0),
+                row_h: 24.0,
+                overscan: 2,
+                on_scroll: |_| (),
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| (),
+            },
             role("list-empty", Role::List),
         );
         draw_once(&mut empty_lv);
@@ -10597,21 +10656,23 @@ mod tests {
             &Sel::Single(0),
             |_| (),
             tok,
-            VisibleWindow::new(80.0),
-            24.0,
-            2,
-            |_| (),
-            "Empty",
-            |i| {
-                if i == 0 {
-                    tok.danger
-                } else {
-                    tok.muted
-                }
+            ListOpts {
+                window: VisibleWindow::new(80.0),
+                row_h: 24.0,
+                overscan: 2,
+                on_scroll: |_| (),
+                empty: "Empty",
+                meta_color: |i| {
+                    if i == 0 {
+                        tok.danger
+                    } else {
+                        tok.muted
+                    }
+                },
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| (),
             },
-            None,
-            RowFace::FLUSH,
-            |_| (),
             role("list-color", Role::List),
         );
         draw_once(&mut color_lv);
@@ -10620,15 +10681,17 @@ mod tests {
             &Sel::Single(0),
             |_| (),
             tok,
-            VisibleWindow::new(80.0),
-            24.0,
-            2,
-            |_| (),
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            |_| (),
+            ListOpts {
+                window: VisibleWindow::new(80.0),
+                row_h: 24.0,
+                overscan: 2,
+                on_scroll: |_| (),
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| (),
+            },
             role("list", Role::List).with_disabled(true),
         );
         draw_once(&mut dead_lv);
@@ -10853,10 +10916,10 @@ mod tests {
             A11y::new("api-token", Role::Group),
         );
         let search_src = src
-            .split("pub fn search_input_clear")
+            .split("pub fn search_input")
             .nth(1)
             .unwrap()
-            .split("pub fn themed_pick_list")
+            .split("pub fn pick_list")
             .next()
             .unwrap();
         assert!(!search_src.contains("apply_name(value)"));
@@ -10864,7 +10927,7 @@ mod tests {
         assert!(search_src.contains("on_submit"));
         assert!(search_src.contains("input_id"));
         assert!(search_src.contains("highlight"));
-        assert!(src.contains("pub fn search_input_clear"));
+        assert!(src.contains("pub fn search_input"));
         let vf_src = src
             .split("pub fn value_field")
             .nth(1)
@@ -10881,7 +10944,7 @@ mod tests {
         use iced::advanced::widget::Tree;
         use iced::{Font, Pixels, Size};
         let tok = named("dark").tokens;
-        let mut el: Element<'_, ()> = search_input_clear(
+        let mut el: Element<'_, ()> = search_input(
             value,
             |_| (),
             on_clear,
@@ -10915,7 +10978,7 @@ mod tests {
         let tok = named("dark")
             .tokens
             .with_direction(crate::i18n::Direction::Rtl);
-        let mut field: Element<'_, ()> = themed_text_input(
+        let mut field: Element<'_, ()> = text_input(
             "تلاش",
             "",
             |_| (),
@@ -10926,7 +10989,7 @@ mod tests {
             None,
         );
         draw_once(&mut field);
-        let mut search: Element<'_, ()> = search_input_clear(
+        let mut search: Element<'_, ()> = search_input(
             "",
             |_| (),
             None,
@@ -10937,7 +11000,7 @@ mod tests {
             &[],
         );
         draw_once(&mut search);
-        let mut counted: Element<'_, ()> = themed_text_input(
+        let mut counted: Element<'_, ()> = text_input(
             "نام",
             "نام",
             |_| (),
@@ -11017,7 +11080,7 @@ mod tests {
         let a11y = A11y::new("find", Role::TextBox).with_disabled(true);
         assert_eq!(a11y.child(Role::TextBox).node_id(), "textbox|find|1");
         let mut el: Element<'_, String> =
-            search_input("typed-query", |s| s, None, tok, a11y, None, &[]);
+            search_input("typed-query", |s| s, None, None, tok, a11y, None, &[]);
         let mut tree = Tree::new(el.as_widget());
         let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
             Font::DEFAULT,
@@ -11066,12 +11129,13 @@ mod tests {
             "",
             |_| (),
             None,
+            None,
             tok,
             A11y::new("Search", Role::TextBox),
             None,
             &[],
         );
-        let mut pick: Element<'_, ()> = themed_pick_list(
+        let mut pick: Element<'_, ()> = pick_list(
             &["All"][..],
             Some("All"),
             |_| (),
@@ -11374,7 +11438,7 @@ mod tests {
         assert_eq!(ed.value, s.on_surface);
         assert_eq!(ed.selection, s.secondary_container);
         // Disabled slider face uses scheme track colors (style closure).
-        let _: Element<'_, ()> = themed_slider(
+        let _: Element<'_, ()> = slider(
             0.0..=1.0,
             0.5,
             |_| (),
@@ -11863,15 +11927,17 @@ mod tests {
             &Sel::None,
             |c| c.id,
             tok,
-            win,
-            24.0,
-            2,
-            |_| 0,
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            |i| i,
+            ListOpts {
+                window: win,
+                row_h: 24.0,
+                overscan: 2,
+                on_scroll: |_| 0,
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |i| i,
+            },
             A11y::new("slotted", Role::List),
         );
         draw_once(&mut el);
@@ -11881,15 +11947,17 @@ mod tests {
             &Sel::None,
             |_| (),
             tok,
-            win,
-            24.0,
-            0,
-            |_| (),
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            |_| (),
+            ListOpts {
+                window: win,
+                row_h: 24.0,
+                overscan: 0,
+                on_scroll: |_| (),
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| (),
+            },
             A11y::new("empty-slots", Role::List),
         );
         draw_once(&mut empty_slots);
@@ -11920,7 +11988,7 @@ mod tests {
             A11y::new("checks", Role::Table),
         );
         draw_once(&mut dt);
-        let _: Element<'_, ()> = themed_slider(
+        let _: Element<'_, ()> = slider(
             0.0..=1.0,
             0.2,
             |_| (),
@@ -11933,7 +12001,7 @@ mod tests {
             tok,
             A11y::new("ticked", Role::Slider),
         );
-        let _: Element<'_, ()> = themed_slider(
+        let _: Element<'_, ()> = slider(
             0.0..=1.0,
             0.2,
             |_| (),
@@ -11995,15 +12063,17 @@ mod tests {
             &Sel::None,
             |_| (),
             tok,
-            win,
-            24.0,
-            0,
-            |_| (),
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            |_| (),
+            ListOpts {
+                window: win,
+                row_h: 24.0,
+                overscan: 0,
+                on_scroll: |_| (),
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| (),
+            },
             A11y::new("dead-check", Role::List).with_disabled(true),
         );
         draw_once(&mut dead_check);
@@ -12063,15 +12133,17 @@ mod tests {
             &Sel::Single(0),
             |_| window,
             tok,
-            window,
-            20.0,
-            4,
-            |w| w,
-            "Empty",
-            |_| tok.muted,
-            Some(Id::from("list-scroll")),
-            RowFace::FLUSH,
-            |_| window,
+            ListOpts {
+                window,
+                row_h: 20.0,
+                overscan: 4,
+                on_scroll: |w| w,
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: Some(Id::from("list-scroll")),
+                face: RowFace::FLUSH,
+                on_check: |_| window,
+            },
             A11y::new("list", Role::List),
         );
         let _ = drive(&mut list_el);
@@ -12108,7 +12180,7 @@ mod tests {
             crate::collection::window_after_scroll(window, 4.0, 200.0, 20.0, 80, 4, Some(0));
         assert_eq!(after.start, 0);
         assert!((after.scroll - 4.0).abs() < 0.01);
-        let mut scroller: Element<'_, f32> = themed_scroll(
+        let mut scroller: Element<'_, f32> = scroll(
             iced::widget::column![
                 label("a", tok, A11y::new("a", Role::Status)),
                 Space::new().height(800.0),
@@ -12164,15 +12236,17 @@ mod tests {
             &Sel::Single(0),
             |_| window,
             tok,
-            window,
-            row_h,
-            4,
-            |w| w,
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            |_| window,
+            ListOpts {
+                window,
+                row_h,
+                overscan: 4,
+                on_scroll: |w| w,
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| window,
+            },
             A11y::new("list", Role::List),
         );
         let mut tree = Tree::new(el.as_widget());
@@ -12203,7 +12277,7 @@ mod tests {
             "RTL list leading check must sit on the start (right) side",
         );
 
-        let mut scroller: Element<'_, f32> = themed_scroll(
+        let mut scroller: Element<'_, f32> = scroll(
             iced::widget::column![
                 label("a", tok, A11y::new("a", Role::Status)),
                 Space::new().height(800.0),
@@ -12335,7 +12409,7 @@ mod tests {
     #[test]
     fn themed_slider_thumb_aligns_start() {
         let src = include_str!("widget.rs")
-            .split("pub fn themed_slider")
+            .split("pub fn slider<'")
             .nth(1)
             .unwrap()
             .split("fn disabled_slider_face")
@@ -12369,7 +12443,7 @@ mod tests {
         let tok = crate::theme::named("dark")
             .tokens
             .with_direction(crate::i18n::Direction::Rtl);
-        let mut el: Element<'_, f32> = themed_slider(
+        let mut el: Element<'_, f32> = slider(
             0.0..=1.0,
             0.4,
             |v| v,
@@ -12494,7 +12568,7 @@ mod tests {
         use iced::{Font, Pixels, Size};
 
         let face = include_str!("widget.rs")
-            .split("pub fn themed_button_sized")
+            .split("pub fn button<'")
             .nth(1)
             .unwrap()
             .split("pub fn split_button")
@@ -12508,20 +12582,22 @@ mod tests {
             .tokens
             .with_direction(crate::i18n::Direction::Rtl);
         let title = "کنٹرولز";
-        let mut el: Element<'_, ()> = themed_button(
+        let mut el: Element<'_, ()> = button(
             title,
             Some(()),
             tok,
             Variant::Primary,
             Icons::NONE,
+            ButtonOpts::SHRINK,
             A11y::button(title),
         );
-        let mut empty: Element<'_, ()> = themed_button(
+        let mut empty: Element<'_, ()> = button(
             "",
             Some(()),
             tok,
             Variant::Primary,
             Icons::NONE,
+            ButtonOpts::SHRINK,
             A11y::button("pad"),
         );
         let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
@@ -12609,7 +12685,7 @@ mod tests {
             .tokens
             .with_direction(crate::i18n::Direction::Rtl);
         let opts = ["a", "b"];
-        let mut pick: Element<'_, &str> = themed_pick_list(
+        let mut pick: Element<'_, &str> = pick_list(
             opts,
             Some("a"),
             |s| s,
@@ -12682,7 +12758,7 @@ mod tests {
         let tok = named("dark")
             .tokens
             .with_direction(crate::i18n::Direction::Rtl);
-        let mut box_el: Element<'_, bool> = themed_checkbox(
+        let mut box_el: Element<'_, bool> = checkbox(
             "Accept",
             true,
             |on| on,
@@ -12752,7 +12828,7 @@ mod tests {
     #[test]
     fn empty_checkbox_label_is_shrink_width() {
         let tok = named("dark").tokens;
-        let mut named_box: Element<'_, bool> = themed_checkbox(
+        let mut named_box: Element<'_, bool> = checkbox(
             "Accept",
             false,
             |on| on,
@@ -12760,7 +12836,7 @@ mod tests {
             A11y::new("Accept", Role::Checkbox),
         );
         let mut empty: Element<'_, bool> =
-            themed_checkbox("", false, |on| on, tok, A11y::new("row", Role::Checkbox));
+            checkbox("", false, |on| on, tok, A11y::new("row", Role::Checkbox));
         let named_w = layout_size(&mut named_box, iced::Size::new(320.0, 48.0)).width;
         let empty_w = layout_size(&mut empty, iced::Size::new(320.0, 48.0)).width;
         must(
@@ -12797,15 +12873,17 @@ mod tests {
             &Sel::Single(0),
             |_| window,
             tok,
-            window,
-            row_h,
-            4,
-            |w| w,
-            "Empty",
-            |_| tok.muted,
-            Some(Id::from("list-rail")),
-            RowFace::FLUSH,
-            |_| window,
+            ListOpts {
+                window,
+                row_h,
+                overscan: 4,
+                on_scroll: |w| w,
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: Some(Id::from("list-rail")),
+                face: RowFace::FLUSH,
+                on_check: |_| window,
+            },
             A11y::new("list", Role::List),
         );
         let mut tree = Tree::new(el.as_widget());
@@ -12914,15 +12992,17 @@ mod tests {
             &Sel::None,
             |_| window,
             tok,
-            window,
-            row_h,
-            4,
-            |w| w,
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            |_| window,
+            ListOpts {
+                window,
+                row_h,
+                overscan: 4,
+                on_scroll: |w| w,
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| window,
+            },
             A11y::new("list", Role::List),
         );
         let mut tree = Tree::new(el.as_widget());
@@ -13044,15 +13124,17 @@ mod tests {
             &Sel::None,
             |_| window,
             tok,
-            window,
-            row_h,
-            4,
-            |w| w,
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            |_| window,
+            ListOpts {
+                window,
+                row_h,
+                overscan: 4,
+                on_scroll: |w| w,
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| window,
+            },
             A11y::new("list", Role::List),
         );
         let mut tree = Tree::new(el.as_widget());
@@ -13089,15 +13171,17 @@ mod tests {
             &Sel::None,
             |_| window,
             tok,
-            window,
-            row_h,
-            4,
-            |w| w,
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            |_| window,
+            ListOpts {
+                window,
+                row_h,
+                overscan: 4,
+                on_scroll: |w| w,
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| window,
+            },
             A11y::new("list", Role::List),
         );
         el.as_widget().diff(&mut tree);
@@ -13146,15 +13230,17 @@ mod tests {
             &Sel::None,
             |c| Ev::Pick(c.id),
             tok,
-            window,
-            row_h,
-            4,
-            Ev::Scroll,
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            Ev::Pick,
+            ListOpts {
+                window,
+                row_h,
+                overscan: 4,
+                on_scroll: Ev::Scroll,
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: Ev::Pick,
+            },
             A11y::new("list", Role::List),
         );
         let mut tree = Tree::new(el.as_widget());
@@ -13265,15 +13351,17 @@ mod tests {
             &Sel::None,
             |_| top,
             tok,
-            top,
-            row_h,
-            4,
-            |w| w,
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            |_| top,
+            ListOpts {
+                window: top,
+                row_h,
+                overscan: 4,
+                on_scroll: |w| w,
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| top,
+            },
             A11y::new("list", Role::List),
         );
         let mut tree = Tree::new(el.as_widget());
@@ -13313,15 +13401,17 @@ mod tests {
             &Sel::None,
             |_| top,
             tok,
-            top,
-            row_h,
-            4,
-            |w| w,
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            |_| top,
+            ListOpts {
+                window: top,
+                row_h,
+                overscan: 4,
+                on_scroll: |w| w,
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| top,
+            },
             A11y::new("list", Role::List),
         );
         el.as_widget().diff(&mut tree);
@@ -13363,15 +13453,17 @@ mod tests {
             &Sel::None,
             |_| top,
             tok,
-            top,
-            row_h,
-            4,
-            |w| w,
-            "Empty",
-            |_| tok.muted,
-            Some(id.clone()),
-            RowFace::FLUSH,
-            |_| top,
+            ListOpts {
+                window: top,
+                row_h,
+                overscan: 4,
+                on_scroll: |w| w,
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: Some(id.clone()),
+                face: RowFace::FLUSH,
+                on_check: |_| top,
+            },
             A11y::new("list", Role::List),
         );
         let mut tree = Tree::new(el.as_widget());
@@ -13421,15 +13513,17 @@ mod tests {
             &Sel::Single(0),
             |_| top,
             tok,
-            top,
-            row_h,
-            4,
-            |w| w,
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            |_| top,
+            ListOpts {
+                window: top,
+                row_h,
+                overscan: 4,
+                on_scroll: |w| w,
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| top,
+            },
             A11y::new("list", Role::List),
         );
         let mut tree = Tree::new(el.as_widget());
@@ -13444,15 +13538,17 @@ mod tests {
             &Sel::Single(30),
             |_| deep,
             tok,
-            deep,
-            row_h,
-            4,
-            |w| w,
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            |_| deep,
+            ListOpts {
+                window: deep,
+                row_h,
+                overscan: 4,
+                on_scroll: |w| w,
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| deep,
+            },
             A11y::new("list", Role::List),
         );
         el.as_widget().diff(&mut tree);
@@ -13495,15 +13591,17 @@ mod tests {
             &Sel::Single(0),
             |_| top,
             tok,
-            top,
-            row_h,
-            4,
-            |w| w,
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            |_| top,
+            ListOpts {
+                window: top,
+                row_h,
+                overscan: 4,
+                on_scroll: |w| w,
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| top,
+            },
             A11y::new("list", Role::List),
         );
         let mut tree = Tree::new(el.as_widget());
@@ -13539,15 +13637,17 @@ mod tests {
             &Sel::Single(0),
             |_| top,
             tok,
-            top,
-            row_h,
-            4,
-            |w| w,
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            |_| top,
+            ListOpts {
+                window: top,
+                row_h,
+                overscan: 4,
+                on_scroll: |w| w,
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| top,
+            },
             A11y::new("list", Role::List),
         );
         el.as_widget().diff(&mut tree);
@@ -13590,15 +13690,17 @@ mod tests {
             &Sel::None,
             |_| window,
             tok,
-            window,
-            row_h,
-            4,
-            |w| w,
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            |_| window,
+            ListOpts {
+                window,
+                row_h,
+                overscan: 4,
+                on_scroll: |w| w,
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| window,
+            },
             A11y::new("list", Role::List),
         );
         let mut tree = Tree::new(el.as_widget());
@@ -13673,15 +13775,17 @@ mod tests {
             &Sel::None,
             |_| window,
             tok,
-            window,
-            row_h,
-            overscan,
-            |w| w,
-            "Empty",
-            |_| tok.muted,
-            Some(id.clone()),
-            RowFace::FLUSH,
-            |_| window,
+            ListOpts {
+                window,
+                row_h,
+                overscan,
+                on_scroll: |w| w,
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: Some(id.clone()),
+                face: RowFace::FLUSH,
+                on_check: |_| window,
+            },
             A11y::new("list", Role::List),
         );
         let mut tree = Tree::new(el.as_widget());
@@ -13729,15 +13833,17 @@ mod tests {
             &Sel::None,
             |_| sep_win,
             tok,
-            sep_win,
-            sep_h,
-            1,
-            |w| w,
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            |_| sep_win,
+            ListOpts {
+                window: sep_win,
+                row_h: sep_h,
+                overscan: 1,
+                on_scroll: |w| w,
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| sep_win,
+            },
             A11y::new("sep-list", Role::List),
         );
         let mut sep_tree = Tree::new(sep_el.as_widget());
@@ -13781,15 +13887,17 @@ mod tests {
             &Sel::None,
             |_| 0.0,
             tok,
-            window,
-            crate::collection::RowHeights::PerRow(&heights),
-            0,
-            |w| w.scroll,
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            |_| 0.0,
+            ListOpts {
+                window,
+                row_h: crate::collection::RowHeights::PerRow(&heights),
+                overscan: 0,
+                on_scroll: |w: crate::collection::VisibleWindow| w.scroll,
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| 0.0,
+            },
             A11y::new("var-list", Role::List),
         );
         let mut tree = Tree::new(el.as_widget());
@@ -13818,17 +13926,19 @@ mod tests {
             &Sel::Single(0),
             |_| (),
             tok,
-            window,
-            crate::collection::RowHeights::PerRow(&heights),
-            0,
-            |_| (),
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::Card {
-                meter: Some(|i| if i == 0 { 0.8 } else { 0.2 }),
+            ListOpts {
+                window,
+                row_h: crate::collection::RowHeights::PerRow(&heights),
+                overscan: 0,
+                on_scroll: |_| (),
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::Card {
+                    meter: Some(|i| if i == 0 { 0.8 } else { 0.2 }),
+                },
+                on_check: |_| (),
             },
-            |_| (),
             A11y::new("card-list", Role::List),
         );
         let mut tree_c = Tree::new(cards.as_widget());
@@ -13859,17 +13969,19 @@ mod tests {
             &Sel::None,
             |_| (),
             tok,
-            VisibleWindow::new(80.0),
-            72.0,
-            0,
-            |_| (),
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::Card {
-                meter: None::<fn(usize) -> f32>,
+            ListOpts {
+                window: VisibleWindow::new(80.0),
+                row_h: 72.0,
+                overscan: 0,
+                on_scroll: |_| (),
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::Card {
+                    meter: None::<fn(usize) -> f32>,
+                },
+                on_check: |_| (),
             },
-            |_| (),
             A11y::new("card-bare", Role::List).with_disabled(true),
         );
         draw_once(&mut no_meter);
@@ -14157,15 +14269,17 @@ mod tests {
             &Sel::Single(0),
             |c| c.id,
             tok,
-            win,
-            64.0,
-            2,
-            |_| 0,
-            "No rows",
-            |_| tok.scheme().on_surface_variant,
-            None,
-            RowFace::FLUSH,
-            |_| 0,
+            ListOpts {
+                window: win,
+                row_h: 64.0,
+                overscan: 2,
+                on_scroll: |_| 0,
+                empty: "No rows",
+                meta_color: |_| tok.scheme().on_surface_variant,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| 0,
+            },
             A11y::new("mail", Role::List),
         );
         draw_once(&mut el);
@@ -14190,15 +14304,17 @@ mod tests {
             &Sel::Single(0),
             |c| c.id,
             tok,
-            win,
-            32.0,
-            2,
-            |_| 0,
-            "No rows",
-            |_| tok.scheme().on_surface_variant,
-            None,
-            RowFace::FLUSH,
-            |_| 0,
+            ListOpts {
+                window: win,
+                row_h: 32.0,
+                overscan: 2,
+                on_scroll: |_| 0,
+                empty: "No rows",
+                meta_color: |_| tok.scheme().on_surface_variant,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| 0,
+            },
             A11y::new("mail", Role::List),
         );
         let mut step_el: Element<'_, usize> = list_view(
@@ -14206,15 +14322,17 @@ mod tests {
             &Sel::Single(0),
             |c| c.id,
             tok,
-            win,
-            32.0,
-            2,
-            |_| 0,
-            "No rows",
-            |_| tok.scheme().on_surface_variant,
-            None,
-            RowFace::FLUSH,
-            |_| 0,
+            ListOpts {
+                window: win,
+                row_h: 32.0,
+                overscan: 2,
+                on_scroll: |_| 0,
+                empty: "No rows",
+                meta_color: |_| tok.scheme().on_surface_variant,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| 0,
+            },
             A11y::new("mail", Role::List),
         );
         let flat = layout_size(&mut flat_el, iced::Size::new(320.0, 80.0));
@@ -14425,7 +14543,7 @@ mod tests {
         use iced::mouse;
         use iced::{Event, Font, Pixels, Point, Rectangle, Size};
         let tok = named("dark").tokens;
-        let mut el: Element<'_, u8> = themed_radio(
+        let mut el: Element<'_, u8> = radio(
             "Locked",
             1u8,
             Some(1u8),
@@ -14468,7 +14586,7 @@ mod tests {
         use iced::mouse;
         use iced::{Event, Font, Pixels, Point, Rectangle, Size};
         let tok = named("dark").tokens;
-        let mut slider_el: Element<'_, u8> = themed_slider(
+        let mut slider_el: Element<'_, u8> = slider(
             0.0..=1.0,
             0.5,
             |_| 1u8,
@@ -14482,7 +14600,7 @@ mod tests {
             A11y::new("vol", Role::Slider).with_disabled(true),
         );
         let opts = ["a".to_string(), "b".to_string()];
-        let mut pick_el: Element<'_, u8> = themed_pick_list(
+        let mut pick_el: Element<'_, u8> = pick_list(
             opts,
             Some("a".into()),
             |_| 2u8,
@@ -15077,7 +15195,7 @@ mod tests {
     #[test]
     fn wheel_steps_slider_number_and_pick() {
         let tok = named("dark").tokens;
-        let mut slider: Element<'_, f32> = themed_slider(
+        let mut slider: Element<'_, f32> = slider(
             0.0..=1.0,
             0.4,
             |v| v,
@@ -15114,7 +15232,7 @@ mod tests {
         assert_eq!(n_down, ["2".to_string()]);
 
         let opts = ["alpha".to_string(), "beta".to_string(), "gamma".to_string()];
-        let mut pick: Element<'_, String> = themed_pick_list(
+        let mut pick: Element<'_, String> = pick_list(
             opts.clone(),
             Some("beta".into()),
             |s| s,
@@ -15135,7 +15253,7 @@ mod tests {
         let cmd = pump_pick_command_wheel(&mut pick, -1.0);
         assert!(!cmd.is_empty());
         let empty: &[String] = &[];
-        let _: Element<'_, String> = themed_pick_list(
+        let _: Element<'_, String> = pick_list(
             empty,
             None,
             |s| s,
@@ -15200,7 +15318,7 @@ mod tests {
         use iced::{Font, Pixels, Size};
         let tok = named("dark").tokens;
         let opts = ["nord", "dark"];
-        let mut el: Element<'_, &str> = themed_pick_list(
+        let mut el: Element<'_, &str> = pick_list(
             opts,
             Some("nord"),
             |s| s,
@@ -15236,10 +15354,10 @@ mod tests {
             ),
         );
         let src = include_str!("widget.rs")
-            .split("pub fn themed_pick_list")
+            .split("pub fn pick_list")
             .nth(1)
             .unwrap()
-            .split("pub fn date_picker")
+            .split("pub fn date_stepper")
             .next()
             .unwrap();
         assert!(src.contains("ControlSize::Compact"));
@@ -15299,7 +15417,7 @@ mod tests {
         assert!(compact <= crate::m3::density::TRAILING_ICON_COMPACT as f32);
         assert!(compact < pick_handle_size(tok, ControlSize::Default));
         assert!(compact <= sized_control_height(tok, ControlSize::Compact) - 8.0);
-        let mut el: Element<'_, &str> = themed_pick_list(
+        let mut el: Element<'_, &str> = pick_list(
             ["nord", "dark"],
             Some("nord"),
             |s| s,
@@ -15345,10 +15463,10 @@ mod tests {
             "LTR pick mark must use Density::inset from the end",
         );
         let src = include_str!("widget.rs")
-            .split("pub fn themed_pick_list")
+            .split("pub fn pick_list")
             .nth(1)
             .unwrap()
-            .split("pub fn date_picker")
+            .split("pub fn date_stepper")
             .next()
             .unwrap();
         assert!(src.contains("Handle::None"));
@@ -15366,7 +15484,7 @@ mod tests {
     #[test]
     fn themed_pick_list_matches_field_height_without_extra_gutter() {
         let tok = named("dark").tokens;
-        let mut field: Element<'_, String> = themed_text_input(
+        let mut field: Element<'_, String> = text_input(
             "Name",
             "nord",
             |s| s,
@@ -15409,7 +15527,7 @@ mod tests {
             a11y = a11y.with_disabled(true);
         }
         let mut el: Element<'_, &str> =
-            themed_pick_list(opts, Some("nord"), |s| s, tok, ControlSize::Default, a11y);
+            pick_list(opts, Some("nord"), |s| s, tok, ControlSize::Default, a11y);
         let mut tree = Tree::new(el.as_widget());
         let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
             Font::DEFAULT,
@@ -15451,7 +15569,7 @@ mod tests {
         use iced::{Font, Pixels, Point, Size};
         let tok = named("dark").tokens;
         let opts = ["nord", "dark"];
-        let mut el: Element<'_, &str> = themed_pick_list(
+        let mut el: Element<'_, &str> = pick_list(
             opts,
             Some("nord"),
             |s| s,
@@ -15505,7 +15623,7 @@ mod tests {
             [
                 FormRow::new(
                     "Name",
-                    themed_text_input(
+                    text_input(
                         "Name",
                         "Ada",
                         |_| 99usize,
@@ -15519,7 +15637,7 @@ mod tests {
                 .with_focus(name_id.clone()),
                 FormRow::new(
                     "Theme",
-                    themed_pick_list(
+                    pick_list(
                         ["nord", "dark"],
                         Some("nord"),
                         |_| 99usize,
@@ -15530,7 +15648,7 @@ mod tests {
                 ),
                 FormRow::new(
                     "Ok",
-                    themed_checkbox(
+                    checkbox(
                         "Ok",
                         false,
                         |_| 99usize,
@@ -15540,7 +15658,7 @@ mod tests {
                 ),
                 FormRow::new(
                     "Kind",
-                    themed_radio(
+                    radio(
                         "A",
                         0u8,
                         Some(0),
@@ -15720,7 +15838,7 @@ mod tests {
             vec![99]
         );
         let tok = named("dark").tokens;
-        let mut lone: Element<'_, usize> = themed_text_input(
+        let mut lone: Element<'_, usize> = text_input(
             "Name",
             "Ada",
             |_| 99usize,
@@ -15751,7 +15869,7 @@ mod tests {
         let mut solo: Element<'_, usize> = form_group(
             [FormRow::new(
                 "Name",
-                themed_text_input(
+                text_input(
                     "Name",
                     "",
                     |_| 99usize,
@@ -15796,7 +15914,7 @@ mod tests {
         let mut el: Element<'_, usize> = form_group(
             [FormRow::new(
                 "",
-                themed_checkbox(
+                checkbox(
                     "Remember",
                     false,
                     |_| 99usize,
@@ -15827,7 +15945,7 @@ mod tests {
         let mut labeled: Element<'_, usize> = form_group(
             [FormRow::new(
                 "Name",
-                themed_text_input(
+                text_input(
                     "Name",
                     "",
                     |_| 99usize,
@@ -15862,7 +15980,7 @@ mod tests {
             [
                 FormRow::new(
                     "Ok",
-                    themed_checkbox(
+                    checkbox(
                         "Ok",
                         false,
                         |_| 99usize,
@@ -15872,7 +15990,7 @@ mod tests {
                 ),
                 FormRow::new(
                     "Kind",
-                    themed_radio(
+                    radio(
                         "A",
                         0u8,
                         Some(0),
@@ -16028,7 +16146,7 @@ mod tests {
             .split("pub fn search_view")
             .nth(1)
             .unwrap()
-            .split("pub fn themed_pick_list")
+            .split("pub fn pick_list")
             .next()
             .unwrap();
         assert!(search.contains("menu_item_style"));
@@ -16120,15 +16238,17 @@ mod tests {
             &Sel::Single(0),
             |c| c.id,
             pill,
-            VisibleWindow::new(200.0),
-            32.0,
-            2,
-            |_| 0,
-            "No rows",
-            |_| pill.scheme().on_surface_variant,
-            None,
-            RowFace::FLUSH,
-            |_| 0,
+            ListOpts {
+                window: VisibleWindow::new(200.0),
+                row_h: 32.0,
+                overscan: 2,
+                on_scroll: |_| 0,
+                empty: "No rows",
+                meta_color: |_| pill.scheme().on_surface_variant,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| 0,
+            },
             A11y::new("mail", Role::List),
         );
         draw_once(&mut list_el);
@@ -16662,15 +16782,17 @@ mod tests {
             &Sel::None,
             |c| c,
             tok,
-            window,
-            24.0,
-            0,
-            |_| list_side(),
-            "Empty",
-            |_| tok.muted,
-            None,
-            RowFace::FLUSH,
-            |_| list_side(),
+            ListOpts {
+                window,
+                row_h: 24.0,
+                overscan: 0,
+                on_scroll: |_| list_side(),
+                empty: "Empty",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| list_side(),
+            },
             A11y::new("list", Role::List),
         );
         let list_msgs = press_messages(

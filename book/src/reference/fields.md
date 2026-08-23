@@ -14,7 +14,7 @@ Each constructor takes `A11y` unless noted. iced 0.14 publishes the widget id on
 
 **`text-input`** — A single-line editor.
 
-Constructor: [`widget::themed_text_input`](https://docs.rs/icedtea/latest/icedtea/widget/fn.themed_text_input.html)
+Constructor: [`widget::text_input`](https://docs.rs/icedtea/latest/icedtea/widget/fn.text_input.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
@@ -113,8 +113,8 @@ The placeholder is the a11y name. Pass submit for Enter and an
 input id when the application must focus the field. Pass
 `highlight` to run a syntax highlighter on the typed query
 (`FieldRun` slices, same roles as `FieldOpts`). The application
-owns the matcher. [`search_input_clear`](https://docs.rs/icedtea/latest/icedtea/widget/fn.search_input_clear.html)
-paints the clear mark only when the value is non-empty.
+owns the matcher. Pass `on_clear` for the trailing clear mark; it
+paints only when the value is non-empty.
 
 Pass `A11y`.
 
@@ -150,7 +150,7 @@ Pass `A11y`.
 
 **`select`** — Pick one string from a list.
 
-Constructor: [`widget::themed_pick_list`](https://docs.rs/icedtea/latest/icedtea/widget/fn.themed_pick_list.html)
+Constructor: [`widget::pick_list`](https://docs.rs/icedtea/latest/icedtea/widget/fn.pick_list.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
@@ -203,7 +203,7 @@ Pass `A11y`.
 
 **`date`** — Pick a calendar date.
 
-Constructor: [`widget::date_picker`](https://docs.rs/icedtea/latest/icedtea/widget/fn.date_picker.html)
+Constructor: [`widget::date_stepper`](https://docs.rs/icedtea/latest/icedtea/widget/fn.date_stepper.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)

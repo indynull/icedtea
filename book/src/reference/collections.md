@@ -30,6 +30,8 @@ Constructor: [`widget::list_view`](https://docs.rs/icedtea/latest/icedtea/widget
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
+Window, row height, overscan, scroll, empty copy, meta color,
+`scroll_id`, face, and `on_check` sit on [`ListOpts`](https://docs.rs/icedtea/latest/icedtea/widget/struct.ListOpts.html).
 `empty` is the copy when the model has no rows. Selection stays on
 indices. A row press is [`ItemClick`](https://docs.rs/icedtea/latest/icedtea/collection/struct.ItemClick.html):
 shift+primary extends, Command/Ctrl+primary toggles, secondary on a

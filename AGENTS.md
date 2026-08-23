@@ -75,14 +75,14 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
 - Every public widget constructor takes `a11y::A11y` and calls
   `a11y::attach` (name, role, value, disabled, checked). iced 0.14 has
   no accesskit slot; the widget id carries the node id.
-- Always size `themed_pick_list` trailing marks from
+- Always size `pick_list` trailing marks from
   `m3::density::TRAILING_ICON` (24 dp, 20 dp Compact) and
   `Density::inset` on the **end**. Own the Material drop mark in
   the constructor. Never iced `Handle::Arrow` (physical-right)
   and never a sibling overlay that misses clicks.
 - Lists and tables virtualize when row counts leave the hundreds
   (`collection::visible_range` + scroll offset). Their rail uses
-  `collection::scroller_span` with a 24px minimum handle. `themed_scroll`
+  `collection::scroller_span` with a 24px minimum handle. `scroll`
   still uses iced's scroller (2px floor). Free-form expand cards use
   `virtual_column` + `expand_card_heights` (extend list windowing; do
   not add a second list model).
@@ -124,9 +124,12 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   and tokens (chrome rows take an `ActionTable`). Rustdoc with a
   working example sits immediately above it. The map in `catalog`
   tests names that function. Image is `image_slot`, scroll is
-  `themed_scroll`, keys subscribe with `key::listen`, sidebar recipe
+  `scroll`, keys subscribe with `key::listen`, sidebar recipe
   is `Breakpoint::from_width`.
 - One path per feature. Pick it and delete the other. Fallbacks re-grow.
+- Always put optional extras on a constructor in one `*Opts` on that
+  same call (`ButtonOpts`, `ListOpts`, `FieldOpts`). Never a second
+  `pub fn` for the same catalog id.
 - Always vary a constructor’s painted look with a `*Face` enum on that
   same call (`RowFace`, `CardFace`, `FieldFace`, `TreeFace`). Never a
   second catalog widget or a stylesheet for the same job. Prefer a new

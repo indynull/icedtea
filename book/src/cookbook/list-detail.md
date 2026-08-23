@@ -26,6 +26,7 @@ struct App {
 enum Message {
     Select(ItemClick),
     Scroll(VisibleWindow),
+    Check(usize),
 }
 
 impl App {
@@ -33,6 +34,7 @@ impl App {
         match message {
             Message::Select(click) => self.sel.apply_item_click(click),
             Message::Scroll(w) => self.window = w,
+            Message::Check(_) => {}
         }
         Task::none()
     }
@@ -44,15 +46,17 @@ impl App {
             &self.sel,
             Message::Select,
             tok,
-            self.window,
-            32.0,
-            2,
-            Message::Scroll,
-            "No rows",
-            |_| tok.muted,
-            None,
-            icedtea::collection::RowFace::FLUSH,
-            Message::Select,
+            widget::ListOpts {
+                window: self.window,
+                row_h: 32.0,
+                overscan: 2,
+                on_scroll: Message::Scroll,
+                empty: "No rows",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: icedtea::collection::RowFace::FLUSH,
+                on_check: Message::Check,
+            },
             A11y::new("files", Role::List),
         );
         let title = self

@@ -226,7 +226,7 @@ is `table.footer_hints()`, or an optional caption string.
 
 **`scrollbar`** — A themed scroller with a usable handle.
 
-Constructor: [`widget::themed_scroll`](https://docs.rs/icedtea/latest/icedtea/widget/fn.themed_scroll.html)
+Constructor: [`widget::scroll`](https://docs.rs/icedtea/latest/icedtea/widget/fn.scroll.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·

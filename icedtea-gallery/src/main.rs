@@ -32,8 +32,8 @@ use icedtea::toast::{ToastKind, ToastQueue};
 use icedtea::variant::Variant;
 use icedtea::widget;
 use icedtea::widget::{
-    BadgeSize, CardFace, Cell, ChipKind, ControlSize, DateValue, MarkdownDoc, TimeClock, TimeField,
-    TimeValue,
+    BadgeSize, ButtonOpts, CardFace, Cell, ChipKind, ControlSize, DateValue, ListOpts, MarkdownDoc,
+    TimeClock, TimeField, TimeValue,
 };
 use icedtea::{Boot, Element, Task};
 use samples::CodeLang;
@@ -556,10 +556,11 @@ fn catalog_header<'a>(query: &'a str, tok: Tokens, cat: &'a Catalog) -> Element<
             query,
             Message::CatalogQuery,
             None,
+            None,
             tok,
             named(cat.t("search"), Role::TextBox),
             None,
-            &[],
+            &[]
         ),
     ]
     .spacing(12)
@@ -2371,7 +2372,7 @@ impl Gallery {
         let pick = |label: &str, options: Vec<String>, current: &str, on: fn(String) -> Message| {
             let w = look_pick_width(&options, current, tok);
             let lab: Element<'_, Message> = widget::meta(label, tok, named(label, Role::Status));
-            let list: Element<'_, Message> = container(widget::themed_pick_list(
+            let list: Element<'_, Message> = container(widget::pick_list(
                 options,
                 Some(current.to_string()),
                 on,
@@ -2402,7 +2403,7 @@ impl Gallery {
                     tok,
                     named("theme", Role::Status),
                 ),
-                container(widget::themed_pick_list(
+                container(widget::pick_list(
                     self.themes.names(),
                     Some(self.theme.clone()),
                     Message::Theme,
@@ -4020,7 +4021,7 @@ impl Gallery {
             container(catalog_header(&self.catalog_query, tok, &self.catalog))
                 .width(Length::Fill)
                 .style(move |_| icedtea::style::panel(tok)),
-            widget::themed_scroll(
+            widget::scroll(
                 catalog_nav(
                     &self.catalog_query,
                     self.page,
@@ -4055,7 +4056,7 @@ impl Gallery {
         let body = if page_fills(self.page) {
             page.into()
         } else {
-            widget::themed_scroll(
+            widget::scroll(
                 page.into(),
                 tok,
                 named("page", Role::Group),
@@ -4294,12 +4295,13 @@ impl Gallery {
                         } else {
                             Some(Message::Note(name.into()))
                         };
-                        faces.push(widget::themed_button(
+                        faces.push(widget::button(
                             name,
                             press,
                             tok,
                             *v,
                             Icons::NONE,
+                            ButtonOpts::SHRINK,
                             btn(name),
                         ));
                     }
@@ -4309,12 +4311,13 @@ impl Gallery {
                     let mut faces = Vec::new();
                     for v in chunk {
                         let name = variant_label(*v, &self.catalog);
-                        faces.push(widget::themed_button(
+                        faces.push(widget::button(
                             name,
                             None,
                             tok,
                             *v,
                             Icons::NONE,
+                            ButtonOpts::SHRINK,
                             btn(name).with_disabled(true),
                         ));
                     }
@@ -4324,20 +4327,22 @@ impl Gallery {
                     tok.direction,
                     8.0,
                     [
-                        widget::themed_button(
+                        widget::button(
                             self.catalog.t("open"),
                             Some(Message::Note(self.catalog.t("open").into())),
                             tok,
                             Variant::Primary,
                             Icons::leading(icedtea::icon::Icon::Search),
+                            ButtonOpts::SHRINK,
                             btn(self.catalog.t("open")),
                         ),
-                        widget::themed_button(
+                        widget::button(
                             self.catalog.t("more"),
                             Some(Message::Note(self.catalog.t("more").into())),
                             tok,
                             Variant::Outlined,
                             Icons::trailing(icedtea::icon::Icon::Chevron),
+                            ButtonOpts::SHRINK,
                             btn(self.catalog.t("more")),
                         ),
                     ],
@@ -4444,21 +4449,21 @@ impl Gallery {
                     tok,
                     named("check-hint", Role::Status),
                 ),
-                widget::themed_checkbox(
+                widget::checkbox(
                     self.catalog.t("check.accept"),
                     self.checked,
                     Message::Check,
                     tok,
                     named("Accept", Role::Checkbox).with_checked(self.checked),
                 ),
-                widget::themed_checkbox(
+                widget::checkbox(
                     self.catalog.t("check.optional"),
                     self.optional,
                     Message::Optional,
                     tok,
                     named("Optional", Role::Checkbox).with_checked(self.optional),
                 ),
-                widget::themed_checkbox(
+                widget::checkbox(
                     self.catalog.t("check.locked"),
                     true,
                     Message::Check,
@@ -4478,7 +4483,7 @@ impl Gallery {
                     tok,
                     named("radio-hint", Role::Status),
                 ),
-                widget::themed_radio(
+                widget::radio(
                     self.catalog.t("radio.a"),
                     0,
                     Some(self.radio),
@@ -4486,7 +4491,7 @@ impl Gallery {
                     tok,
                     named("Option A", Role::Radio).with_checked(self.radio == 0),
                 ),
-                widget::themed_radio(
+                widget::radio(
                     self.catalog.t("radio.b"),
                     1,
                     Some(self.radio),
@@ -4494,7 +4499,7 @@ impl Gallery {
                     tok,
                     named("Option B", Role::Radio).with_checked(self.radio == 1),
                 ),
-                widget::themed_radio(
+                widget::radio(
                     self.catalog.t("state.disabled"),
                     2,
                     Some(self.radio),
@@ -4513,21 +4518,21 @@ impl Gallery {
                     tok,
                     named("switch-hint", Role::Status),
                 ),
-                widget::themed_switch(
+                widget::switch(
                     self.catalog.t("switch.notify"),
                     self.on,
                     Message::Switch,
                     tok,
                     named("Notify", Role::Switch).with_checked(self.on),
                 ),
-                widget::themed_switch(
+                widget::switch(
                     self.catalog.t("switch.sounds"),
                     self.sounds,
                     Message::Sounds,
                     tok,
                     named("Sounds", Role::Switch).with_checked(self.sounds),
                 ),
-                widget::themed_switch(
+                widget::switch(
                     self.catalog.t("check.locked"),
                     true,
                     Message::Switch,
@@ -4552,7 +4557,7 @@ impl Gallery {
                     tok.direction,
                     [
                         column![
-                            widget::themed_slider(
+                            widget::slider(
                                 0.0..=1.0,
                                 self.value,
                                 Message::Slide,
@@ -4575,7 +4580,7 @@ impl Gallery {
                         .spacing(8)
                         .width(Length::Fill)
                         .into(),
-                        widget::themed_slider(
+                        widget::slider(
                             0.0..=1.0,
                             self.value,
                             Message::Slide,
@@ -4708,7 +4713,7 @@ impl Gallery {
                 let copy = widget::progress_label(shown, Some(self.catalog.t("prog.min")), digits);
                 let near = |a: f32, b: f32| (a - b).abs() < 0.02;
                 let pct_btn = |label: &str, to: f32, name: &str| {
-                    widget::themed_button(
+                    widget::button(
                         digits.map_str(label),
                         Some(Message::Slide(to)),
                         tok,
@@ -4718,6 +4723,7 @@ impl Gallery {
                             Variant::Quiet
                         },
                         Icons::NONE,
+                        ButtonOpts::SHRINK,
                         btn(name),
                     )
                 };
@@ -4776,7 +4782,7 @@ impl Gallery {
                 named("number", Role::SpinButton).with_value(self.number.clone()),
             ),
             "text-input" => column![
-                widget::themed_text_input(
+                widget::text_input(
                     self.catalog.t("hint.name"),
                     &self.name,
                     Message::Name,
@@ -4792,13 +4798,14 @@ impl Gallery {
                     named("Name", Role::TextBox),
                     Some(icedtea::iced::widget::Id::new("gallery-name")),
                 ),
-                widget::themed_button(
+                widget::button(
                     self.catalog.t("field.focus"),
                     Some(Message::FocusName),
                     tok,
                     Variant::Quiet,
                     Icons::NONE,
-                    btn("Focus field"),
+                    ButtonOpts::SHRINK,
+                    btn("Focus field")
                 ),
                 widget::meta(
                     if self.dialog_note.is_empty() {
@@ -4908,7 +4915,7 @@ impl Gallery {
                 };
                 let runs = search_field_runs(&self.search_query);
                 column![
-                    widget::search_input_clear(
+                    widget::search_input(
                         &self.search_query,
                         Message::SearchQuery,
                         Some(Message::SearchClear),
@@ -4960,7 +4967,7 @@ impl Gallery {
                     named("fs-hint", Role::Status),
                 ),
                 widget::field_support(
-                    widget::themed_text_input(
+                    widget::text_input(
                         self.catalog.t("field.email"),
                         &self.number,
                         Message::Number,
@@ -5021,7 +5028,7 @@ impl Gallery {
                         [
                             widget::FormRow::new(
                                 self.catalog.t("hint.name"),
-                                widget::themed_text_input(
+                                widget::text_input(
                                     self.catalog.t("hint.name"),
                                     &self.name,
                                     Message::Name,
@@ -5035,7 +5042,7 @@ impl Gallery {
                             .with_focus(name_id),
                             widget::FormRow::new(
                                 self.catalog.t("field.form-severity"),
-                                widget::themed_pick_list(
+                                widget::pick_list(
                                     opts,
                                     Some(self.pick.clone()),
                                     Message::Pick,
@@ -5056,7 +5063,7 @@ impl Gallery {
                             ),
                             widget::FormRow::new(
                                 String::new(),
-                                widget::themed_checkbox(
+                                widget::checkbox(
                                     self.catalog.t("field.form-ok"),
                                     self.checked,
                                     Message::Check,
@@ -5109,7 +5116,7 @@ impl Gallery {
                         tok,
                         named("pick-default-cap", Role::Status),
                     ),
-                    widget::themed_pick_list(
+                    widget::pick_list(
                         opts.clone(),
                         Some(self.pick.clone()),
                         Message::Pick,
@@ -5122,7 +5129,7 @@ impl Gallery {
                         tok,
                         named("pick-compact-cap", Role::Status),
                     ),
-                    widget::themed_pick_list(
+                    widget::pick_list(
                         opts,
                         Some(self.pick.clone()),
                         Message::Pick,
@@ -5138,7 +5145,7 @@ impl Gallery {
             }
             "date" => column![
                 state_caption(self.catalog.t("date.appointment"), tok),
-                widget::date_picker(
+                widget::date_stepper(
                     self.date,
                     Message::DatePrev,
                     Message::DateNext,
@@ -5147,7 +5154,7 @@ impl Gallery {
                 ),
                 widget::rule_h(tok, named("date-rule", Role::Separator)),
                 state_caption(self.catalog.t("state.disabled"), tok),
-                widget::date_picker(
+                widget::date_stepper(
                     self.date,
                     Message::DatePrev,
                     Message::DateNext,
@@ -5323,7 +5330,7 @@ impl Gallery {
                         tok.direction,
                         12.0,
                         [
-                            container(widget::themed_scroll(
+                            container(widget::scroll(
                                 widget::markdown_outline(
                                     &self.md_heads,
                                     self.md_jump,
@@ -5339,7 +5346,7 @@ impl Gallery {
                             ))
                             .width(Length::Fixed(220.0))
                             .into(),
-                            widget::themed_scroll(
+                            widget::scroll(
                                 widget::markdown_view(
                                     &self.md.items,
                                     Some(&self.md_sel.span),
@@ -5374,7 +5381,7 @@ impl Gallery {
                     .replace("{hl}", &format!("{hl:?}"));
                 column![
                     widget::meta(hint, tok, named("code-hint", Role::Status)),
-                    widget::themed_pick_list(
+                    widget::pick_list(
                         CodeLang::names(),
                         Some(self.code_lang.clone()),
                         Message::CodeLang,
@@ -5382,7 +5389,7 @@ impl Gallery {
                         widget::ControlSize::Default,
                         named(&self.code_lang, Role::ComboBox),
                     ),
-                    widget::themed_checkbox(
+                    widget::checkbox(
                         self.catalog.t("code.wrap"),
                         self.code_wrap,
                         Message::CodeWrap,
@@ -5427,7 +5434,7 @@ impl Gallery {
                         let hl = icedtea::theme::code_highlight(&name);
                         container(
                             column![
-                                widget::themed_button(
+                                widget::button(
                                     name.clone(),
                                     Some(Message::Theme(name.clone())),
                                     t,
@@ -5437,7 +5444,8 @@ impl Gallery {
                                         Variant::Quiet
                                     },
                                     Icons::NONE,
-                                    btn(&name),
+                                    ButtonOpts::SHRINK,
+                                    btn(&name)
                                 ),
                                 widget::meta(
                                     format!("{hl}"),
@@ -5476,7 +5484,7 @@ impl Gallery {
                         tok.direction,
                         8.0,
                         [
-                            widget::themed_button(
+                            widget::button(
                                 "gallery-brand",
                                 Some(Message::Theme("gallery-brand".into())),
                                 tok,
@@ -5486,9 +5494,10 @@ impl Gallery {
                                     Variant::Quiet
                                 },
                                 Icons::NONE,
-                                btn("gallery-brand"),
+                                ButtonOpts::SHRINK,
+                                btn("gallery-brand")
                             ),
-                            widget::themed_pick_list(
+                            widget::pick_list(
                                 families,
                                 Some(self.family.clone()),
                                 Message::Family,
@@ -5496,14 +5505,14 @@ impl Gallery {
                                 widget::ControlSize::Default,
                                 named("family", Role::ComboBox),
                             ),
-                            widget::themed_checkbox(
+                            widget::checkbox(
                                 self.catalog.t("pref.follow-os"),
                                 self.follow_os,
                                 Message::Follow,
                                 tok,
                                 named("follow", Role::Checkbox).with_checked(self.follow_os),
                             ),
-                            widget::themed_button(
+                            widget::button(
                                 self.catalog.t("face.light"),
                                 Some(Message::Appearance(Appearance::Light)),
                                 tok,
@@ -5513,9 +5522,10 @@ impl Gallery {
                                     Variant::Quiet
                                 },
                                 Icons::NONE,
-                                btn(self.catalog.t("face.light")),
+                                ButtonOpts::SHRINK,
+                                btn(self.catalog.t("face.light"))
                             ),
-                            widget::themed_button(
+                            widget::button(
                                 self.catalog.t("face.dark"),
                                 Some(Message::Appearance(Appearance::Dark)),
                                 tok,
@@ -5525,7 +5535,8 @@ impl Gallery {
                                     Variant::Quiet
                                 },
                                 Icons::NONE,
-                                btn(self.catalog.t("face.dark")),
+                                ButtonOpts::SHRINK,
+                                btn(self.catalog.t("face.dark"))
                             ),
                         ],
                     )
@@ -5694,7 +5705,7 @@ impl Gallery {
                             tok,
                             named("icon-hint", Role::Status),
                         ),
-                        widget::search_input_clear(
+                        widget::search_input(
                             &self.icon_query,
                             Message::IconQuery,
                             Some(Message::IconQuery(String::new())),
@@ -5704,7 +5715,7 @@ impl Gallery {
                             None,
                             &[],
                         ),
-                        container(widget::themed_scroll(
+                        container(widget::scroll(
                             grid,
                             tok,
                             named("icon-grid", Role::Group),
@@ -5851,14 +5862,15 @@ impl Gallery {
                             &self.list_filter,
                             Message::ListFilter,
                             None,
+                            None,
                             tok,
                             named(self.catalog.t("search"), Role::TextBox),
                             None,
-                            &[],
+                            &[]
                         ),
                         {
                             let buckets: Element<'_, Message> = row![
-                                widget::themed_radio(
+                                widget::radio(
                                     self.catalog.t("list.all"),
                                     ListBucket::All,
                                     Some(self.list_bucket),
@@ -5867,7 +5879,7 @@ impl Gallery {
                                     named("list-all", Role::Radio)
                                         .with_checked(self.list_bucket == ListBucket::All),
                                 ),
-                                widget::themed_radio(
+                                widget::radio(
                                     self.catalog.t("list.unread"),
                                     ListBucket::Unread,
                                     Some(self.list_bucket),
@@ -5876,7 +5888,7 @@ impl Gallery {
                                     named("list-unread", Role::Radio)
                                         .with_checked(self.list_bucket == ListBucket::Unread),
                                 ),
-                                widget::themed_radio(
+                                widget::radio(
                                     self.catalog.t("list.flagged"),
                                     ListBucket::Flagged,
                                     Some(self.list_bucket),
@@ -5889,7 +5901,7 @@ impl Gallery {
                             .spacing(12)
                             .into();
                             let faces: Element<'_, Message> = row![
-                                widget::themed_radio(
+                                widget::radio(
                                     self.catalog.t("list.oneline"),
                                     false,
                                     Some(self.list_card),
@@ -5898,7 +5910,7 @@ impl Gallery {
                                     named("list-one-line", Role::Radio)
                                         .with_checked(!self.list_card),
                                 ),
-                                widget::themed_radio(
+                                widget::radio(
                                     self.catalog.t("list.cards"),
                                     true,
                                     Some(self.list_card),
@@ -5938,21 +5950,23 @@ impl Gallery {
                     &self.list_sel,
                     Message::ListSel,
                     tok,
-                    self.list_window,
-                    icedtea::collection::RowHeights::PerRow(&self.list_heights),
-                    OVERSCAN,
-                    Message::ListScroll,
-                    self.catalog.t("list.empty"),
-                    move |_| tok.scheme().on_surface_variant,
-                    Some(self.list_clip_id()),
-                    if self.list_card {
-                        icedtea::collection::RowFace::Card {
-                            meter: Some(list_meter as fn(usize) -> f32),
-                        }
-                    } else {
-                        icedtea::collection::RowFace::FLUSH
+                    ListOpts {
+                        window: self.list_window,
+                        row_h: icedtea::collection::RowHeights::PerRow(&self.list_heights),
+                        overscan: OVERSCAN,
+                        on_scroll: Message::ListScroll,
+                        empty: self.catalog.t("list.empty"),
+                        meta_color: move |_| tok.scheme().on_surface_variant,
+                        scroll_id: Some(self.list_clip_id()),
+                        face: if self.list_card {
+                            icedtea::collection::RowFace::Card {
+                                meter: Some(list_meter as fn(usize) -> f32),
+                            }
+                        } else {
+                            icedtea::collection::RowFace::FLUSH
+                        },
+                        on_check: Message::ListCheck,
                     },
-                    Message::ListCheck,
                     named("list", Role::List),
                 ))
                 .width(Length::Fill)
@@ -6288,13 +6302,14 @@ impl Gallery {
                                 }
                                 tags
                             },
-                            widget::themed_button(
+                            widget::button(
                                 self.catalog.t("open"),
                                 Some(Message::FileOpen),
                                 tok,
                                 Variant::Quiet,
                                 Icons::NONE,
-                                btn(self.catalog.t("open")),
+                                ButtonOpts::SHRINK,
+                                btn(self.catalog.t("open"))
                             ),
                         ]
                         .spacing(8)
@@ -6491,14 +6506,16 @@ impl Gallery {
             "pad" => {
                 let h = Length::Fixed(icedtea::density::Density::default().tile() as f32);
                 let tile = |title: &'static str, v: Variant| {
-                    widget::themed_button_sized(
+                    widget::button(
                         title,
                         Some(Message::Pad(title)),
                         tok,
                         v,
                         Icons::NONE,
-                        Length::Fill,
-                        h,
+                        ButtonOpts {
+                            width: Length::Fill,
+                            height: h,
+                        },
                         btn(title),
                     )
                 };
@@ -6603,7 +6620,7 @@ impl Gallery {
                         named(&format!("scroll-{i}"), Role::Header),
                     ));
                 }
-                container(widget::themed_scroll(
+                container(widget::scroll(
                     lines.into(),
                     tok,
                     named("scroll", Role::Group),
@@ -6641,7 +6658,7 @@ impl Gallery {
                 widget::group_box(
                     self.catalog.t("group.identity"),
                     column![
-                        widget::themed_text_input(
+                        widget::text_input(
                             self.catalog.t("hint.name"),
                             &self.query,
                             Message::Query,
@@ -6651,7 +6668,7 @@ impl Gallery {
                             named("Name", Role::TextBox),
                             None,
                         ),
-                        widget::themed_checkbox(
+                        widget::checkbox(
                             self.catalog.t("group.remember"),
                             self.checked,
                             Message::Toggle,
@@ -6720,12 +6737,13 @@ impl Gallery {
             .align_x(icedtea::i18n::align_start(tok.direction))
             .into(),
             "toast" => column![
-                widget::themed_button(
+                widget::button(
                     self.catalog.t("toast.action"),
                     Some(Message::Toast),
                     tok,
                     Variant::Primary,
                     Icons::NONE,
+                    ButtonOpts::SHRINK,
                     btn("Toast")
                 ),
                 {
@@ -6750,7 +6768,7 @@ impl Gallery {
                 widget::spinner(tok, self.spin, named("spinner", Role::Progress)),
             ),
             "busy" => column![
-                widget::themed_switch(
+                widget::switch(
                     self.catalog.t("busy.flag"),
                     self.on,
                     Message::Switch,
@@ -6784,40 +6802,44 @@ impl Gallery {
             .into(),
             "dialogs" => {
                 let mut actions = row![
-                    widget::themed_button(
+                    widget::button(
                         self.catalog.t("dialog.open-ellipsis"),
                         Some(Message::FileOpen),
                         tok,
                         Variant::Quiet,
                         Icons::NONE,
-                        btn(self.catalog.t("open")),
+                        ButtonOpts::SHRINK,
+                        btn(self.catalog.t("open"))
                     ),
-                    widget::themed_button(
+                    widget::button(
                         self.catalog.t("dialog.save-ellipsis"),
                         Some(Message::FileSave),
                         tok,
                         Variant::Primary,
                         Icons::NONE,
-                        btn(self.catalog.t("save")),
+                        ButtonOpts::SHRINK,
+                        btn(self.catalog.t("save"))
                     ),
-                    widget::themed_button(
+                    widget::button(
                         self.catalog.t("dialog.folder"),
                         Some(Message::Folder),
                         tok,
                         Variant::Quiet,
                         Icons::NONE,
-                        btn(self.catalog.t("dialog.folder")),
+                        ButtonOpts::SHRINK,
+                        btn(self.catalog.t("dialog.folder"))
                     ),
                 ]
                 .spacing(8);
                 let progress = Self::anim_progress(&self.dialog_anim);
                 if !self.dialog_open && progress <= 0.01 {
-                    actions = actions.push(widget::themed_button(
+                    actions = actions.push(widget::button(
                         self.catalog.t("dialog.open"),
                         Some(Message::DialogOpen(true)),
                         tok,
                         Variant::Quiet,
                         Icons::NONE,
+                        ButtonOpts::SHRINK,
                         btn("dialog-open"),
                     ));
                 }
@@ -6881,7 +6903,7 @@ impl Gallery {
                             tok,
                             named("ss-hint", Role::Status),
                         ),
-                        widget::themed_button(
+                        widget::button(
                             if self.side_sheet {
                                 self.catalog.t("sheet.close")
                             } else {
@@ -6891,7 +6913,8 @@ impl Gallery {
                             tok,
                             Variant::Primary,
                             Icons::NONE,
-                            btn("sheet-toggle"),
+                            ButtonOpts::SHRINK,
+                            btn("sheet-toggle")
                         ),
                     ]
                     .spacing(12)
@@ -7016,15 +7039,17 @@ impl Gallery {
                     &self.list_detail_sel,
                     Message::ListSel,
                     tok,
-                    self.list_detail_window,
-                    64.0,
-                    OVERSCAN,
-                    Message::ListScroll,
-                    self.catalog.t("list.empty"),
-                    move |_| tok.scheme().on_surface_variant,
-                    Some(icedtea::iced::widget::Id::from("gallery-list-detail")),
-                    icedtea::collection::RowFace::FLUSH,
-                    Message::ListCheck,
+                    ListOpts {
+                        window: self.list_detail_window,
+                        row_h: 64.0,
+                        overscan: OVERSCAN,
+                        on_scroll: Message::ListScroll,
+                        empty: self.catalog.t("list.empty"),
+                        meta_color: move |_| tok.scheme().on_surface_variant,
+                        scroll_id: Some(icedtea::iced::widget::Id::from("gallery-list-detail")),
+                        face: icedtea::collection::RowFace::FLUSH,
+                        on_check: Message::ListCheck,
+                    },
                     named("list", Role::List),
                 ),
                 {
@@ -7075,7 +7100,7 @@ impl Gallery {
             "navigation" => {
                 let here = self.nav.current();
                 let place = |id: &'static str, title: &str| {
-                    widget::themed_button_sized(
+                    widget::button(
                         title,
                         Some(Message::NavTo(id)),
                         tok,
@@ -7085,8 +7110,10 @@ impl Gallery {
                             Variant::Quiet
                         },
                         Icons::NONE,
-                        Length::Fill,
-                        Length::Shrink,
+                        ButtonOpts {
+                            width: Length::Fill,
+                            height: Length::Shrink,
+                        },
                         btn(title),
                     )
                 };
@@ -7264,7 +7291,7 @@ impl Gallery {
                     dir,
                     12.0,
                     [
-                        widget::themed_radio(
+                        widget::radio(
                             self.catalog.t("pal.face.default"),
                             PaletteFace::Default,
                             Some(self.pal_face),
@@ -7273,7 +7300,7 @@ impl Gallery {
                             named("pal-face-default", Role::Radio)
                                 .with_checked(self.pal_face == PaletteFace::Default),
                         ),
-                        widget::themed_radio(
+                        widget::radio(
                             self.catalog.t("pal.face.compact"),
                             PaletteFace::Compact,
                             Some(self.pal_face),
@@ -7282,7 +7309,7 @@ impl Gallery {
                             named("pal-face-compact", Role::Radio)
                                 .with_checked(self.pal_face == PaletteFace::Compact),
                         ),
-                        widget::themed_radio(
+                        widget::radio(
                             self.catalog.t("pal.face.detail"),
                             PaletteFace::Detail,
                             Some(self.pal_face),
@@ -7297,7 +7324,7 @@ impl Gallery {
                     dir,
                     12.0,
                     [
-                        widget::themed_radio(
+                        widget::radio(
                             self.catalog.t("pal.group.none"),
                             PaletteGroup::None,
                             Some(self.pal_group),
@@ -7306,7 +7333,7 @@ impl Gallery {
                             named("pal-group-none", Role::Radio)
                                 .with_checked(self.pal_group == PaletteGroup::None),
                         ),
-                        widget::themed_radio(
+                        widget::radio(
                             self.catalog.t("pal.group.section"),
                             PaletteGroup::Section,
                             Some(self.pal_group),
@@ -7315,7 +7342,7 @@ impl Gallery {
                             named("pal-group-section", Role::Radio)
                                 .with_checked(self.pal_group == PaletteGroup::Section),
                         ),
-                        widget::themed_radio(
+                        widget::radio(
                             self.catalog.t("pal.group.prefix"),
                             PaletteGroup::Prefix,
                             Some(self.pal_group),
@@ -7330,14 +7357,14 @@ impl Gallery {
                     dir,
                     12.0,
                     [
-                        widget::themed_checkbox(
+                        widget::checkbox(
                             self.catalog.t("pal.omit"),
                             self.pal_omit,
                             Message::PaletteOmit,
                             tok,
                             named("pal-omit", Role::Checkbox).with_checked(self.pal_omit),
                         ),
-                        widget::themed_checkbox(
+                        widget::checkbox(
                             self.catalog.t("pal.highlight"),
                             self.pal_highlight,
                             Message::PaletteHighlight,
@@ -7351,12 +7378,13 @@ impl Gallery {
                     .width(Length::Fill)
                     .align_x(icedtea::i18n::align_start(dir));
                 if self.palette.page().is_some() {
-                    knobs = knobs.push(widget::themed_button(
+                    knobs = knobs.push(widget::button(
                         self.catalog.t("pal.back"),
                         Some(Message::PaletteBack),
                         tok,
                         icedtea::variant::Variant::Quiet,
                         icedtea::icon::Icons::NONE,
+                        ButtonOpts::SHRINK,
                         named("pal-back", Role::Button),
                     ));
                 }
@@ -7529,13 +7557,14 @@ impl Gallery {
                                 tok,
                                 named("ws-center", Role::Status),
                             ),
-                            widget::themed_button(
+                            widget::button(
                                 self.catalog.t("ws.move-btn"),
                                 Some(Message::WsMove),
                                 tok,
                                 Variant::Quiet,
                                 Icons::NONE,
-                                btn(self.catalog.t("ws.move-btn")),
+                                ButtonOpts::SHRINK,
+                                btn(self.catalog.t("ws.move-btn"))
                             ),
                         ]
                         .spacing(8)
@@ -7597,7 +7626,7 @@ impl Gallery {
             .height(Length::Fixed(220.0))
             .into(),
             "drawer" => column![
-                widget::themed_button(
+                widget::button(
                     if self.drawer_open {
                         self.catalog.t("drawer.hide")
                     } else {
@@ -7607,7 +7636,8 @@ impl Gallery {
                     tok,
                     Variant::Quiet,
                     Icons::NONE,
-                    btn("drawer-toggle"),
+                    ButtonOpts::SHRINK,
+                    btn("drawer-toggle")
                 ),
                 pattern::drawer(
                     self.drawer_open,
@@ -7635,7 +7665,7 @@ impl Gallery {
             .align_x(icedtea::i18n::align_start(tok.direction))
             .into(),
             "cheatsheet" => column![
-                widget::themed_text_input(
+                widget::text_input(
                     self.catalog.t("cheat.filter"),
                     &self.cheat_q,
                     Message::Cheat,
@@ -7669,14 +7699,14 @@ impl Gallery {
                     None,
                 );
                 column![
-                    widget::themed_switch(
+                    widget::switch(
                         self.catalog.t("motion.reduce"),
                         self.reduced_motion,
                         Message::ReduceMotion,
                         tok,
                         named("reduce-motion", Role::Switch).with_checked(self.reduced_motion),
                     ),
-                    widget::themed_button(
+                    widget::button(
                         if self.dialog_open {
                             self.catalog.t("motion.close")
                         } else {
@@ -7686,7 +7716,8 @@ impl Gallery {
                         tok,
                         Variant::Primary,
                         Icons::NONE,
-                        btn("overlay-toggle"),
+                        ButtonOpts::SHRINK,
+                        btn("overlay-toggle")
                     ),
                     icedtea::motion::overlay(
                         card,
@@ -7711,7 +7742,7 @@ impl Gallery {
                         let pulse_paint = tok.fade(pulse_t);
                         let dx = self.shown_shake() * 16.0;
                         let fade_col = column![
-                            widget::themed_button(
+                            widget::button(
                                 if self.fade_open {
                                     self.catalog.t("motion.fade-out")
                                 } else {
@@ -7721,7 +7752,8 @@ impl Gallery {
                                 tok,
                                 Variant::Quiet,
                                 Icons::NONE,
-                                btn("fade-toggle"),
+                                ButtonOpts::SHRINK,
+                                btn("fade-toggle")
                             ),
                             icedtea::motion::overlay(
                                 widget::group_box(
@@ -7744,7 +7776,7 @@ impl Gallery {
                         ]
                         .spacing(6);
                         let bounce_col = column![
-                            widget::themed_button(
+                            widget::button(
                                 if bounce_t > 0.5 {
                                     self.catalog.t("motion.bounce-out")
                                 } else {
@@ -7754,7 +7786,8 @@ impl Gallery {
                                 tok,
                                 Variant::Quiet,
                                 Icons::NONE,
-                                btn("bounce-play"),
+                                ButtonOpts::SHRINK,
+                                btn("bounce-play")
                             ),
                             icedtea::motion::overlay(
                                 widget::group_box(
@@ -7777,7 +7810,7 @@ impl Gallery {
                         ]
                         .spacing(6);
                         let pulse_col = column![
-                            widget::themed_switch(
+                            widget::switch(
                                 self.catalog.t("motion.pulse"),
                                 self.pulse_on,
                                 Message::Pulse,
@@ -7799,13 +7832,14 @@ impl Gallery {
                         ]
                         .spacing(6);
                         let shake_col = column![
-                            widget::themed_button(
+                            widget::button(
                                 self.catalog.t("motion.shake"),
                                 Some(Message::ShakePlay),
                                 tok,
                                 Variant::Quiet,
                                 Icons::NONE,
-                                btn("shake-play"),
+                                ButtonOpts::SHRINK,
+                                btn("shake-play")
                             ),
                             container(widget::group_box(
                                 self.catalog.t("motion.shake"),
@@ -7842,7 +7876,7 @@ impl Gallery {
             "expand-motion" => {
                 let progress = Self::anim_progress(&self.expand_anim);
                 column![
-                    widget::themed_button(
+                    widget::button(
                         if self.expander_open {
                             self.catalog.t("expand.collapse")
                         } else {
@@ -7852,7 +7886,8 @@ impl Gallery {
                         tok,
                         Variant::Primary,
                         Icons::NONE,
-                        btn("expand-toggle"),
+                        ButtonOpts::SHRINK,
+                        btn("expand-toggle")
                     ),
                     icedtea::motion::expand(
                         expand_notes_body(tok, &self.catalog),
@@ -9222,7 +9257,7 @@ mod tests {
             "secret token label must use catalog fill"
         );
         assert!(
-            !product.contains("themed_text_input(\n                        \"Email\""),
+            !product.contains("text_input(\n                        \"Email\""),
             "email placeholder must use catalog fill"
         );
         assert!(
@@ -9282,11 +9317,11 @@ mod tests {
             "breadcrumb Gallery must use catalog fill"
         );
         assert!(
-            !product.contains("themed_button(\n                    \"Toast\""),
+            !product.contains("button( ButtonOpts::SHRINK,\n                    \"Toast\""),
             "Toast button must use catalog fill"
         );
         assert!(
-            !product.contains("themed_switch(\n                    \"Busy\""),
+            !product.contains("switch(\n                    \"Busy\""),
             "Busy switch must use catalog fill"
         );
         assert!(
@@ -9530,8 +9565,8 @@ mod tests {
             .next()
             .unwrap();
         assert!(icon_page.contains("Icon::ALL"));
-        assert!(icon_page.contains("search_input_clear"));
-        assert!(icon_page.contains("themed_scroll"));
+        assert!(icon_page.contains("search_input"));
+        assert!(icon_page.contains("scroll"));
         assert!(icon_page.contains("layout::wrap"));
         assert!(icon_page.contains("Length::Fixed(TILE)"));
         assert!(icon_page.contains("align_x(Alignment::Center)"));

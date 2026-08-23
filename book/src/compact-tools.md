@@ -2,7 +2,7 @@
 
 A tool-sized window sets size on `Boot`. Density, type scale, corners,
 and elevation are the same `Boot` / `Tokens` fields as a full window.
-Tiles use `themed_button_sized` and `layout::pad`. Large values use
+Tiles use `button` with `ButtonOpts` and `layout::pad`. Large values use
 `Tokens::display()` (M3 Display Small times `font_scale`) with platform
 bold. Keys use `key::press` so Shift+8 is `*`.
 
@@ -45,7 +45,7 @@ readable (`⌫` on the face, name `Backspace`).
 
 ## Field focus
 
-`themed_text_input` takes an optional iced `Id`. After the window
+`text_input` takes an optional iced `Id`. After the window
 shows, focus that field with `iced::widget::operation::focus`.
 
 ## Chrome compose

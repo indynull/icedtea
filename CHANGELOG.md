@@ -4,10 +4,15 @@
 
 ### Feature
 
-- `FieldOpts.highlight` and `search_input` / `search_input_clear`
-  run a syntax highlighter on the typed value (`FieldRun` plus
-  `FieldInk` roles). `FieldInk::Error` keeps body ink and underlines
-  in the danger role.
+- Constructors use the job name (`button`, `checkbox`, `switch`,
+  `radio`, `slider`, `text_input`, `pick_list`, `scroll`). Search
+  clear is `on_clear` on `search_input`. Date is `date_stepper`.
+  Width and height sit on `ButtonOpts`. List extras sit on
+  `ListOpts`.
+- `FieldOpts.highlight` and `search_input` run a syntax highlighter
+  on the typed value (`FieldRun` plus `FieldInk` roles).
+  `FieldInk::Error` keeps body ink and underlines in the danger
+  role.
 - Gallery look strip offers Hebrew. Clocks stay on Western digits.
 - `Boot::transparent` sets an ARGB window buffer.
 - `Boot::decorations` turns the client title bar off on an application
@@ -22,8 +27,8 @@
 
 ### Bug fix
 
-- `search_input_clear` paints the clear mark only when the value is
-  non-empty.
+- `search_input` paints the clear mark only when `on_clear` is set
+  and the value is non-empty.
 - Elevation Level 1 is a visible drop on dark Desktop.
 - Elevated buttons raise one elevation level on hover.
 - Elevation resting heights match the Material table (0 / 1 / 3 / 6 /
@@ -32,8 +37,7 @@
   large increased (32 dp), and Extra extra large (48 dp).
 - Gallery type sample uses the locale Code page name (Vietnamese
   `Mã`), not leftover English `Code`.
-- `themed_slider` fills from the start edge. Min sits on start, max
-  on end.
+- `slider` fills from the start edge. Min sits on start, max on end.
 - `ClockDigits::map_str` maps `%` to the Arabic percent sign so
   `40%` paints as `٤٠٪`.
 - `progress` and `progress_ring` fill from the start edge and sit
@@ -47,7 +51,7 @@
 - Gallery control, field, and keys columns start-align their
   captions, so a Fill sibling cannot leave the hint on physical left.
 - `layout::form` sits the label gutter on the start edge.
-- `themed_text_input` and `search_input` sit placeholder, value, and
+- `text_input` and `search_input` sit placeholder, value, and
   leading icons on the start edge. The character count uses
   `ClockDigits`.
 - `number_input` paints its value with `ClockDigits` and sits it on

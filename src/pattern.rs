@@ -18,7 +18,8 @@
 //! ```
 
 use iced::widget::{
-    button, column, container, mouse_area, rich_text, row, span, text, Column, Row, Space, Stack,
+    button as iced_button, column, container, mouse_area, rich_text, row, span, text, Column, Row,
+    Space, Stack,
 };
 use iced::{Alignment, Element, Length, Padding, Point, Size};
 
@@ -34,8 +35,8 @@ use crate::theme::Tokens;
 use crate::typo;
 use crate::variant::Variant;
 use crate::widget::{
-    dismiss_button, group_box, icon_svg, label, meta, search_input, tab_bar, themed_button,
-    themed_scroll, themed_text_input, CardFace, FieldOpts,
+    button, dismiss_button, group_box, icon_svg, label, meta, scroll, search_input, tab_bar,
+    text_input, ButtonOpts, CardFace, FieldOpts,
 };
 
 /// Group actions by the id prefix before `.` (`file.save` → `file`).
@@ -168,12 +169,13 @@ pub fn toolbar<'a, M: Clone + 'a>(
         .spacing(crate::density::GRID as f32)
         .padding(tok.density.gap());
     for a in actions {
-        r = r.push(themed_button(
+        r = r.push(button(
             a.title.clone(),
             a.invoke(),
             tok,
             Variant::Quiet,
             Icons::NONE,
+            ButtonOpts::SHRINK,
             A11y::button(a.title.clone()).with_disabled(!a.enabled),
         ));
     }
@@ -229,7 +231,7 @@ pub fn command_bar<'a, M: Clone + 'a>(
         let face = text(a.title.clone())
             .size(tok.body())
             .color(tok.scheme().on_surface);
-        let mut b = button(face)
+        let mut b = iced_button(face)
             .padding([2.0, tok.density.gap()])
             .style(style::joined_button_style(tok, Variant::Ghost));
         if let Some(m) = a.invoke() {
@@ -389,6 +391,7 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
     let query_field = search_input(
         query,
         on_query,
+        None,
         submit,
         paint,
         A11y::new(placeholder, Role::TextBox),
@@ -412,7 +415,7 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
                     paint,
                     A11y::new(p.label.clone(), Role::Status)
                 ),
-                themed_text_input(
+                text_input(
                     p.label.as_str(),
                     &p.value,
                     on_prompt,
@@ -441,7 +444,7 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
         })
     } else if n > opts.scroll_after {
         Some(
-            container(themed_scroll(
+            container(scroll(
                 list.into(),
                 paint,
                 A11y::new("palette-list", Role::List),
@@ -608,7 +611,7 @@ fn palette_hit<'a, M: Clone + 'a>(
         PaletteFace::Compact => (tok.density.inset() - 2.0).max(4.0),
         PaletteFace::Default | PaletteFace::Detail => tok.density.inset(),
     };
-    let mut b = button(line)
+    let mut b = iced_button(line)
         .padding(pad)
         .width(Length::Fill)
         .style(style::palette_hit(tok, selected));
@@ -724,12 +727,13 @@ pub fn status_page<'a, M: Clone + 'a>(
     .spacing(tok.density.gap())
     .align_x(align_start(tok.direction));
     if let Some((t, m)) = action {
-        col = col.push(themed_button(
+        col = col.push(button(
             t.clone(),
             Some(m),
             tok,
             Variant::Primary,
             Icons::NONE,
+            ButtonOpts::SHRINK,
             A11y::button(t),
         ));
     }
@@ -870,7 +874,7 @@ pub fn preferences_page<'a, M: Clone + 'a>(
         ));
     }
     column![
-        themed_text_input(
+        text_input(
             cat.t("search"),
             query,
             on_query,
@@ -880,7 +884,7 @@ pub fn preferences_page<'a, M: Clone + 'a>(
             A11y::new(cat.t("search"), Role::TextBox),
             None,
         ),
-        themed_scroll(
+        scroll(
             body.into(),
             tok,
             A11y::new("prefs", Role::Group),
@@ -1004,12 +1008,13 @@ pub fn navigation_view<'a, M: Clone + 'a>(
         list_detail(sidebar, content, crate::layout::fixed(260.0), tok, dir)
     } else {
         let top = if nav.can_back() {
-            themed_button(
+            button(
                 cat.t("back"),
                 Some(on_back),
                 tok,
                 Variant::Quiet,
                 Icons::NONE,
+                ButtonOpts::SHRINK,
                 A11y::button(cat.t("back")),
             )
         } else {
@@ -1101,7 +1106,7 @@ pub fn nav_rail<'a, M: Clone + 'a>(
                 .unwrap_or_default()
         };
         let icons = dest.icon.map(Icons::leading).unwrap_or(Icons::NONE);
-        let mut face: Element<'a, M> = crate::widget::themed_button(
+        let mut face: Element<'a, M> = crate::widget::button(
             face_title,
             if a11y.disabled {
                 None
@@ -1111,6 +1116,7 @@ pub fn nav_rail<'a, M: Clone + 'a>(
             tok,
             if on { Variant::Quiet } else { Variant::Ghost },
             icons,
+            ButtonOpts::SHRINK,
             A11y::button(dest.title.clone())
                 .with_checked(on)
                 .with_disabled(a11y.disabled),
@@ -1326,31 +1332,34 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
     // M3 dialog: extra, cancel (text) then confirm (filled), trailing edge.
     let mut actions = Row::new().spacing(tok.density.gap());
     for (t, m) in extra {
-        actions = actions.push(themed_button(
+        actions = actions.push(button(
             t.clone(),
             Some(m),
             tok,
             Variant::Quiet,
             Icons::NONE,
+            ButtonOpts::SHRINK,
             A11y::button(t),
         ));
     }
     if let Some((t, m)) = cancel {
-        actions = actions.push(themed_button(
+        actions = actions.push(button(
             t.clone(),
             Some(m),
             tok,
             Variant::Ghost,
             Icons::NONE,
+            ButtonOpts::SHRINK,
             A11y::button(t),
         ));
     }
-    actions = actions.push(themed_button(
+    actions = actions.push(button(
         accept.0.clone(),
         Some(accept.1),
         tok,
         Variant::Primary,
         Icons::NONE,
+        ButtonOpts::SHRINK,
         A11y::button(accept.0),
     ));
     let actions = container(actions)
@@ -1472,12 +1481,13 @@ pub fn sectioned_menu<'a, M: Clone + 'a>(
         }
         for a in sec.actions {
             col = col.push(
-                container(themed_button(
+                container(button(
                     a.title.clone(),
                     a.invoke(),
                     tok,
                     Variant::Ghost,
                     Icons::NONE,
+                    ButtonOpts::SHRINK,
                     A11y::new(a.title.clone(), Role::MenuItem).with_disabled(!a.enabled),
                 ))
                 .width(Length::Fill)
@@ -1546,7 +1556,7 @@ pub fn cascade_menu<'a, M: Clone + 'a>(
         } else {
             act.invoke()
         };
-        primary = primary.push(themed_button(
+        primary = primary.push(button(
             title.clone(),
             press,
             tok,
@@ -1556,6 +1566,7 @@ pub fn cascade_menu<'a, M: Clone + 'a>(
                 Variant::Ghost
             },
             Icons::NONE,
+            ButtonOpts::SHRINK,
             A11y::new(title, Role::MenuItem).with_disabled(!act.enabled),
         ));
     }
@@ -1777,7 +1788,7 @@ pub fn context_menu<'a, M: Clone + 'a>(
         )
         .width(Length::Fill)
         .align_x(crate::i18n::align_start(tok.direction));
-        let mut row = button(face)
+        let mut row = iced_button(face)
             .padding(Padding::from([
                 paint.density.gap() / 2.0 + 2.0,
                 paint.density.gap() + 2.0,
@@ -1794,7 +1805,7 @@ pub fn context_menu<'a, M: Clone + 'a>(
     let inner = if size.height + 1.0
         < paint.density.gap() + (n.max(1) as f32) * context_row_h(paint.density)
     {
-        container(themed_scroll(
+        container(scroll(
             list,
             paint,
             A11y::new("context-scroll", Role::Group),
@@ -2087,13 +2098,14 @@ pub fn tool_panel<'a, M: Clone + 'a>(
     let dock = dock.into();
     let head = row![
         iced::widget::Space::new().width(Length::Fill),
-        themed_button(
+        button(
             dock.clone(),
             a11y.apply_message(on_dock),
             tok,
             Variant::Ghost,
             Icons::NONE,
-            A11y::button(dock).with_disabled(a11y.disabled),
+            ButtonOpts::SHRINK,
+            A11y::button(dock).with_disabled(a11y.disabled)
         ),
     ]
     .spacing(tok.density.gap())
@@ -2210,7 +2222,7 @@ pub fn cheatsheet<'a, M: Clone + 'a>(
         col = col.push(line);
     }
     crate::a11y::attach(
-        themed_scroll(
+        scroll(
             col.into(),
             tok,
             A11y::new("cheatsheet", Role::Group),

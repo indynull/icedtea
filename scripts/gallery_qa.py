@@ -839,7 +839,7 @@ LEFTOVER_ENGLISH = (
     'Cell::from("Month")',
     'password_input(\n                "Secret"',
     'secret_field(\n                    "Token"',
-    'themed_text_input(\n                        "Email"',
+    'text_input(\n                        "Email"',
     'suggest_field(\n                    "Command"',
     'Action::new("file.open", "Open"',
     'Action::new("file.recent", "Recent"',
@@ -1160,7 +1160,7 @@ def gallery_readout_hits(root: Path) -> list[str]:
         hits.append("percent buttons skip ClockDigits::map_str")
     if "i18n::order" not in arm and "order(" not in arm:
         hits.append("percent buttons skip i18n::order")
-    if 'themed_button(\n                            "25%"' in arm or '"25%"' in arm and "map_str" not in arm:
+    if 'widget::button(\n                            "25%"' in arm or '"25%"' in arm and "map_str" not in arm:
         hits.append("hardcoded 25% button")
     return hits
 

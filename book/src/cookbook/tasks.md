@@ -87,7 +87,7 @@ a successful write, `reload` reads the table again.
 toolbar, `ctrl+n`, or Enter in the field. `Message::Toggle` is a
 checkbox. Empty titles are not saved.
 
-`themed_scroll` lets a long list move. `A11y` is the name a screen
+`scroll` lets a long list move. `A11y` is the name a screen
 reader uses; every icedtea constructor takes one.
 
 ## Run it

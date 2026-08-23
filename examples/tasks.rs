@@ -121,7 +121,7 @@ impl Tasks {
         } else {
             for row in &self.rows {
                 let id = row.id;
-                list = list.push(widget::themed_checkbox(
+                list = list.push(widget::checkbox(
                     row.title.clone(),
                     row.done,
                     move |done| Message::Toggle(id, done),
@@ -132,7 +132,7 @@ impl Tasks {
         }
         icedtea::iced::widget::column![
             pattern::toolbar(self.table.iter(), tok, Direction::Ltr),
-            widget::themed_text_input(
+            widget::text_input(
                 "New task",
                 &self.draft,
                 Message::Draft,
@@ -142,7 +142,7 @@ impl Tasks {
                 A11y::new("new-task", Role::TextBox),
                 None,
             ),
-            widget::themed_scroll(
+            widget::scroll(
                 list.into(),
                 tok,
                 A11y::new("tasks", Role::List),

@@ -816,12 +816,13 @@ mod tests {
         use iced::advanced::widget::Tree;
         use iced::{Event, Font, Pixels, Point, Size};
         let tok = named("dark").tokens;
-        let face = widget::themed_button(
+        let face = widget::button(
             "Copy",
             Some(()),
             tok,
             Variant::Ghost,
             crate::icon::Icons::NONE,
+            crate::widget::ButtonOpts::SHRINK,
             A11y::button("Copy"),
         );
         let progress = 0.5;
@@ -883,12 +884,13 @@ mod tests {
         use iced::widget::{column, row, Space};
         use iced::{Event, Font, Pixels, Point, Size};
         let tok = named("dark").tokens;
-        let face = widget::themed_button(
+        let face = widget::button(
             "Copy",
             Some(()),
             tok,
             Variant::Ghost,
             crate::icon::Icons::NONE,
+            crate::widget::ButtonOpts::SHRINK,
             A11y::button("Copy"),
         );
         let placed = column![

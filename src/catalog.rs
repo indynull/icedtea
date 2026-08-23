@@ -181,25 +181,25 @@ pub fn page_title(page: &str) -> &'static str {
 /// ```
 /// assert_eq!(
 ///     icedtea::catalog::constructor("button"),
-///     Some(("widget", "themed_button"))
+///     Some(("widget", "button"))
 /// );
 /// ```
 pub fn constructor(id: &str) -> Option<(&'static str, &'static str)> {
     Some(match id {
-        "button" => ("widget", "themed_button"),
+        "button" => ("widget", "button"),
         "segmented-button" => ("widget", "segmented_button"),
         "button-group" => ("widget", "button_group"),
         "icon-button" => ("widget", "icon_button"),
         "toggle-icon-button" => ("widget", "icon_button_toggle"),
         "split-button" => ("widget", "split_button"),
         "toggle-button" => ("widget", "toggle_button"),
-        "checkbox" => ("widget", "themed_checkbox"),
+        "checkbox" => ("widget", "checkbox"),
         "checkbox-indeterminate" => ("widget", "checkbox_indeterminate"),
-        "radio" => ("widget", "themed_radio"),
-        "switch" => ("widget", "themed_switch"),
-        "slider" => ("widget", "themed_slider"),
+        "radio" => ("widget", "radio"),
+        "switch" => ("widget", "switch"),
+        "slider" => ("widget", "slider"),
         "range-slider" => ("widget", "range_slider"),
-        "text-input" => ("widget", "themed_text_input"),
+        "text-input" => ("widget", "text_input"),
         "field-support" => ("widget", "field_support"),
         "password" => ("widget", "password_input"),
         "secret" => ("widget", "secret_field"),
@@ -208,10 +208,10 @@ pub fn constructor(id: &str) -> Option<(&'static str, &'static str)> {
         "search" => ("widget", "search_input"),
         "search-view" => ("widget", "search_view"),
         "suggest" => ("widget", "suggest_field"),
-        "select" => ("widget", "themed_pick_list"),
+        "select" => ("widget", "pick_list"),
         "form" => ("widget", "form_group"),
         "number" => ("widget", "number_input"),
-        "date" => ("widget", "date_picker"),
+        "date" => ("widget", "date_stepper"),
         "time" => ("widget", "time_picker"),
         "progress" => ("widget", "progress"),
         "progress-ring" => ("widget", "progress_ring"),
@@ -256,7 +256,7 @@ pub fn constructor(id: &str) -> Option<(&'static str, &'static str)> {
         "status-bar" => ("pattern", "status_bar"),
         "busy" => ("widget", "busy_overlay"),
         "toast" => ("widget", "toast_view"),
-        "scrollbar" => ("widget", "themed_scroll"),
+        "scrollbar" => ("widget", "scroll"),
         "dialogs" => ("pattern", "dialog_sheet"),
         "side-sheet" => ("pattern", "side_sheet"),
         "list-detail" => ("pattern", "list_detail"),
@@ -651,20 +651,20 @@ mod tests {
         let layout = include_str!("layout/recipes.rs");
         let motion = include_str!("motion.rs");
         let map = [
-            ("button", "themed_button", widget),
+            ("button", "button", widget),
             ("segmented-button", "segmented_button", widget),
             ("button-group", "button_group", widget),
             ("icon-button", "icon_button", widget),
             ("toggle-icon-button", "icon_button_toggle", widget),
             ("split-button", "split_button", widget),
             ("toggle-button", "toggle_button", widget),
-            ("checkbox", "themed_checkbox", widget),
+            ("checkbox", "checkbox", widget),
             ("checkbox-indeterminate", "checkbox_indeterminate", widget),
-            ("radio", "themed_radio", widget),
-            ("switch", "themed_switch", widget),
-            ("slider", "themed_slider", widget),
+            ("radio", "radio", widget),
+            ("switch", "switch", widget),
+            ("slider", "slider", widget),
             ("range-slider", "range_slider", widget),
-            ("text-input", "themed_text_input", widget),
+            ("text-input", "text_input", widget),
             ("field-support", "field_support", widget),
             ("password", "password_input", widget),
             ("secret", "secret_field", widget),
@@ -673,10 +673,10 @@ mod tests {
             ("search", "search_input", widget),
             ("search-view", "search_view", widget),
             ("suggest", "suggest_field", widget),
-            ("select", "themed_pick_list", widget),
+            ("select", "pick_list", widget),
             ("form", "form_group", widget),
             ("number", "number_input", widget),
-            ("date", "date_picker", widget),
+            ("date", "date_stepper", widget),
             ("time", "time_picker", widget),
             ("progress", "progress", widget),
             ("progress-ring", "progress_ring", widget),
@@ -721,7 +721,7 @@ mod tests {
             ("status-bar", "status_bar", pattern),
             ("busy", "busy_overlay", widget),
             ("toast", "toast_view", widget),
-            ("scrollbar", "themed_scroll", widget),
+            ("scrollbar", "scroll", widget),
             ("dialogs", "dialog_sheet", pattern),
             ("side-sheet", "side_sheet", pattern),
             ("list-detail", "list_detail", pattern),
@@ -864,7 +864,7 @@ mod tests {
     fn fn_params_mention_reads_the_shipped_signature() {
         assert!(fn_params_mention(
             include_str!("widget.rs"),
-            "themed_button",
+            "button",
             "A11y"
         ));
         assert!(!fn_params_mention(
@@ -950,7 +950,7 @@ mod tests {
         assert!(hello.contains("file.save"));
         assert!(hello.contains("ctrl+s"));
         assert!(hello.contains("pattern::toolbar") || hello.contains("main_window"));
-        assert!(hello.contains("textarea") || hello.contains("themed_text_input"));
+        assert!(hello.contains("textarea") || hello.contains("text_input"));
         assert!(!hello.contains("count.inc"));
         assert!(!hello.contains("n: i32"));
     }
@@ -1025,7 +1025,7 @@ mod tests {
     fn constructor_rustdoc_has_no_catalog_title() {
         let widget = include_str!("widget.rs");
         assert!(
-            !rustdoc_block_above(&widget[..find_pub_fn(widget, "themed_button").unwrap()])
+            !rustdoc_block_above(&widget[..find_pub_fn(widget, "button").unwrap()])
                 .contains("catalog id")
         );
     }
@@ -1059,7 +1059,7 @@ mod tests {
         let recipes = include_str!("layout/recipes.rs");
         must(
             !recipes.contains("pub fn scroll_y<"),
-            "themed_scroll is the scroll constructor",
+            "scroll is the scroll constructor",
         );
         must(
             !recipes.contains("pub fn sidebar_mode"),

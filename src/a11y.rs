@@ -561,19 +561,27 @@ mod tests {
         let tok = theme::named("dark").tokens;
         let disabled = A11y::button("Save").with_disabled(true);
         assert!(disabled.apply_message(Some(())).is_none());
-        let _: Element<'_, ()> = widget::themed_button(
+        let _: Element<'_, ()> = widget::button(
             "",
             Some(()),
             tok,
             Variant::Primary,
             Icons::NONE,
+            widget::ButtonOpts::SHRINK,
             disabled.clone(),
         );
         assert_eq!(disabled.apply_name(""), "Save");
         let named = A11y::button("Save");
         assert_eq!(named.apply_name(""), "Save");
-        let _: Element<'_, ()> =
-            widget::themed_button("", Some(()), tok, Variant::Primary, Icons::NONE, named);
+        let _: Element<'_, ()> = widget::button(
+            "",
+            Some(()),
+            tok,
+            Variant::Primary,
+            Icons::NONE,
+            widget::ButtonOpts::SHRINK,
+            named,
+        );
         let rec = A11y::new("vol", Role::Slider)
             .with_hint("Volume")
             .merge_value(format!("{}", 0.4))
@@ -581,7 +589,7 @@ mod tests {
         assert_eq!(rec.value.as_deref(), Some("0.4"));
         assert_eq!(rec.hint.as_deref(), Some("Volume"));
         assert_eq!(rec.checked, Some(false));
-        let _: Element<'_, f32> = widget::themed_slider(
+        let _: Element<'_, f32> = widget::slider(
             0.0..=1.0,
             0.4,
             |v| v,
@@ -597,13 +605,13 @@ mod tests {
         );
         let box_rec = A11y::new("Accept", Role::Checkbox).with_checked(true);
         assert!(box_rec.apply_checked(false));
-        let _: Element<'_, bool> = widget::themed_checkbox("Accept", false, |on| on, tok, box_rec);
+        let _: Element<'_, bool> = widget::checkbox("Accept", false, |on| on, tok, box_rec);
         let field = A11y::new("Email", Role::Group)
             .merge_error(Some("Enter a valid address."))
             .merge_hint("We never share your email.");
         assert_eq!(field.error.as_deref(), Some("Enter a valid address."));
         assert_eq!(field.hint.as_deref(), Some("We never share your email."));
-        let child = widget::themed_text_input(
+        let child = widget::text_input(
             "Email",
             "x",
             |s| s,

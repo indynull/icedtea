@@ -320,7 +320,7 @@ pub fn column_box<'a, M: 'a>(
 }
 
 /// Equal-fill tile pad: each cell shares the row width.
-/// Equal-fill tiles. Pair with [`crate::widget::themed_button_sized`].
+/// Equal-fill tiles. Pair with [`crate::widget::button`].
 ///
 /// `columns` is the row length.
 ///

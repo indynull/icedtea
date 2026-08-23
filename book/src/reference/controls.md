@@ -16,7 +16,7 @@ Each constructor takes `A11y` unless noted. iced 0.14 publishes the widget id on
 
 **`button`** — Press a labeled control to send a message.
 
-Constructor: [`widget::themed_button`](https://docs.rs/icedtea/latest/icedtea/widget/fn.themed_button.html)
+Constructor: [`widget::button`](https://docs.rs/icedtea/latest/icedtea/widget/fn.button.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
@@ -26,7 +26,8 @@ Constructor: [`widget::themed_button`](https://docs.rs/icedtea/latest/icedtea/wi
 `A11y::button(name).with_disabled(true)` drops the press handler.
 `Variant` picks the token wash (`Primary` filled, `Quiet` tonal,
 `Outlined`, `Elevated`, `Ghost` text). `Icons` is leading and trailing
-chrome.
+chrome. `ButtonOpts` is width and height (`SHRINK` for a chrome
+label, `{ width: Length::Fill, height }` for a pad tile).
 
 ### Split button
 
@@ -62,7 +63,7 @@ Pass `A11y`.
 
 **`checkbox`** — Check or clear a boolean.
 
-Constructor: [`widget::themed_checkbox`](https://docs.rs/icedtea/latest/icedtea/widget/fn.themed_checkbox.html)
+Constructor: [`widget::checkbox`](https://docs.rs/icedtea/latest/icedtea/widget/fn.checkbox.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
@@ -77,7 +78,7 @@ Pass `A11y`.
 
 **`radio`** — Pick one value from a small set.
 
-Constructor: [`widget::themed_radio`](https://docs.rs/icedtea/latest/icedtea/widget/fn.themed_radio.html)
+Constructor: [`widget::radio`](https://docs.rs/icedtea/latest/icedtea/widget/fn.radio.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
@@ -92,7 +93,7 @@ Pass `A11y`.
 
 **`switch`** — A sliding on/off control.
 
-Constructor: [`widget::themed_switch`](https://docs.rs/icedtea/latest/icedtea/widget/fn.themed_switch.html)
+Constructor: [`widget::switch`](https://docs.rs/icedtea/latest/icedtea/widget/fn.switch.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
@@ -107,7 +108,7 @@ Pass `A11y`.
 
 **`slider`** — Pick a number on a range.
 
-Constructor: [`widget::themed_slider`](https://docs.rs/icedtea/latest/icedtea/widget/fn.themed_slider.html)
+Constructor: [`widget::slider`](https://docs.rs/icedtea/latest/icedtea/widget/fn.slider.html)
 
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
