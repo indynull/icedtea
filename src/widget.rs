@@ -43,7 +43,7 @@ use iced::widget::{
 };
 use iced::{
     keyboard, Alignment, Background, Color, Element, Event, Length, Padding, Point, Radians,
-    Rectangle, Size,
+    Rectangle, Size, Vector,
 };
 
 use crate::host_canvas::{ArcRing, SpinnerDots};
@@ -389,6 +389,16 @@ fn closed_disclosure(tok: Tokens) -> &'static str {
     }
 }
 
+/// iced's rail is physical-left. Horizontal RTL paints `end+start-value`
+/// so the handle sits the same distance from start.
+fn slider_paint_value(range: &std::ops::RangeInclusive<f32>, value: f32, rtl: bool) -> f32 {
+    if rtl {
+        *range.start() + *range.end() - value
+    } else {
+        value
+    }
+}
+
 /// Step for a continuous [`themed_slider`] range (~100 positions).
 ///
 /// iced's slider defaults to step `1`, so a `0.0..=1.0` range only hits
@@ -450,15 +460,13 @@ pub fn icon_style(tok: Tokens) -> impl Fn(&iced::Theme, svg::Status) -> svg::Sty
 ///     widget::icon_svg(Glyph::Bytes(mark), tok, A11y::new("app", Role::Image));
 /// ```
 pub fn icon_svg<'a, M: 'a>(glyph: impl Into<Glyph>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
-    let handle = svg::Handle::from_memory(glyph.into().bytes());
-    a11y::attach(
-        svg(handle)
-            .width(16.0)
-            .height(16.0)
-            .style(icon_style(tok))
-            .into(),
-        &a11y,
-    )
+    let glyph = glyph.into();
+    let handle = svg::Handle::from_memory(glyph.bytes());
+    let mut pic = svg(handle).width(16.0).height(16.0).style(icon_style(tok));
+    if tok.direction == crate::i18n::Direction::Rtl && glyph.flips_rtl() {
+        pic = pic.rotation(std::f32::consts::PI);
+    }
+    a11y::attach(pic.into(), &a11y)
 }
 
 /// A line of body text.
@@ -518,6 +526,18 @@ pub fn figure_display<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) 
     a11y::attach(r.into(), &a11y)
 }
 
+/// Muted caption. Shrink-wraps so a chrome row can sit it next to a
+/// pick. A Fill sibling (`labeled_control`, field) needs the parent
+/// column to `align_x(align_start)` or this lands on physical left.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let _: icedtea::Element<'_, ()> =
+///     widget::meta("Every named variant", tok, A11y::new("hint", Role::Status));
+/// ```
 pub fn meta<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
     let s = a11y.apply_name(s);
     a11y::attach(
@@ -882,13 +902,15 @@ pub enum FieldFace {
     Outlined,
 }
 
-/// Card paint: elevated (shadow), filled, or outline only.
+/// Card paint: elevated (shadow), filled, outline, or a start rail.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum CardFace {
     #[default]
     Elevated,
     Filled,
     Outlined,
+    /// Inset start rail and a label gutter. Body stays off the rail.
+    Rail,
 }
 
 /// How each tree row is painted.
@@ -965,13 +987,18 @@ impl ControlSize {
     }
 }
 
-/// Optional field chrome: face, prefix/suffix icons, floating label, count.
+/// Optional field chrome: face, prefix/suffix icons, floating label, count,
+/// and a syntax highlighter on the value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FieldOpts<'a> {
     pub face: FieldFace,
     pub icons: Icons,
     pub label: &'a str,
     pub max_len: Option<usize>,
+    /// Syntax highlighter: byte ranges in the current value, painted
+    /// with [`FieldInk`]. The application owns the matcher. Empty
+    /// means one ink.
+    pub highlight: &'a [FieldRun],
 }
 
 impl FieldOpts<'static> {
@@ -980,7 +1007,45 @@ impl FieldOpts<'static> {
         icons: Icons::NONE,
         label: "",
         max_len: None,
+        highlight: &[],
     };
+}
+
+/// Token role for a [`FieldRun`]. Colors come from [`Tokens`], not hex.
+/// [`Self::Error`] keeps body ink and draws a danger underline (spelling).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FieldInk {
+    Text,
+    Success,
+    Warning,
+    Muted,
+    Error,
+}
+
+/// One styled span in a single-line field. `start` / `end` are UTF-8
+/// byte offsets into the current value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FieldRun {
+    pub start: usize,
+    pub end: usize,
+    pub ink: FieldInk,
+}
+
+impl FieldRun {
+    pub const fn new(start: usize, end: usize, ink: FieldInk) -> Self {
+        Self { start, end, ink }
+    }
+}
+
+impl FieldInk {
+    fn color(self, tok: Tokens) -> Color {
+        match self {
+            Self::Text | Self::Error => tok.text,
+            Self::Success => tok.success,
+            Self::Warning => tok.warning,
+            Self::Muted => tok.muted,
+        }
+    }
 }
 
 impl CheckState {
@@ -1459,7 +1524,8 @@ impl SliderMarks<'static> {
 /// Pass min, max, and the current value. The message is the new value
 /// while the thumb moves. Wheel over the control steps by
 /// [`slider_step`]. Disabled ignores drag and wheel. `marks` paints
-/// ticks and end labels when set. Rail corners follow [`Tokens::shape`]
+/// ticks and end labels when set; min sits on start, max on end. The
+/// rail fills from start. Rail corners follow [`Tokens::shape`]
 /// ([`crate::m3::shape::Component::Track`]).
 ///
 ///
@@ -1487,6 +1553,8 @@ pub fn themed_slider<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let a11y = a11y.merge_value(format!("{value}"));
+    let rtl_rail = !marks.vertical && tok.direction == crate::i18n::Direction::Rtl;
+    let painted = slider_paint_value(&range, value, rtl_rail);
     let slider_el: Element<'a, M> = if a11y.disabled {
         let _ = (value, msg);
         let (w, h) = if marks.vertical {
@@ -1501,16 +1569,18 @@ pub fn themed_slider<'a, M: Clone + 'a>(
             .into()
     } else {
         let step = slider_step(range.clone());
+        let range_msg = range.clone();
+        let on_move = move |v| msg(slider_paint_value(&range_msg, v, rtl_rail));
         if marks.vertical {
-            iced::widget::vertical_slider(range.clone(), value, msg)
+            iced::widget::vertical_slider(range.clone(), painted, on_move)
                 .step(step)
-                .style(style::slider_style(tok))
+                .style(style::slider_style_rail(tok, false))
                 .height(Length::Fill)
                 .into()
         } else {
-            slider(range.clone(), value, msg)
+            slider(range.clone(), painted, on_move)
                 .step(step)
-                .style(style::slider_style(tok))
+                .style(style::slider_style_rail(tok, rtl_rail))
                 .width(Length::Fill)
                 .into()
         }
@@ -1522,13 +1592,14 @@ pub fn themed_slider<'a, M: Clone + 'a>(
         Length::Fill
     });
     if !marks.thumb.is_empty() {
-        col = col.push(
-            text(marks.thumb)
-                .size(tok.meta())
-                .color(s.on_surface)
+        let thumb = text(marks.thumb).size(tok.meta()).color(s.on_surface);
+        col = col.push(if marks.vertical {
+            thumb
+        } else {
+            thumb
                 .align_x(crate::i18n::align_start(tok.direction))
-                .width(Length::Fill),
-        );
+                .width(Length::Fill)
+        });
     }
     if marks.ticks > 1 && !marks.vertical {
         let mut ticks = Row::new().width(Length::Fill);
@@ -1549,16 +1620,20 @@ pub fn themed_slider<'a, M: Clone + 'a>(
         col = col.push(slider_el);
     }
     if !marks.min.is_empty() || !marks.max.is_empty() {
-        col = col.push(
-            row![
-                text(marks.min)
-                    .size(tok.meta())
-                    .color(s.on_surface_variant)
-                    .width(Length::Fill),
-                text(marks.max).size(tok.meta()).color(s.on_surface_variant),
-            ]
-            .width(Length::Fill),
-        );
+        let min_el: Element<'a, M> =
+            container(text(marks.min).size(tok.meta()).color(s.on_surface_variant))
+                .width(Length::Fill)
+                .align_x(crate::i18n::align_start(tok.direction))
+                .into();
+        let max_el: Element<'a, M> = text(marks.max)
+            .size(tok.meta())
+            .color(s.on_surface_variant)
+            .into();
+        let mut ends = Row::new().width(Length::Fill);
+        for kid in crate::i18n::order(tok.direction, [min_el, max_el]) {
+            ends = ends.push(kid);
+        }
+        col = col.push(ends);
     }
     let el: Element<'a, M> = if a11y.disabled {
         col.into()
@@ -1652,6 +1727,7 @@ pub fn range_slider<'a, M: Clone + 'a>(
         ]
         .spacing(4)
         .width(Length::Fill)
+        .align_x(crate::i18n::align_start(tok.direction))
         .into(),
         &a11y,
     )
@@ -1761,6 +1837,7 @@ pub fn progress<'a, M: 'a>(
         Column::new()
             .spacing(4)
             .width(Length::Fill)
+            .align_x(crate::i18n::align_start(tok.direction))
             .push(bar)
             .push(meta(c, tok, A11y::new(c, Role::Status)))
             .into()
@@ -1828,6 +1905,7 @@ pub fn progress_ring<'a, M: 'a>(
         column![ring, meta(c, tok, A11y::new(c, Role::Status))]
             .spacing(4)
             .width(Length::Fill)
+            .align_x(crate::i18n::align_start(tok.direction))
             .into()
     } else {
         ring.into()
@@ -2022,16 +2100,22 @@ pub fn number_input<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let shown = format!("{value}");
-    let mut i = text_input("0", &shown)
+    let shown = tok.clock_digits.map_str(&format!("{value}"));
+    let zero = tok.clock_digits.map_str("0");
+    let rtl = tok.direction == crate::i18n::Direction::Rtl;
+    let mut i = text_input(&zero, &shown)
         .style(style::field_style(tok, false))
         .padding(pad(tok))
-        .size(tok.body());
-    let el: Element<'a, M> = if a11y.disabled {
+        .size(tok.body())
+        .align_x(crate::i18n::align_x_start(tok.direction))
+        .width(if rtl { Length::Shrink } else { Length::Fill });
+    if !a11y.disabled {
+        i = i.on_input(on_change);
+    }
+    let inner: Element<'a, M> = if a11y.disabled {
         let _ = on_change;
         i.into()
     } else {
-        i = i.on_input(on_change);
         mouse_area(i)
             .on_scroll(move |delta| {
                 let dir = if scroll_wheel_y(delta) > 0.0 { 1 } else { -1 };
@@ -2039,7 +2123,23 @@ pub fn number_input<'a, M: Clone + 'a>(
             })
             .into()
     };
-    a11y::attach(el, &a11y)
+    let field: Element<'a, M> = if rtl {
+        Row::new()
+            .push(Space::new().width(Length::Fill))
+            .push(inner)
+            .align_y(Alignment::Center)
+            .width(Length::Fill)
+            .into()
+    } else {
+        container(inner).width(Length::Fill).into()
+    };
+    // Id on this fill container. a11y::attach copies intrinsic size
+    // and would drop the start park.
+    container(field)
+        .width(Length::Fill)
+        .height(Length::Fixed(control_height(tok)))
+        .id(Id::from(a11y.node_id()))
+        .into()
 }
 
 /// Step a numeric value.
@@ -2053,6 +2153,9 @@ pub fn step_number(value: f64, step: f64, min: f64, max: f64, dir: i32) -> f64 {
 ///
 /// Optional iced `Id` so you can `focus` after show. Disabled greys
 /// the field and drops edit. Empty value is a valid state.
+/// [`FieldOpts::highlight`] is a syntax highlighter: application
+/// [`FieldRun`]s on the typed value. Caret, selection, and
+/// placeholder stay iced's.
 ///
 ///
 /// ```
@@ -2085,10 +2188,12 @@ pub fn themed_text_input<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let a11y = a11y.merge_value(value.to_string());
     let outlined = matches!(opts.face, FieldFace::Outlined);
+    let hide_value = field_runs_hide_value(value, opts.highlight);
     let mut i = text_input(placeholder, value)
-        .style(style::field_style(tok, outlined))
+        .style(style::field_style_paint(tok, outlined, hide_value))
         .padding(pad(tok))
-        .size(tok.body());
+        .size(tok.body())
+        .align_x(crate::i18n::align_x_start(tok.direction));
     if let Some(id) = input_id {
         i = i.id(id);
     }
@@ -2098,18 +2203,23 @@ pub fn themed_text_input<'a, M: Clone + 'a>(
             i = i.on_submit(m);
         }
     }
-    let mut field: Element<'a, M> = container(i)
+    let painted = paint_field_value(i.into(), value, opts.highlight, tok);
+    let mut field: Element<'a, M> = container(painted)
         .width(Length::Fill)
         .height(Length::Fixed(control_height(tok)))
         .into();
     if opts.icons != Icons::NONE {
-        let mut r = Row::new().spacing(gap(tok)).align_y(Alignment::Center);
+        let mut kids: Vec<Element<'a, M>> = Vec::new();
         if let Some(ic) = opts.icons.leading {
-            r = r.push(icon_svg(ic, tok, A11y::new("prefix", Role::Image)));
+            kids.push(icon_svg(ic, tok, A11y::new("prefix", Role::Image)));
         }
-        r = r.push(field);
+        kids.push(field);
         if let Some(ic) = opts.icons.trailing {
-            r = r.push(icon_svg(ic, tok, A11y::new("suffix", Role::Image)));
+            kids.push(icon_svg(ic, tok, A11y::new("suffix", Role::Image)));
+        }
+        let mut r = Row::new().spacing(gap(tok)).align_y(Alignment::Center);
+        for kid in crate::i18n::order(tok.direction, kids) {
+            r = r.push(kid);
         }
         field = r.width(Length::Fill).into();
     }
@@ -2125,10 +2235,11 @@ pub fn themed_text_input<'a, M: Clone + 'a>(
     if let Some(max) = opts.max_len {
         let n = value.chars().count();
         col = col.push(
-            text(format!("{n}/{max}"))
+            text(tok.clock_digits.map_str(&format!("{n}/{max}")))
                 .size(tok.meta())
                 .color(tok.scheme().on_surface_variant)
-                .width(Length::Fill),
+                .width(Length::Fill)
+                .align_x(crate::i18n::align_start(tok.direction)),
         );
     }
     a11y::attach(col.into(), &a11y)
@@ -2178,14 +2289,16 @@ pub fn field_support<'a, M: 'a>(
             text(err.to_string())
                 .size(tok.meta())
                 .color(s.error)
-                .width(Length::Fill),
+                .width(Length::Fill)
+                .align_x(crate::i18n::align_start(tok.direction)),
         );
     } else if let Some(help) = support.filter(|t| !t.is_empty()) {
         col = col.push(
             text(help.to_string())
                 .size(tok.meta())
                 .color(s.on_surface_variant)
-                .width(Length::Fill),
+                .width(Length::Fill)
+                .align_x(crate::i18n::align_start(tok.direction)),
         );
     }
     a11y::attach(col.into(), &a11y)
@@ -2284,7 +2397,9 @@ pub fn password_input<'a, M: Clone + 'a>(
         .secure(masked)
         .style(style::field_style(tok, false))
         .padding(pad(tok))
-        .size(tok.body());
+        .size(tok.body())
+        .width(Length::Fill)
+        .align_x(crate::i18n::align_x_start(tok.direction));
     if !a11y.disabled {
         i = i.on_input(on_input);
     }
@@ -2487,6 +2602,11 @@ pub fn textarea<'a, M: Clone + 'a>(
     height: Length,
     a11y: A11y,
 ) -> Element<'a, M> {
+    // iced 0.14 text_editor has no writing direction. Do not shrink-wrap
+    // or pin a guessed width: that parks a growing box on start while
+    // the caret stays LTR inside it (Urdu typed in a right-hand slab
+    // with the caret ahead of the run). Keep a stable Fill field until
+    // iced 0.15 / https://github.com/iced-rs/iced/pull/3294.
     let mut e = text_editor(content)
         .height(height)
         .padding(pad(tok))
@@ -2681,7 +2801,9 @@ pub fn editor_style(
 /// Use for palette and list filters. Empty query means show all.
 /// Placeholder is the a11y name. `on_submit` is Enter. `input_id`
 /// focuses the field (palette, find-in-page).
-/// Corners follow [`Tokens::shape`] ([`crate::m3::shape::Component::Search`]).
+/// `highlight` is a syntax highlighter: byte ranges the application
+/// computed. Empty is one ink. Corners follow [`Tokens::shape`]
+/// ([`crate::m3::shape::Component::Search`]).
 ///
 ///
 /// ```
@@ -2697,8 +2819,10 @@ pub fn editor_style(
 ///     tok,
 ///     A11y::new("Search", Role::TextBox),
 ///     None,
+///     &[],
 /// );
 /// ```
+#[allow(clippy::too_many_arguments)]
 pub fn search_input<'a, M: Clone + 'a>(
     value: &str,
     on_input: impl Fn(String) -> M + 'a,
@@ -2706,13 +2830,17 @@ pub fn search_input<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
     input_id: Option<Id>,
+    highlight: &[FieldRun],
 ) -> Element<'a, M> {
-    search_input_clear(value, on_input, None, on_submit, tok, a11y, input_id)
+    search_input_clear(
+        value, on_input, None, on_submit, tok, a11y, input_id, highlight,
+    )
 }
 
 /// Search field with optional clear control when non-empty.
 ///
 /// `on_clear` empties the query. When `None`, behaves like [`search_input`].
+/// `highlight` is the same syntax highlighter [`search_input`] takes.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -2729,8 +2857,10 @@ pub fn search_input<'a, M: Clone + 'a>(
 ///     tok,
 ///     A11y::new("Search", Role::TextBox),
 ///     None,
+///     &[],
 /// );
 /// ```
+#[allow(clippy::too_many_arguments)]
 pub fn search_input_clear<'a, M: Clone + 'a>(
     value: &str,
     on_input: impl Fn(String) -> M + 'a,
@@ -2739,6 +2869,7 @@ pub fn search_input_clear<'a, M: Clone + 'a>(
     tok: Tokens,
     a11y: A11y,
     input_id: Option<Id>,
+    highlight: &[FieldRun],
 ) -> Element<'a, M> {
     let search_ic: Element<'a, M> = icon_svg(Icon::Search, tok, A11y::new("search", Role::Image));
     let placeholder = if a11y.name.is_empty() {
@@ -2747,10 +2878,12 @@ pub fn search_input_clear<'a, M: Clone + 'a>(
         a11y.name.clone()
     };
     let field_a11y = a11y.child(Role::TextBox).merge_value(value.to_string());
+    let hide_value = field_runs_hide_value(value, highlight);
     let mut i = text_input(&placeholder, value)
-        .style(style::search_style(tok))
+        .style(style::search_style_paint(tok, hide_value))
         .padding(pad(tok))
-        .size(tok.body());
+        .size(tok.body())
+        .align_x(crate::i18n::align_x_start(tok.direction));
     if let Some(id) = input_id {
         i = i.id(id);
     }
@@ -2760,20 +2893,18 @@ pub fn search_input_clear<'a, M: Clone + 'a>(
             i = i.on_submit(m);
         }
     }
+    let painted = paint_field_value(i.into(), value, highlight, tok);
     let field: Element<'a, M> = a11y::attach(
-        container(i)
+        container(painted)
             .width(Length::Fill)
             .height(Length::Fixed(control_height(tok)))
             .into(),
         &field_a11y,
     );
-    let mut r = Row::new().spacing(gap(tok)).align_y(Alignment::Center);
-    for kid in crate::i18n::order(tok.direction, [search_ic, field]) {
-        r = r.push(kid);
-    }
-    if !value.is_empty() {
-        if let Some(clear) = on_clear {
-            r = r.push(icon_button(
+    let mut kids: Vec<Element<'a, M>> = vec![search_ic, field];
+    if let Some(clear) = on_clear {
+        if !value.is_empty() {
+            kids.push(icon_button(
                 Icon::Close,
                 if a11y.disabled { None } else { Some(clear) },
                 tok,
@@ -2783,7 +2914,365 @@ pub fn search_input_clear<'a, M: Clone + 'a>(
             ));
         }
     }
+    let mut r = Row::new().spacing(gap(tok)).align_y(Alignment::Center);
+    for kid in crate::i18n::order(tok.direction, kids) {
+        r = r.push(kid);
+    }
     a11y::attach(r.into(), &a11y)
+}
+
+fn field_runs_hide_value(value: &str, runs: &[FieldRun]) -> bool {
+    !value.is_empty()
+        && cover_field_runs(value, runs)
+            .iter()
+            .any(|run| run.ink != FieldInk::Text)
+}
+
+fn paint_field_value<'a, M: Clone + 'a>(
+    input: Element<'a, M>,
+    value: &str,
+    runs: &[FieldRun],
+    tok: Tokens,
+) -> Element<'a, M> {
+    let hide = field_runs_hide_value(value, runs);
+    let covered = if hide {
+        cover_field_runs(value, runs)
+    } else {
+        Vec::new()
+    };
+    Element::new(HighlightField {
+        input,
+        runs: covered,
+        value: value.to_string(),
+        tok,
+        hide,
+    })
+}
+
+fn cover_field_runs(value: &str, runs: &[FieldRun]) -> Vec<FieldRun> {
+    let n = value.len();
+    let mut spans: Vec<FieldRun> = runs
+        .iter()
+        .copied()
+        .filter_map(|run| {
+            let start = run.start.min(n);
+            let end = run.end.min(n).max(start);
+            if start >= end || !value.is_char_boundary(start) || !value.is_char_boundary(end) {
+                return None;
+            }
+            Some(FieldRun {
+                start,
+                end,
+                ink: run.ink,
+            })
+        })
+        .collect();
+    spans.sort_by_key(|run| run.start);
+    let mut out = Vec::new();
+    let mut at = 0;
+    for run in spans {
+        if run.start < at {
+            continue;
+        }
+        if run.start > at {
+            out.push(FieldRun {
+                start: at,
+                end: run.start,
+                ink: FieldInk::Text,
+            });
+        }
+        out.push(run);
+        at = run.end;
+    }
+    if at < n {
+        out.push(FieldRun {
+            start: at,
+            end: n,
+            ink: FieldInk::Text,
+        });
+    }
+    out
+}
+
+type FieldPara = <iced::Renderer as iced::advanced::text::Renderer>::Paragraph;
+
+struct HighlightPaint {
+    paragraph: FieldPara,
+}
+
+fn field_input_cursor(input: &Tree, value: &str) -> (usize, bool) {
+    use iced::widget::text_input::{State, Value};
+    let state = match &input.state {
+        tree::State::Some(any) => any.downcast_ref::<State<FieldPara>>(),
+        tree::State::None => None,
+    };
+    let Some(state) = state else {
+        return (0, false);
+    };
+    let grapheme = match state.cursor().state(&Value::new(value)) {
+        iced::widget::text_input::cursor::State::Index(i)
+        | iced::widget::text_input::cursor::State::Selection { end: i, .. } => i,
+    };
+    (grapheme, state.is_focused())
+}
+
+struct HighlightField<'a, Message> {
+    input: Element<'a, Message>,
+    runs: Vec<FieldRun>,
+    value: String,
+    tok: Tokens,
+    hide: bool,
+}
+
+impl<'a, Message: Clone> Widget<Message, iced::Theme, iced::Renderer>
+    for HighlightField<'a, Message>
+{
+    fn tag(&self) -> tree::Tag {
+        tree::Tag::of::<HighlightPaint>()
+    }
+
+    fn state(&self) -> tree::State {
+        tree::State::new(HighlightPaint {
+            paragraph: FieldPara::default(),
+        })
+    }
+
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(self.input.as_widget())]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_ref(&self.input));
+    }
+
+    fn size(&self) -> iced::Size<Length> {
+        self.input.as_widget().size()
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        let input = self
+            .input
+            .as_widget_mut()
+            .layout(&mut tree.children[0], renderer, limits);
+        let size = input.size();
+        if self.hide {
+            use iced::advanced::text::{self, Paragraph as _, Span, Text};
+            let text_bounds = input
+                .children()
+                .first()
+                .map(layout::Node::bounds)
+                .unwrap_or_else(|| Rectangle::new(Point::ORIGIN, size));
+            let font = text::Renderer::default_font(renderer);
+            let px = iced::Pixels(self.tok.body());
+            let spans: Vec<Span<'_, ()>> = self
+                .runs
+                .iter()
+                .filter_map(|run| {
+                    let slice = self.value.get(run.start..run.end)?;
+                    if slice.is_empty() {
+                        return None;
+                    }
+                    Some(Span::new(slice).size(px).color(run.ink.color(self.tok)))
+                })
+                .collect();
+            let paint = tree.state.downcast_mut::<HighlightPaint>();
+            paint.paragraph = FieldPara::with_spans(Text {
+                content: spans.as_slice(),
+                bounds: Size::new(f32::INFINITY, text_bounds.height),
+                size: px,
+                line_height: text::LineHeight::default(),
+                font,
+                align_x: text::Alignment::Default,
+                align_y: iced::alignment::Vertical::Center,
+                shaping: text::Shaping::Advanced,
+                wrapping: text::Wrapping::default(),
+            });
+        }
+        layout::Node::with_children(size, vec![input])
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &iced::Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &Rectangle,
+    ) {
+        let Some(child_layout) = layout.children().next() else {
+            return;
+        };
+        self.input.as_widget_mut().update(
+            &mut tree.children[0],
+            event,
+            child_layout,
+            cursor,
+            renderer,
+            clipboard,
+            shell,
+            viewport,
+        );
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut iced::Renderer,
+        theme: &iced::Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+    ) {
+        let Some(input_layout) = layout.children().next() else {
+            return;
+        };
+        self.input.as_widget().draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            input_layout,
+            cursor,
+            viewport,
+        );
+        if !self.hide {
+            return;
+        }
+        use iced::advanced::text::{self, Paragraph as _};
+        let paint = tree.state.downcast_ref::<HighlightPaint>();
+        let paragraph = &paint.paragraph;
+        let text_bounds = input_layout
+            .children()
+            .next()
+            .map(|c| c.bounds())
+            .unwrap_or(input_layout.bounds());
+        let min_w = paragraph.min_width();
+        let align_off = if min_w > text_bounds.width {
+            0.0
+        } else if self.tok.direction == crate::i18n::Direction::Rtl {
+            text_bounds.width - min_w
+        } else {
+            0.0
+        };
+        let (grapheme, focused) = field_input_cursor(&tree.children[0], &self.value);
+        let caret_x = paragraph
+            .grapheme_position(0, grapheme)
+            .map(|p| p.x)
+            .unwrap_or(0.0);
+        let scroll = (caret_x + 5.0 - text_bounds.width).max(0.0);
+        let origin =
+            text_bounds.anchor(paragraph.min_bounds(), Alignment::Start, Alignment::Center)
+                + Vector::new(align_off - scroll, 0.0);
+        renderer.with_layer(text_bounds, |renderer| {
+            text::Renderer::fill_paragraph(renderer, paragraph, origin, self.tok.text, text_bounds);
+            let mut span_i = 0;
+            for run in &self.runs {
+                let Some(slice) = self.value.get(run.start..run.end) else {
+                    continue;
+                };
+                if slice.is_empty() {
+                    continue;
+                }
+                if run.ink == FieldInk::Error {
+                    for region in paragraph.span_bounds(span_i) {
+                        let y = (origin.y + region.y + region.height - 2.0).max(origin.y);
+                        renderer.fill_quad(
+                            renderer::Quad {
+                                bounds: Rectangle {
+                                    x: origin.x + region.x,
+                                    y,
+                                    width: region.width.max(1.0),
+                                    height: 1.0,
+                                },
+                                ..renderer::Quad::default()
+                            },
+                            self.tok.danger,
+                        );
+                    }
+                }
+                span_i += 1;
+            }
+        });
+        if focused {
+            renderer.fill_quad(
+                renderer::Quad {
+                    bounds: Rectangle {
+                        x: (text_bounds.x + align_off - scroll + caret_x).floor(),
+                        y: text_bounds.y,
+                        width: 1.0,
+                        height: text_bounds.height,
+                    },
+                    ..renderer::Quad::default()
+                },
+                self.tok.text,
+            );
+        }
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+        renderer: &iced::Renderer,
+    ) -> mouse::Interaction {
+        let Some(child_layout) = layout.children().next() else {
+            return mouse::Interaction::None;
+        };
+        self.input.as_widget().mouse_interaction(
+            &tree.children[0],
+            child_layout,
+            cursor,
+            viewport,
+            renderer,
+        )
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &iced::Renderer,
+        operation: &mut dyn iced::advanced::widget::Operation,
+    ) {
+        let Some(child_layout) = layout.children().next() else {
+            return;
+        };
+        self.input.as_widget_mut().operate(
+            &mut tree.children[0],
+            child_layout,
+            renderer,
+            operation,
+        );
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &iced::Renderer,
+        viewport: &Rectangle,
+        translation: iced::Vector,
+    ) -> Option<iced::advanced::overlay::Element<'b, Message, iced::Theme, iced::Renderer>> {
+        let child_layout = layout.children().next()?;
+        self.input.as_widget_mut().overlay(
+            &mut tree.children[0],
+            child_layout,
+            renderer,
+            viewport,
+            translation,
+        )
+    }
 }
 
 /// Docked search results under a search field (M3 search view, desktop).
@@ -2829,6 +3318,7 @@ pub fn search_view<'a, M: Clone + 'a>(
         tok,
         A11y::new(a11y.name.clone(), Role::TextBox).with_disabled(a11y.disabled),
         None,
+        &[],
     );
     let body: Element<'a, M> = if hits.is_empty() {
         meta(empty, tok, A11y::new(empty, Role::Status))
@@ -3414,6 +3904,8 @@ pub fn date_picker<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let v = value.clamp();
     let shown = format!("{:04}-{:02}-{:02}", v.year, v.month, v.day);
+    // ISO date plus < > is an LTR island (Firefox). Do not reorder
+    // the stepper; the parent start-aligns the whole control.
     a11y::attach(
         row![
             themed_button(
@@ -4609,7 +5101,7 @@ pub fn badge<'a, M: 'a>(
     size: BadgeSize,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let title = a11y.apply_name(title);
+    let title = tok.clock_digits.map_str(&a11y.apply_name(title));
     let (wash, ink, mut border) = chip_face(tok, variant);
     border.radius = tok.radius(crate::m3::shape::Component::Badge);
     let pad = match size {
@@ -4639,18 +5131,29 @@ pub fn badge<'a, M: 'a>(
 /// A titled panel around children.
 ///
 /// Empty title is a border only. Same constructor paints a card.
+/// `trailing` sits on the header end (kind badge, close).
+/// [`CardFace::Rail`] adds an inset start rail and a label gutter.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
 /// use icedtea::theme;
+/// use icedtea::variant::Variant;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let _: icedtea::Element<'_, ()> = widget::group_box(
 ///     "Document",
-///     widget::label("notes.txt", tok, A11y::new("notes", Role::Header)),
+///     widget::label("buffer.txt", tok, A11y::new("buffer", Role::Header)),
 ///     tok,
-///     widget::CardFace::Elevated,
+///     widget::CardFace::Rail,
 ///     A11y::new("Document", Role::Group),
+///     Some(widget::badge(
+///         "doc",
+///         None,
+///         tok,
+///         Variant::Quiet,
+///         widget::BadgeSize::Small,
+///         A11y::new("doc", Role::Status),
+///     )),
 /// );
 /// ```
 pub fn group_box<'a, M: 'a>(
@@ -4659,26 +5162,84 @@ pub fn group_box<'a, M: 'a>(
     tok: Tokens,
     face: CardFace,
     a11y: A11y,
+    trailing: impl Into<Option<Element<'a, M>>>,
 ) -> Element<'a, M> {
     let title = a11y.apply_name(title);
-    a11y::attach(
-        container(
-            column![
-                meta(title.clone(), tok, A11y::new(title, Role::Header)),
-                child
-            ]
-            .spacing(gap(tok)),
-        )
-        .padding(sheet(tok))
+    let trailing = trailing.into();
+    let mut col = Column::new()
+        .spacing(gap(tok))
         .width(Length::Fill)
-        .style(move |_| match face {
-            CardFace::Elevated => style::raised_card(tok),
-            CardFace::Filled => style::card(tok, false),
-            CardFace::Outlined => style::outlined_card(tok),
-        })
-        .into(),
+        .align_x(crate::i18n::align_start(tok.direction));
+    if let Some(head) = card_header(title, trailing, tok) {
+        col = col.push(head);
+    }
+    col = col.push(child);
+    let inner: Element<'a, M> = if matches!(face, CardFace::Rail) {
+        let parts = crate::i18n::order(tok.direction, [rail_mark(tok), col.into()]);
+        let mut lined = Row::new()
+            .spacing(gap(tok))
+            .align_y(Alignment::Start)
+            .width(Length::Fill);
+        for part in parts {
+            lined = lined.push(part);
+        }
+        lined.into()
+    } else {
+        col.into()
+    };
+    a11y::attach(
+        container(inner)
+            .padding(sheet(tok))
+            .width(Length::Fill)
+            .style(move |_| match face {
+                CardFace::Elevated => style::raised_card(tok),
+                CardFace::Filled => style::card(tok, false),
+                CardFace::Outlined => style::outlined_card(tok),
+                CardFace::Rail => style::card(tok, false),
+            })
+            .into(),
         &a11y,
     )
+}
+
+fn card_header<'a, M: 'a>(
+    title: String,
+    trailing: Option<Element<'a, M>>,
+    tok: Tokens,
+) -> Option<Element<'a, M>> {
+    if title.is_empty() && trailing.is_none() {
+        return None;
+    }
+    let start: Element<'a, M> = if title.is_empty() {
+        Space::new().width(Length::Fill).into()
+    } else {
+        container(meta(title.clone(), tok, A11y::new(title, Role::Header)))
+            .width(Length::Fill)
+            .align_x(crate::i18n::align_start(tok.direction))
+            .into()
+    };
+    let mut cells = vec![start];
+    if let Some(end) = trailing {
+        cells.push(end);
+    }
+    let mut head = Row::new()
+        .spacing(gap(tok))
+        .align_y(Alignment::Center)
+        .width(Length::Fill);
+    for cell in crate::i18n::order(tok.direction, cells) {
+        head = head.push(cell);
+    }
+    Some(head.into())
+}
+
+fn rail_mark<'a, M: 'a>(tok: Tokens) -> Element<'a, M> {
+    let w = crate::m3::density::GRID as f32;
+    let s = tok.scheme();
+    container(Space::new().width(w).height(Length::Fill))
+        .width(w)
+        .height(Length::Fill)
+        .style(move |_| style::fill(s.primary, s.on_primary))
+        .into()
 }
 
 /// A page-level message with an optional action.
@@ -7032,14 +7593,14 @@ pub fn tab_bar<'a, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let visible = tab_visible_count(&tabs.titles, max_width);
-    let mut r = Row::new().spacing(0).align_y(Alignment::End);
+    let mut cells: Vec<Element<'a, M>> = Vec::new();
     for (i, title) in tabs.titles.iter().enumerate().take(visible) {
         let active = i == tabs.active;
         let tab_off = a11y.disabled || tabs.is_disabled(i);
         let badge = tabs.badges.get(i).filter(|s| !s.is_empty()).cloned();
-        let mut label_row = Row::new().spacing(6).align_y(Alignment::Center);
+        let mut label_kids: Vec<Element<'a, M>> = Vec::new();
         if let Some(Some(ic)) = tabs.icons.get(i) {
-            label_row = label_row.push(icon_svg(*ic, tok, A11y::new(title.clone(), Role::Image)));
+            label_kids.push(icon_svg(*ic, tok, A11y::new(title.clone(), Role::Image)));
         }
         let title_el = if tab_off {
             text(title.clone())
@@ -7048,9 +7609,9 @@ pub fn tab_bar<'a, M: Clone + 'a>(
         } else {
             text(title.clone()).size(tok.meta())
         };
-        label_row = label_row.push(title_el);
+        label_kids.push(title_el.into());
         if let Some(b) = badge {
-            label_row = label_row.push(self::badge(
+            label_kids.push(self::badge(
                 b,
                 None,
                 tok,
@@ -7058,6 +7619,10 @@ pub fn tab_bar<'a, M: Clone + 'a>(
                 BadgeSize::Small,
                 A11y::new("tab-badge", Role::Status),
             ));
+        }
+        let mut label_row = Row::new().spacing(6).align_y(Alignment::Center);
+        for kid in crate::i18n::order(tok.direction, label_kids) {
+            label_row = label_row.push(kid);
         }
         let mut tab = button(label_row)
             .padding(pad(tok))
@@ -7076,22 +7641,23 @@ pub fn tab_bar<'a, M: Clone + 'a>(
         };
         let label_col = column![tab, indicator].spacing(0).width(Length::Shrink);
         let cell: Element<'a, M> = if tabs.closable {
-            row![
-                label_col,
-                dismiss_button(
-                    on_close(i),
-                    tok,
-                    A11y::button(format!("close {title}")).with_disabled(tab_off),
-                )
-            ]
-            .spacing(2)
-            .align_y(Alignment::Center)
-            .width(Length::Shrink)
-            .into()
+            let dismiss = dismiss_button(
+                on_close(i),
+                tok,
+                A11y::button(format!("close {title}")).with_disabled(tab_off),
+            );
+            let mut cell_row = Row::new()
+                .spacing(2)
+                .align_y(Alignment::Center)
+                .width(Length::Shrink);
+            for kid in crate::i18n::order(tok.direction, [label_col.into(), dismiss]) {
+                cell_row = cell_row.push(kid);
+            }
+            cell_row.into()
         } else {
             label_col.into()
         };
-        r = r.push(a11y::attach(
+        cells.push(a11y::attach(
             cell,
             &A11y::new(title.clone(), Role::Tab)
                 .with_checked(active && !tab_off)
@@ -7107,7 +7673,7 @@ pub fn tab_bar<'a, M: Clone + 'a>(
             .map(|(_, t)| t.clone())
             .collect();
         if !hidden.is_empty() {
-            r = r.push(themed_pick_list(
+            cells.push(themed_pick_list(
                 hidden,
                 None,
                 tab_overflow_pick(all, on_select),
@@ -7117,9 +7683,15 @@ pub fn tab_bar<'a, M: Clone + 'a>(
             ));
         }
     }
+    let mut r = Row::new().spacing(0).align_y(Alignment::End);
+    for cell in crate::i18n::order(tok.direction, cells) {
+        r = r.push(cell);
+    }
     // Strip sits on app-bar surface; outline hairline under the row.
     let strip = column![
-        r,
+        container(r)
+            .width(Length::Fill)
+            .align_x(crate::i18n::align_start(tok.direction)),
         container(Space::new().width(Length::Fill).height(1)).style(move |_| style::hairline(tok)),
     ];
     a11y::attach(
@@ -7712,6 +8284,22 @@ mod tests {
     }
 
     #[test]
+    fn badge_maps_eastern_digits() {
+        let western = named("dark").tokens;
+        let eastern = western.with_clock_digits(crate::i18n::ClockDigits::Eastern);
+        assert_eq!(western.clock_digits.map_str("29"), "29");
+        assert_eq!(eastern.clock_digits.map_str("29"), "٢٩");
+        let _: Element<'_, ()> = badge(
+            "29",
+            None,
+            eastern,
+            Variant::Primary,
+            BadgeSize::Small,
+            A11y::new("29", Role::Status),
+        );
+    }
+
+    #[test]
     fn badge_primary_ink_contrasts_with_fill() {
         let tok = named("dark").tokens;
         let s = tok.scheme();
@@ -7804,7 +8392,86 @@ mod tests {
             tok,
             A11y::new("Search", Role::TextBox),
             None,
+            &[],
         );
+    }
+
+    #[test]
+    fn cover_field_runs_fills_gaps_and_drops_invalid() {
+        let value = "has:goals AND x";
+        let runs = [
+            FieldRun::new(0, 4, FieldInk::Success),
+            FieldRun::new(10, 13, FieldInk::Warning),
+            FieldRun::new(1, 2, FieldInk::Muted),
+            FieldRun::new(80, 90, FieldInk::Warning),
+            FieldRun::new(4, 4, FieldInk::Warning),
+        ];
+        assert_eq!(
+            cover_field_runs(value, &runs),
+            vec![
+                FieldRun::new(0, 4, FieldInk::Success),
+                FieldRun::new(4, 10, FieldInk::Text),
+                FieldRun::new(10, 13, FieldInk::Warning),
+                FieldRun::new(13, value.len(), FieldInk::Text),
+            ]
+        );
+        assert_eq!(
+            cover_field_runs("ab", &[FieldRun::new(1, 2, FieldInk::Warning)]),
+            vec![
+                FieldRun::new(0, 1, FieldInk::Text),
+                FieldRun::new(1, 2, FieldInk::Warning),
+            ]
+        );
+        let mid = "é".len();
+        assert!(
+            cover_field_runs("é", &[FieldRun::new(1, mid, FieldInk::Warning)])
+                .iter()
+                .all(|run| run.ink == FieldInk::Text)
+        );
+    }
+
+    #[test]
+    fn field_highlight_paints_the_typed_value() {
+        let tok = named("dark").tokens;
+        let runs = [FieldRun::new(0, 3, FieldInk::Warning)];
+        let mut field: Element<'_, ()> = themed_text_input(
+            "q",
+            "AND x",
+            |_| (),
+            None,
+            FieldOpts {
+                highlight: &runs,
+                ..FieldOpts::NONE
+            },
+            tok,
+            A11y::new("q", Role::TextBox),
+            None,
+        );
+        draw_once(&mut field);
+        let search_runs = [
+            FieldRun::new(0, 4, FieldInk::Success),
+            FieldRun::new(5, 8, FieldInk::Error),
+        ];
+        let mut search: Element<'_, ()> = search_input(
+            "has:goa",
+            |_| (),
+            None,
+            tok,
+            A11y::new("Search", Role::TextBox),
+            None,
+            &search_runs,
+        );
+        draw_once(&mut search);
+        let mut empty: Element<'_, ()> = search_input(
+            "",
+            |_| (),
+            None,
+            tok,
+            A11y::new("Search", Role::TextBox),
+            None,
+            &[],
+        );
+        draw_once(&mut empty);
     }
 
     #[test]
@@ -8174,6 +8841,7 @@ mod tests {
             tok,
             role("sc", Role::TextBox),
             None,
+            &[],
         );
         let _: Element<'_, ()> = search_input_clear(
             "",
@@ -8183,6 +8851,7 @@ mod tests {
             tok,
             role("sc0", Role::TextBox),
             None,
+            &[],
         );
         let _: Element<'_, ()> = search_input_clear(
             "q",
@@ -8192,6 +8861,7 @@ mod tests {
             tok,
             role("sc-n", Role::TextBox).with_disabled(true),
             None,
+            &[],
         );
         let _: Element<'_, ()> = range_slider(
             0.0..=10.0,
@@ -8241,7 +8911,7 @@ mod tests {
         );
         assert_eq!(
             progress_label(0.4, Some("1 min"), crate::i18n::ClockDigits::Eastern),
-            "٤٠% · ١ min"
+            "٤٠٪ · ١ min"
         );
         let _: Element<'_, ()> = image_slot(
             ImageSlot::Ready {
@@ -8435,7 +9105,7 @@ mod tests {
             role("vf-off", Role::Group).with_disabled(true),
         );
         let _: Element<'_, ()> =
-            search_input("q", |_| (), None, tok, role("q", Role::TextBox), None);
+            search_input("q", |_| (), None, tok, role("q", Role::TextBox), None, &[]);
         let mut sv: Element<'_, ()> = search_view(
             "in",
             ["Inbox", "Sent"],
@@ -8627,6 +9297,7 @@ mod tests {
             tok,
             A11y::new("", Role::TextBox),
             None,
+            &[],
         );
         let _: Element<'_, ()> = tooltip_wrap(
             label("x", tok, role("x", Role::Header)),
@@ -8769,6 +9440,7 @@ mod tests {
             tok,
             CardFace::Elevated,
             role("g", Role::Group),
+            None,
         );
         let _: Element<'_, ()> = banner("b", Some(("go".into(), ())), tok, role("b", Role::Status));
         let _: Element<'_, ()> = banner("b", None, tok, role("b", Role::Status));
@@ -9135,6 +9807,7 @@ mod tests {
             .unwrap();
         assert!(!pass_src.contains("apply_name(value)"));
         assert!(pass_src.contains("secure(masked)"));
+        assert!(pass_src.contains("align_x_start(tok.direction)"));
         let secret_src = src
             .split("pub fn secret_field")
             .nth(1)
@@ -9317,6 +9990,7 @@ mod tests {
             icons: Icons::both(Icon::Search, Icon::Close),
             label: "Find",
             max_len: Some(8),
+            highlight: &[],
         };
         let mut field = themed_text_input(
             "q",
@@ -9334,6 +10008,7 @@ mod tests {
             icons: Icons::NONE,
             label: "Name",
             max_len: Some(4),
+            highlight: &[],
         };
         let mut empty = themed_text_input(
             "Name",
@@ -9393,6 +10068,7 @@ mod tests {
             tok,
             CardFace::Filled,
             role("cf", Role::Group),
+            None,
         );
         draw_once(&mut filled_card);
         let mut suggest = chip(
@@ -9447,6 +10123,7 @@ mod tests {
             tok,
             CardFace::Outlined,
             role("c", Role::Group),
+            None,
         );
         draw_once(&mut card);
         let mut mark: Element<'_, ()> = badge(
@@ -9523,6 +10200,7 @@ mod tests {
         assert_eq!(TooltipAnchor::Start.position(), tooltip::Position::Left);
         assert_eq!(FieldFace::default(), FieldFace::Filled);
         assert_eq!(CardFace::default(), CardFace::Elevated);
+        assert_ne!(CardFace::Rail, CardFace::Elevated);
         assert_eq!(TreeFace::default(), TreeFace::Outline);
         assert_eq!(BadgeSize::default(), BadgeSize::Large);
         assert_eq!(ChipKind::default(), ChipKind::Assist);
@@ -9541,6 +10219,113 @@ mod tests {
             btn("Wide"),
         );
         draw_once(&mut comfy_btn);
+    }
+
+    #[test]
+    fn group_box_rail_face_and_header_trailing() {
+        let tok = named("dark").tokens;
+        let trailing = badge(
+            "doc",
+            None,
+            tok,
+            Variant::Quiet,
+            BadgeSize::Small,
+            A11y::new("doc", Role::Status),
+        );
+        let mut rail: Element<'_, ()> = group_box(
+            "Brief",
+            label("body", tok, A11y::new("body", Role::Status)),
+            tok,
+            CardFace::Rail,
+            A11y::new("brief", Role::Group),
+            Some(trailing),
+        );
+        draw_once(&mut rail);
+        let mut empty_title: Element<'_, ()> = group_box(
+            "",
+            label("x", tok, A11y::new("x", Role::Status)),
+            tok,
+            CardFace::Rail,
+            A11y::new("empty", Role::Group),
+            None,
+        );
+        draw_once(&mut empty_title);
+        let rtl = tok.with_direction(crate::i18n::Direction::Rtl);
+        let mut rtl_rail: Element<'_, ()> = group_box(
+            "Brief",
+            label("body", rtl, A11y::new("rtl-body", Role::Status)),
+            rtl,
+            CardFace::Rail,
+            A11y::new("rtl-brief", Role::Group),
+            None,
+        );
+        draw_once(&mut rtl_rail);
+        assert_ne!(CardFace::Rail, CardFace::Elevated);
+        assert_ne!(CardFace::Rail, CardFace::Filled);
+        assert_ne!(CardFace::Rail, CardFace::Outlined);
+    }
+
+    #[test]
+    fn group_box_rtl_trailing_sits_on_the_header_end() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+
+        let tok = named("dark")
+            .tokens
+            .with_direction(crate::i18n::Direction::Rtl);
+        let trailing = badge(
+            "doc",
+            None,
+            tok,
+            Variant::Quiet,
+            BadgeSize::Small,
+            A11y::new("doc", Role::Status),
+        );
+        let mut el: Element<'_, ()> = group_box(
+            "Brief",
+            label("body", tok, A11y::new("body", Role::Status)),
+            tok,
+            CardFace::Elevated,
+            A11y::new("brief", Role::Group),
+            Some(trailing),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let node = el.as_widget_mut().layout(
+            &mut tree,
+            &renderer,
+            &Limits::new(Size::ZERO, Size::new(320.0, 200.0)),
+        );
+        let layout = Layout::new(&node);
+        // attach → padded frame → column → header row of [trailing, title]
+        // after i18n::order on RTL.
+        let frame = layout.children().next().expect("group_box frame");
+        let col = frame.children().next().expect("group_box column");
+        let header = col.children().next().expect("group_box header");
+        let mut kids = header.children();
+        let trailing = kids.next().expect("header trailing");
+        let title = kids.next().expect("header title");
+        must(kids.next().is_none(), "header is title plus trailing only");
+        must(
+            trailing.bounds().x + trailing.bounds().width <= title.bounds().x + 1.0,
+            format!(
+                "RTL trailing must sit on the end (left) of the title; trailing={:?} title={:?}",
+                trailing.bounds(),
+                title.bounds()
+            ),
+        );
+        must(
+            trailing.bounds().width < title.bounds().width,
+            format!(
+                "title Fill must be wider than the trailing badge; trailing={:?} title={:?}",
+                trailing.bounds(),
+                title.bounds()
+            ),
+        );
     }
 
     #[test]
@@ -9646,6 +10431,12 @@ mod tests {
             ),
             progress_ring(0.5, Some("half"), tok, role("pr", Role::Progress)),
             number_input(3.0, |_| (), tok, role("n", Role::SpinButton)),
+            number_input(
+                3.0,
+                |_| (),
+                tok.with_clock_digits(crate::i18n::ClockDigits::Eastern),
+                role("n-ar", Role::SpinButton),
+            ),
             textarea(
                 &code,
                 |_| (),
@@ -9704,6 +10495,7 @@ mod tests {
                 tok,
                 CardFace::Elevated,
                 role("box", Role::Group),
+                None,
             ),
             banner("Hi", None, tok, role("ban", Role::Status)),
             info_bar(ToastKind::Info, "n", tok, role("ib", Role::Status)),
@@ -10071,6 +10863,7 @@ mod tests {
         assert!(search_src.contains("a11y.child(Role::TextBox)"));
         assert!(search_src.contains("on_submit"));
         assert!(search_src.contains("input_id"));
+        assert!(search_src.contains("highlight"));
         assert!(src.contains("pub fn search_input_clear"));
         let vf_src = src
             .split("pub fn value_field")
@@ -10081,6 +10874,135 @@ mod tests {
             .unwrap();
         assert!(vf_src.contains("label_width") && vf_src.contains("Length::Fixed"));
         assert!(vf_src.contains("Length::Fill"));
+    }
+
+    fn search_clear_row_len(value: &str, on_clear: Option<()>) -> usize {
+        use iced::advanced::layout::Limits;
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, ()> = search_input_clear(
+            value,
+            |_| (),
+            on_clear,
+            None,
+            tok,
+            A11y::new("search-clear", Role::TextBox),
+            None,
+            &[],
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(400.0, 80.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let row = node.children().first().expect("search a11y row");
+        row.children().len()
+    }
+
+    #[test]
+    fn search_clear_omits_the_mark_when_the_value_is_empty() {
+        assert_eq!(search_clear_row_len("", Some(())), 2);
+        assert_eq!(search_clear_row_len("q", Some(())), 3);
+        assert_eq!(search_clear_row_len("q", None), 2);
+        assert_eq!(search_clear_row_len("", None), 2);
+    }
+
+    #[test]
+    fn rtl_text_input_sits_placeholder_on_the_start() {
+        let tok = named("dark")
+            .tokens
+            .with_direction(crate::i18n::Direction::Rtl);
+        let mut field: Element<'_, ()> = themed_text_input(
+            "تلاش",
+            "",
+            |_| (),
+            None,
+            FieldOpts::NONE,
+            tok,
+            A11y::new("تلاش", Role::TextBox),
+            None,
+        );
+        draw_once(&mut field);
+        let mut search: Element<'_, ()> = search_input_clear(
+            "",
+            |_| (),
+            None,
+            None,
+            tok,
+            A11y::new("تلاش", Role::TextBox),
+            None,
+            &[],
+        );
+        draw_once(&mut search);
+        let mut counted: Element<'_, ()> = themed_text_input(
+            "نام",
+            "نام",
+            |_| (),
+            None,
+            FieldOpts {
+                icons: Icons::leading(crate::icon::Icon::Search),
+                max_len: Some(24),
+                ..FieldOpts::NONE
+            },
+            tok.with_clock_digits(crate::i18n::ClockDigits::Eastern),
+            A11y::new("نام", Role::TextBox),
+            None,
+        );
+        draw_once(&mut counted);
+        assert_eq!(crate::i18n::ClockDigits::Eastern.map_str("0/24"), "٠/٢٤");
+        let mut secret: Element<'_, ()> =
+            password_input("سر", "", |_| (), tok, A11y::new("سر", Role::TextBox), true);
+        draw_once(&mut secret);
+        let body = Content::with_text("ab\ncd");
+        let mut area: Element<'_, ()> = textarea(
+            &body,
+            |_| (),
+            tok,
+            Length::Fixed(80.0),
+            A11y::new("body", Role::TextBox),
+        );
+        use iced::advanced::layout::Limits;
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+        let mut tree = Tree::new(area.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let node = area.as_widget_mut().layout(
+            &mut tree,
+            &renderer,
+            &Limits::new(Size::ZERO, Size::new(240.0, 80.0)),
+        );
+        assert!((node.size().width - 240.0).abs() < 0.5);
+        let child = node.children().first().expect("textarea inner");
+        assert!(
+            child.bounds().x.abs() < 0.5 && (child.bounds().width - 240.0).abs() < 0.5,
+            "RTL textarea stays Fill until iced#3294, got {:?}",
+            child.bounds()
+        );
+        let mut num: Element<'_, String> =
+            number_input(3.0, |s| s, tok, A11y::new("n", Role::SpinButton));
+        let mut ntree = Tree::new(num.as_widget());
+        let nnode = num.as_widget_mut().layout(
+            &mut ntree,
+            &renderer,
+            &Limits::new(Size::ZERO, Size::new(240.0, 48.0)),
+        );
+        let nrow = nnode.children().first().expect("number row");
+        let digit = nrow
+            .children()
+            .iter()
+            .max_by(|a, b| a.bounds().x.total_cmp(&b.bounds().x))
+            .expect("number digit");
+        assert!(
+            digit.bounds().x > 80.0,
+            "RTL number digit must sit on start (right), got x={}",
+            digit.bounds().x
+        );
     }
 
     #[test]
@@ -10094,7 +11016,8 @@ mod tests {
         let tok = named("dark").tokens;
         let a11y = A11y::new("find", Role::TextBox).with_disabled(true);
         assert_eq!(a11y.child(Role::TextBox).node_id(), "textbox|find|1");
-        let mut el: Element<'_, String> = search_input("typed-query", |s| s, None, tok, a11y, None);
+        let mut el: Element<'_, String> =
+            search_input("typed-query", |s| s, None, tok, a11y, None, &[]);
         let mut tree = Tree::new(el.as_widget());
         let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
             Font::DEFAULT,
@@ -10146,6 +11069,7 @@ mod tests {
             tok,
             A11y::new("Search", Role::TextBox),
             None,
+            &[],
         );
         let mut pick: Element<'_, ()> = themed_pick_list(
             &["All"][..],
@@ -11398,6 +12322,10 @@ mod tests {
             src.contains("clock_digits") && src.contains("map_str"),
             "range_slider must map the low/high label with ClockDigits",
         );
+        must(
+            src.contains("align_start(tok.direction)"),
+            "range_slider span must sit on the start edge",
+        );
         assert_eq!(
             crate::i18n::ClockDigits::Eastern.map_str("20 – 80"),
             "٢٠ – ٨٠"
@@ -11417,6 +12345,91 @@ mod tests {
             src.contains("align_start(tok.direction)"),
             "slider thumb label must align to start",
         );
+        must(
+            src.contains("i18n::order(tok.direction, [min_el, max_el])"),
+            "slider min/max must follow window direction",
+        );
+        must(
+            src.contains("slider_paint_value"),
+            "horizontal RTL slider must paint from start",
+        );
+    }
+
+    #[test]
+    fn themed_slider_rtl_rail_paints_from_start() {
+        let range = 0.0..=1.0;
+        assert_eq!(slider_paint_value(&range, 0.4, false), 0.4);
+        assert_eq!(slider_paint_value(&range, 0.4, true), 0.6);
+        assert_eq!(
+            slider_paint_value(&range, slider_paint_value(&range, 0.25, true), true),
+            0.25
+        );
+        let wide = 20.0..=80.0;
+        assert_eq!(slider_paint_value(&wide, 20.0, true), 80.0);
+        let tok = crate::theme::named("dark")
+            .tokens
+            .with_direction(crate::i18n::Direction::Rtl);
+        let mut el: Element<'_, f32> = themed_slider(
+            0.0..=1.0,
+            0.4,
+            |v| v,
+            SliderMarks {
+                ticks: 5,
+                min: "0",
+                max: "1",
+                thumb: "now",
+                ..SliderMarks::NONE
+            },
+            tok,
+            crate::a11y::A11y::new("vol", crate::a11y::Role::Slider),
+        );
+        draw_once(&mut el);
+    }
+
+    #[test]
+    fn rtl_meta_stays_shrink_in_a_start_column() {
+        use iced::advanced::layout::Limits;
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+
+        let src = include_str!("widget.rs")
+            .split("pub fn meta<")
+            .nth(1)
+            .unwrap()
+            .split("/// A monospace panel")
+            .next()
+            .unwrap();
+        must(
+            !src.contains("Length::Fill"),
+            "meta must stay shrink so a look-strip row can sit it next to a pick",
+        );
+        let tok = named("dark")
+            .tokens
+            .with_direction(crate::i18n::Direction::Rtl);
+        let mut el: Element<'_, ()> = Column::new()
+            .push(meta("hint", tok, A11y::new("hint", Role::Status)))
+            .width(Length::Fill)
+            .align_x(crate::i18n::align_start(tok.direction))
+            .into();
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(400.0, 80.0));
+        let mut tree = Tree::new(el.as_widget());
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = iced::advanced::layout::Layout::new(&node);
+        let origin = layout.bounds();
+        let mut boxes = Vec::new();
+        walk_bounds(layout, &mut boxes);
+        must(
+            boxes
+                .iter()
+                .any(|b| b.width < origin.width * 0.5 && b.x - origin.x > origin.width * 0.4),
+            format!(
+                "RTL meta in a start-aligned column must sit on the start (right), boxes={boxes:?}"
+            ),
+        );
     }
 
     #[test]
@@ -11435,6 +12448,10 @@ mod tests {
         must(
             src.contains("i18n::order(tok.direction"),
             "progress must order fill portions by Tokens.direction",
+        );
+        must(
+            src.contains("align_start(tok.direction)"),
+            "progress percent line must sit on the start edge",
         );
         let tok = named("dark")
             .tokens
@@ -15140,6 +16157,62 @@ mod tests {
     }
 
     #[test]
+    fn tab_bar_puts_close_on_the_end() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels};
+
+        fn cell_child_xs(tok: Tokens) -> (f32, f32) {
+            let mut tabs = Tabs::new(["Notes"]);
+            tabs.closable = true;
+            let mut el: Element<'_, usize> = tab_bar(
+                &tabs,
+                |i| i,
+                |_| 99,
+                480.0,
+                false,
+                tok,
+                A11y::new("tabs", Role::Tab),
+            );
+            let mut tree = Tree::new(el.as_widget());
+            let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+                Font::DEFAULT,
+                Pixels::from(16u32),
+            ));
+            let limits = Limits::new(iced::Size::ZERO, iced::Size::new(480.0, 80.0));
+            let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+            let mut layout = Layout::new(&node);
+            while layout.children().count() == 1 {
+                layout = layout.children().next().expect("wrapper");
+            }
+            // column[cells, hairline] → the cells row, then the closable cell.
+            let strip_row = layout.children().next().expect("tab strip row");
+            let mut cell = strip_row;
+            while cell.children().count() == 1 {
+                cell = cell.children().next().expect("wrapper");
+            }
+            let mut xs = cell.children().map(|c| c.bounds().x);
+            (
+                xs.next().expect("first cell child"),
+                xs.next().expect("second cell child"),
+            )
+        }
+
+        let ltr = named("dark").tokens;
+        let rtl = ltr.with_direction(crate::i18n::Direction::Rtl);
+        let (ltr_label, ltr_close) = cell_child_xs(ltr);
+        let (rtl_close, rtl_label) = cell_child_xs(rtl);
+        must(
+            ltr_close > ltr_label,
+            format!("LTR close ({ltr_close}) sits after the label ({ltr_label})"),
+        );
+        must(
+            rtl_close < rtl_label,
+            format!("RTL close ({rtl_close}) sits on the end, left of the label ({rtl_label})"),
+        );
+    }
+
+    #[test]
     fn tab_bar_skips_press_on_a_disabled_tab() {
         let tok = named("dark").tokens;
         let tabs = Tabs::new(["One", "Two"]).with_disabled(1);
@@ -15248,15 +16321,6 @@ mod tests {
         let bundled: Element<'_, ()> =
             icon_svg(Icon::Search, tok, A11y::new("search", Role::Image));
         let _ = (app, bundled, named_ink);
-        let src = include_str!("widget.rs")
-            .split("pub fn icon_svg")
-            .nth(1)
-            .unwrap()
-            .split("pub fn label")
-            .next()
-            .unwrap();
-        assert!(src.contains("glyph.into().bytes()"));
-        assert!(src.contains("icon_style(tok)"));
         let btn: Element<'_, ()> = icon_button(
             Glyph::Bytes(mark),
             Some(()),

@@ -72,7 +72,8 @@ Constructor: [`pattern::workspace`](https://docs.rs/icedtea/latest/icedtea/patte
 
 `DockNode` is the layout tree (save, restore, `move_panel`).
 `pane` is called with each leaf id so every leaf can hold application
-content.
+content. `header` is trailing chrome on that leaf (kind badge, close).
+Pass `|_| None` when the leaf has none.
 
 Pass `A11y`.
 

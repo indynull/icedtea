@@ -32,7 +32,9 @@ Dracula, Everforest, Kanagawa, Ayu, GitHub, and others).
 [`theme::named`](https://docs.rs/icedtea/latest/icedtea/theme/fn.named.html)
 and `theme::code_highlight` pick UI tokens and the iced highlighter
 face together. Register more on `ThemeCatalog`. `Boot.theme` is a
-concrete name and defaults to `dark`. `light` and `dark` are a
+concrete name and defaults to `dark`.
+`Boot::transparent` asks iced for an ARGB buffer.
+`Boot::decorations` sets the client title bar. `light` and `dark` are a
 neutral desktop pair. Persist defaults `follow_os` on, so host chrome
 layers onto that pair; pick another catalog name to choose a colorway.
 `markdown_view` paints inline code and links from `Tokens::scheme()`

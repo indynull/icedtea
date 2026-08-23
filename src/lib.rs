@@ -158,8 +158,10 @@
 //! - Multiple-document-interface window mosaics.
 //! - Binding the look to one desktop shell. Themes may follow system
 //!   light/dark; chrome stays icedtea’s.
-//! - Domain widgets for a specific product (session timelines, containers,
-//!   editors' language services). Applications own those.
+//! - Domain widgets that own a product protocol or store (session
+//!   timelines, language services, mail accounts, host services).
+//!   Applications own those. A face, header slot, or window knob a
+//!   second app would call is library chrome.
 //! - Document undo/redo. Applications own history.
 //! - Sample documents and bitmaps as library API.
 //! - A second collection widget for variable-height cards. Extend list.
@@ -272,8 +274,8 @@ macro_rules! run {
 ///
 /// No window until the application returns [`Prepared::open`].
 /// Closing every window leaves the process up; quit with
-/// [`iced::exit`]. `view` takes `window::Id`. Theme is the same
-/// `fn(&State) -> Theme` as [`run!`].
+/// [`iced::exit`]. `view` and `theme` take `window::Id` so an overlay
+/// can use a transparent canvas while a desktop window stays opaque.
 ///
 /// ```ignore
 /// icedtea::daemon!(
@@ -301,8 +303,8 @@ macro_rules! daemon {
         );
         $crate::typo::install_platform_faces();
         $crate::iced::daemon($new, $update, $view)
-            .title(move |_, _| __title.clone())
-            .theme(move |state, _| $theme(state))
+            .title($crate::app::WindowTitle(__title))
+            .theme($theme)
             .subscription($sub)
             .settings(__prep.iced_settings)
             .default_font($crate::typo::UI)
@@ -378,6 +380,7 @@ mod tests {
         assert!(src.contains("$crate::iced::daemon($new, $update, $view)"));
         let daemon_src = src.split("macro_rules! daemon").nth(1).unwrap();
         assert!(!daemon_src.contains(".window("));
+        assert!(daemon_src.contains(".theme($theme)"));
         let prep = bootstrap(&Boot::new("tea", "dev.icedtea.tea"));
         assert!(!prep.title.is_empty());
         assert!(prep.iced_settings.fonts.is_empty());

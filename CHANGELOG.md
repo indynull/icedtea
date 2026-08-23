@@ -4,25 +4,88 @@
 
 ### Feature
 
+- `FieldOpts.highlight` and `search_input` / `search_input_clear`
+  run a syntax highlighter on the typed value (`FieldRun` plus
+  `FieldInk` roles). `FieldInk::Error` keeps body ink and underlines
+  in the danger role.
 - Gallery look strip offers Hebrew. Clocks stay on Western digits.
+- `Boot::transparent` sets an ARGB window buffer.
+- `Boot::decorations` turns the client title bar off on an application
+  window.
+- `group_box` takes a header trailing child (`None` when the header
+  is title only).
+- `workspace` takes a header callback for leaf trailing chrome
+  (`|_| None` when the leaf has none).
+- `CardFace::Rail` paints an inset start rail and a label gutter.
+- `daemon!` theme function receives the window id so an overlay
+  canvas can differ from a desktop window.
 
 ### Bug fix
 
-- `progress` fills from the start edge. `progress_label` maps digits
-  with `ClockDigits`.
+- `search_input_clear` paints the clear mark only when the value is
+  non-empty.
+- Elevation Level 1 is a visible drop on dark Desktop.
+- Elevated buttons raise one elevation level on hover.
+- Elevation resting heights match the Material table (0 / 1 / 3 / 6 /
+  8 / 12 dp).
+- The Material shape scale includes Large increased (20 dp), Extra
+  large increased (32 dp), and Extra extra large (48 dp).
+- Gallery type sample uses the locale Code page name (Vietnamese
+  `Mã`), not leftover English `Code`.
+- `themed_slider` fills from the start edge. Min sits on start, max
+  on end.
+- `ClockDigits::map_str` maps `%` to the Arabic percent sign so
+  `40%` paints as `٤٠٪`.
+- `progress` and `progress_ring` fill from the start edge and sit
+  percent copy there. `progress_label` maps digits with `ClockDigits`.
 - `range_slider` maps its low/high label with `ClockDigits`.
-- The gallery Controls pack and slider pair follow window direction.
+- Gallery page titles, button rows, and the Controls pack follow
+  window direction. Range slider sits with the slider on the first
+  screen. Image slots, type labels, the workspace dock, markdown
+  outline, tab body, and the side-sheet action follow start.
+- The Chinese markdown sample document title is 标记.
+- Gallery control, field, and keys columns start-align their
+  captions, so a Fill sibling cannot leave the hint on physical left.
+- `layout::form` sits the label gutter on the start edge.
+- `themed_text_input` and `search_input` sit placeholder, value, and
+  leading icons on the start edge. The character count uses
+  `ClockDigits`.
+- `number_input` paints its value with `ClockDigits` and sits it on
+  the start edge.
+- RTL `textarea` stays a stable Fill field. iced 0.14 `text_editor`
+  has no writing direction; shrink-wrapping the buffer put the caret
+  ahead of Urdu (see iced#3294).
+- `layout::wrap` takes window direction so a tile row starts at the
+  start edge. Inspector properties and the gallery scroll demo
+  start-align.
+- `icon_svg` flips Chevron and Back on a right-to-left window.
+- `ClockDigits::western_str` maps Eastern digits back to ASCII.
+- `group_box` and `about_page` start-align their title and body.
+  Credits wrap on the card so a long locale blurb stays inside.
+- `status_page` centers a start-aligned empty block.
+- `tab_bar` sits the first tab on the start edge and a closable
+  tab's close mark on the end.
+- `dialog_sheet` fills its caller width so long locale actions keep
+  their labels.
 - Clock faces pick Eastern or Western digits from the language, so
   Hebrew keeps 123 on a right-to-left window.
 - `menu_bar` titles stay one line for Arabic and Hebrew headings.
 - The gallery look strip sizes picks to the option so RTL labels
   keep their gap.
+- Gallery list-detail, inspector, navigation, and workspace jobs
+  name the pane, not a physical side.
+- `side_sheet` docks on the trailing edge and slides from there, so
+  an RTL end sheet sits on the left.
+- Gallery grid inject note uses the locale Tile word plus mapped
+  digits.
 
 ### Chore
 
-- `just gallery-gif` records a live pointer demo (click, type, wheel)
-  for the README and handbook tour. Primary invokes an Action; the
-  status and job line show the press.
+- `just gallery-gif` writes `tmp/gallery.gif`. Persist into `assets/`
+  and the handbook with `just gallery-gif persist` when tagging a
+  version. The recording is a live pointer demo; Primary invokes an
+  Action.
+- `just material-snapshot` fetches Material spec pages for gallery QA.
 
 ## 0.13.0 — 2026-08-21
 

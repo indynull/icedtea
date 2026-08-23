@@ -2,6 +2,21 @@
 
 ## Do
 
+- RTL `textarea`: iced 0.14 `text_editor` has no writing direction
+  (caret, hit-test, and line origin stay LTR). Do **not** shrink-wrap
+  or pin a measured width — that growing right-hand slab puts the
+  caret ahead of Urdu/Arabic and splits a new line to the opposite
+  edge. Keep a stable Fill field. Replace the editor when iced 0.15
+  lands [iced#3294](https://github.com/iced-rs/iced/pull/3294)
+  (fixes [iced#2102](https://github.com/iced-rs/iced/issues/2102),
+  [iced#1877](https://github.com/iced-rs/iced/issues/1877),
+  [iced#1454](https://github.com/iced-rs/iced/issues/1454)).
+- Field highlighter bidi: `HighlightField` packs one left-to-right
+  paragraph (caret, scroll, span bounds). Arabic and Urdu queries
+  do not follow writing direction. Stay on this path until iced
+  styles the input paragraph. Do not treat English SQL highlighting
+  or the empty-search clear mark as this item.
+
 ## Bugs
 
 ## Consider
@@ -28,6 +43,16 @@ Non-goals:
 - Carousel and marketing hero sheets.
 - Snackbar as a second path next to `toast`.
 - Bottom sheets (mobile).
+- Layer-shell via a Smithay client loop in the widget crate. Window
+  roles stay iced `window::Settings`. An exclusive-zone panel binds
+  `zwlr_layer_shell_v1` in the application until iced can open that
+  surface. A later `host*` opener is only if iced still cannot and a
+  second app needs the role.
+- A foreign Wayland client surface hosted inside a pane. The compositor
+  maps that surface; icedtea paints the chrome around it.
+- Domain columns, permission cards, mail list/read/compose, or
+  host-file chips as catalog widgets. Applications compose those from
+  `chip`, field, table, dialog, list, and textarea.
 - Loading indicator as M3 Expressive shape-morph.
 - Floating toolbar as a pill / expressive float.
 - Compact `tab_bar` as a second size. In-pane exclusive tabs are

@@ -1,13 +1,38 @@
 #!/usr/bin/env bash
-# Record the gallery tour into assets/gallery.gif and book/src/gallery.gif.
-# Needs a display, ffmpeg, xwininfo, wmctrl, import, and python3 (XTest).
-# Default: Xephyr + metacity so the live desktop cannot appear in a frame.
-# ICEDTEA_GALLERY_ISOLATED=0 records on the current display (float a tiler first).
+# Record the gallery tour into tmp/gallery.gif (gitignored).
+# `persist` copies that file into assets/gallery.gif and book/src/gallery.gif.
+# Persist only when tagging a version. Needs a display, ffmpeg, xwininfo,
+# wmctrl, import, and python3 (XTest). Default: Xephyr + metacity so the
+# live desktop cannot appear in a frame. ICEDTEA_GALLERY_ISOLATED=0 records
+# on the current display (float a tiler first).
 set -eu
 # pipefail is off: xdpyinfo | awk-exit and identify | awk-exit are SIGPIPE.
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
+
+local_gif="$root/tmp/gallery.gif"
+dest_assets="$root/assets/gallery.gif"
+dest_book="$root/book/src/gallery.gif"
+
+cmd="${1:-record}"
+case "$cmd" in
+  persist)
+    if [[ ! -f "$local_gif" ]]; then
+      echo "gallery-gif: $local_gif is missing; run just gallery-gif first" >&2
+      exit 1
+    fi
+    cp -f "$local_gif" "$dest_assets"
+    cp -f "$local_gif" "$dest_book"
+    echo "gallery-gif: persisted $local_gif to $dest_assets and $dest_book ($(wc -c <"$dest_assets") bytes)"
+    exit 0
+    ;;
+  record) ;;
+  *)
+    echo "gallery-gif: unknown command $cmd (record or persist)" >&2
+    exit 1
+    ;;
+esac
 
 if [[ -z "${DISPLAY:-}" ]]; then
   echo "gallery-gif: DISPLAY is not set" >&2
@@ -96,8 +121,8 @@ client_h=900
 min_w=1400
 min_h=800
 hold_ms=2000
-dest="$root/assets/gallery.gif"
-book="$root/book/src/gallery.gif"
+mkdir -p "$root/tmp"
+dest="$local_gif"
 
 screen="$(xdpyinfo | awk '/dimensions:/ { print $2; exit }')"
 screen_w="${screen%x*}"
@@ -609,7 +634,7 @@ ffmpeg -y -hide_banner -loglevel error \
   -i "$workdir/live.mkv" \
   -vf "subtitles=$workdir/captions.srt:fontsdir=${caption_dir}:force_style='FontName=${caption_name},FontSize=32,Bold=1,PlayResY=${fh},PrimaryColour=&H00B2DBEB,OutlineColour=&H0021201D,BorderStyle=1,Outline=2,Shadow=1,MarginV=56',split[s0][s1];[s0]palettegen=max_colors=192:stats_mode=single[p];[s1][p]paletteuse=dither=sierra2_4a" \
   -loop 0 "$dest"
-cp -f "$dest" "$book"
+
 
 gif_wh="$(identify -format '%wx%h' "${dest}[0]")"
 gif_w="${gif_wh%x*}"
@@ -619,4 +644,5 @@ if (( gif_w < min_w || gif_h < min_h )); then
   exit 1
 fi
 
-echo "gallery-gif: wrote $dest and $book (${gif_wh}, $(wc -c <"$dest") bytes, pointer demo, tiler=$tiler)"
+echo "gallery-gif: wrote $dest (${gif_wh}, $(wc -c <"$dest") bytes, pointer demo, tiler=$tiler)"
+echo "gallery-gif: local only; persist on a version tag with just gallery-gif persist"

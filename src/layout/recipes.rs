@@ -97,16 +97,37 @@ pub fn wrap_rows(n: usize, child_w: f32, gap: f32, width: f32) -> usize {
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let chip = widget::label("New", tok, A11y::new("New", Role::Status));
-/// let _: icedtea::Element<'_, ()> = layout::wrap(vec![chip], 80.0, 8.0, 240.0);
+/// let _: icedtea::Element<'_, ()> =
+///     layout::wrap(vec![chip], 80.0, 8.0, 240.0, icedtea::i18n::Direction::Ltr);
 /// ```
 pub fn wrap<'a, M: 'a>(
     children: Vec<Element<'a, M>>,
     child_w: f32,
     gap: f32,
     width: f32,
+    dir: Direction,
 ) -> Element<'a, M> {
     let per = wrap_per_row(child_w, gap, width);
-    grid(children, per, gap.max(0.0) as u32)
+    let mut rows = Column::new().spacing(gap.max(0.0));
+    let mut iter = children.into_iter().peekable();
+    while iter.peek().is_some() {
+        let mut chunk = Vec::new();
+        for _ in 0..per {
+            if let Some(c) = iter.next() {
+                chunk.push(c);
+            }
+        }
+        let mut r = Row::new().spacing(gap.max(0.0));
+        for c in crate::i18n::order(dir, chunk) {
+            r = r.push(c);
+        }
+        rows = rows.push(
+            container(r)
+                .width(Length::Fill)
+                .align_x(crate::i18n::align_start(dir)),
+        );
+    }
+    rows.into()
 }
 
 /// Dock slot occupancy → default window size.
@@ -350,7 +371,9 @@ pub fn form<'a, M: 'a>(
 ) -> Element<'a, M> {
     let mut col = Column::new().spacing(spacing);
     for (label, field) in rows_in {
-        let label = container(label).width(Length::Fixed(FORM_LABEL));
+        let label = container(label)
+            .width(Length::Fixed(FORM_LABEL))
+            .align_x(crate::i18n::align_start(dir));
         let field = container(field).width(Length::Fill);
         let pair = match dir {
             Direction::Ltr => Row::new().push(label).push(field),
@@ -672,10 +695,34 @@ mod tests {
         let _: Element<'_, ()> = grid(vec![t().into(), t().into(), t().into()], 2, 8);
         let _: Element<'_, ()> = pad(vec![t().into(), t().into(), t().into(), t().into()], 4, 8);
         let _: Element<'_, ()> = pad(vec![], 4, 8);
-        let _: Element<'_, ()> = wrap(vec![t().into(), t().into(), t().into()], 40.0, 8.0, 100.0);
+        let _: Element<'_, ()> = wrap(
+            vec![t().into(), t().into(), t().into()],
+            40.0,
+            8.0,
+            100.0,
+            crate::i18n::Direction::Ltr,
+        );
+        let _: Element<'_, ()> = wrap(
+            vec![t().into(), t().into()],
+            40.0,
+            8.0,
+            100.0,
+            crate::i18n::Direction::Rtl,
+        );
         let _: Element<'_, ()> = grid(vec![], 2, 8);
         let _: Element<'_, ()> = form([(t().into(), t().into())], 8, crate::i18n::Direction::Ltr);
         let _: Element<'_, ()> = form([(t().into(), t().into())], 8, crate::i18n::Direction::Rtl);
+        let form_src = include_str!("recipes.rs")
+            .split("pub fn form<")
+            .nth(1)
+            .unwrap()
+            .split("/// Visible child")
+            .next()
+            .unwrap();
+        assert!(
+            form_src.contains("align_start(dir)"),
+            "form label gutter must sit on the start edge"
+        );
         let _: Element<'_, ()> = stack_child(vec![t().into(), t().into()], 1);
         let _: Element<'_, ()> = stack_child(vec![], 3);
         let tok = crate::theme::named("dark").tokens;

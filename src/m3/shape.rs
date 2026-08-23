@@ -12,11 +12,28 @@ pub enum Shape {
     Small,
     Medium,
     Large,
+    LargeIncreased,
     ExtraLarge,
+    ExtraLargeIncreased,
+    ExtraExtraLarge,
     Full,
 }
 
 impl Shape {
+    /// Ten-step M3 corner scale plus Full (snapshot `styles/shape`).
+    pub const STEPS: [(Self, f32); 10] = [
+        (Self::None, 0.0),
+        (Self::ExtraSmall, 4.0),
+        (Self::Small, 8.0),
+        (Self::Medium, 12.0),
+        (Self::Large, 16.0),
+        (Self::LargeIncreased, 20.0),
+        (Self::ExtraLarge, 28.0),
+        (Self::ExtraLargeIncreased, 32.0),
+        (Self::ExtraExtraLarge, 48.0),
+        (Self::Full, 9999.0),
+    ];
+
     pub fn dp(self) -> f32 {
         match self {
             Self::None => 0.0,
@@ -24,7 +41,10 @@ impl Shape {
             Self::Small => 8.0,
             Self::Medium => 12.0,
             Self::Large => 16.0,
+            Self::LargeIncreased => 20.0,
             Self::ExtraLarge => 28.0,
+            Self::ExtraLargeIncreased => 32.0,
+            Self::ExtraExtraLarge => 48.0,
             Self::Full => 9999.0,
         }
     }
@@ -174,6 +194,18 @@ impl Component {
     pub fn radius_for(self, policy: ShapePolicy) -> Radius {
         self.shape_for(policy).radius()
     }
+
+    /// Material resting elevation (snapshot component table).
+    pub fn elevation(self) -> crate::m3::Elevation {
+        use crate::m3::Elevation;
+        match self {
+            Self::Dialog | Self::Search => Elevation::Level3,
+            Self::Menu | Self::Tooltip => Elevation::Level2,
+            Self::Card => Elevation::Level1,
+            Self::Banner => Elevation::Level1,
+            _ => Elevation::Level0,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -207,19 +239,17 @@ mod tests {
     use super::*;
     #[test]
     fn shape_scale() {
-        for s in [
-            Shape::None,
-            Shape::ExtraSmall,
-            Shape::Small,
-            Shape::Medium,
-            Shape::Large,
-            Shape::ExtraLarge,
-            Shape::Full,
-        ] {
-            let _ = s.radius();
-            assert!(s.dp() >= 0.0);
+        for (step, dp) in Shape::STEPS {
+            assert_eq!(step.dp(), dp, "{step:?}");
+            let _ = step.radius();
         }
+        assert_eq!(
+            Shape::STEPS.map(|(_, d)| d),
+            [0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 28.0, 32.0, 48.0, 9999.0]
+        );
         assert!(Shape::Small.dp() < Shape::Large.dp());
+        assert!(Shape::Large.dp() < Shape::LargeIncreased.dp());
+        assert!(Shape::ExtraLarge.dp() < Shape::ExtraLargeIncreased.dp());
         assert_eq!(Corner::None.radius_px(), 0.0);
         assert_eq!(Corner::None.radius().top_left, 0.0);
         assert_eq!(Corner::Tight.radius_px(), 4.0);
@@ -354,6 +384,15 @@ mod tests {
             Component::Track.shape_for(ShapePolicy::Material),
             Shape::Full
         );
+        assert_eq!(Component::Dialog.elevation(), crate::m3::Elevation::Level3);
+        assert_eq!(Component::Search.elevation(), crate::m3::Elevation::Level3);
+        assert_eq!(Component::Menu.elevation(), crate::m3::Elevation::Level2);
+        assert_eq!(Component::Tooltip.elevation(), crate::m3::Elevation::Level2);
+        assert_eq!(Component::Card.elevation(), crate::m3::Elevation::Level1);
+        assert_eq!(Component::Banner.elevation(), crate::m3::Elevation::Level1);
+        assert_eq!(Component::Button.elevation(), crate::m3::Elevation::Level0);
+        assert_eq!(Component::Field.elevation(), crate::m3::Elevation::Level0);
+        assert_eq!(Component::AppBar.elevation(), crate::m3::Elevation::Level0);
         assert_eq!(
             Component::Field.radius_for(ShapePolicy::Tight).top_left,
             4.0

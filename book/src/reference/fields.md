@@ -21,9 +21,14 @@ Constructor: [`widget::themed_text_input`](https://docs.rs/icedtea/latest/icedte
 [iced](https://crates.io/crates/iced)
 
 `FieldOpts` picks filled or outlined, prefix/suffix icons, a floating
-label when the value is non-empty, and an optional character count.
-Optional iced `Id` so you can `focus` after show. Disabled greys the
-field and drops edit. Empty value is a valid state.
+label when the value is non-empty, an optional character count, and
+a highlighter: `highlight` is byte ranges plus a `FieldInk` role
+(`text`, `success`, `warning`, `muted`, `error`). `error` keeps body
+ink and draws a danger underline (spelling). The application owns
+the matcher (this handbook's search demo uses SQL); the field paints
+those runs on the typed value. Optional iced `Id` so you can `focus`
+after show. Disabled greys the field and drops edit. Empty value is
+a valid state.
 
 Pass `A11y`.
 
@@ -105,7 +110,11 @@ Constructor: [`widget::search_input`](https://docs.rs/icedtea/latest/icedtea/wid
 
 Use for palette and list filters. Empty query means “show all”.
 The placeholder is the a11y name. Pass submit for Enter and an
-input id when the application must focus the field.
+input id when the application must focus the field. Pass
+`highlight` to run a syntax highlighter on the typed query
+(`FieldRun` slices, same roles as `FieldOpts`). The application
+owns the matcher. [`search_input_clear`](https://docs.rs/icedtea/latest/icedtea/widget/fn.search_input_clear.html)
+paints the clear mark only when the value is non-empty.
 
 Pass `A11y`.
 

@@ -393,6 +393,7 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
         paint,
         A11y::new(placeholder, Role::TextBox),
         Some(iced::widget::Id::new("palette-query")),
+        &[],
     );
     let mut fields = Column::new().spacing(6).align_x(align_start(dir));
     fields = fields.push(query_field);
@@ -721,7 +722,7 @@ pub fn status_page<'a, M: Clone + 'a>(
         meta(body.clone(), tok, A11y::new(body, Role::Status)),
     ]
     .spacing(tok.density.gap())
-    .width(Length::Fill);
+    .align_x(align_start(tok.direction));
     if let Some((t, m)) = action {
         col = col.push(themed_button(
             t.clone(),
@@ -743,6 +744,11 @@ pub fn status_page<'a, M: Clone + 'a>(
 
 /// Name, version, license, and credits.
 ///
+/// The card is a fixed width so the credits line wraps inside the
+/// group box. `Length::Fill` plus word wrap still measures as one
+/// line under mixed bidi (Hebrew/Arabic plus `iced 0.14`), so the
+/// credits text gets a definite inner width.
+///
 ///
 /// ```
 /// use icedtea::i18n::Catalog;
@@ -761,20 +767,32 @@ pub fn about_page<'a, M: Clone + 'a>(
     tok: Tokens,
     cat: &'a Catalog,
 ) -> Element<'a, M> {
-    group_box(
+    const ABOUT_WIDTH: f32 = 420.0;
+    let inner = (ABOUT_WIDTH - 2.0 * tok.density.sheet()).max(120.0);
+    container(group_box(
         cat.t("about"),
         column![
             text(name).size(tok.page()).color(tok.scheme().on_surface),
             meta(version, tok, A11y::new(version, Role::Status)),
             meta(license, tok, A11y::new(license, Role::Status)),
-            meta(credits, tok, A11y::new(credits, Role::Status)),
+            text(credits)
+                .size(tok.meta())
+                .color(tok.scheme().on_surface_variant)
+                .wrapping(iced::widget::text::Wrapping::Glyph)
+                .width(Length::Fixed(inner))
+                .align_x(align_start(tok.direction)),
         ]
         .spacing(6.0)
+        .width(Length::Fill)
+        .align_x(align_start(tok.direction))
         .into(),
         tok,
         CardFace::Elevated,
         A11y::new(cat.t("about"), Role::Dialog),
-    )
+        None,
+    ))
+    .width(Length::Fixed(ABOUT_WIDTH))
+    .into()
 }
 
 /// Searchable preferences groups.
@@ -837,7 +855,7 @@ pub fn preferences_page<'a, M: Clone + 'a>(
         ));
     }
     for g in filtered {
-        let mut lines = Column::new().spacing(4);
+        let mut lines = Column::new().spacing(4).align_x(align_start(tok.direction));
         for (k, v) in &g.keys {
             let line = format!("{k}: {v}");
             lines = lines.push(meta(line.clone(), tok, A11y::new(line, Role::Status)));
@@ -848,6 +866,7 @@ pub fn preferences_page<'a, M: Clone + 'a>(
             tok,
             CardFace::Elevated,
             A11y::new(g.title.clone(), Role::Group),
+            None,
         ));
     }
     column![
@@ -1366,7 +1385,7 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
             .width(Length::Fill),
         )
         .padding(tok.density.inset() * 2.0)
-        .width(Length::Fixed(280.0))
+        .width(Length::Fill)
         .style(move |_| style::dialog_sheet_face(tok))
         .into(),
         &A11y::new(title, Role::Dialog),
@@ -1569,8 +1588,9 @@ pub fn cascade_menu<'a, M: Clone + 'a>(
 
 /// Docked supporting pane (M3 side sheet) over a dimmed scene.
 ///
-/// `end` true docks trailing edge (LTR right). Body is application
-/// content; dismiss is optional. `progress` is 0 (gone) to 1 (rest).
+/// `end` true docks the trailing edge (right in LTR, left in RTL).
+/// Body is application content; dismiss is optional. `progress` is
+/// 0 (gone) to 1 (rest).
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -1604,21 +1624,22 @@ pub fn side_sheet<'a, M: Clone + 'a>(
     let title = title.into();
     let t = crate::motion::visual(progress, tok.reduced_motion);
     let paint = tok.fade(t);
-    let mut head = Row::new()
-        .spacing(paint.density.gap())
-        .align_y(Alignment::Center)
-        .push(label(
-            title.clone(),
-            paint,
-            A11y::new(title.clone(), Role::Header),
-        ))
-        .push(Space::new().width(Length::Fill));
+    let mut head_kids: Vec<Element<'a, M>> = vec![
+        label(title.clone(), paint, A11y::new(title.clone(), Role::Header)),
+        Space::new().width(Length::Fill).into(),
+    ];
     if let Some(m) = on_dismiss {
-        head = head.push(dismiss_button(
+        head_kids.push(dismiss_button(
             m,
             paint,
             A11y::button(format!("close {title}")),
         ));
+    }
+    let mut head = Row::new()
+        .spacing(paint.density.gap())
+        .align_y(Alignment::Center);
+    for kid in crate::i18n::order(tok.direction, head_kids) {
+        head = head.push(kid);
     }
     let sheet = container(
         column![head, body]
@@ -1630,7 +1651,13 @@ pub fn side_sheet<'a, M: Clone + 'a>(
     .width(Length::Fixed(width.max(200.0)))
     .height(Length::Fill)
     .style(move |_| style::fade_face(style::dialog_sheet_face(tok), t));
-    let slide = if end {
+    // Slide is a physical pixel offset. Map logical start/end through
+    // window direction so RTL end comes from the left.
+    let from_physical_end = match tok.direction {
+        crate::i18n::Direction::Ltr => end,
+        crate::i18n::Direction::Rtl => !end,
+    };
+    let slide = if from_physical_end {
         crate::motion::Slide::End
     } else {
         crate::motion::Slide::Start
@@ -1642,23 +1669,17 @@ pub fn side_sheet<'a, M: Clone + 'a>(
         tok,
         A11y::new(title.clone(), Role::Group),
     );
-    let docked = if end {
-        container(
-            row![Space::new().width(Length::Fill), sheet]
-                .height(Length::Fill)
-                .width(Length::Fill),
-        )
-        .width(Length::Fill)
-        .height(Length::Fill)
+    let fill: Element<'a, M> = Space::new().width(Length::Fill).into();
+    let dock_kids = if end {
+        vec![fill, sheet]
     } else {
-        container(
-            row![sheet, Space::new().width(Length::Fill)]
-                .height(Length::Fill)
-                .width(Length::Fill),
-        )
-        .width(Length::Fill)
-        .height(Length::Fill)
+        vec![sheet, fill]
     };
+    let mut dock_row = Row::new().height(Length::Fill).width(Length::Fill);
+    for kid in crate::i18n::order(tok.direction, dock_kids) {
+        dock_row = dock_row.push(kid);
+    }
+    let docked = container(dock_row).width(Length::Fill).height(Length::Fill);
     Stack::new()
         .push(backdrop)
         .push(
@@ -1854,6 +1875,7 @@ pub fn inspector<'a, M: 'a>(
         .width(layout::fixed(280.0))
         .height(Length::Fill)
         .padding(tok.density.inset())
+        .align_x(crate::i18n::align_start(tok.direction))
         .style(move |_| style::panel(tok))
         .into();
     let mut row = Row::new().width(Length::Fill).height(Length::Fill);
@@ -1865,8 +1887,10 @@ pub fn inspector<'a, M: 'a>(
 
 /// Nested dock tree: splits with a sash, tab groups, and leaf chrome.
 ///
-/// `pane` is called with each leaf id (and the active tab id). `on_sash`
-/// is the split index then the grip event. `on_tab` is the depth-first
+/// `pane` is called with each leaf id (and the active tab id). `header`
+/// is trailing chrome on that leaf (kind badge, close). Pass
+/// `|_| None` when the leaf has no header extra. `on_sash` is the
+/// split index then the grip event. `on_tab` is the depth-first
 /// tab-group index, then the selected tab (`DockNode::select_tab_group`).
 ///
 ///
@@ -1895,6 +1919,7 @@ pub fn inspector<'a, M: 'a>(
 ///     |id| {
 ///         widget::label(id, tok, A11y::new(id, Role::Status))
 ///     },
+///     |_id| None,
 ///     icedtea::iced::Size::new(400.0, 240.0),
 ///     on_sash,
 ///     on_tab,
@@ -1902,9 +1927,11 @@ pub fn inspector<'a, M: 'a>(
 ///     A11y::new("workspace", Role::Group),
 /// );
 /// ```
+#[allow(clippy::too_many_arguments)]
 pub fn workspace<'a, M: Clone + 'a>(
     root: &crate::workspace::DockNode,
     pane: impl Fn(&str) -> Element<'a, M> + Copy + 'a,
+    header: impl Fn(&str) -> Option<Element<'a, M>> + Copy + 'a,
     viewport: Size,
     on_sash: impl Fn(usize, layout::SashEvent) -> M + Copy + 'a,
     on_tab: impl Fn(usize, usize) -> M + Copy + 'a,
@@ -1913,6 +1940,7 @@ pub fn workspace<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let mut paint = DockPaint {
         pane,
+        header,
         split_i: 0,
         tab_i: 0,
         on_sash,
@@ -1930,13 +1958,15 @@ pub fn workspace<'a, M: Clone + 'a>(
     )
 }
 
-struct DockPaint<'a, M, Pane, Sash, Tab>
+struct DockPaint<'a, M, Pane, Header, Sash, Tab>
 where
     Pane: Fn(&str) -> Element<'a, M> + Copy + 'a,
+    Header: Fn(&str) -> Option<Element<'a, M>> + Copy + 'a,
     Sash: Fn(usize, layout::SashEvent) -> M + Copy + 'a,
     Tab: Fn(usize, usize) -> M + Copy + 'a,
 {
     pane: Pane,
+    header: Header,
     split_i: usize,
     tab_i: usize,
     on_sash: Sash,
@@ -1944,15 +1974,16 @@ where
     tok: Tokens,
 }
 
-fn paint_dock<'a, M, Pane, Sash, Tab>(
+fn paint_dock<'a, M, Pane, Header, Sash, Tab>(
     node: &crate::workspace::DockNode,
     width: f32,
     height: f32,
-    paint: &mut DockPaint<'a, M, Pane, Sash, Tab>,
+    paint: &mut DockPaint<'a, M, Pane, Header, Sash, Tab>,
 ) -> Element<'a, M>
 where
     M: Clone + 'a,
     Pane: Fn(&str) -> Element<'a, M> + Copy + 'a,
+    Header: Fn(&str) -> Option<Element<'a, M>> + Copy + 'a,
     Sash: Fn(usize, layout::SashEvent) -> M + Copy + 'a,
     Tab: Fn(usize, usize) -> M + Copy + 'a,
 {
@@ -1960,12 +1991,14 @@ where
     match node {
         crate::workspace::DockNode::Leaf(p) => {
             let body = (paint.pane)(&p.id);
+            let trailing = (paint.header)(&p.id);
             group_box(
                 p.title.clone(),
                 body,
                 tok,
                 CardFace::Elevated,
                 A11y::new(p.id.clone(), Role::Group),
+                trailing,
             )
         }
         crate::workspace::DockNode::Tabs { panes, active } => {
@@ -2072,6 +2105,7 @@ pub fn tool_panel<'a, M: Clone + 'a>(
             tok,
             CardFace::Elevated,
             a11y.clone(),
+            None,
         ),
         &a11y,
     )
@@ -2140,13 +2174,14 @@ pub fn cheatsheet<'a, M: Clone + 'a>(
     let q = query.trim().to_ascii_lowercase();
     let rail = crate::chrome::SCROLL_RAIL_WIDTH;
     let g = tok.density.gap();
+    let (left, right) = crate::i18n::inline_pad(tok.direction, g, g + rail);
     let mut col = Column::new()
         .spacing(crate::density::GRID as f32)
         .padding(Padding {
             top: g,
-            right: g + rail,
+            right,
             bottom: g,
-            left: g,
+            left,
         });
     for a in table.iter() {
         if !a.enabled {
@@ -2161,15 +2196,18 @@ pub fn cheatsheet<'a, M: Clone + 'a>(
             .as_ref()
             .map(|s| s.to_string())
             .unwrap_or_else(|| "—".into());
-        col = col.push(row![
-            label(
-                a.title.clone(),
-                tok,
-                A11y::new(a.title.clone(), Role::Status)
-            ),
-            iced::widget::Space::new().width(Length::Fill),
-            meta(keys.clone(), tok, A11y::new(keys, Role::Status)),
-        ]);
+        let mut line = Row::new().align_y(Alignment::Center);
+        let title: Element<'a, M> = label(
+            a.title.clone(),
+            tok,
+            A11y::new(a.title.clone(), Role::Status),
+        );
+        let fill: Element<'a, M> = iced::widget::Space::new().width(Length::Fill).into();
+        let shortcut: Element<'a, M> = meta(keys.clone(), tok, A11y::new(keys, Role::Status));
+        for kid in order(tok.direction, [title, fill, shortcut]) {
+            line = line.push(kid);
+        }
+        col = col.push(line);
     }
     crate::a11y::attach(
         themed_scroll(
@@ -2800,6 +2838,16 @@ mod tests {
         paint(&mut page);
         let mut about = about_page("App", "0.1.0", "MIT", "us", tok, &cat);
         paint(&mut about);
+        let rtl = tok.with_direction(Direction::Rtl);
+        let mut about_rtl = about_page(
+            "icedtea",
+            "0.2.0",
+            "MIT",
+            "iced 0.14 ڈیسک ٹاپ اطلاقیوں کے ویجٹ اور چوکھٹا۔",
+            rtl,
+            &cat,
+        );
+        paint(&mut about_rtl);
         let mut prefs_el = preferences_page(&prefs, "", |_| (), tok, &cat);
         paint(&mut prefs_el);
         let mut mw = main_window(lab("m"), lab("t"), lab("c"), lab("s"), tok);
@@ -2967,6 +3015,7 @@ mod tests {
         let mut ws = workspace(
             &root,
             |_| lab("c"),
+            |_id| None,
             Size::new(400.0, 240.0),
             |_, _| (),
             |_, _| (),
@@ -3010,6 +3059,7 @@ mod tests {
         let mut ws = workspace(
             &root,
             |_| lab("c"),
+            |_id| None,
             Size::new(400.0, 240.0),
             |_, _| (),
             |_, _| (),
@@ -3038,6 +3088,7 @@ mod tests {
                     "edit-body"
                 })
             },
+            |_id| None,
             Size::new(400.0, 240.0),
             |_, _| (),
             |_, _| (),
@@ -3054,6 +3105,7 @@ mod tests {
         let mut vws = workspace(
             &vertical,
             |_| lab("c"),
+            |_id| None,
             Size::new(400.0, 240.0),
             |_, _| (),
             |_, _| (),
@@ -3070,6 +3122,7 @@ mod tests {
         let mut tws = workspace(
             &twins,
             |_| lab("c"),
+            |_id| None,
             Size::new(200.0, 120.0),
             |_, _| (),
             |_, _| (),
@@ -3081,6 +3134,7 @@ mod tests {
         let mut ews = workspace(
             &empty_tabs,
             |_| lab("c"),
+            |_id| None,
             Size::new(200.0, 120.0),
             |_, _| (),
             |_, _| (),
@@ -3366,6 +3420,71 @@ mod tests {
             .next()
             .unwrap();
         assert!(head.contains("align_start(dir)"));
+    }
+
+    #[test]
+    fn cheatsheet_row_title_sits_on_start() {
+        use crate::shortcut::Shortcut;
+        let ltr = crate::theme::named("dark").tokens;
+        let rtl = ltr.with_direction(crate::i18n::Direction::Rtl);
+        let mut table = ActionTable::new();
+        table.insert(
+            Action::new("file.save", "Save the document now", ())
+                .with_shortcut(Shortcut::parse("s").unwrap()),
+        );
+        fn layout_sheet(
+            tok: crate::theme::Tokens,
+            table: &ActionTable<()>,
+        ) -> iced::advanced::layout::Node {
+            use iced::advanced::layout::Limits;
+            use iced::advanced::widget::Tree;
+            use iced::{Font, Pixels, Size};
+            let mut el: Element<'_, ()> = cheatsheet(table, "", tok);
+            let mut tree = Tree::new(el.as_widget());
+            let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+                Font::DEFAULT,
+                Pixels::from(16u32),
+            ));
+            el.as_widget_mut().layout(
+                &mut tree,
+                &renderer,
+                &Limits::new(Size::ZERO, Size::new(480.0, 240.0)),
+            )
+        }
+        fn first_cheat_row(
+            node: &iced::advanced::layout::Node,
+        ) -> Option<&iced::advanced::layout::Node> {
+            let kids = node.children();
+            if kids.len() == 3 {
+                let w: Vec<f32> = kids.iter().map(|c| c.bounds().width).collect();
+                if w[1] > w[0] && w[1] > w[2] && w[1] > 80.0 {
+                    return Some(node);
+                }
+            }
+            kids.iter().find_map(first_cheat_row)
+        }
+        let ltr_n = layout_sheet(ltr, &table);
+        let rtl_n = layout_sheet(rtl, &table);
+        let ltr_row = first_cheat_row(&ltr_n).expect("ltr cheat row");
+        let rtl_row = first_cheat_row(&rtl_n).expect("rtl cheat row");
+        let ltr_w: Vec<f32> = ltr_row
+            .children()
+            .iter()
+            .map(|c| c.bounds().width)
+            .collect();
+        let rtl_w: Vec<f32> = rtl_row
+            .children()
+            .iter()
+            .map(|c| c.bounds().width)
+            .collect();
+        assert!(
+            ltr_w[0] > ltr_w[2],
+            "ltr title should sit on the start (left), got widths {ltr_w:?}"
+        );
+        assert!(
+            rtl_w[2] > rtl_w[0],
+            "rtl title should sit on the start (right), got widths {rtl_w:?}"
+        );
     }
 
     #[test]

@@ -1,5 +1,9 @@
 ## Material Design 3
 
+Source of what Material says: `references/material/INDEX.md`
+(`just material-snapshot`). icedtea’s desktop map is `src/m3/`.
+Read those before scoring elevation, shape, type, or trailing icons.
+
 - Spacing on a **4 dp grid**; default density 8 dp gap, 48 dp touch targets.
 - Controls show M3 states: enabled, disabled, hovered, focused, pressed, selected/error where defined.
 - Surfaces use token roles only (`Tokens::scheme()`); no one-off hex.
@@ -23,6 +27,9 @@ affordance, hierarchy, contrast, states) map onto the classes below.
 This is a **desktop widget library gallery**, not a marketing site:
 prefer control correctness and catalog honesty over pixel-diff thrash.
 
+Proof is the still in `visual.md` then the captured shot. A `SCORE.md`
+ok row or a constructor-source substring is not a score for that page.
+
 ---
 
 ## 1. Hierarchy and density
@@ -31,6 +38,9 @@ prefer control correctness and catalog honesty over pixel-diff thrash.
 - One primary focus per section; no equal-weight wall of controls
 - Gaps on the **4px grid** (default density 8px); uneven “random” air is ugly
 - Related items grouped; orphan controls or two copies of the same idea are broken catalog sense
+- Locale first screen matches English density. Hints and captions on
+  physical left with a large unused start gap is **broken** (the page
+  looks empty even when the constructors are there)
 - Multi-host pages: each host has usable height (not one row + empty Fill hole)
 - A constructor this pass changed must be **on the idle first screen**
   of its page. Below-fold only is not a score for that widget.
@@ -150,9 +160,15 @@ walk languages by eye. Do not skip a fill language.
   (Fill+align inside iced `button` drops RTL glyphs) are **broken**.
   `layout-button-face` / `rtl_themed_button`; `faces-controls`.
 - Arabic/Urdu clocks use Eastern digits (`digits-eastern`). Hebrew
-  keeps 123. Code, paths, and URLs stay left-to-right (`ltr-islands`).
+  keeps 123 — Western Hebrew digits are the contract, not leftover.
+  Code, paths, filenames (`notes.txt`), and key chords (`ctrl+n`)
+  stay left-to-right (`ltr-islands`). A confirm card centered on
+  the dim wash is the modal, not a start-align miss.
 - Painted chrome is the locale fill. Leftover English on those
   labels is **broken** (`leftover-src`, `copy`, `copy-keys`).
+  Score the shot: Latin `Enter` / `Escape` on Keys, `Contain, cover`
+  on Image, or a raw `ok` on Main window status is leftover English.
+  A constructor-body grep is not this score.
 - Chrome stays one line (menu, look strip, toolbar, nav, buttons,
   chips, tabs). Mid-word wrap is **broken** (`wrap-chrome`).
   Markdown, code wrap-on, card titles, expand / job / hint, and

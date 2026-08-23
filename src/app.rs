@@ -16,6 +16,15 @@ use crate::window::{self, DisplayBounds, WindowKind};
 /// let prep = icedtea::app::bootstrap(&boot);
 /// assert_eq!(prep.tokens.canvas, icedtea::theme::named("dark").tokens.canvas);
 /// assert!(prep.iced_settings.fonts.is_empty());
+/// assert!(!prep.window.transparent);
+/// assert!(prep.window.decorations);
+/// let glass = icedtea::app::bootstrap(
+///     &icedtea::app::Boot::new("demo", "dev.icedtea.demo")
+///         .transparent(true)
+///         .decorations(false),
+/// );
+/// assert!(glass.window.transparent);
+/// assert!(!glass.window.decorations);
 /// ```
 #[derive(Debug, Clone)]
 pub struct Boot {
@@ -33,6 +42,8 @@ pub struct Boot {
     pub max_size: Option<Size>,
     pub pointer: Option<(f32, f32)>,
     pub displays: Vec<DisplayBounds>,
+    pub transparent: bool,
+    pub decorations: Option<bool>,
 }
 
 impl Boot {
@@ -52,6 +63,8 @@ impl Boot {
             max_size: None,
             pointer: None,
             displays: Vec::new(),
+            transparent: false,
+            decorations: None,
         }
     }
 
@@ -127,6 +140,19 @@ impl Boot {
         self.displays = displays.into();
         self
     }
+
+    /// ARGB window buffer. Later compositor blur needs the channel.
+    pub fn transparent(mut self, on: bool) -> Self {
+        self.transparent = on;
+        self
+    }
+
+    /// Client title bar. `None` on [`Boot::new`] follows the window kind
+    /// (on for application and dialog, off for overlay).
+    pub fn decorations(mut self, on: bool) -> Self {
+        self.decorations = Some(on);
+        self
+    }
 }
 
 /// Resolved boot data used by `run`.
@@ -198,6 +224,10 @@ pub fn bootstrap_with_catalog(boot: &Boot, themes: &ThemeCatalog) -> Prepared {
                     ));
                 }
             }
+            win.transparent = boot.transparent;
+            if let Some(decorations) = boot.decorations {
+                win.decorations = decorations;
+            }
             win
         },
         iced_theme,
@@ -252,12 +282,26 @@ pub fn default_font() -> Font {
 /// ```
 /// let t = icedtea::app::WindowTitle("demo".into());
 /// assert_eq!(<icedtea::app::WindowTitle as icedtea::iced::application::TitleFn<()>>::title(&t, &()), "demo");
+/// assert_eq!(
+///     <icedtea::app::WindowTitle as icedtea::iced::daemon::TitleFn<()>>::title(
+///         &t,
+///         &(),
+///         icedtea::iced::window::Id::unique(),
+///     ),
+///     "demo"
+/// );
 /// ```
 #[derive(Debug, Clone)]
 pub struct WindowTitle(pub String);
 
 impl<S> iced::application::TitleFn<S> for WindowTitle {
     fn title(&self, _state: &S) -> String {
+        self.0.clone()
+    }
+}
+
+impl<S> iced::daemon::TitleFn<S> for WindowTitle {
+    fn title(&self, _state: &S, _window: iced::window::Id) -> String {
         self.0.clone()
     }
 }
@@ -351,5 +395,37 @@ mod tests {
             <WindowTitle as iced::application::TitleFn<()>>::title(&t, &()),
             "demo"
         );
+    }
+
+    #[test]
+    fn bootstrap_transparent_and_decorations_follow_boot() {
+        let app = bootstrap(&Boot::new("App", "dev.x"));
+        assert!(!app.window.transparent);
+        assert!(app.window.decorations);
+
+        let glass = bootstrap(&Boot::new("App", "dev.x").transparent(true));
+        assert!(glass.window.transparent);
+        assert!(glass.window.decorations);
+
+        let opaque = bootstrap(&Boot::new("App", "dev.x").transparent(false));
+        assert!(!opaque.window.transparent);
+
+        let bare = bootstrap(&Boot::new("App", "dev.x").decorations(false));
+        assert!(!bare.window.decorations);
+        assert!(!bare.window.transparent);
+
+        let framed = bootstrap(&Boot::new("App", "dev.x").decorations(true));
+        assert!(framed.window.decorations);
+
+        let overlay = bootstrap(&Boot::new("p", "dev.x").overlay());
+        assert!(!overlay.window.decorations);
+        assert!(!overlay.window.transparent);
+
+        let overlay_chrome = bootstrap(&Boot::new("p", "dev.x").overlay().decorations(true));
+        assert!(overlay_chrome.window.decorations);
+
+        let overlay_glass = bootstrap(&Boot::new("p", "dev.x").overlay().transparent(true));
+        assert!(overlay_glass.window.transparent);
+        assert!(!overlay_glass.window.decorations);
     }
 }

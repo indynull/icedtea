@@ -299,10 +299,12 @@ def find_window_id(display: str, pid: int, timeout_s: float = 20.0) -> str:
     raise SystemExit(f"timed out waiting for window (pid={pid})")
 
 
-def place_window(display: str, wid: str, x: int, y: int, w: int, h: int) -> None:
+def place_window(
+    display: str, wid: str, x: int, y: int, w: int, h: int, *, nested: bool = True
+) -> None:
     env = os.environ.copy()
     env["DISPLAY"] = display
-    if _which("swaymsg"):
+    if nested and _which("swaymsg"):
         dec = int(wid, 16) if str(wid).lower().startswith("0x") else int(wid)
         _run(["swaymsg", f"[id={dec}] floating enable"], check=False)
     _run(
@@ -311,11 +313,14 @@ def place_window(display: str, wid: str, x: int, y: int, w: int, h: int) -> None
     )
     _run(["wmctrl", "-i", "-r", wid, "-e", f"0,{x},{y},{w},{h}"], env=env)
     time.sleep(0.15)
-    _run(["wmctrl", "-i", "-a", wid], env=env)
+    if nested:
+        _run(["wmctrl", "-i", "-a", wid], env=env)
 
 
-def pointer_clear_hover(display: str) -> None:
-    """Park the pointer on the root so no control stays in Hovered style."""
+def pointer_clear_hover(display: str, *, nested: bool = True) -> None:
+    """Park the pointer on the nested root so no control stays Hovered."""
+    if not nested:
+        return
     env = os.environ.copy()
     env["DISPLAY"] = display
     try:
@@ -563,12 +568,14 @@ DEFAULT_INTERACT: list[dict[str, str]] = [
         "match": "controls:",
         "name": "controls-shape-pill",
         "script": "shape Pill\n",
+        "restore": "shape Desktop\n",
         "expect": "buttons stadium; exclusive segments joined rectangles, not independent pills",
     },
     {
         "match": "Tabs, accordion",
         "name": "sections-shape-pill",
         "script": "shape Pill\n",
+        "restore": "shape Desktop\n",
         "expect": "tab labels rectangular with underbar; not stadiums",
     },
     {
@@ -2206,12 +2213,14 @@ def main() -> int:
 
     t_boot0 = _now_ms()
     print(f"starting {binary}", file=sys.stderr)
+    gallery_log = work / "gallery.err"
+    gallery_err = gallery_log.open("wb")
     gallery = subprocess.Popen(
         [str(binary)],
         cwd=root,
         env=env,
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
+        stderr=gallery_err,
         start_new_session=True,
     )
 
@@ -2222,6 +2231,7 @@ def main() -> int:
                 gallery.wait(timeout=3)
             except subprocess.TimeoutExpired:
                 gallery.kill()
+        gallery_err.close()
         nested.stop()
 
     try:
@@ -2235,7 +2245,10 @@ def main() -> int:
         print(f"tour_len={tour_len}", file=sys.stderr)
 
         wid = find_window_id(display, gallery.pid)
-        place_window(display, wid, 40, 48, args.client_w, args.client_h)
+        on_nested = args.backend != "host"
+        place_window(
+            display, wid, 40, 48, args.client_w, args.client_h, nested=on_nested
+        )
 
         if not wait_file(ackfile, lambda t: t.strip() == "0", timeout_s=10.0):
             raise SystemExit("gallery did not acknowledge beat 0")
@@ -2245,6 +2258,11 @@ def main() -> int:
                 inject_script(injectfile, f"language {args.locale}\n")
             except TimeoutError as exc:
                 raise SystemExit(f"locale inject failed: {exc}") from exc
+            time.sleep(max(0.9, args.settle_ms / 1000.0))
+            # Rebuild beat 0 after the locale fill paints.
+            cmdfile.write_text("0\n", encoding="utf-8")
+            if not wait_file(ackfile, lambda t: t.strip() == "0", timeout_s=10.0):
+                raise SystemExit("gallery did not acknowledge locale beat 0")
             time.sleep(max(0.9, args.settle_ms / 1000.0))
         boot_ms = _now_ms() - t_boot0
 
@@ -2280,8 +2298,10 @@ def main() -> int:
             expect: str | None = None,
         ) -> None:
             nonlocal shot_i
-            place_window(display, wid, 40, 48, args.client_w, args.client_h)
-            pointer_clear_hover(display)
+            place_window(
+                display, wid, 40, 48, args.client_w, args.client_h, nested=on_nested
+            )
+            pointer_clear_hover(display, nested=on_nested)
             time.sleep(0.05)
             name = f"{shot_i:02d}-beat{beat:02d}-{kind}-{slug(name_extra)[:40]}"
             shot_rel = f"shots/{name}.png"
@@ -2353,6 +2373,42 @@ def main() -> int:
                 name_extra=caption or page,
                 t0=t_step0,
             )
+            prev_idle = next(
+                (s for s in reversed(steps[:-1]) if s.get("kind") == "idle"),
+                None,
+            )
+            last = steps[-1]
+            if (
+                prev_idle
+                and prev_idle.get("page") != page
+                and prev_idle.get("shot")
+                and last.get("shot")
+            ):
+                pa = out / prev_idle["shot"]
+                pb = out / last["shot"]
+                if pa.is_file() and pb.is_file() and pa.read_bytes() == pb.read_bytes():
+                    print(
+                        f"repeat grab {prev_idle.get('page')}->{page}, settle again",
+                        file=sys.stderr,
+                    )
+                    time.sleep(max(0.8, settle))
+                    steps.pop()
+                    shot_i -= 1
+                    if steps_path.is_file():
+                        lines = steps_path.read_text(encoding="utf-8").splitlines()
+                        steps_path.write_text(
+                            "\n".join(lines[:-1]) + ("\n" if lines[:-1] else ""),
+                            encoding="utf-8",
+                        )
+                    record_shot(
+                        beat=beat,
+                        caption=caption,
+                        face=face,
+                        page=page,
+                        kind="idle",
+                        name_extra=caption or page,
+                        t0=t_step0,
+                    )
 
             if args.interact:
                 for ix in interactions_for_caption(caption):
@@ -2389,6 +2445,11 @@ def main() -> int:
                         f"  interact {ix['name']}: applied={applied} expect={ix.get('expect')!r}",
                         file=sys.stderr,
                     )
+                    if restore := ix.get("restore"):
+                        try:
+                            inject_script(injectfile, restore)
+                        except TimeoutError as exc:
+                            print(f"restore failed: {exc}", file=sys.stderr)
 
         total_ms = _now_ms() - t_all0
         step_ms = [s["step_ms"] for s in steps if s.get("step_ms") is not None]

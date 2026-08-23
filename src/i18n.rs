@@ -26,6 +26,7 @@ pub enum Direction {
 /// use icedtea::i18n::ClockDigits;
 /// assert_eq!(ClockDigits::for_lang("ar"), ClockDigits::Eastern);
 /// assert_eq!(ClockDigits::for_lang("he"), ClockDigits::Western);
+/// assert_eq!(ClockDigits::western_str("٩٠%"), "90%");
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ClockDigits {
@@ -49,7 +50,9 @@ impl ClockDigits {
         }
     }
 
-    /// Map ASCII 0-9 in `s` onto this set. Other characters stay.
+    /// Map ASCII 0-9 in `s` onto this set. `%` becomes the Arabic
+    /// percent sign so `40%` stays one run (`٤٠٪`) instead of a
+    /// bidi-split `٪٤`. Other characters stay.
     pub fn map_str(self, s: &str) -> String {
         if self != Self::Eastern {
             return s.to_string();
@@ -58,9 +61,28 @@ impl ClockDigits {
             .map(|c| {
                 if let Some(d) = c.to_digit(10) {
                     Self::EASTERN[d as usize]
+                } else if c == '%' {
+                    '٪'
                 } else {
                     c
                 }
+            })
+            .collect()
+    }
+
+    /// Map Eastern digits and the Arabic percent sign in `s` back to
+    /// ASCII. Other characters stay.
+    pub fn western_str(s: &str) -> String {
+        s.chars()
+            .map(|c| {
+                if c == '٪' {
+                    return '%';
+                }
+                Self::EASTERN
+                    .iter()
+                    .position(|&e| e == c)
+                    .and_then(|d| char::from_digit(d as u32, 10))
+                    .unwrap_or(c)
             })
             .collect()
     }
@@ -129,6 +151,22 @@ pub fn align_end(dir: Direction) -> iced::Alignment {
     match dir {
         Direction::Ltr => iced::Alignment::End,
         Direction::Rtl => iced::Alignment::Start,
+    }
+}
+
+/// Horizontal start for iced `text_input` placeholder and value.
+///
+/// iced `align_x` takes physical Left/Right. This is the start edge.
+///
+/// ```
+/// use icedtea::i18n::{align_x_start, Direction};
+/// assert_eq!(align_x_start(Direction::Ltr), iced::alignment::Horizontal::Left);
+/// assert_eq!(align_x_start(Direction::Rtl), iced::alignment::Horizontal::Right);
+/// ```
+pub fn align_x_start(dir: Direction) -> iced::alignment::Horizontal {
+    match dir {
+        Direction::Ltr => iced::alignment::Horizontal::Left,
+        Direction::Rtl => iced::alignment::Horizontal::Right,
     }
 }
 
@@ -429,8 +467,11 @@ mod tests {
         assert_eq!(ClockDigits::for_lang("fa-IR"), ClockDigits::Eastern);
         assert_eq!(ClockDigits::for_lang("ur"), ClockDigits::Eastern);
         assert_eq!(ClockDigits::for_lang("en"), ClockDigits::Western);
-        assert_eq!(ClockDigits::Eastern.map_str("40% · 1 min"), "٤٠% · ١ min");
+        assert_eq!(ClockDigits::Eastern.map_str("40% · 1 min"), "٤٠٪ · ١ min");
         assert_eq!(ClockDigits::Western.map_str("40%"), "40%");
+        assert_eq!(ClockDigits::western_str("٩٠%"), "90%");
+        assert_eq!(ClockDigits::western_str("٩٠٪"), "90%");
+        assert_eq!(ClockDigits::western_str("100%"), "100%");
         assert_eq!(direction_for("fa-IR"), Direction::Rtl);
         assert_eq!(direction_for("ur"), Direction::Rtl);
         assert_eq!(direction_for(""), Direction::Ltr);
@@ -455,6 +496,14 @@ mod tests {
         assert_eq!(align_start(Direction::Rtl), iced::Alignment::End);
         assert_eq!(align_end(Direction::Ltr), iced::Alignment::End);
         assert_eq!(align_end(Direction::Rtl), iced::Alignment::Start);
+        assert_eq!(
+            align_x_start(Direction::Ltr),
+            iced::alignment::Horizontal::Left
+        );
+        assert_eq!(
+            align_x_start(Direction::Rtl),
+            iced::alignment::Horizontal::Right
+        );
         assert_eq!(inline_pad(Direction::Ltr, 8.0, 12.0), (8.0, 12.0));
         assert_eq!(inline_pad(Direction::Rtl, 8.0, 12.0), (12.0, 8.0));
     }

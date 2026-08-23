@@ -73,8 +73,9 @@ Constructor: [`widget::group_box`](https://docs.rs/icedtea/latest/icedtea/widget
 [source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Same constructor as group-box. `CardFace` is elevated, filled, or
-outlined. Empty title is a border only.
+Same constructor as group-box. `CardFace` is elevated, filled,
+outlined, or rail (inset start rail and a label gutter). An optional
+trailing child sits on the header end. Empty title is a border only.
 
 Pass `A11y`.
 

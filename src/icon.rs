@@ -424,6 +424,11 @@ impl Icon {
         self.svg().as_bytes()
     }
 
+    /// Horizontal arrows that flip with the window (Firefox directional icons).
+    pub fn flips_rtl(self) -> bool {
+        matches!(self, Self::Chevron | Self::Back)
+    }
+
     pub fn from_slug(slug: &str) -> Option<Self> {
         match slug {
             "close" => Some(Self::Close),
@@ -556,6 +561,13 @@ impl Glyph {
         match self {
             Self::Named(icon) => icon.bytes(),
             Self::Bytes(bytes) => bytes,
+        }
+    }
+
+    pub fn flips_rtl(self) -> bool {
+        match self {
+            Self::Named(icon) => icon.flips_rtl(),
+            Self::Bytes(_) => false,
         }
     }
 }

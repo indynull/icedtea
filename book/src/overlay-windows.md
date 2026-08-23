@@ -4,6 +4,8 @@
 window. `icedtea::run!` starts iced's application builder and ends
 when the last window closes. `icedtea::daemon!` starts `iced::daemon`
 with the same `Prepared` settings and stays up with no window mapped.
+`view` and `theme` receive the window id, so an overlay can use a
+transparent canvas while a desktop window stays opaque.
 `Prepared::open` maps the overlay; `Prepared::open_desktop` maps a
 decorated pop-out after `window::retarget`. Quit with `iced::exit`.
 `Boot::size(w, h)` is the inner size; there is no 720x480 maximum.

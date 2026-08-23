@@ -31,19 +31,39 @@ pub enum Elevation {
 }
 
 impl Elevation {
+    /// Material resting height in dp (snapshot `styles/elevation`).
+    pub fn dp(self) -> f32 {
+        match self {
+            Self::Level0 | Self::Flat => 0.0,
+            Self::Level1 => 1.0,
+            Self::Level2 | Self::Raised => 3.0,
+            Self::Level3 => 6.0,
+            Self::Level4 => 8.0,
+            Self::Level5 => 12.0,
+        }
+    }
+
+    /// One Material hover/focus step (level + 1, capped at 5).
+    pub fn raise(self) -> Self {
+        match self {
+            Self::Level0 | Self::Flat => Self::Level1,
+            Self::Level1 => Self::Level2,
+            Self::Level2 | Self::Raised => Self::Level3,
+            Self::Level3 => Self::Level4,
+            Self::Level4 | Self::Level5 => Self::Level5,
+        }
+    }
+
     pub fn shadow(self) -> Shadow {
-        let e = match self {
-            Self::Flat | Self::Level0 => Self::Level0,
-            Self::Raised => Self::Level2,
-            other => other,
-        };
-        let (blur, y, a) = match e {
+        let (blur, y, a) = match self {
             Self::Level0 | Self::Flat => (0.0, 0.0, 0.0),
-            Self::Level1 => (2.0, 1.0, 0.15),
-            Self::Level2 | Self::Raised => (4.0, 2.0, 0.18),
-            Self::Level3 => (8.0, 4.0, 0.20),
-            Self::Level4 => (12.0, 6.0, 0.22),
-            Self::Level5 => (16.0, 8.0, 0.24),
+            // Offset y is the snapshot dp height. Blur and alpha are the
+            // desktop paint so Level1 is visible on a dark surface.
+            Self::Level1 => (3.0, 1.0, 0.32),
+            Self::Level2 | Self::Raised => (6.0, 3.0, 0.30),
+            Self::Level3 => (12.0, 6.0, 0.28),
+            Self::Level4 => (16.0, 8.0, 0.26),
+            Self::Level5 => (24.0, 12.0, 0.24),
         };
         Shadow {
             color: Color::from_rgba(0.0, 0.0, 0.0, a),
@@ -53,12 +73,7 @@ impl Elevation {
     }
 
     pub fn surface(self, scheme: Scheme) -> Color {
-        let e = match self {
-            Self::Flat => Self::Level0,
-            Self::Raised => Self::Level2,
-            other => other,
-        };
-        match e {
+        match self {
             Self::Level0 | Self::Flat => scheme.surface,
             Self::Level1 => scheme.surface_container_low,
             Self::Level2 | Self::Raised => scheme.surface_container,
@@ -83,10 +98,29 @@ mod tests {
         assert_eq!(Elevation::Level3.surface(s), s.surface_container_high);
         assert_eq!(Elevation::Level4.surface(s), s.surface_container_highest);
         assert_eq!(Elevation::Level5.surface(s), s.surface_container_highest);
+        assert_eq!(Elevation::Level0.dp(), 0.0);
+        assert_eq!(Elevation::Level1.dp(), 1.0);
+        assert_eq!(Elevation::Level2.dp(), 3.0);
+        assert_eq!(Elevation::Level3.dp(), 6.0);
+        assert_eq!(Elevation::Level4.dp(), 8.0);
+        assert_eq!(Elevation::Level5.dp(), 12.0);
         assert_eq!(Elevation::Level0.shadow().blur_radius, 0.0);
+        assert_eq!(Elevation::Flat.shadow().blur_radius, 0.0);
         assert!(Elevation::Level1.shadow().blur_radius > 0.0);
+        assert!(Elevation::Level1.shadow().color.a >= 0.28);
+        assert_ne!(
+            Elevation::Level1.shadow().blur_radius,
+            Elevation::Flat.shadow().blur_radius
+        );
+        assert_eq!(Elevation::Level1.shadow().offset.y, 1.0);
+        assert_eq!(Elevation::Level2.shadow().offset.y, 3.0);
+        assert_eq!(Elevation::Level3.shadow().offset.y, 6.0);
         assert!(Elevation::Raised.shadow().blur_radius > 0.0);
         assert!(Elevation::Level5.shadow().blur_radius >= Elevation::Level3.shadow().blur_radius);
+        assert_eq!(Elevation::Level1.raise(), Elevation::Level2);
+        assert_eq!(Elevation::Level2.raise(), Elevation::Level3);
+        assert_eq!(Elevation::Level5.raise(), Elevation::Level5);
+        assert_eq!(Elevation::Level0.raise(), Elevation::Level1);
         let _ = Elevation::Level4.shadow();
         assert_eq!(ElevationPolicy::default(), ElevationPolicy::Desktop);
     }

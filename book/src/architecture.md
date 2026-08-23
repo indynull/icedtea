@@ -18,7 +18,8 @@ A window is a loop you write in Rust:
 
 [`Boot`](https://docs.rs/icedtea/latest/icedtea/app/struct.Boot.html)
 sets title, application id, theme name, locale, density, type scale,
-shape, elevation, and window kind: application, dialog, or overlay.
+shape, elevation, window kind (application, dialog, or overlay),
+transparent buffer, and client decorations.
 `Catalog::for_locale` fills chrome strings for that locale (English,
 Vietnamese, Japanese, Chinese, Arabic, Urdu).
 [`run!`](https://docs.rs/icedtea/latest/icedtea/macro.run.html) loads
@@ -26,6 +27,8 @@ that and starts iced.
 [`daemon!`](https://docs.rs/icedtea/latest/icedtea/macro.daemon.html)
 uses the same [`Prepared`](https://docs.rs/icedtea/latest/icedtea/app/struct.Prepared.html)
 settings when the process must stay up with no window mapped.
+A desktop shell is that daemon plus `Boot` knobs and `workspace`
+leaf headers — the same constructors a single-window tool calls.
 [`bootstrap`](https://docs.rs/icedtea/latest/icedtea/app/fn.bootstrap.html)
 is that path without opening a window.
 

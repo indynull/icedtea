@@ -24,6 +24,7 @@ just gallery-qa     # visual QA (shots under tmp/gallery-qa/); see .grok/skills/
 just gallery-gif    # recapture assets/gallery.gif when the gallery shell changes
 just book-stills    # recapture book/src/images/ constructor stills
 just material-symbols  # fetch Material Symbols Sharp for Glyph::Bytes
+just material-snapshot  # Material spec pages for gallery QA
 ```
 
 ## Tree
@@ -104,7 +105,11 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   stays one line; markdown, code wrap-on, cards, and job/hint wrap.
 - Never Fill+align `text` inside an iced 0.14 `button` (drops
   right-to-left glyphs). Shrink the title or wrap shrink text in a
-  fill container.
+  fill container. Page titles: `i18n::order` plus a filling spacer.
+  `meta` stays shrink (look-strip rows sit it next to a pick). The
+  column that holds a caption beside a Fill control must
+  `align_x(align_start)`, or the caption lands on physical left and
+  the page looks empty. Form labels: Fixed gutter plus `align_start`.
 - Key order: an open modal consumes (even if a field is focused);
   otherwise focused text owns unmodified typing; otherwise
   `key::handle` matches the action table. `ctrl` in a shortcut is the
@@ -124,7 +129,14 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
 - One path per feature. Pick it and delete the other. Fallbacks re-grow.
 - Always vary a constructor’s painted look with a `*Face` enum on that
   same call (`RowFace`, `CardFace`, `FieldFace`, `TreeFace`). Never a
-  second catalog widget or a stylesheet for the same job.
+  second catalog widget or a stylesheet for the same job. Prefer a new
+  face on an existing constructor over a new catalog id.
+- Always add a constructor when a shipping application needs the
+  paint and the function names a **job** any icedtea application
+  could call (a face, a chrome row, a window knob). Product protocol
+  and store stay in the application. The first-window example is a
+  compact compose of those jobs; it is not the filter for what the
+  library may grow.
 - Always size chrome pad and inter-item gap from `Tokens.density`
   (`Density::gap`, `Density::inset`, `pad` on the control face).
   `ControlSize` Compact and Comfortable stay explicit per-control
@@ -138,7 +150,11 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   document copy is `copy_text` on `MarkdownDoc::source`. Contract:
   `select` module rustdoc. Gallery demos only public constructors.
 - Always recapture handbook stills with `just book-stills` in the same change when the painted constructor or chrome in a published still changes. Update `.grok/skills/gallery-qa/references/visual.md` in that change (still path + idle must-show). Never hand-edit those PNGs or generate them.
-- Never put tour GIFs, handbook stills, or `book/` in the crate `include`. Icons and `assets/themes/catalog.json` are compiled in. `gallery.gif` stays in git for README; the guide is GitHub Pages. crates.io cap is 10 MiB.
+- Always score gallery paint by reading the `visual.md` still then the captured shot. Never treat `SCORE.md`, a constructor-body substring (`include_str`, `contains("i18n::order")`), leftover-English source lists, or a generated image as the visual pass. Never call `image_gen` during gallery QA.
+- Never run `just gallery-qa --backend host` from an agent session. Capture on Xephyr. Host activates the window and moves the pointer on their seat.
+- Never put tour GIFs, handbook stills, or `book/` in the crate `include`. Icons and `assets/themes/catalog.json` are compiled in. `gallery.gif` stays in git for README as the last tagged tour; the guide is GitHub Pages. crates.io cap is 10 MiB.
+- Always record the README/handbook tour with `just gallery-gif` (writes `tmp/gallery.gif`). Score that local file after a paint change. Never commit it, and never commit `assets/gallery.gif` or `book/src/gallery.gif`, except when tagging a version: `just gallery-gif persist` then include those two paths in `Update changelog for X.Y.Z`.
+- Always take window size, decorations, transparency, and kind from iced `window::Settings` on `Boot`. Never add a second renderer or a Smithay client loop in the widget crate. Layer-shell waits on iced; a later `host*` opener is allowed only if iced still cannot and another application needs that role (same isolation as native dialogs). Never host another client’s Wayland surface (that is the web-view non-goal). Product protocol (accounts, sessions, host services) stays in the application.
 - Always drop `target/llvm-cov-target` after a passing local coverage
   run. `just clean` is `cargo clean`. Only `just cov` and the test jobs
   set `CARGO_INCREMENTAL=0`. Targeted `cargo test` /
@@ -208,8 +224,8 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   constructors an app would call—same messages, tokens, and A11y.
   Never stage dual-pane or other glue that invents a path the library
   does not ship.
-- Always use one first-path program (`examples/hello.rs`) that is a
-  tiny Save tool: `file.save`, toolbar, filling editor, status.
+- Always use one first-path program (`examples/hello.rs`): one
+  `Action`, chrome that consumes the table, a filling editor, status.
   README, crate-root, and First window include that program. Never
   lead with a counter.
 - Never put maintainer process (coverage fail-under, publish pipeline,
@@ -223,7 +239,7 @@ resize, or keyboard key enums to finish. The gallery is the document
 shell; the README pad is the tool-sized window.
 
 When generating an icedtea application: start from `examples/hello.rs`
-(Save, toolbar, editor, status). A list plus an on-disk SQLite file
+(one Action, chrome, editor, status). A list plus an on-disk SQLite file
 is `book/src/cookbook/tasks.md` and `examples/tasks.rs`. Constructors
 return `Element`s and emit the application's messages. The application
 owns state and any database. Do not add a second renderer, a
@@ -243,8 +259,11 @@ Rejected alternatives live once under Non-goals below. Do not add a
 - Multiple-document-interface window mosaics.
 - Binding the look to one desktop shell. Themes may follow system
   light/dark; chrome stays icedtea’s.
-- Domain widgets for a specific product (session timelines, containers,
-  editors' language services). Applications own those.
+- Domain widgets that own a product protocol or store (session
+  timelines, language services, mail accounts, host services).
+  Applications own those. A face, header slot, or window knob a
+  second app would call is library chrome even if one application
+  asked first.
 - Document undo/redo. Applications own history.
 - Gallery copy and sample bitmaps as library API.
 - A second collection widget for variable-height cards. Extend list.

@@ -2,6 +2,10 @@
 
 icedtea maps its design system to
 [Material Design 3](https://m3.material.io/get-started).
+A dated snapshot of the spec pages used in gallery QA lives in
+`.grok/skills/gallery-qa/references/material/` (`just material-snapshot`).
+Applying a new number into `src/m3` is a human edit after reading that
+snapshot.
 
 ## Color roles
 
@@ -54,8 +58,12 @@ on `Tokens` picks the map:
 
 Switch thumbs stay circular via geometry. Tracks use `Component::Track`.
 `m3::Elevation` uses tonal surface containers plus optional shadow.
-[`ElevationPolicy::Flat`](https://docs.rs/icedtea/latest/icedtea/m3/enum.ElevationPolicy.html)
+Resting heights match the Material table (0 / 1 / 3 / 6 / 8 / 12 dp).
+Desktop Level 1 is a visible drop. Elevated buttons raise one level
+on hover. [`ElevationPolicy::Flat`](https://docs.rs/icedtea/latest/icedtea/m3/enum.ElevationPolicy.html)
 drops the shadow; surfaces stay on their tonal container.
+The shape scale is the ten Material steps (0 / 4 / 8 / 12 / 16 / 20 /
+28 / 32 / 48 dp) plus Full.
 
 ## Density
 

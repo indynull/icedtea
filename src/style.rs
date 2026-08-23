@@ -369,7 +369,16 @@ fn button_face(
         }
         Variant::Elevated => {
             let (bg, fg) = face(s.surface_container_high, s.primary, surface, state);
-            (bg, fg, pill, tok.shadow(crate::m3::Elevation::Level1))
+            let level = crate::m3::Elevation::Level1;
+            let level = if matches!(
+                state,
+                ControlState::Hovered | ControlState::Pressed | ControlState::Focused
+            ) {
+                level.raise()
+            } else {
+                level
+            };
+            (bg, fg, pill, tok.shadow(level))
         }
     }
 }
@@ -573,6 +582,16 @@ pub fn field_style(
     tok: Tokens,
     outlined: bool,
 ) -> impl Fn(&iced::Theme, text_input::Status) -> text_input::Style {
+    field_style_paint(tok, outlined, false)
+}
+
+/// Same as [`field_style`]. `hide_value` clears the iced value ink so a
+/// field can paint [`crate::widget::FieldRun`]s over the typed text.
+pub fn field_style_paint(
+    tok: Tokens,
+    outlined: bool,
+    hide_value: bool,
+) -> impl Fn(&iced::Theme, text_input::Status) -> text_input::Style {
     move |_theme, status| {
         let s = tok.scheme();
         let (border_color, width) = match status {
@@ -598,9 +617,13 @@ pub fn field_style(
             },
             icon: s.on_surface_variant,
             placeholder: s.on_surface_variant,
-            value: match status {
-                text_input::Status::Disabled => layer_on(s.surface, s.on_surface, 0.38),
-                _ => s.on_surface,
+            value: if hide_value {
+                Color::TRANSPARENT
+            } else {
+                match status {
+                    text_input::Status::Disabled => layer_on(s.surface, s.on_surface, 0.38),
+                    _ => s.on_surface,
+                }
             },
             selection: s.secondary_container,
         }
@@ -609,6 +632,15 @@ pub fn field_style(
 
 /// M3 filled text field (surface container highest, outline, primary focus).
 pub fn search_style(tok: Tokens) -> impl Fn(&iced::Theme, text_input::Status) -> text_input::Style {
+    search_style_paint(tok, false)
+}
+
+/// Same as [`search_style`]. `hide_value` clears the iced value ink so a
+/// field can paint [`crate::widget::FieldRun`]s over the typed text.
+pub fn search_style_paint(
+    tok: Tokens,
+    hide_value: bool,
+) -> impl Fn(&iced::Theme, text_input::Status) -> text_input::Style {
     move |_theme, status| {
         let s = tok.scheme();
         let (border_color, width) = match status {
@@ -630,9 +662,13 @@ pub fn search_style(tok: Tokens) -> impl Fn(&iced::Theme, text_input::Status) ->
             },
             icon: s.on_surface_variant,
             placeholder: s.on_surface_variant,
-            value: match status {
-                text_input::Status::Disabled => layer_on(s.surface, s.on_surface, 0.38),
-                _ => s.on_surface,
+            value: if hide_value {
+                Color::TRANSPARENT
+            } else {
+                match status {
+                    text_input::Status::Disabled => layer_on(s.surface, s.on_surface, 0.38),
+                    _ => s.on_surface,
+                }
             },
             selection: s.secondary_container,
         }
@@ -796,18 +832,30 @@ pub fn switch_style(tok: Tokens) -> impl Fn(&iced::Theme, toggler::Status) -> to
 }
 
 pub fn slider_style(tok: Tokens) -> impl Fn(&iced::Theme, slider::Status) -> slider::Style {
+    slider_style_rail(tok, false)
+}
+
+/// Iced paints the first rail color from physical left to the handle.
+/// Horizontal RTL sliders invert the value and swap these so fill
+/// comes from start.
+pub(crate) fn slider_style_rail(
+    tok: Tokens,
+    rtl_horizontal: bool,
+) -> impl Fn(&iced::Theme, slider::Status) -> slider::Style {
     move |_theme, status| {
         let s = tok.scheme();
         let handle_r = match status {
             slider::Status::Active => 10.0,
             slider::Status::Hovered | slider::Status::Dragged => 12.0,
         };
+        let (head, tail) = if rtl_horizontal {
+            (s.surface_container_highest, s.primary)
+        } else {
+            (s.primary, s.surface_container_highest)
+        };
         slider::Style {
             rail: slider::Rail {
-                backgrounds: (
-                    Background::Color(s.primary),
-                    Background::Color(s.surface_container_highest),
-                ),
+                backgrounds: (Background::Color(head), Background::Color(tail)),
                 width: 4.0,
                 border: Border {
                     color: Color::TRANSPARENT,
@@ -961,6 +1009,25 @@ mod tests {
             let light_msg = format!("{v:?}: disabled ink vanishes on light canvas");
             assert!((ink - light_canvas).abs() > 0.15, "{light_msg}");
         }
+    }
+
+    #[test]
+    fn elevated_button_raises_one_level_on_hover() {
+        let tok = named("dark").tokens;
+        let theme = crate::theme::iced_theme("dark", tok);
+        let st = button_style(tok, Variant::Elevated);
+        let rest = st(&theme, button::Status::Active);
+        let hover = st(&theme, button::Status::Hovered);
+        assert_eq!(
+            rest.shadow.blur_radius,
+            tok.shadow(crate::m3::Elevation::Level1).blur_radius
+        );
+        assert_eq!(
+            hover.shadow.blur_radius,
+            tok.shadow(crate::m3::Elevation::Level1.raise()).blur_radius
+        );
+        assert!(hover.shadow.blur_radius > rest.shadow.blur_radius);
+        assert!(rest.shadow.blur_radius > 0.0);
     }
 
     #[test]
@@ -1236,6 +1303,14 @@ mod tests {
         assert_eq!(sw.border_radius.map(|r| r.top_left), Some(0.0));
         let sl = slider_style(tok)(&theme, slider::Status::Active);
         assert_eq!(sl.rail.border.radius.top_left, 0.0);
+        let s = tok.scheme();
+        let ltr = slider_style_rail(tok, false)(&theme, slider::Status::Active);
+        let rtl = slider_style_rail(tok, true)(&theme, slider::Status::Active);
+        assert_eq!(ltr.rail.backgrounds.0, Background::Color(s.primary));
+        assert_eq!(
+            rtl.rail.backgrounds.0,
+            Background::Color(s.surface_container_highest)
+        );
         assert_eq!(progress_style(tok)(&theme).border.radius.top_left, 0.0);
         let material = tok.with_shape(crate::m3::ShapePolicy::Material);
         let mtheme = crate::theme::iced_theme("dark", material);
