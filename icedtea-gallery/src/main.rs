@@ -6260,13 +6260,8 @@ impl Gallery {
                 tok,
                 named("pages", Role::Group),
             ),
-            "card" => column![
-                widget::meta(
-                    self.catalog.t("hint.card"),
-                    tok,
-                    named("card-hint", Role::Status),
-                ),
-                row![
+            "card" => {
+                let document: Element<'_, Message> =
                     icedtea::iced::widget::container(icedtea::widget::group_box(
                         self.catalog.t("hint.document"),
                         column![
@@ -6309,7 +6304,7 @@ impl Gallery {
                                 Variant::Quiet,
                                 Icons::NONE,
                                 ButtonOpts::SHRINK,
-                                btn(self.catalog.t("open"))
+                                btn(self.catalog.t("open")),
                             ),
                         ]
                         .spacing(8)
@@ -6326,28 +6321,42 @@ impl Gallery {
                             named("card-saved", Role::Status),
                         )),
                     ))
-                    .width(Length::FillPortion(1)),
+                    .width(Length::Fill)
+                    .into();
+                let empty: Element<'_, Message> =
                     icedtea::iced::widget::container(icedtea::widget::group_box(
                         self.catalog.t("card.empty"),
                         widget::meta(
                             self.catalog.t("hint.no-items"),
                             tok,
-                            named("empty-card", Role::Status)
+                            named("empty-card", Role::Status),
                         ),
                         tok,
                         CardFace::Outlined,
                         named("empty-card-box", Role::Group),
                         None,
                     ))
-                    .width(Length::FillPortion(1)),
+                    .width(Length::Fill)
+                    .into();
+                let mut pair = icedtea::iced::widget::Row::new()
+                    .spacing(12)
+                    .width(Length::Fill);
+                for kid in order(tok.direction, [document, empty]) {
+                    pair = pair.push(kid);
+                }
+                column![
+                    widget::meta(
+                        self.catalog.t("hint.card"),
+                        tok,
+                        named("card-hint", Role::Status),
+                    ),
+                    pair,
                 ]
                 .spacing(12)
-                .width(Length::Fill),
-            ]
-            .spacing(12)
-            .width(Length::Fill)
-            .align_x(icedtea::i18n::align_start(tok.direction))
-            .into(),
+                .width(Length::Fill)
+                .align_x(icedtea::i18n::align_start(tok.direction))
+                .into()
+            }
             "rule" => widget::rule_h(tok, named("rule", Role::Separator)),
             "chip" => column![
                 widget::meta(
@@ -6801,36 +6810,39 @@ impl Gallery {
             .align_x(icedtea::i18n::align_start(tok.direction))
             .into(),
             "dialogs" => {
-                let mut actions = row![
-                    widget::button(
-                        self.catalog.t("dialog.open-ellipsis"),
-                        Some(Message::FileOpen),
-                        tok,
-                        Variant::Quiet,
-                        Icons::NONE,
-                        ButtonOpts::SHRINK,
-                        btn(self.catalog.t("open"))
-                    ),
-                    widget::button(
-                        self.catalog.t("dialog.save-ellipsis"),
-                        Some(Message::FileSave),
-                        tok,
-                        Variant::Primary,
-                        Icons::NONE,
-                        ButtonOpts::SHRINK,
-                        btn(self.catalog.t("save"))
-                    ),
-                    widget::button(
-                        self.catalog.t("dialog.folder"),
-                        Some(Message::Folder),
-                        tok,
-                        Variant::Quiet,
-                        Icons::NONE,
-                        ButtonOpts::SHRINK,
-                        btn(self.catalog.t("dialog.folder"))
-                    ),
-                ]
-                .spacing(8);
+                let mut actions = dir_row(
+                    tok.direction,
+                    8.0,
+                    [
+                        widget::button(
+                            self.catalog.t("dialog.open-ellipsis"),
+                            Some(Message::FileOpen),
+                            tok,
+                            Variant::Quiet,
+                            Icons::NONE,
+                            ButtonOpts::SHRINK,
+                            btn(self.catalog.t("open")),
+                        ),
+                        widget::button(
+                            self.catalog.t("dialog.save-ellipsis"),
+                            Some(Message::FileSave),
+                            tok,
+                            Variant::Primary,
+                            Icons::NONE,
+                            ButtonOpts::SHRINK,
+                            btn(self.catalog.t("save")),
+                        ),
+                        widget::button(
+                            self.catalog.t("dialog.folder"),
+                            Some(Message::Folder),
+                            tok,
+                            Variant::Quiet,
+                            Icons::NONE,
+                            ButtonOpts::SHRINK,
+                            btn(self.catalog.t("dialog.folder")),
+                        ),
+                    ],
+                );
                 let progress = Self::anim_progress(&self.dialog_anim);
                 if !self.dialog_open && progress <= 0.01 {
                     actions = actions.push(widget::button(

@@ -1329,10 +1329,10 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let title = title.into();
     let body = body.into();
-    // M3 dialog: extra, cancel (text) then confirm (filled), trailing edge.
-    let mut actions = Row::new().spacing(tok.density.gap());
+    // M3 dialog: extra, cancel (text) then confirm (filled), toward the end.
+    let mut acts: Vec<Element<'a, M>> = Vec::new();
     for (t, m) in extra {
-        actions = actions.push(button(
+        acts.push(button(
             t.clone(),
             Some(m),
             tok,
@@ -1343,7 +1343,7 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
         ));
     }
     if let Some((t, m)) = cancel {
-        actions = actions.push(button(
+        acts.push(button(
             t.clone(),
             Some(m),
             tok,
@@ -1353,7 +1353,7 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
             A11y::button(t),
         ));
     }
-    actions = actions.push(button(
+    acts.push(button(
         accept.0.clone(),
         Some(accept.1),
         tok,
@@ -1362,20 +1362,22 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
         ButtonOpts::SHRINK,
         A11y::button(accept.0),
     ));
+    let mut actions = Row::new().spacing(tok.density.gap());
+    for el in order(tok.direction, acts) {
+        actions = actions.push(el);
+    }
     let actions = container(actions)
         .width(Length::Fill)
         .align_x(crate::i18n::align_end(tok.direction));
-    let mut head = Row::new()
-        .spacing(tok.density.gap())
-        .align_y(Alignment::Center);
+    let mut head_parts: Vec<Element<'a, M>> = Vec::new();
     if let Some(ic) = icon {
-        head = head.push(crate::widget::icon_svg(
+        head_parts.push(crate::widget::icon_svg(
             ic,
             tok,
             A11y::new(title.clone(), Role::Image),
         ));
     }
-    head = head.push(crate::a11y::attach(
+    head_parts.push(crate::a11y::attach(
         text(title.clone())
             .size(tok.title())
             .font(typo::UI_BOLD)
@@ -1383,6 +1385,12 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
             .into(),
         &A11y::new(title.clone(), Role::Header),
     ));
+    let mut head = Row::new()
+        .spacing(tok.density.gap())
+        .align_y(Alignment::Center);
+    for el in order(tok.direction, head_parts) {
+        head = head.push(el);
+    }
     crate::a11y::attach(
         container(
             column![
@@ -2329,6 +2337,64 @@ mod tests {
             tok,
         );
         draw_once(&mut dlg);
+    }
+
+    #[test]
+    fn dialog_sheet_puts_confirm_on_the_end() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+        fn action_widths(el: &mut Element<'_, ()>) -> Vec<f32> {
+            let mut tree = Tree::new(el.as_widget());
+            let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+                Font::DEFAULT,
+                Pixels::from(16u32),
+            ));
+            let limits = Limits::new(Size::ZERO, Size::new(480.0, 240.0));
+            let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+            let layout = Layout::new(&node);
+            let mut boxes = Vec::new();
+            fn walk(layout: Layout<'_>, boxes: &mut Vec<iced::Rectangle>) {
+                boxes.push(layout.bounds());
+                for child in layout.children() {
+                    walk(child, boxes);
+                }
+            }
+            walk(layout, &mut boxes);
+            let mut row: Vec<_> = boxes
+                .into_iter()
+                .filter(|b| b.height > 24.0 && b.height < 48.0 && b.width > 36.0 && b.width < 180.0)
+                .collect();
+            row.sort_by(|a, b| a.x.partial_cmp(&b.x).unwrap());
+            row.into_iter().map(|b| b.width).collect()
+        }
+        let ltr = crate::theme::named("dark").tokens;
+        let rtl = ltr.with_direction(crate::i18n::Direction::Rtl);
+        let mk = |tok| {
+            dialog_sheet(
+                "Save",
+                "Overwrite?",
+                ("Save".into(), ()),
+                Some(("Cancel".into(), ())),
+                [("Don't save".into(), ())],
+                None,
+                tok,
+            )
+        };
+        let ltr_w = action_widths(&mut mk(ltr));
+        let rtl_w = action_widths(&mut mk(rtl));
+        assert!(
+            ltr_w.len() >= 3 && rtl_w.len() >= 3,
+            "dialog actions ltr={ltr_w:?} rtl={rtl_w:?}"
+        );
+        assert!(
+            ltr_w[0] > ltr_w[ltr_w.len() - 1],
+            "LTR extra (Don't save) is on start, confirm on end: {ltr_w:?}"
+        );
+        assert!(
+            rtl_w[0] < rtl_w[rtl_w.len() - 1],
+            "RTL confirm (Save) is on end (left): {rtl_w:?}"
+        );
     }
 
     #[test]

@@ -27,6 +27,9 @@
 
 ### Bug fix
 
+- `dialog_sheet` sits extra, cancel, then confirm toward the end, so
+  Save is on the left of a right-to-left card.
+- Marks document and empty cards follow window direction.
 - `search_input` paints the clear mark only when `on_clear` is set
   and the value is non-empty.
 - Elevation Level 1 is a visible drop on dark Desktop.
