@@ -64,10 +64,12 @@ book-serve:
 gallery-qa *args:
     python3 scripts/gallery_qa.py {{args}}
 
-# Ship README/book tour GIF: live pointer demo (click, type, wheel, inject).
+# Local tour GIF under tmp/ (gitignored). Persist on a version tag.
+#   just gallery-gif
+#   just gallery-gif persist
 # ICEDTEA_GALLERY_ISOLATED=0 uses the current display.
-gallery-gif:
-    bash scripts/gallery-gif.sh
+gallery-gif *args:
+    bash scripts/gallery-gif.sh {{args}}
 
 # Recapture handbook constructor stills into book/src/images/.
 # Same Xephyr path as gallery-qa. Does not invent screenshots.
@@ -79,3 +81,10 @@ book-stills *args:
 #   just material-symbols --self-test
 material-symbols *args:
     python3 scripts/material_symbols.py {{args}}
+
+# Snapshot Material Design 3 spec pages for gallery QA.
+#   just material-snapshot
+#   just material-snapshot --check
+# Writes .grok/skills/gallery-qa/references/material/
+material-snapshot *args:
+    python3 scripts/material_snapshot.py {{args}}

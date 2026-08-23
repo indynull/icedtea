@@ -1,0 +1,144 @@
+{
+  "fetched_at": "2026-08-23T13:14:01Z",
+  "carbon_version": "2026-08-19_06-10-14",
+  "bundle": "https://m3.material.io/static/angular/main.4dfe169d936f254a.js",
+  "site": "https://m3.material.io",
+  "pages": [
+    {
+      "slug": "styles/elevation",
+      "url": "https://m3.material.io/styles/elevation",
+      "file": "pages/styles__elevation.md",
+      "sha256": "60c3c5438ab4d16eb398ee890052061c3ca51c67ad040895da87dcb09ac0f92c",
+      "title": "Elevation",
+      "updated": "2026-07-17T05:03:59.318Z"
+    },
+    {
+      "slug": "styles/shape",
+      "url": "https://m3.material.io/styles/shape",
+      "file": "pages/styles__shape.md",
+      "sha256": "21ed653b4fd934f00d0adf9f8bfe83a4412f6ee7de2257fa27d9d3b0309324a6",
+      "title": "Shape",
+      "updated": "2026-07-17T05:28:54.725Z"
+    },
+    {
+      "slug": "styles/spacing",
+      "url": "https://m3.material.io/styles/spacing",
+      "file": "pages/styles__spacing.md",
+      "sha256": "2515f4d24eb26e5d79da0a24acee7b3d770125125182235bc712298faecd46c0",
+      "title": "Spacing",
+      "updated": "2026-07-17T05:30:24.800Z"
+    },
+    {
+      "slug": "styles/typography",
+      "url": "https://m3.material.io/styles/typography",
+      "file": "pages/styles__typography.md",
+      "sha256": "2e79e71513f3373e2c5deb9f8a743bd4a184d41c05138bdea72e0f7b51192851",
+      "title": "Typography",
+      "updated": "2026-08-10T14:59:40.852Z"
+    },
+    {
+      "slug": "styles/color/roles",
+      "url": "https://m3.material.io/styles/color/roles",
+      "file": "pages/styles__color__roles.md",
+      "sha256": "0c5463d0c561392692f4a2e2efa51c1c35bfb9d91444483d206fe4144c30d8a4",
+      "title": "Color roles",
+      "updated": "2026-07-27T13:48:22.900Z"
+    },
+    {
+      "slug": "styles/motion/overview",
+      "url": "https://m3.material.io/styles/motion/overview",
+      "file": "pages/styles__motion__overview.md",
+      "sha256": "06ac496b50793584671a5ea85418fb7ad759b092c9f5d9b3b611c8b32f9e7bf4",
+      "title": "Motion physics system",
+      "updated": "2026-07-17T05:25:55.367Z"
+    },
+    {
+      "slug": "styles/motion/easing-and-duration",
+      "url": "https://m3.material.io/styles/motion/easing-and-duration",
+      "file": "pages/styles__motion__easing-and-duration.md",
+      "sha256": "dc9846dbc409e0ef26c507b506116e6c29feb13a7841da02090c5197e30dd96c",
+      "title": "Easing and duration",
+      "updated": "2026-07-17T05:03:58.337Z"
+    },
+    {
+      "slug": "foundations/design-tokens",
+      "url": "https://m3.material.io/foundations/design-tokens",
+      "file": "pages/foundations__design-tokens.md",
+      "sha256": "a32b4ccdd7677fc186524705510ec34cd6feca58e72e93b0e225f6ced2c8bd10",
+      "title": "Design tokens",
+      "updated": "2026-07-17T05:01:46.434Z"
+    },
+    {
+      "slug": "foundations/interaction/states",
+      "url": "https://m3.material.io/foundations/interaction/states",
+      "file": "pages/foundations__interaction__states.md",
+      "sha256": "dfa716e56a24c132003cc99bb4cd19c30990ae8357b28b39f76bf5ff2dd3270e",
+      "title": "States",
+      "updated": "2026-07-17T05:30:22.307Z"
+    },
+    {
+      "slug": "foundations/layout/grids-spacing",
+      "url": "https://m3.material.io/foundations/layout/grids-spacing",
+      "file": "pages/foundations__layout__grids-spacing.md",
+      "sha256": "6fb858923eb3e36433bbaa57b4338622c10e86cc2137649714f39ddc2e6b61f8",
+      "title": "Grids &amp; spacing",
+      "updated": "2026-07-17T05:07:21.447Z"
+    },
+    {
+      "slug": "foundations/layout/bidirectionality-rtl",
+      "url": "https://m3.material.io/foundations/layout/bidirectionality-rtl",
+      "file": "pages/foundations__layout__bidirectionality-rtl.md",
+      "sha256": "b3c73b15a803f52f71894ccb235053f0d391e0ac701e1df28cd3cf2c90a6554d",
+      "title": "Bidirectionality &amp; RTL",
+      "updated": "2026-08-05T08:56:11.377Z"
+    },
+    {
+      "slug": "components/lists",
+      "url": "https://m3.material.io/components/lists",
+      "file": "pages/components__lists.md",
+      "sha256": "49bc6663334511b00e8e03ac24cfc1328bc43f2f1f2e550d0b8542a55601c8ae",
+      "title": "Lists",
+      "updated": "2026-08-06T17:09:16.197Z"
+    },
+    {
+      "slug": "components/menus",
+      "url": "https://m3.material.io/components/menus",
+      "file": "pages/components__menus.md",
+      "sha256": "28ad058a65b695de43bd57fff5a72d86ef295feae8e6d15b33f0717868a693cc",
+      "title": "Menus",
+      "updated": "2026-07-28T07:32:19.493Z"
+    },
+    {
+      "slug": "components/search",
+      "url": "https://m3.material.io/components/search",
+      "file": "pages/components__search.md",
+      "sha256": "359b585727ae9647cc46882475ab2c0af3aeb5ee3f53411eda28dd0df9c939ce",
+      "title": "Search",
+      "updated": "2026-07-27T04:04:05.736Z"
+    },
+    {
+      "slug": "components/text-fields",
+      "url": "https://m3.material.io/components/text-fields",
+      "file": "pages/components__text-fields.md",
+      "sha256": "900df12fd33b41111dd2ba0baf58b730d0c5c37cbbae2815cc2bdc87e24bde79",
+      "title": "Text fields",
+      "updated": "2026-07-30T05:18:12.451Z"
+    },
+    {
+      "slug": "components/buttons",
+      "url": "https://m3.material.io/components/buttons",
+      "file": "pages/components__buttons.md",
+      "sha256": "74a80d9f3074c5e053e748b30638c8fd3f321d258b65527259b64d79836372ef",
+      "title": "Buttons",
+      "updated": "2026-07-24T06:19:49.216Z"
+    },
+    {
+      "slug": "components/dialogs",
+      "url": "https://m3.material.io/components/dialogs",
+      "file": "pages/components__dialogs.md",
+      "sha256": "7c0822aaa362d1f5e67b3f6ababc1958396c58437d4ea0fcc38878ede0a32037",
+      "title": "Dialogs",
+      "updated": "2026-07-28T07:11:33.307Z"
+    }
+  ]
+}
