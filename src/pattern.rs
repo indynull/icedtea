@@ -2383,18 +2383,9 @@ mod tests {
         };
         let ltr_w = action_widths(&mut mk(ltr));
         let rtl_w = action_widths(&mut mk(rtl));
-        assert!(
-            ltr_w.len() >= 3 && rtl_w.len() >= 3,
-            "dialog actions ltr={ltr_w:?} rtl={rtl_w:?}"
-        );
-        assert!(
-            ltr_w[0] > ltr_w[ltr_w.len() - 1],
-            "LTR extra (Don't save) is on start, confirm on end: {ltr_w:?}"
-        );
-        assert!(
-            rtl_w[0] < rtl_w[rtl_w.len() - 1],
-            "RTL confirm (Save) is on end (left): {rtl_w:?}"
-        );
+        assert!(ltr_w.len() >= 3 && rtl_w.len() >= 3);
+        assert!(ltr_w[0] > ltr_w[ltr_w.len() - 1]);
+        assert!(rtl_w[0] < rtl_w[rtl_w.len() - 1]);
     }
 
     #[test]
@@ -2470,6 +2461,17 @@ mod tests {
         let body = label("x", tok, A11y::new("x", Role::Status));
         let scene = label("s", tok, A11y::new("s", Role::Status));
         let _: Element<'_, ()> = side_sheet(scene, "L", body, None, false, 100.0, 1.0, tok);
+        let rtl = tok.with_direction(crate::i18n::Direction::Rtl);
+        let body = label("x", rtl, A11y::new("x", Role::Status));
+        let scene = label("s", rtl, A11y::new("s", Role::Status));
+        let mut rtl_end: Element<'_, ()> =
+            side_sheet(scene, "I", body, Some(()), true, 240.0, 1.0, rtl);
+        draw_once(&mut rtl_end);
+        let body = label("x", rtl, A11y::new("x", Role::Status));
+        let scene = label("s", rtl, A11y::new("s", Role::Status));
+        let mut rtl_start: Element<'_, ()> =
+            side_sheet(scene, "L", body, None, false, 100.0, 1.0, rtl);
+        draw_once(&mut rtl_start);
         assert!(MenuSection::<()>::untitled([]).title.is_none());
         assert!(MenuSection::<()>::new("", []).title.is_none());
         assert_eq!(MenuSection::<()>::new("T", []).title.as_deref(), Some("T"));
@@ -3533,13 +3535,15 @@ mod tests {
             node: &iced::advanced::layout::Node,
         ) -> Option<&iced::advanced::layout::Node> {
             let kids = node.children();
-            if kids.len() == 3 {
+            let hit = kids.len() == 3 && {
                 let w: Vec<f32> = kids.iter().map(|c| c.bounds().width).collect();
-                if w[1] > w[0] && w[1] > w[2] && w[1] > 80.0 {
-                    return Some(node);
-                }
+                w[1] > w[0] && w[1] > w[2] && w[1] > 80.0
+            };
+            if hit {
+                Some(node)
+            } else {
+                kids.iter().find_map(first_cheat_row)
             }
-            kids.iter().find_map(first_cheat_row)
         }
         let ltr_n = layout_sheet(ltr, &table);
         let rtl_n = layout_sheet(rtl, &table);
@@ -3555,14 +3559,8 @@ mod tests {
             .iter()
             .map(|c| c.bounds().width)
             .collect();
-        assert!(
-            ltr_w[0] > ltr_w[2],
-            "ltr title should sit on the start (left), got widths {ltr_w:?}"
-        );
-        assert!(
-            rtl_w[2] > rtl_w[0],
-            "rtl title should sit on the start (right), got widths {rtl_w:?}"
-        );
+        assert!(ltr_w[0] > ltr_w[2]);
+        assert!(rtl_w[2] > rtl_w[0]);
     }
 
     #[test]

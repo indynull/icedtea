@@ -647,14 +647,12 @@ mod tests {
         assert!(file_cjk.width >= pad.x() + size * 2.0);
         assert!(text_advance("保存", size) >= size * 2.0);
         let arabic = "عرض";
-        assert!(
-            text_advance(arabic, size) >= size * 3.0,
-            "Arabic menu titles need one em per letter so they stay one line"
-        );
-        assert!(
-            title_extents(arabic, pad, size, 18.0).width >= pad.x() + size * 3.0,
-            "عرض title box must fit three Arabic letters"
-        );
+        assert!(text_advance(arabic, size) >= size * 3.0);
+        assert!(title_extents(arabic, pad, size, 18.0).width >= pad.x() + size * 3.0);
+        assert!(text_advance("שלום", size) >= size * 4.0);
+        for ch in ['\u{FB1D}', '\u{FE70}'] {
+            assert_eq!(text_advance(&ch.to_string(), size), size);
+        }
         let draw = include_str!("menubar.rs")
             .split("fn draw(")
             .nth(1)
@@ -662,10 +660,7 @@ mod tests {
             .split("fn overlay(")
             .next()
             .unwrap();
-        assert!(
-            draw.contains("Wrapping::None"),
-            "menu titles must not wrap (iced default is Word)"
-        );
+        assert!(draw.contains("Wrapping::None"));
         for ch in [
             '\u{A960}',
             '한',

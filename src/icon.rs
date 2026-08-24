@@ -721,6 +721,7 @@ mod tests {
         );
         let mark: &'static [u8] = br##"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="#000"><path d="M8 1 15 8 8 15 1 8z"/></svg>"##;
         assert_eq!(Glyph::Bytes(mark).bytes(), mark);
+        assert!(!Glyph::Bytes(mark).flips_rtl());
         assert_eq!(Glyph::from(Icon::Check).bytes(), Icon::Check.bytes());
         assert_eq!(Icon::ALL.len(), 96);
     }

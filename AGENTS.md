@@ -170,9 +170,12 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   no application has asked for it.
 - Coverage fail-under is 100 on lcov/Codecov source-line hits
   (`codecov.yml` project and patch target after the three host
-  uploads). Agents must pass that Codecov check. Never fail a
-  continuous-integration test job on one host's lcov `DA,0`. Do not
-  use `llvm-cov --fail-under-lines` (macro expansions). Never rewrite
+  uploads). Always run local `just cov` (`scripts/check_lcov.py`
+  empty) on this tree before saying ready to push or tag. Never
+  leave counted `DA,0` for continuous integration to find. Agents
+  must pass that Codecov check. Never fail a continuous-integration
+  test job on one host's lcov `DA,0`. Do not use
+  `llvm-cov --fail-under-lines` (macro expansions). Never rewrite
   production so a coverage counter stops flagging a line. Cover the
   real path or leave the miss.
 - `catalog::ENTRIES` is the gallery checklist. Adding an export means
@@ -314,8 +317,10 @@ Do not default to full `just check` after every edit. Prefer:
 
 Skip doc builds and rustdoc tests when the change is pure private
 logic, host glue, or tests with no rustdoc/API surface change. Skip
-coverage until handoff unless you are chasing fail-under. Report the
-exact command and result you ran.
+coverage while iterating. Never claim ready to push or tag until
+`just cov` has been run on this tree in this session and
+`scripts/check_lcov.py` is empty. Report the exact command and
+result you ran.
 
 - Coverage ignore is host glue only: `src/host.rs` (native dialogs,
   clipboard tasks), `src/host_canvas.rs` (iced canvas stroke), and
@@ -556,8 +561,10 @@ tables or essays in discussion notes.
 
 ## Done for a change
 
-- Full `just check` green before claiming a feature complete or asking
-  for human review (not required after every intermediate edit).
+- Full `just check` green before claiming a feature complete, ready
+  to push, or asking for human review (not required after every
+  intermediate edit). `just cov` is part of that; do not push or
+  tag on lint plus tests alone.
 - New or changed public API: rustdoc example immediately above the
   constructor, `catalog::ENTRIES` plus the constructor-name map in
   `catalog` tests, a gallery page if it is a widget or pattern, and

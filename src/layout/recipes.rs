@@ -719,10 +719,7 @@ mod tests {
             .split("/// Visible child")
             .next()
             .unwrap();
-        assert!(
-            form_src.contains("align_start(dir)"),
-            "form label gutter must sit on the start edge"
-        );
+        assert!(form_src.contains("align_start(dir)"));
         let _: Element<'_, ()> = stack_child(vec![t().into(), t().into()], 1);
         let _: Element<'_, ()> = stack_child(vec![], 3);
         let tok = crate::theme::named("dark").tokens;

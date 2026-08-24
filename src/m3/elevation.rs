@@ -48,7 +48,8 @@ impl Elevation {
         match self {
             Self::Level0 | Self::Flat => Self::Level1,
             Self::Level1 => Self::Level2,
-            Self::Level2 | Self::Raised => Self::Level3,
+            Self::Level2 => Self::Level3,
+            Self::Raised => Self::Level3,
             Self::Level3 => Self::Level4,
             Self::Level4 | Self::Level5 => Self::Level5,
         }
@@ -119,8 +120,21 @@ mod tests {
         assert!(Elevation::Level5.shadow().blur_radius >= Elevation::Level3.shadow().blur_radius);
         assert_eq!(Elevation::Level1.raise(), Elevation::Level2);
         assert_eq!(Elevation::Level2.raise(), Elevation::Level3);
+        assert_eq!(Elevation::Raised.raise(), Elevation::Level3);
         assert_eq!(Elevation::Level5.raise(), Elevation::Level5);
         assert_eq!(Elevation::Level0.raise(), Elevation::Level1);
+        for e in [
+            Elevation::Level0,
+            Elevation::Flat,
+            Elevation::Level1,
+            Elevation::Level2,
+            Elevation::Raised,
+            Elevation::Level3,
+            Elevation::Level4,
+            Elevation::Level5,
+        ] {
+            let _ = std::hint::black_box(e).raise();
+        }
         let _ = Elevation::Level4.shadow();
         assert_eq!(ElevationPolicy::default(), ElevationPolicy::Desktop);
     }

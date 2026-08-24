@@ -8458,6 +8458,21 @@ mod tests {
             None,
         );
         draw_once(&mut field);
+        let muted = [FieldRun::new(0, 3, FieldInk::Muted)];
+        let mut quiet: Element<'_, ()> = text_input(
+            "q",
+            "AND x",
+            |_| (),
+            None,
+            FieldOpts {
+                highlight: &muted,
+                ..FieldOpts::NONE
+            },
+            tok,
+            A11y::new("q", Role::TextBox),
+            None,
+        );
+        draw_once(&mut quiet);
         let search_runs = [
             FieldRun::new(0, 4, FieldInk::Success),
             FieldRun::new(5, 8, FieldInk::Error),
@@ -8484,6 +8499,189 @@ mod tests {
             &[],
         );
         draw_once(&mut empty);
+    }
+
+    #[test]
+    fn field_highlight_paints_rtl_overflow_focus_and_empty_runs() {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::renderer::Style;
+        use iced::advanced::widget::operation::focusable;
+        use iced::advanced::widget::{Tree, Widget};
+        use iced::mouse;
+        use iced::{Event, Font, Pixels, Point, Rectangle, Size, Theme};
+        let rtl = named("dark")
+            .tokens
+            .with_direction(crate::i18n::Direction::Rtl);
+        let id = Id::from("hl-focus");
+        let long = "abcdefghijklmnopqrstuvwxyz0123456789";
+        let runs = [
+            FieldRun::new(0, 4, FieldInk::Warning),
+            FieldRun::new(4, 8, FieldInk::Error),
+        ];
+        let mut field: Element<'_, ()> = text_input(
+            "q",
+            long,
+            |_| (),
+            None,
+            FieldOpts {
+                highlight: &runs,
+                ..FieldOpts::NONE
+            },
+            rtl,
+            A11y::new("q", Role::TextBox),
+            Some(id.clone()),
+        );
+        let mut tree = Tree::new(field.as_widget());
+        let mut renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(80.0, 40.0));
+        let node = field.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let vp = Rectangle::new(Point::ORIGIN, Size::new(80.0, 40.0));
+        let mut op = focusable::focus::<()>(id);
+        field
+            .as_widget_mut()
+            .operate(&mut tree, layout, &renderer, &mut op);
+        field.as_widget().draw(
+            &tree,
+            &mut renderer,
+            &Theme::Dark,
+            &Style::default(),
+            layout,
+            mouse::Cursor::Unavailable,
+            &vp,
+        );
+        let short_runs = [FieldRun::new(0, 2, FieldInk::Success)];
+        let mut short_rtl: Element<'_, ()> = text_input(
+            "q",
+            "ab",
+            |_| (),
+            None,
+            FieldOpts {
+                highlight: &short_runs,
+                ..FieldOpts::NONE
+            },
+            rtl,
+            A11y::new("q", Role::TextBox),
+            None,
+        );
+        let mut stree = Tree::new(short_rtl.as_widget());
+        let snode = short_rtl
+            .as_widget_mut()
+            .layout(&mut stree, &renderer, &limits);
+        let slayout = Layout::new(&snode);
+        short_rtl.as_widget().draw(
+            &stree,
+            &mut renderer,
+            &Theme::Dark,
+            &Style::default(),
+            slayout,
+            mouse::Cursor::Unavailable,
+            &vp,
+        );
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            field.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::CursorMoved {
+                    position: Point::new(8.0, 8.0),
+                }),
+                layout,
+                mouse::Cursor::Available(Point::new(8.0, 8.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+        }
+        let _ = field.as_widget().mouse_interaction(
+            &tree,
+            layout,
+            mouse::Cursor::Available(Point::new(8.0, 8.0)),
+            &vp,
+            &renderer,
+        );
+
+        let tok = named("dark").tokens;
+        let mut painted = HighlightField {
+            input: Space::new().width(40).height(20).into(),
+            runs: vec![
+                FieldRun::new(0, 0, FieldInk::Text),
+                FieldRun::new(80, 90, FieldInk::Error),
+                FieldRun::new(0, 2, FieldInk::Error),
+            ],
+            value: "ab".into(),
+            tok,
+            hide: true,
+        };
+        let mut ptree = Tree::new(&painted as &dyn Widget<(), iced::Theme, iced::Renderer>);
+        let pnode = Widget::<(), iced::Theme, iced::Renderer>::layout(
+            &mut painted,
+            &mut ptree,
+            &renderer,
+            &limits,
+        );
+        let playout = Layout::new(&pnode);
+        Widget::<(), iced::Theme, iced::Renderer>::draw(
+            &painted,
+            &ptree,
+            &mut renderer,
+            &Theme::Dark,
+            &Style::default(),
+            playout,
+            mouse::Cursor::Unavailable,
+            &vp,
+        );
+        let empty = iced::advanced::layout::Node::new(Size::new(40.0, 20.0));
+        let empty_layout = Layout::new(&empty);
+        let mut empty_msgs = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut empty_msgs);
+            Widget::<(), iced::Theme, iced::Renderer>::update(
+                &mut painted,
+                &mut ptree,
+                &Event::Mouse(mouse::Event::CursorMoved {
+                    position: Point::ORIGIN,
+                }),
+                empty_layout,
+                mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+        }
+        Widget::<(), iced::Theme, iced::Renderer>::draw(
+            &painted,
+            &ptree,
+            &mut renderer,
+            &Theme::Dark,
+            &Style::default(),
+            empty_layout,
+            mouse::Cursor::Unavailable,
+            &vp,
+        );
+        let _ = Widget::<(), iced::Theme, iced::Renderer>::mouse_interaction(
+            &painted,
+            &ptree,
+            empty_layout,
+            mouse::Cursor::Unavailable,
+            &vp,
+            &renderer,
+        );
+        let mut none_op = focusable::unfocus::<()>();
+        Widget::<(), iced::Theme, iced::Renderer>::operate(
+            &mut painted,
+            &mut ptree,
+            empty_layout,
+            &renderer,
+            &mut none_op,
+        );
     }
 
     #[test]
@@ -10302,6 +10500,33 @@ mod tests {
             None,
         );
         draw_once(&mut empty_title);
+        let trail_only = badge(
+            "doc",
+            None,
+            tok,
+            Variant::Quiet,
+            BadgeSize::Small,
+            A11y::new("doc", Role::Status),
+        );
+        let mut empty_named: Element<'_, ()> = group_box(
+            "",
+            label("x", tok, A11y::new("x", Role::Status)),
+            tok,
+            CardFace::Filled,
+            A11y::new("trail", Role::Group),
+            Some(trail_only),
+        );
+        draw_once(&mut empty_named);
+        assert!(card_header::<()>(String::new(), None, tok).is_none());
+        let trail = badge(
+            "doc",
+            None,
+            tok,
+            Variant::Quiet,
+            BadgeSize::Small,
+            A11y::new("doc", Role::Status),
+        );
+        assert!(card_header::<()>(String::new(), Some(trail), tok).is_some());
         let rtl = tok.with_direction(crate::i18n::Direction::Rtl);
         let mut rtl_rail: Element<'_, ()> = group_box(
             "Brief",
@@ -11042,10 +11267,12 @@ mod tests {
         );
         assert!((node.size().width - 240.0).abs() < 0.5);
         let child = node.children().first().expect("textarea inner");
-        assert!(
+        must(
             child.bounds().x.abs() < 0.5 && (child.bounds().width - 240.0).abs() < 0.5,
-            "RTL textarea stays Fill until iced#3294, got {:?}",
-            child.bounds()
+            format!(
+                "RTL textarea stays Fill until iced#3294, got {:?}",
+                child.bounds()
+            ),
         );
         let mut num: Element<'_, String> =
             number_input(3.0, |s| s, tok, A11y::new("n", Role::SpinButton));
@@ -11061,10 +11288,12 @@ mod tests {
             .iter()
             .max_by(|a, b| a.bounds().x.total_cmp(&b.bounds().x))
             .expect("number digit");
-        assert!(
+        must(
             digit.bounds().x > 80.0,
-            "RTL number digit must sit on start (right), got x={}",
-            digit.bounds().x
+            format!(
+                "RTL number digit must sit on start (right), got x={}",
+                digit.bounds().x
+            ),
         );
     }
 
@@ -11445,6 +11674,66 @@ mod tests {
             SliderMarks::NONE,
             tok,
             A11y::new("off", Role::Slider).with_disabled(true),
+        );
+    }
+
+    #[test]
+    fn virtual_clip_second_layout_and_miss_viewport() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::renderer::Style;
+        use iced::advanced::widget::{Tree, Widget};
+        use iced::mouse;
+        use iced::{Font, Pixels, Point, Rectangle, Size, Theme};
+
+        let tok = named("dark").tokens;
+        let heights = [20.0f32; 40];
+        let prev = VisibleWindow::new(200.0);
+        let mut clip = VirtualClip {
+            rows: clip_rows(Column::new()),
+            build: Box::new(|_win| Column::new()),
+            built: (0, 0),
+            prev,
+            heights: crate::collection::RowHeights::PerRow(&heights),
+            len: 40,
+            overscan: 2,
+            cover: Some(0),
+            on_scroll: Box::new(|w| w),
+            scroll_id: None,
+            tok,
+        };
+        let mut tree = Tree::new(&clip as &dyn Widget<VisibleWindow, iced::Theme, iced::Renderer>);
+        let mut renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(320.0, 200.0));
+        let _ = Widget::<VisibleWindow, iced::Theme, iced::Renderer>::layout(
+            &mut clip, &mut tree, &renderer, &limits,
+        );
+        let node = Widget::<VisibleWindow, iced::Theme, iced::Renderer>::layout(
+            &mut clip, &mut tree, &renderer, &limits,
+        );
+        let layout = Layout::new(&node);
+        let miss = Rectangle::new(Point::new(4000.0, 4000.0), Size::new(4.0, 4.0));
+        Widget::<VisibleWindow, iced::Theme, iced::Renderer>::draw(
+            &clip,
+            &tree,
+            &mut renderer,
+            &Theme::Dark,
+            &Style::default(),
+            layout,
+            mouse::Cursor::Unavailable,
+            &miss,
+        );
+        let state = tree.state.downcast_ref::<VirtualClipState>();
+        must(state.last_ready, "second layout must keep last_ready");
+        clip.cover = Some(999);
+        let _ = Widget::<VisibleWindow, iced::Theme, iced::Renderer>::layout(
+            &mut clip, &mut tree, &renderer, &limits,
+        );
+        clip.cover = None;
+        let _ = Widget::<VisibleWindow, iced::Theme, iced::Renderer>::layout(
+            &mut clip, &mut tree, &renderer, &limits,
         );
     }
 
@@ -12203,6 +12492,16 @@ mod tests {
         }
     }
 
+    fn find_tag(
+        tree: &mut iced::advanced::widget::Tree,
+        tag: iced::advanced::widget::tree::Tag,
+    ) -> Option<&mut iced::advanced::widget::Tree> {
+        if tree.tag == tag {
+            return Some(tree);
+        }
+        tree.children.iter_mut().find_map(|c| find_tag(c, tag))
+    }
+
     fn rail_box(boxes: &[iced::Rectangle]) -> iced::Rectangle {
         let rail_w = crate::chrome::SCROLL_RAIL_WIDTH;
         *boxes
@@ -12853,7 +13152,9 @@ mod tests {
     fn list_view_rail_drag_updates_scroll_without_changing_range() {
         use iced::advanced::clipboard;
         use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::tree;
         use iced::advanced::widget::Tree;
+        use iced::keyboard;
         use iced::mouse;
         use iced::{Event, Font, Pixels, Point, Rectangle, Size};
 
@@ -12892,6 +13193,31 @@ mod tests {
             Pixels::from(16u32),
         ));
         let limits = Limits::new(Size::ZERO, Size::new(320.0, viewport));
+        let mut dummy = Tree::empty();
+        assert!(find_tag(&mut dummy, tree::Tag::of::<VirtualClipState>()).is_none());
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        {
+            use iced::advanced::renderer::Style;
+            use iced::Theme;
+            let mut miss_r = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+                Font::DEFAULT,
+                Pixels::from(16u32),
+            ));
+            let miss = Rectangle::new(Point::new(4000.0, 4000.0), Size::new(4.0, 4.0));
+            el.as_widget().draw(
+                &tree,
+                &mut miss_r,
+                &Theme::Dark,
+                &Style::default(),
+                layout,
+                mouse::Cursor::Unavailable,
+                &miss,
+            );
+        }
+        if let Some(clip) = find_tag(&mut tree, tree::Tag::of::<VirtualClipState>()) {
+            clip.state.downcast_mut::<VirtualClipState>().last_ready = false;
+        }
         let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
         let layout = Layout::new(&node);
         let mut boxes = Vec::new();
@@ -12967,6 +13293,187 @@ mod tests {
                 .zip(&after)
                 .any(|(b, a)| (*a - *b).abs() > 0.5),
             format!("rail drag must move painted rows, before={before:?} after={after:?}"),
+        );
+
+        let layout = Layout::new(&node);
+        let grab_now = mouse::Cursor::Available(grab);
+        let grab_hit = el
+            .as_widget()
+            .mouse_interaction(&tree, layout, grab_now, &vp, &renderer);
+        must(
+            grab_hit == mouse::Interaction::Grabbing,
+            format!("rail thumb while dragging must grab, got {grab_hit:?}"),
+        );
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+                layout,
+                grab_now,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+        }
+        let track = Point::new(rb.x + rb.width / 2.0, rb.y + 4.0);
+        let thumb_mid = Point::new(rb.x + rb.width / 2.0, rb.y + thumb_y + thumb_h / 2.0);
+        let _ = el.as_widget().mouse_interaction(
+            &tree,
+            layout,
+            mouse::Cursor::Available(thumb_mid),
+            &vp,
+            &renderer,
+        );
+        let _ = el.as_widget().mouse_interaction(
+            &tree,
+            layout,
+            mouse::Cursor::Available(track),
+            &vp,
+            &renderer,
+        );
+        let _ = el.as_widget().mouse_interaction(
+            &tree,
+            layout,
+            mouse::Cursor::Unavailable,
+            &vp,
+            &renderer,
+        );
+        let pane_pt = Point::new(origin.x + 24.0, origin.y + 24.0);
+        let _ = el.as_widget().mouse_interaction(
+            &tree,
+            layout,
+            mouse::Cursor::Available(pane_pt),
+            &vp,
+            &renderer,
+        );
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+        }
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(track),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(track),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(keyboard::key::Named::Shift),
+                    modified_key: keyboard::Key::Named(keyboard::key::Named::Shift),
+                    physical_key: keyboard::key::Physical::Unidentified(
+                        keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: keyboard::Location::Standard,
+                    modifiers: keyboard::Modifiers::SHIFT,
+                    text: None,
+                    repeat: false,
+                }),
+                layout,
+                mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+        }
+        let miss = Rectangle::new(Point::new(4000.0, 4000.0), Size::new(4.0, 4.0));
+        {
+            use iced::advanced::renderer::Style;
+            use iced::Theme;
+            let mut renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+                Font::DEFAULT,
+                Pixels::from(16u32),
+            ));
+            el.as_widget().draw(
+                &tree,
+                &mut renderer,
+                &Theme::Dark,
+                &Style::default(),
+                layout,
+                mouse::Cursor::Unavailable,
+                &miss,
+            );
+        }
+        let id = Id::from("list-rail");
+        let mut snap = operation::scrollable::snap_to::<()>(
+            id.clone(),
+            operation::scrollable::RelativeOffset {
+                x: None,
+                y: Some(0.5),
+            },
+        );
+        el.as_widget_mut()
+            .operate(&mut tree, layout, &renderer, &mut snap);
+        let mut by = operation::scrollable::scroll_by::<()>(
+            id.clone(),
+            operation::scrollable::AbsoluteOffset { x: 0.0, y: 40.0 },
+        );
+        el.as_widget_mut()
+            .operate(&mut tree, layout, &renderer, &mut by);
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::CursorMoved {
+                    position: Point::new(origin.x + 20.0, origin.y + 20.0),
+                }),
+                layout,
+                mouse::Cursor::Available(Point::new(origin.x + 20.0, origin.y + 20.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+        }
+        if let Some(clip) = find_tag(&mut tree, tree::Tag::of::<VirtualClipState>()) {
+            clip.children.clear();
+        }
+        let _ = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        if let Some(clip) = find_tag(&mut tree, tree::Tag::of::<VirtualClipState>()) {
+            clip.children.clear();
+            clip.children.push(Tree::empty());
+            clip.children.push(Tree::empty());
+        }
+        el.as_widget_mut().diff(&mut tree);
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        if let Some(clip) = find_tag(&mut tree, tree::Tag::of::<VirtualClipState>()) {
+            clip.state.downcast_mut::<VirtualClipState>().dragging = Some(4.0);
+        }
+        let _ = el.as_widget().mouse_interaction(
+            &tree,
+            layout,
+            mouse::Cursor::Available(thumb_mid),
+            &vp,
+            &renderer,
         );
     }
 
@@ -16440,6 +16947,9 @@ mod tests {
         let app: Element<'_, ()> = icon_svg(Glyph::Bytes(mark), tok, A11y::new("app", Role::Image));
         let bundled: Element<'_, ()> =
             icon_svg(Icon::Search, tok, A11y::new("search", Role::Image));
+        let rtl = tok.with_direction(crate::i18n::Direction::Rtl);
+        let mut back: Element<'_, ()> = icon_svg(Icon::Back, rtl, A11y::new("back", Role::Image));
+        draw_once(&mut back);
         let _ = (app, bundled, named_ink);
         let btn: Element<'_, ()> = icon_button(
             Glyph::Bytes(mark),
@@ -16765,11 +17275,15 @@ mod tests {
     fn list_grid_table_and_tree_emit_item_click() {
         let tok = named("dark").tokens;
         let list = VecList {
-            items: vec![
-                crate::collection::ListRow::new("Alpha")
-                    .with_leading(crate::collection::RowSlot::Check(true)),
-                crate::collection::ListRow::new("Beta"),
-            ],
+            items: {
+                let mut items = vec![
+                    crate::collection::ListRow::new("Alpha")
+                        .with_leading(crate::collection::RowSlot::Check(true)),
+                    crate::collection::ListRow::new("Beta"),
+                ];
+                items.extend((2..20).map(|i| crate::collection::ListRow::new(format!("R{i}"))));
+                items
+            },
         };
         let window = VisibleWindow::new(80.0);
         let list_side = || ItemClick {

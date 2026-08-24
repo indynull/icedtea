@@ -932,7 +932,21 @@ mod tests {
     use iced::advanced::clipboard;
     use iced::advanced::layout::Limits;
     use iced::advanced::widget::{Tree, Widget};
-    use iced::{Font, Pixels, Point, Theme};
+    use iced::{Font, Length, Pixels, Point, Theme};
+
+    #[test]
+    fn scroll_rail_and_clip_layer_size_and_into_element() {
+        let tok = named("dark").tokens;
+        let rail = ScrollRail::new(400.0, 120.0, 0.0, |y| y, tok);
+        let size = Widget::<f32, iced::Theme, iced::Renderer>::size(&rail);
+        assert_eq!(size.width, Length::Fixed(SCROLL_RAIL_WIDTH));
+        assert_eq!(size.height, Length::Fill);
+        let _: Element<'_, f32> = rail.into();
+        let clip = ClipLayer::new(iced::widget::Space::new().width(8).height(8));
+        let clip_size = Widget::<(), iced::Theme, iced::Renderer>::size(&clip);
+        assert_eq!(clip_size.width, Length::Fill);
+        let _: Element<'_, ()> = clip.into();
+    }
 
     #[test]
     fn clip_layer_uses_with_layer_scissor() {

@@ -395,6 +395,10 @@ mod tests {
             <WindowTitle as iced::application::TitleFn<()>>::title(&t, &()),
             "demo"
         );
+        assert_eq!(
+            <WindowTitle as iced::daemon::TitleFn<()>>::title(&t, &(), iced::window::Id::unique()),
+            "demo"
+        );
     }
 
     #[test]
