@@ -1998,12 +1998,9 @@ def record_gif_demo(
         time.sleep(1.4)
 
         goto(page="fields")
-        send_inject("query in\nsearch-go\n")
-        show("Search filters Inbox as you type")
-        glide_to(display, search_x, search_y, ms=420)
-        click_at(display, search_x, search_y)
-        time.sleep(0.2)
-        xdotool(display, "type", "--delay", "80", "in")
+        send_inject("view-query in\n")
+        show("Search view keeps Inbox for in")
+        glide_to(display, search_x, search_y + 80, ms=420)
         time.sleep(1.6)
 
         goto(page="list")
@@ -2029,9 +2026,6 @@ def record_gif_demo(
         send_inject("pal-query save\n")
         show("The command palette filters the Action table")
         glide_to(display, pal_x, pal_y, ms=420)
-        click_at(display, pal_x, pal_y)
-        time.sleep(0.2)
-        xdotool(display, "type", "--delay", "80", "save")
         time.sleep(1.8)
 
         goto(light=True)
