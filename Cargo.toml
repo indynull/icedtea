@@ -64,3 +64,22 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+
+# Workspace crates keep file/line for panic backtraces. Dependencies
+# carry no debug info. `cargo build --profile debugging` is full debug.
+[profile.dev]
+debug = "line-tables-only"
+opt-level = 1
+lto = "off"
+
+[profile.dev.package."*"]
+debug = false
+
+[profile.debugging]
+inherits = "dev"
+debug = "full"
+
+[profile.release]
+lto = "thin"
+strip = true
+codegen-units = 8
