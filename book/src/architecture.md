@@ -69,8 +69,9 @@ paint one frame from a 0–1 progress. See [Motion](motion.md).
 lays constructors out: `toolbar` and `status_bar` from the action
 table, `list_detail` beside a filling pane, `main_window`.
 [`layout`](https://docs.rs/icedtea/latest/icedtea/layout/index.html)
-is the box recipes: `layout::dock`, `layout::split_view`,
-`layout::clamp`, `layout::form`. See [Layout](layout.md).
+is the box recipes: `layout::pack`, `layout::wrap`, `layout::dock`,
+`layout::split_view`, `layout::clamp`, `layout::form`. See
+[Layout](layout.md).
 
 An open modal consumes keys first. Otherwise a focused field owns
 unmodified typing. Otherwise `key::handle` matches the action table.

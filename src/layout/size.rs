@@ -51,6 +51,77 @@ impl SizePolicy {
     }
 }
 
+/// Assign `total` from preferred sizes: shrink toward min, then grow
+/// only children with stretch. Leftover after max caps is left unused
+/// so the box can pack it.
+///
+/// ```
+/// use icedtea::layout::{allocate, SizePolicy};
+/// let sizes = allocate(100.0, &[
+///     SizePolicy::fixed(20.0),
+///     SizePolicy::expand(1.0),
+/// ]);
+/// assert!((sizes[0] - 20.0).abs() < 0.01);
+/// assert!((sizes[1] - 80.0).abs() < 0.01);
+/// ```
+pub fn allocate(total: f32, policies: &[SizePolicy]) -> Vec<f32> {
+    if policies.is_empty() {
+        return Vec::new();
+    }
+    let total = total.max(0.0);
+    let mut sizes: Vec<f32> = policies
+        .iter()
+        .map(|p| p.preferred.clamp(p.min, p.max))
+        .collect();
+    let used: f32 = sizes.iter().sum();
+    if used > total + 0.01 {
+        let room: f32 = sizes
+            .iter()
+            .zip(policies)
+            .map(|(s, p)| (*s - p.min).max(0.0))
+            .sum();
+        if room <= 0.01 {
+            let scale = total / used;
+            for s in &mut sizes {
+                *s *= scale;
+            }
+            return sizes;
+        }
+        let overflow = used - total;
+        for (i, p) in policies.iter().enumerate() {
+            let share = (sizes[i] - p.min).max(0.0) / room * overflow;
+            sizes[i] = (sizes[i] - share).max(p.min);
+        }
+        return sizes;
+    }
+    let leftover = total - used;
+    let stretch_sum: f32 = policies.iter().map(|p| p.stretch).sum();
+    if leftover > 0.0 && stretch_sum > 0.0 {
+        for (i, p) in policies.iter().enumerate() {
+            if p.stretch <= 0.0 {
+                continue;
+            }
+            let extra = leftover * (p.stretch / stretch_sum);
+            sizes[i] = (sizes[i] + extra).min(p.max);
+        }
+    }
+    let used: f32 = sizes.iter().sum();
+    if used < total - 0.01 {
+        let mut best: Option<usize> = None;
+        let mut best_stretch = 0.0;
+        for (i, p) in policies.iter().enumerate() {
+            if sizes[i] < p.max - 0.01 && p.stretch > best_stretch {
+                best_stretch = p.stretch;
+                best = Some(i);
+            }
+        }
+        if let Some(i) = best {
+            sizes[i] = (sizes[i] + (total - used)).min(policies[i].max);
+        }
+    }
+    sizes
+}
+
 /// Distribute `total` across policies: mins first, then stretch leftover.
 pub fn distribute(total: f32, policies: &[SizePolicy]) -> Vec<f32> {
     if policies.is_empty() {
@@ -155,5 +226,50 @@ mod tests {
         );
         assert!(rem[0] <= 15.01);
         assert!(rem[1] >= 60.0);
+    }
+
+    #[test]
+    fn allocate_starts_at_preferred_and_leaves_hug_leftover() {
+        assert!(allocate(100.0, &[]).is_empty());
+        let hug = allocate(
+            100.0,
+            &[
+                SizePolicy::between(10.0, 20.0, 20.0, 0.0),
+                SizePolicy::between(10.0, 20.0, 20.0, 0.0),
+            ],
+        );
+        assert!((hug[0] - 20.0).abs() < 0.01);
+        assert!((hug[1] - 20.0).abs() < 0.01);
+        let share = allocate(
+            100.0,
+            &[
+                SizePolicy::between(10.0, 20.0, 20.0, 0.0),
+                SizePolicy::expand(1.0),
+            ],
+        );
+        assert!((share[0] - 20.0).abs() < 0.01);
+        assert!((share[1] - 80.0).abs() < 0.01);
+        let squeezed = allocate(
+            20.0,
+            &[
+                SizePolicy::between(10.0, 30.0, 40.0, 0.0),
+                SizePolicy::between(10.0, 30.0, 40.0, 0.0),
+            ],
+        );
+        assert!((squeezed[0] - 10.0).abs() < 0.01);
+        assert!((squeezed[1] - 10.0).abs() < 0.01);
+        let zero = allocate(0.0, &[SizePolicy::fixed(0.0), SizePolicy::fixed(0.0)]);
+        assert_eq!(zero, vec![0.0, 0.0]);
+        let scale = allocate(10.0, &[SizePolicy::fixed(20.0), SizePolicy::fixed(20.0)]);
+        assert!((scale[0] - 5.0).abs() < 0.01);
+        let rem = allocate(
+            100.0,
+            &[
+                SizePolicy::between(0.0, 0.0, 20.0, 1.0),
+                SizePolicy::between(0.0, 0.0, 1000.0, 1.0),
+            ],
+        );
+        assert!(rem[0] <= 20.01);
+        assert!(rem[1] >= 79.0);
     }
 }

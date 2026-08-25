@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Feature
+
+- `layout::pack` measures each child and allocates leftover on a row
+  or column (`Slot::hug` / `Slot::share`, `Pack` start / end / center
+  / between).
+- `layout::wrap` measures unequal children and starts a new line when
+  the next does not fit. Share slots with a min width reflow a tile
+  wall. Window direction puts the first child on the start edge.
+  Callers pass slots, not a child width or the parent width.
+- `layout::wrap_per_row` and `layout::wrap_rows` are gone.
+
+### Bug fix
+
+- `layout::form_columns` keeps the label at its preferred width and
+  gives leftover to the field.
+
 ## 0.14.0 — 2026-08-23
 
 ### Feature

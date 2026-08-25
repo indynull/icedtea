@@ -110,7 +110,18 @@ and look-strip bands on every idle shot.
 
 These surfaces wrap on purpose: markdown, code with wrap on, list
 card titles, expand / accordion / dialog body, job and hint lines,
-status-page copy.
+status-page copy, `layout::wrap` chips and tiles.
+
+`layout::pack` and `layout::wrap` follow window direction. Pack Start
+puts the first hug child on the start edge (right in RTL) and the
+end hug on the end. Wrap puts the first measured child on the start
+of each line. A pack strip that stays physical left/right when the
+window is Arabic, Urdu, or Hebrew is **broken**.
+
+A `layout::wrap` of min-width share tiles must drop a column when the
+parent is too narrow for the previous count. Scoring the layout page
+at compact vs wide is that check; a single-width still is not
+enough — the library tests drive two parent widths.
 
 ## SCORE rows
 

@@ -224,8 +224,12 @@ Hash consecutive shot files. A pair that is byte-identical across
 page painted. Recapture those beats (`--settle-ms` if paint is slow).
 Only if a second grab is still the previous page is the gallery stuck.
 
-Do not invent beat numbers from the page name. Tour beats are
-fixed (`0` controls … `38` expand open). An idle-only cut writes
+Do not invent beat numbers from the page name. Tour beats follow
+`catalog::pages()` plus extras (`code`, `motion`, `expand-motion`).
+Layout sits after Keys: idle first screen is pack (Find, filling
+search, Go) then wrap chips and min-width tiles. Score start/end
+on RTL; two parent widths are the library tests, not one still.
+An idle-only cut writes
 one file per beat (`00-beat00-idle-…`). An `--interact` cut
 interleaves after-inject frames, so file prefixes are sequential
 across idle *and* after (`00` idle controls, `01` after-toggles,

@@ -720,6 +720,7 @@ fn page_job<'a>(page: &str, cat: &'a Catalog) -> &'a str {
         "colors" => cat.t("job.colors"),
         "keys" => cat.t("job.keys"),
         "marks" => cat.t("job.marks"),
+        "layout" => cat.t("job.layout"),
         "chrome-rows" => cat.t("job.chrome-rows"),
         "feedback" => cat.t("job.feedback"),
         "dialogs" => cat.t("job.dialogs"),
@@ -787,6 +788,7 @@ fn page_label<'a>(page: &str, cat: &'a Catalog) -> &'a str {
         "colors" => cat.t("page.colors"),
         "keys" => cat.t("page.keys"),
         "marks" => cat.t("page.marks"),
+        "layout" => cat.t("page.layout"),
         "chrome-rows" => cat.t("page.chrome-rows"),
         "feedback" => cat.t("page.feedback"),
         "dialogs" => cat.t("page.dialogs"),
@@ -851,6 +853,65 @@ fn place_labels(cat: &Catalog) -> Vec<String> {
 
 fn wrap_chip_labels(cat: &Catalog) -> Vec<String> {
     WRAP_KEYS.iter().map(|k| cat.t(k).to_string()).collect()
+}
+
+fn hug_wrap<'a>(
+    children: impl IntoIterator<Item = Element<'a, Message>>,
+    gap: f32,
+    dir: Direction,
+) -> Element<'a, Message> {
+    layout::wrap(
+        children.into_iter().map(layout::Slot::hug),
+        layout::BoxOpts {
+            gap,
+            line_gap: gap,
+            width: layout::FILL,
+            height: layout::SHRINK,
+            ..layout::BoxOpts::new()
+        },
+        dir,
+    )
+}
+
+/// Catalog width for Fill demos on Controls and Fields. Hug controls
+/// size to content. Lists, documents, and the textarea still fill.
+const CATALOG_MIN: f32 = 240.0;
+const CATALOG_MAX: f32 = 400.0;
+
+fn catalog_sized(id: &str) -> bool {
+    matches!(
+        id,
+        "slider"
+            | "range-slider"
+            | "search"
+            | "search-view"
+            | "text-input"
+            | "field-support"
+            | "password"
+            | "secret"
+            | "value-field"
+            | "suggest"
+            | "select"
+            | "form"
+            | "number"
+    )
+}
+
+fn catalog_host<'a>(child: Element<'a, Message>, dir: Direction) -> Element<'a, Message> {
+    layout::pack(
+        [layout::Slot::sized(
+            child,
+            icedtea::layout::SizePolicy::between(CATALOG_MIN, CATALOG_MAX, CATALOG_MAX, 1.0),
+        )],
+        layout::BoxOpts {
+            width: layout::FILL,
+            height: layout::SHRINK,
+            pack: layout::Pack::Start,
+            cross: layout::Cross::Start,
+            ..layout::BoxOpts::new()
+        },
+        dir,
+    )
 }
 
 fn retitle_panel(panel: &mut icedtea::workspace::Panel, cat: &Catalog) {
@@ -1129,6 +1190,7 @@ fn tour_caption_for(page: &str) -> &'static str {
         "theme" => "Theme: named colorways, follow OS",
         "colors" => "Colors: tokens and mixes",
         "keys" => "Keys: shortcuts and cheatsheet",
+        "layout" => "Layout: pack, wrap, tiles",
         "marks" => "Marks: cards, chips, badges",
         "chrome-rows" => "Chrome: menu, toolbar, status",
         "feedback" => "Feedback: busy overlay, toasts, scroll",
@@ -1279,6 +1341,8 @@ fn parse_inject_line(line: &str) -> Option<Message> {
         "pal-pick" | "pal_pick" => Some(Message::PalettePick(parts.next()?.parse().ok()?)),
         "pal-back" | "pal_back" => Some(Message::PaletteBack),
         "icon-query" | "icon_query" => Some(Message::IconQuery(parts.next()?.to_string())),
+        "pack-query" | "pack_query" => Some(Message::PackQuery(parts.next()?.to_string())),
+        "pack-go" | "pack_go" => Some(Message::PackGo),
         "copy-icon" | "copy_icon" => Some(Message::CopyIcon(parts.next()?.to_string())),
         "search-go" | "search_go" => Some(Message::SearchGo),
         "code-wrap" | "code_wrap" => Some(Message::CodeWrap(parts.next()? == "true")),
@@ -1423,6 +1487,8 @@ enum Message {
     SearchQuery(String),
     ViewQuery(String),
     IconQuery(String),
+    PackQuery(String),
+    PackGo,
     CopyIcon(String),
     PrefsQuery(String),
     Name(String),
@@ -1648,6 +1714,7 @@ struct Gallery {
     list_flags: Vec<(bool, bool)>,
     list_filter: String,
     icon_query: String,
+    pack_query: String,
     list_bucket: ListBucket,
     /// Rows matching the current filter (all pages).
     list_matched: usize,
@@ -1915,6 +1982,7 @@ impl Gallery {
             list_flags: (0..1_000).map(sample_mail_flags).collect(),
             list_filter: String::new(),
             icon_query: String::new(),
+            pack_query: String::new(),
             list_bucket: ListBucket::All,
             list_matched: 1_000,
             list: VecList {
@@ -3691,6 +3759,14 @@ impl Gallery {
             }
             Message::TreeFace(face) => self.tree_face = face,
             Message::IconQuery(q) => self.icon_query = q,
+            Message::PackQuery(q) => self.pack_query = q,
+            Message::PackGo => {
+                self.note = if self.pack_query.is_empty() {
+                    self.catalog.t("pack.go").to_string()
+                } else {
+                    self.pack_query.clone()
+                };
+            }
             Message::CopyIcon(slug) => {
                 self.note = format!("{} · {slug}", self.catalog.t("note.copied"));
                 return icedtea::copy_text(slug);
@@ -4239,15 +4315,20 @@ impl Gallery {
                         named(&format!("{}-job", e.id), Role::Status),
                     ));
                 }
-                col = col.push(self.demo_widget(e.id));
+                let mut body = self.demo_widget(e.id);
+                if catalog_sized(e.id) {
+                    body = catalog_host(body, self.direction);
+                }
+                col = col.push(body);
             }
             col
         };
-        // Two columns share the width so fill-width hosts keep a real
-        // column. Controls start the second column at the button group
-        // so that row, checks, and radios sit on the first screen.
-        // Fields put select, form, number, date, and time beside the
-        // text hosts so idle QA can score the pick mark and form_group.
+        // Two columns when the pane is wide enough for each to keep a
+        // usable host; one column when it is not. Controls start the
+        // second tile at the button group so that row, checks, and
+        // radios sit on the first screen at 1600. Fields put select
+        // and form on the second tile. wrap sits the first tile on
+        // the start edge (right in RTL).
         let pack_at = match page {
             "controls" => Some("button-group"),
             "fields" => Some("field-support"),
@@ -4255,20 +4336,28 @@ impl Gallery {
         };
         if let Some(id) = pack_at {
             if let Some(mid) = hosted.iter().position(|e| e.id == id) {
-                let mut pack = icedtea::iced::widget::Row::new()
-                    .spacing(24)
-                    .align_y(Alignment::Start)
-                    .width(Length::Fill);
-                for kid in icedtea::i18n::order(
+                // 480: two tiles need ~984 plus the nav rail. At the
+                // 1100 window they stack; at 1280 and 1600 they sit
+                // beside and share leftover.
+                const COL_MIN: f32 = 480.0;
+                let col = |hosts: &[&icedtea::catalog::Entry]| {
+                    layout::Slot::sized(
+                        stack(hosts),
+                        icedtea::layout::SizePolicy::between(COL_MIN, COL_MIN, f32::INFINITY, 1.0),
+                    )
+                };
+                return layout::wrap(
+                    [col(&hosted[..mid]), col(&hosted[mid..])],
+                    layout::BoxOpts {
+                        gap: 24.0,
+                        line_gap: 20.0,
+                        cross: layout::Cross::Start,
+                        width: layout::FILL,
+                        height: layout::SHRINK,
+                        ..layout::BoxOpts::new()
+                    },
                     self.direction,
-                    [
-                        stack(&hosted[..mid]).width(Length::FillPortion(1)),
-                        stack(&hosted[mid..]).width(Length::FillPortion(1)),
-                    ],
-                ) {
-                    pack = pack.push(kid);
-                }
-                return pack.into();
+                );
             }
         }
         stack(&hosted).into()
@@ -5541,7 +5630,7 @@ impl Gallery {
                         ],
                     )
                     .align_y(Alignment::Center),
-                    layout::wrap(swatches, 160.0, 8.0, 720.0, tok.direction),
+                    hug_wrap(swatches, 8.0, tok.direction),
                 ]
                 .spacing(12)
                 .align_x(icedtea::i18n::align_start(tok.direction))
@@ -5609,7 +5698,7 @@ impl Gallery {
                         tok,
                         named("colors-hint", Role::Status),
                     ),
-                    layout::wrap(swatches, 220.0, 8.0, 720.0, tok.direction),
+                    hug_wrap(swatches, 8.0, tok.direction),
                 ]
                 .spacing(12)
                 .width(Length::Fill)
@@ -5696,7 +5785,7 @@ impl Gallery {
                         named("icon-empty", Role::Status),
                     )
                 } else {
-                    layout::wrap(cells, TILE, gap, inner, tok.direction)
+                    hug_wrap(cells, gap, tok.direction)
                 };
                 let pane_el: Element<'_, Message> = container(
                     column![
@@ -6492,6 +6581,58 @@ impl Gallery {
                 )
                 .into(),
             ),
+            "pack" => {
+                let find = widget::label(
+                    self.catalog.t("pack.find"),
+                    tok,
+                    named("pack-find", Role::Header),
+                );
+                let field = widget::search_input(
+                    &self.pack_query,
+                    Message::PackQuery,
+                    Some(Message::PackQuery(String::new())),
+                    Some(Message::PackGo),
+                    tok,
+                    named(self.catalog.t("pack.find"), Role::TextBox),
+                    None,
+                    &[],
+                );
+                let go = widget::button(
+                    self.catalog.t("pack.go"),
+                    Some(Message::PackGo),
+                    tok,
+                    Variant::Primary,
+                    Icons::NONE,
+                    ButtonOpts::SHRINK,
+                    btn(self.catalog.t("pack.go")),
+                );
+                column![
+                    widget::meta(
+                        self.catalog.t("hint.pack"),
+                        tok,
+                        named("pack-hint", Role::Status),
+                    ),
+                    layout::pack(
+                        [
+                            layout::Slot::hug(find),
+                            layout::Slot::share(field),
+                            layout::Slot::hug(go)
+                        ],
+                        layout::BoxOpts {
+                            gap: tok.density.gap(),
+                            cross: layout::Cross::Center,
+                            width: layout::FILL,
+                            height: layout::SHRINK,
+                            ..layout::BoxOpts::new()
+                        },
+                        tok.direction,
+                    ),
+                ]
+                .spacing(tok.density.gap())
+                .width(Length::Fill)
+                .align_x(icedtea::i18n::align_start(tok.direction))
+                .into()
+            }
             "wrap" => {
                 let chips: Vec<Element<'_, Message>> = self
                     .wrap_chips
@@ -6510,7 +6651,50 @@ impl Gallery {
                         )
                     })
                     .collect();
-                layout::wrap(chips, 120.0, 8.0, 480.0, tok.direction)
+                let tile_keys = [
+                    "tile.inbox",
+                    "tile.drafts",
+                    "tile.sent",
+                    "tile.archive",
+                    "tile.flagged",
+                    "tile.unread",
+                    "tile.later",
+                    "tile.trash",
+                ];
+                let tiles = tile_keys.iter().map(|key| {
+                    let title = self.catalog.t(key);
+                    layout::Slot::sized(
+                        container(widget::label(title, tok, named(title, Role::Button)))
+                            .width(Length::Fill)
+                            .height(Length::Fixed(72.0))
+                            .padding(tok.density.inset())
+                            .style(move |_| icedtea::style::card(tok, false)),
+                        icedtea::layout::SizePolicy::between(200.0, 200.0, f32::INFINITY, 1.0),
+                    )
+                });
+                column![
+                    widget::meta(
+                        self.catalog.t("hint.wrap"),
+                        tok,
+                        named("wrap-hint", Role::Status),
+                    ),
+                    hug_wrap(chips, 8.0, tok.direction),
+                    layout::wrap(
+                        tiles,
+                        layout::BoxOpts {
+                            gap: tok.density.gap(),
+                            line_gap: tok.density.gap(),
+                            width: layout::FILL,
+                            height: layout::SHRINK,
+                            ..layout::BoxOpts::new()
+                        },
+                        tok.direction,
+                    ),
+                ]
+                .spacing(tok.density.gap())
+                .width(Length::Fill)
+                .align_x(icedtea::i18n::align_start(tok.direction))
+                .into()
             }
             "pad" => {
                 let h = Length::Fixed(icedtea::density::Density::default().tile() as f32);
@@ -8005,6 +8189,7 @@ fn handled_ids() -> &'static [&'static str] {
         "chip",
         "filter-chips",
         "badge",
+        "pack",
         "wrap",
         "banner",
         "breadcrumb",
@@ -8407,6 +8592,15 @@ mod tests {
     }
 
     #[test]
+    fn layout_page_builds() {
+        let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
+        g.page = "layout";
+        let _ = g.view();
+        g.direction = icedtea::i18n::Direction::Rtl;
+        let _ = g.view();
+    }
+
+    #[test]
     fn tour_visits_catalog_pages() {
         let pages = icedtea::catalog::pages();
         assert_eq!(
@@ -8752,9 +8946,33 @@ mod tests {
             .next()
             .unwrap();
         assert!(
-            pack.contains("i18n::order"),
-            "controls two-column pack must follow direction"
+            pack.contains("layout::wrap"),
+            "controls columns must reflow with measuring wrap"
         );
+        assert!(
+            !pack.contains("i18n::order"),
+            "wrap already sits the first tile on the start edge"
+        );
+        let hosts = include_str!("main.rs")
+            .split("fn demo(")
+            .nth(1)
+            .unwrap()
+            .split("fn demo_widget")
+            .next()
+            .unwrap();
+        assert!(
+            hosts.contains("catalog_host"),
+            "Fill demos sit in a catalog-width host"
+        );
+        assert!(super::catalog_sized("slider"));
+        assert!(super::catalog_sized("text-input"));
+        assert!(super::catalog_sized("form"));
+        assert!(super::catalog_sized("search"));
+        assert!(!super::catalog_sized("button"));
+        assert!(!super::catalog_sized("textarea"));
+        assert!(!super::catalog_sized("checkbox"));
+        assert_eq!(super::CATALOG_MIN, 240.0);
+        assert_eq!(super::CATALOG_MAX, 400.0);
         let slider = include_str!("main.rs")
             .split("\"slider\" =>")
             .nth(1)
@@ -9579,7 +9797,7 @@ mod tests {
         assert!(icon_page.contains("Icon::ALL"));
         assert!(icon_page.contains("search_input"));
         assert!(icon_page.contains("scroll"));
-        assert!(icon_page.contains("layout::wrap"));
+        assert!(icon_page.contains("hug_wrap"));
         assert!(icon_page.contains("Length::Fixed(TILE)"));
         assert!(icon_page.contains("align_x(Alignment::Center)"));
         assert!(!icon_page.contains("center_x("));

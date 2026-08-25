@@ -9,8 +9,8 @@ Theme, marks, rows, and feedback.
 ![Menu, toolbar, and status](../images/chrome.png)
 
 Widget constructors on this page take `A11y`. Menu, toolbar, status,
-command bar, and cheatsheet take the action table. `layout::wrap` does
-not. iced 0.14 publishes the widget id only.
+command bar, and cheatsheet take the action table. `layout::pack` and
+`layout::wrap` do not. iced 0.14 publishes the widget id only.
 
 ### Theme
 
@@ -123,17 +123,31 @@ Empty string is an empty mark.
 
 Pass `A11y`.
 
+### Pack
+
+**`pack`** — Measure children and allocate leftover on one row or column.
+
+Constructor: [`layout::pack`](https://docs.rs/icedtea/latest/icedtea/layout/fn.pack.html)
+
+[source](https://github.com/indynull/icedtea/blob/master/src/layout/flow.rs) ·
+[icedtea](https://crates.io/crates/icedtea)
+
+Pass `Slot::hug` and `Slot::share`. `Pack` places leftover stretch
+does not take (start, end, center, between). Empty slots yield an
+empty box. Direction mirrors a horizontal box.
+
 ### Wrap
 
-**`wrap`** — Flow children to the next line.
+**`wrap`** — Measure children and start a new line when the next does not fit.
 
 Constructor: [`layout::wrap`](https://docs.rs/icedtea/latest/icedtea/layout/fn.wrap.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/layout/recipes.rs) ·
+[source](https://github.com/indynull/icedtea/blob/master/src/layout/flow.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Pass child width, gap, and available width. Empty children yield an
-empty column.
+Pass slots, gap, and direction. Do not pass a uniform child width or
+the parent width. Empty slots yield an empty box. Share slots with a
+min width reflow how many sit on a line.
 
 ### Banner
 

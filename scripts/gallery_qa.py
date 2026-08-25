@@ -458,6 +458,7 @@ BOOK_STILLS: dict[str, str] = {
     "type": "content.png",
     "list": "collections.png",
     "chrome": "chrome.png",
+    "layout": "layout.png",
     "list-and-detail": "patterns.png",
 }
 BOOK_HELLO_STILL = "first-window.png"
@@ -1132,14 +1133,17 @@ def eastern_digit_hits(root: Path) -> list[str]:
 
 
 def gallery_controls_hits(root: Path) -> list[str]:
-    """Controls two-column pack and slider pair follow Tokens.direction."""
+    """Controls columns wrap; Fill demos sit at catalog width; slider pair follows direction."""
     src = (root / "icedtea-gallery" / "src" / "main.rs").read_text(encoding="utf-8")
     hits: list[str] = []
     if '"controls" => Some("button-group")' not in src:
         return ["missing controls pack_at"]
     pack = src.split('"controls" => Some("button-group")', 1)[1].split("stack(&hosted).into()", 1)[0]
-    if "i18n::order" not in pack:
-        hits.append("controls pack skips i18n::order")
+    if "layout::wrap" not in pack:
+        hits.append("controls columns skip measuring wrap")
+    demo = src.split("fn demo(", 1)[1].split("fn demo_widget", 1)[0]
+    if "catalog_host" not in demo:
+        hits.append("Fill demos skip catalog-width host")
     if '"slider" =>' not in src:
         hits.append("missing slider arm")
     else:
@@ -1276,7 +1280,7 @@ def run_rtl_source_checks(root: Path) -> list[dict]:
         ),
         _src_row(
             "gallery-controls-pack",
-            "controls pack and slider pair follow direction",
+            "controls wrap columns, catalog-width Fill hosts, slider pair follows direction",
             gallery_controls_hits(root),
         ),
     ]
@@ -1723,6 +1727,7 @@ _TOUR_PAGES = (
     "theme",
     "colors",
     "keys",
+    "layout",
     "marks",
     "chrome-rows",
     "feedback",

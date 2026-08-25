@@ -2,8 +2,22 @@
 
 Layout is Rust functions that return iced `Element`s. Recipes live in
 [`icedtea::layout`](https://docs.rs/icedtea/latest/icedtea/layout/index.html):
-`dock`, `split_view`, `clamp`, `form`, `grid`, `pad` (equal-fill
-tiles), `overlay_center`, plus size policy and breakpoints.
+`pack`, `wrap`, `dock`, `split_view`, `clamp`, `form`, `grid`, `pad`
+(equal-fill tiles), `overlay_center`, plus size policy and
+breakpoints.
+
+![Pack strip, wrapping chips, and reflowing tiles](images/layout.png)
+
+`layout::pack` measures each child, then hugs or shares leftover on
+one row or column. Pass [`Slot::hug`](https://docs.rs/icedtea/latest/icedtea/layout/struct.Slot.html)
+and [`Slot::share`](https://docs.rs/icedtea/latest/icedtea/layout/struct.Slot.html).
+[`Pack`](https://docs.rs/icedtea/latest/icedtea/layout/enum.Pack.html)
+places leftover the stretch children do not take: start, end, center,
+or between. `layout::wrap` is the same measurement, then a new line
+when the next child does not fit. Do not pass a uniform child width
+or the parent width. Window direction puts the first child on the
+start edge. Share slots with a min width reflow a tile wall when the
+parent crosses a column count.
 
 `layout::pad(cells, 4, density.space)` shares row width across cells.
 Pair it with `widget::button` and `Density::tile()` for a
@@ -19,7 +33,7 @@ themselves fill (a caption above a filling `textarea`).
 left-to-right start (the right edge when the locale is Arabic or Urdu).
 
 ```rust,ignore
-use icedtea::layout::{self, column_box, row_box};
+use icedtea::layout::{self, column_box, row_box, BoxOpts, Slot};
 
 let panes = row_box(
     [source, preview],
@@ -30,12 +44,21 @@ let panes = row_box(
     icedtea::i18n::Direction::Ltr,
 );
 let _ = column_box([caption, editor], 4, 8, layout::FILL, layout::FILL);
+let strip = layout::pack(
+    [Slot::hug(mark), Slot::share(field), Slot::hug(go)],
+    BoxOpts {
+        gap: 8.0,
+        ..BoxOpts::new()
+    },
+    icedtea::i18n::Direction::Ltr,
+);
+let _ = strip;
 ```
 
 ```rust
-use icedtea::layout::{Breakpoint, SizePolicy, distribute};
+use icedtea::layout::{Breakpoint, SizePolicy, allocate};
 
-let sizes = distribute(100.0, &[SizePolicy::fixed(20.0), SizePolicy::expand(1.0)]);
+let sizes = allocate(100.0, &[SizePolicy::fixed(20.0), SizePolicy::expand(1.0)]);
 assert_eq!(sizes[0], 20.0);
 let _ = Breakpoint::from_width(800.0);
 ```

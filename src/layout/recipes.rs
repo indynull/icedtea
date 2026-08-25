@@ -43,7 +43,7 @@ fn stretches(len: Length) -> bool {
     matches!(len, Length::Fill | Length::FillPortion(_))
 }
 
-use super::size::{distribute, SizePolicy};
+use super::size::{allocate, SizePolicy};
 use super::span::{cell_geometry, grid_extent, GridCell};
 use super::split::{Axis, SashEvent, SplitState};
 use crate::i18n::Direction;
@@ -63,71 +63,6 @@ pub fn clamp_width(available: f32, max: f32) -> f32 {
 /// Side padding when clamping.
 pub fn clamp_pad(available: f32, max: f32) -> f32 {
     ((available - clamp_width(available, max)) / 2.0).max(0.0)
-}
-
-/// How many items fit on one wrap line given child width, gap, and available width.
-pub fn wrap_per_row(child_w: f32, gap: f32, width: f32) -> usize {
-    if child_w <= 0.0 || width <= 0.0 {
-        return 1;
-    }
-    ((width + gap) / (child_w + gap)).floor().max(1.0) as usize
-}
-
-/// How many wrap rows for `n` children of `child_w` in `width` with `gap`.
-pub fn wrap_rows(n: usize, child_w: f32, gap: f32, width: f32) -> usize {
-    if n == 0 {
-        return 0;
-    }
-    if child_w <= 0.0 || width <= 0.0 {
-        return 1;
-    }
-    n.div_ceil(wrap_per_row(child_w, gap, width))
-}
-
-/// Flow children to the next line from available `width`.
-///
-/// Pass child width, gap, and available width. Empty children yield an
-/// empty column.
-///
-///
-/// ```
-/// use icedtea::a11y::{A11y, Role};
-/// use icedtea::layout;
-/// use icedtea::theme;
-/// use icedtea::widget;
-/// let tok = theme::named("dark").tokens;
-/// let chip = widget::label("New", tok, A11y::new("New", Role::Status));
-/// let _: icedtea::Element<'_, ()> =
-///     layout::wrap(vec![chip], 80.0, 8.0, 240.0, icedtea::i18n::Direction::Ltr);
-/// ```
-pub fn wrap<'a, M: 'a>(
-    children: Vec<Element<'a, M>>,
-    child_w: f32,
-    gap: f32,
-    width: f32,
-    dir: Direction,
-) -> Element<'a, M> {
-    let per = wrap_per_row(child_w, gap, width);
-    let mut rows = Column::new().spacing(gap.max(0.0));
-    let mut iter = children.into_iter().peekable();
-    while iter.peek().is_some() {
-        let mut chunk = Vec::new();
-        for _ in 0..per {
-            if let Some(c) = iter.next() {
-                chunk.push(c);
-            }
-        }
-        let mut r = Row::new().spacing(gap.max(0.0));
-        for c in crate::i18n::order(dir, chunk) {
-            r = r.push(c);
-        }
-        rows = rows.push(
-            container(r)
-                .width(Length::Fill)
-                .align_x(crate::i18n::align_start(dir)),
-        );
-    }
-    rows.into()
 }
 
 /// Dock slot occupancy → default window size.
@@ -173,7 +108,7 @@ pub fn window_size_from_dock(spec: DockSpec) -> (iced::Size, iced::Size) {
 
 /// Form row: label width + field stretch.
 pub fn form_columns(total: f32, label_pref: f32) -> (f32, f32) {
-    let sizes = distribute(
+    let sizes = allocate(
         total,
         &[
             SizePolicy::between(80.0, label_pref, 220.0, 0.0),
@@ -603,13 +538,7 @@ mod tests {
         assert_eq!(clamp_width(400.0, 320.0), 320.0);
         assert_eq!(clamp_width(10.0, 320.0), 10.0);
         assert_eq!(clamp_pad(400.0, 320.0), 40.0);
-        assert_eq!(wrap_rows(0, 10.0, 4.0, 100.0), 0);
-        assert_eq!(wrap_per_row(20.0, 4.0, 100.0), 4);
-        assert_eq!(wrap_rows(5, 20.0, 4.0, 100.0), 2);
-        assert_eq!(wrap_rows(3, 0.0, 4.0, 100.0), 1);
-        assert_eq!(wrap_per_row(0.0, 4.0, 100.0), 1);
-        assert_eq!(wrap_per_row(20.0, 4.0, 0.0), 1);
-        assert_eq!(wrap_rows(3, 20.0, 4.0, 0.0), 1);
+
         let (def, min) = window_size_from_dock(DockSpec::default());
         assert!(def.width >= min.width);
         assert_eq!(FORM_LABEL, 140.0);
@@ -695,18 +624,26 @@ mod tests {
         let _: Element<'_, ()> = grid(vec![t().into(), t().into(), t().into()], 2, 8);
         let _: Element<'_, ()> = pad(vec![t().into(), t().into(), t().into(), t().into()], 4, 8);
         let _: Element<'_, ()> = pad(vec![], 4, 8);
-        let _: Element<'_, ()> = wrap(
-            vec![t().into(), t().into(), t().into()],
-            40.0,
-            8.0,
-            100.0,
+        let _: Element<'_, ()> = crate::layout::wrap(
+            [
+                crate::layout::Slot::hug(t()),
+                crate::layout::Slot::hug(t()),
+                crate::layout::Slot::hug(t()),
+            ],
+            crate::layout::BoxOpts {
+                gap: 8.0,
+                line_gap: 8.0,
+                ..crate::layout::BoxOpts::new()
+            },
             crate::i18n::Direction::Ltr,
         );
-        let _: Element<'_, ()> = wrap(
-            vec![t().into(), t().into()],
-            40.0,
-            8.0,
-            100.0,
+        let _: Element<'_, ()> = crate::layout::wrap(
+            [crate::layout::Slot::hug(t()), crate::layout::Slot::hug(t())],
+            crate::layout::BoxOpts {
+                gap: 8.0,
+                line_gap: 8.0,
+                ..crate::layout::BoxOpts::new()
+            },
             crate::i18n::Direction::Rtl,
         );
         let _: Element<'_, ()> = grid(vec![], 2, 8);

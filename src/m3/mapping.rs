@@ -317,6 +317,11 @@ pub const MAP: &[MapRow] = &[
         fate: Fate::Map,
     },
     MapRow {
+        id: "pack",
+        m3: "Layout",
+        fate: Fate::Desktop,
+    },
+    MapRow {
         id: "wrap",
         m3: "Layout",
         fate: Fate::Desktop,

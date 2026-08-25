@@ -91,13 +91,15 @@ pub const ENTRIES: &[Entry] = &[
     Entry { id: "colors", title: "Colors", group: "Chrome", page: "colors" },
     Entry { id: "keys", title: "Keys", group: "Chrome", page: "keys" },
     Entry { id: "cheatsheet", title: "Cheatsheet", group: "Chrome", page: "keys" },
+    // Pack then wrap so idle QA shows hug/share and measuring reflow first.
+    Entry { id: "pack", title: "Pack", group: "Chrome", page: "layout" },
+    Entry { id: "wrap", title: "Wrap", group: "Chrome", page: "layout" },
     // Filter chips first so selected/idle faces are above the fold on Marks.
     Entry { id: "filter-chips", title: "Filter chips", group: "Chrome", page: "marks" },
     Entry { id: "chip", title: "Chip", group: "Chrome", page: "marks" },
     Entry { id: "badge", title: "Badge", group: "Chrome", page: "marks" },
     Entry { id: "card", title: "Card", group: "Chrome", page: "marks" },
     Entry { id: "rule", title: "Rule", group: "Chrome", page: "marks" },
-    Entry { id: "wrap", title: "Wrap", group: "Chrome", page: "marks" },
     Entry { id: "banner", title: "Banner", group: "Chrome", page: "marks" },
     Entry { id: "command-bar", title: "Command bar", group: "Chrome", page: "chrome-rows" },
     Entry { id: "context-menu", title: "Context menu", group: "Chrome", page: "chrome-rows" },
@@ -167,6 +169,7 @@ pub fn page_title(page: &str) -> &'static str {
         "type" => "Type",
         "sections" => "Tabs and sections",
         "marks" => "Marks",
+        "layout" => "Layout",
         "chrome-rows" => "Chrome rows",
         "feedback" => "Feedback",
         "workspace" => "Workspace",
@@ -244,6 +247,7 @@ pub fn constructor(id: &str) -> Option<(&'static str, &'static str)> {
         "chip" => ("widget", "chip"),
         "filter-chips" => ("widget", "filter_chips"),
         "badge" => ("widget", "badge"),
+        "pack" => ("layout", "pack"),
         "wrap" => ("layout", "wrap"),
         "banner" => ("widget", "banner"),
         "command-bar" => ("pattern", "command_bar"),
@@ -331,6 +335,7 @@ mod tests {
             "image",
             "progress-ring",
             "wrap",
+            "pack",
             "badge",
             "command-bar",
             "context-menu",
@@ -648,7 +653,7 @@ mod tests {
         let pattern = include_str!("pattern.rs");
         let theme = include_str!("theme.rs");
         let key = include_str!("key.rs");
-        let layout = include_str!("layout/recipes.rs");
+        let layout = include_str!("layout/flow.rs");
         let motion = include_str!("motion.rs");
         let map = [
             ("button", "button", widget),
@@ -709,6 +714,7 @@ mod tests {
             ("chip", "chip", widget),
             ("filter-chips", "filter_chips", widget),
             ("badge", "badge", widget),
+            ("pack", "pack", layout),
             ("wrap", "wrap", layout),
             ("banner", "banner", widget),
             ("command-bar", "command_bar", pattern),
@@ -775,7 +781,7 @@ mod tests {
             "motion" => include_str!("motion.rs"),
             "theme" => include_str!("theme.rs"),
             "key" => include_str!("key.rs"),
-            "layout" => include_str!("layout/recipes.rs"),
+            "layout" => include_str!("layout/flow.rs"),
             _ => return None,
         })
     }
@@ -878,8 +884,13 @@ mod tests {
             "A11y"
         ));
         assert!(!fn_params_mention(
-            include_str!("layout/recipes.rs"),
+            include_str!("layout/flow.rs"),
             "wrap",
+            "A11y"
+        ));
+        assert!(!fn_params_mention(
+            include_str!("layout/flow.rs"),
+            "pack",
             "A11y"
         ));
         assert!(fn_params_mention(
@@ -888,6 +899,7 @@ mod tests {
             "A11y"
         ));
         assert_eq!(constructor("wrap"), Some(("layout", "wrap")));
+        assert_eq!(constructor("pack"), Some(("layout", "pack")));
         assert!(module_src("no-such-module").is_none());
         assert!(!fn_params_mention("fn other() {}", "missing", "A11y"));
         assert!(!fn_params_mention("pub fn bare", "bare", "A11y"));
@@ -908,8 +920,9 @@ mod tests {
         must(
             page.contains("toolbar")
                 && page.contains("dialog_sheet")
-                && page.contains("layout::wrap"),
-            "accessibility.md must name chrome rows and wrap as not taking A11y",
+                && page.contains("layout::wrap")
+                && page.contains("layout::pack"),
+            "accessibility.md must name chrome rows and pack/wrap as not taking A11y",
         );
         must(
             widgets.contains("Chrome rows") && widgets.contains("recipes do not take"),

@@ -1,5 +1,6 @@
 //! Layout recipes, size policy, and breakpoints.
 //!
+//! Measuring box and wrap: [`pack`], [`wrap`], [`Slot`], [`BoxOpts`].
 //! `dock`, `split_view`, `clamp`, `form`, and `pad` return iced
 //! [`Element`](crate::Element)s. Split sash: the grip emits
 //! [`SashEvent::Press`] only; move and
@@ -8,26 +9,30 @@
 //! [`crate::widget::scroll`], not a raw iced scroller.
 //!
 //! ```
-//! use icedtea::layout::{distribute, SizePolicy};
+//! use icedtea::layout::{allocate, distribute, SizePolicy};
 //! let sizes = distribute(100.0, &[SizePolicy::fixed(20.0), SizePolicy::expand(1.0)]);
 //! assert_eq!(sizes[0], 20.0);
 //! assert_eq!(sizes[1], 80.0);
+//! let packed = allocate(100.0, &[SizePolicy::fixed(20.0), SizePolicy::expand(1.0)]);
+//! assert!((packed[1] - 80.0).abs() < 0.01);
 //! ```
 
 pub mod breakpoint;
+pub mod flow;
 pub mod recipes;
 pub mod size;
 pub mod span;
 pub mod split;
 
 pub use breakpoint::Breakpoint;
+pub use flow::{pack, wrap, BoxOpts, Cross, Pack, Slot};
 pub use recipes::{
     clamp, clamp_pad, clamp_width, column_box, dock, end_offset, fixed, form, form_columns, grid,
     grid_spanned, overlay_card, overlay_center, pad, padding, row_box, split_sizes, split_view,
-    stack_child, stack_visible, stick_to_end, window_size_from_dock, wrap, wrap_per_row, wrap_rows,
-    DockSpec, FILL, FORM_LABEL, LIST_PANE, SHRINK,
+    stack_child, stack_visible, stick_to_end, window_size_from_dock, DockSpec, FILL, FORM_LABEL,
+    LIST_PANE, SHRINK,
 };
-pub use size::{distribute, SizePolicy};
+pub use size::{allocate, distribute, SizePolicy};
 pub use span::{cell_geometry, grid_extent, span_occupies, GridCell};
 pub use split::{
     listen_cursor, listen_sash, sash_from_window_event, sash_pointer_pos, Axis, CursorEvent,
