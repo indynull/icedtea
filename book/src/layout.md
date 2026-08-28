@@ -25,25 +25,38 @@ key pad. Scroll a pane with `widget::scroll`.
 `Breakpoint::from_width` picks the stacked or beside sidebar recipe.
 
 `layout::FILL`, `layout::SHRINK`, and `layout::fixed(px)` are the size
-language for boxes and editors. `row_box` / `column_box` take width and
-height. A fill-height column gives leftover space to children that
-themselves fill (a caption above a filling `textarea`).
+language for boxes and editors. `BoxOpts` takes width and height. A
+fill-height pack gives leftover to [`Slot::share`](https://docs.rs/icedtea/latest/icedtea/layout/struct.Slot.html)
+children (a caption above a filling `textarea`).
 `pattern::list_detail` takes the sidebar as that same size.
 `split_view` and `list_detail` take `Direction`: the first pane is
 left-to-right start (the right edge when the locale is Arabic or Urdu).
 
 ```rust,ignore
-use icedtea::layout::{self, column_box, row_box, BoxOpts, Slot};
+use icedtea::layout::{self, Axis, BoxOpts, Slot};
 
-let panes = row_box(
-    [source, preview],
-    8,
-    0,
-    layout::FILL,
-    layout::FILL,
+let panes = layout::pack(
+    [Slot::share(source), Slot::share(preview)],
+    BoxOpts {
+        gap: 8.0,
+        width: layout::FILL,
+        height: layout::FILL,
+        ..BoxOpts::new()
+    },
     icedtea::i18n::Direction::Ltr,
 );
-let _ = column_box([caption, editor], 4, 8, layout::FILL, layout::FILL);
+let _ = layout::pack(
+    [Slot::hug(caption), Slot::share(editor)],
+    BoxOpts {
+        axis: Axis::Vertical,
+        gap: 4.0,
+        padding: 8.0.into(),
+        width: layout::FILL,
+        height: layout::FILL,
+        ..BoxOpts::new()
+    },
+    icedtea::i18n::Direction::Ltr,
+);
 let strip = layout::pack(
     [Slot::hug(mark), Slot::share(field), Slot::hug(go)],
     BoxOpts {
@@ -52,7 +65,7 @@ let strip = layout::pack(
     },
     icedtea::i18n::Direction::Ltr,
 );
-let _ = strip;
+let _ = (panes, strip);
 ```
 
 ```rust

@@ -1,7 +1,7 @@
-//! Layout recipe helpers: clamp, wrap, dock, form, overlay, scroll stick.
+//! Layout recipe helpers: clamp, dock, form, overlay, scroll stick.
 
-use iced::widget::{column, container, mouse_area, row, stack, Column, Row, Space, Stack};
-use iced::{Alignment, Element, Length, Padding};
+use iced::widget::{container, mouse_area, stack, Column, Row, Space, Stack};
+use iced::{Element, Length, Padding};
 
 /// Fill the parent on this axis.
 ///
@@ -39,11 +39,7 @@ pub fn fixed(px: f32) -> Length {
     Length::Fixed(px)
 }
 
-fn stretches(len: Length) -> bool {
-    matches!(len, Length::Fill | Length::FillPortion(_))
-}
-
-use super::size::{allocate, SizePolicy};
+use super::size::SizePolicy;
 use super::span::{cell_geometry, grid_extent, GridCell};
 use super::split::{Axis, SashEvent, SplitState};
 use crate::i18n::Direction;
@@ -104,18 +100,6 @@ pub fn window_size_from_dock(spec: DockSpec) -> (iced::Size, iced::Size) {
     let def = iced::Size::new((min_w + 120.0).max(640.0), (min_h + 80.0).max(440.0));
     let min = iced::Size::new(min_w.max(320.0), min_h.max(240.0));
     (def, min)
-}
-
-/// Form row: label width + field stretch.
-pub fn form_columns(total: f32, label_pref: f32) -> (f32, f32) {
-    let sizes = allocate(
-        total,
-        &[
-            SizePolicy::between(80.0, label_pref, 220.0, 0.0),
-            SizePolicy::expand(1.0),
-        ],
-    );
-    (sizes[0], sizes[1])
 }
 
 /// Overlay card size inside a window.
@@ -205,55 +189,6 @@ pub fn overlay_center<'a, M: 'a>(backdrop: Element<'a, M>, card: Element<'a, M>)
         .into()
 }
 
-/// Horizontal box. RTL reverses child order.
-///
-/// When `width` fills, children share the row. When `height` fills,
-/// each child stretches to the row height.
-pub fn row_box<'a, M: 'a>(
-    children: impl IntoIterator<Item = Element<'a, M>>,
-    spacing: u32,
-    pad: u32,
-    width: Length,
-    height: Length,
-    dir: Direction,
-) -> Element<'a, M> {
-    let kids = crate::i18n::order(dir, children);
-    // Equal-share columns only when the row is a filling pane, not a chrome strip.
-    let kids: Vec<Element<'a, M>> = if stretches(width) && stretches(height) {
-        kids.into_iter()
-            .map(|c| container(c).width(FILL).height(height).into())
-            .collect()
-    } else {
-        kids
-    };
-    let mut r = row(kids)
-        .spacing(spacing)
-        .padding(pad as f32)
-        .width(width)
-        .height(height);
-    if !stretches(height) {
-        r = r.align_y(Alignment::Center);
-    }
-    r.into()
-}
-
-/// Vertical box. Fill-height children take leftover space after shrink
-/// siblings (a caption above a filling editor).
-pub fn column_box<'a, M: 'a>(
-    children: impl IntoIterator<Item = Element<'a, M>>,
-    spacing: u32,
-    pad: u32,
-    width: Length,
-    height: Length,
-) -> Element<'a, M> {
-    column(children)
-        .spacing(spacing)
-        .padding(pad as f32)
-        .width(width)
-        .height(height)
-        .into()
-}
-
 /// Equal-fill tile pad: each cell shares the row width.
 /// Equal-fill tiles. Pair with [`crate::widget::button`].
 ///
@@ -296,9 +231,20 @@ pub fn grid<'a, M: 'a>(cells: Vec<Element<'a, M>>, columns: usize, spacing: u32)
     rows.into()
 }
 
-/// Form: label/field pairs stacked. RTL puts the field first.
+/// Form: label/field pairs stacked. The label sits on the start edge.
 ///
-/// Labels use [`FORM_LABEL`] so stacked rows share one gutter.
+/// Labels use [`FORM_LABEL`] so stacked rows share one gutter. The
+/// field takes leftover width. Empty rows yield an empty column.
+///
+/// ```
+/// use icedtea::iced::widget::text;
+/// use icedtea::layout;
+/// let _: icedtea::Element<'_, ()> = layout::form(
+///     [(text("Name").into(), text("Ada").into())],
+///     8,
+///     icedtea::i18n::Direction::Ltr,
+/// );
+/// ```
 pub fn form<'a, M: 'a>(
     rows_in: impl IntoIterator<Item = (Element<'a, M>, Element<'a, M>)>,
     spacing: u32,
@@ -307,14 +253,22 @@ pub fn form<'a, M: 'a>(
     let mut col = Column::new().spacing(spacing);
     for (label, field) in rows_in {
         let label = container(label)
-            .width(Length::Fixed(FORM_LABEL))
+            .width(FILL)
             .align_x(crate::i18n::align_start(dir));
-        let field = container(field).width(Length::Fill);
-        let pair = match dir {
-            Direction::Ltr => Row::new().push(label).push(field),
-            Direction::Rtl => Row::new().push(field).push(label),
-        };
-        col = col.push(pair.spacing(spacing).align_y(Alignment::Center));
+        col = col.push(crate::layout::pack(
+            [
+                crate::layout::Slot::sized(label, SizePolicy::fixed(FORM_LABEL)),
+                crate::layout::Slot::share(field),
+            ],
+            crate::layout::BoxOpts {
+                gap: spacing as f32,
+                cross: crate::layout::Cross::Center,
+                width: FILL,
+                height: SHRINK,
+                ..crate::layout::BoxOpts::new()
+            },
+            dir,
+        ));
     }
     col.into()
 }
@@ -542,8 +496,6 @@ mod tests {
         let (def, min) = window_size_from_dock(DockSpec::default());
         assert!(def.width >= min.width);
         assert_eq!(FORM_LABEL, 140.0);
-        let (l, f) = form_columns(400.0, FORM_LABEL);
-        assert!(l >= 80.0 && f > 0.0);
         let card = overlay_card(iced::Size::new(800.0, 600.0), 640.0, 480.0);
         assert!(card.width <= 640.0);
         assert!(stick_to_end(0.0, 10.0, 20.0, 4.0));
@@ -565,10 +517,6 @@ mod tests {
         assert_eq!(fixed(260.0), Length::Fixed(260.0));
         assert_eq!(LIST_PANE, 360.0);
         assert_eq!(fixed(LIST_PANE), Length::Fixed(360.0));
-        assert!(stretches(FILL));
-        assert!(stretches(Length::FillPortion(1)));
-        assert!(!stretches(SHRINK));
-        assert!(!stretches(fixed(16.0)));
     }
 
     #[test]
@@ -595,32 +543,6 @@ mod tests {
         assert!(grip.contains("tok: Tokens"));
         assert!(grip.contains("Space::new()"));
         let _: Element<'_, ()> = overlay_center(t().into(), t().into());
-        let _: Element<'_, ()> = row_box(
-            [t().into(), t().into()],
-            8,
-            8,
-            FILL,
-            SHRINK,
-            crate::i18n::Direction::Ltr,
-        );
-        let _: Element<'_, ()> = row_box(
-            [t().into(), t().into()],
-            8,
-            8,
-            FILL,
-            FILL,
-            crate::i18n::Direction::Rtl,
-        );
-        let _: Element<'_, ()> = row_box(
-            [t().into()],
-            8,
-            8,
-            fixed(120.0),
-            SHRINK,
-            crate::i18n::Direction::Ltr,
-        );
-        let _: Element<'_, ()> = column_box([t().into()], 8, 8, FILL, FILL);
-        let _: Element<'_, ()> = column_box([t().into()], 8, 8, SHRINK, SHRINK);
         let _: Element<'_, ()> = grid(vec![t().into(), t().into(), t().into()], 2, 8);
         let _: Element<'_, ()> = pad(vec![t().into(), t().into(), t().into(), t().into()], 4, 8);
         let _: Element<'_, ()> = pad(vec![], 4, 8);
@@ -657,6 +579,9 @@ mod tests {
             .next()
             .unwrap();
         assert!(form_src.contains("align_start(dir)"));
+        assert!(form_src.contains("pack("));
+        assert!(form_src.contains("Slot::sized"));
+        assert!(form_src.contains("Slot::share"));
         let _: Element<'_, ()> = stack_child(vec![t().into(), t().into()], 1);
         let _: Element<'_, ()> = stack_child(vec![], 3);
         let tok = crate::theme::named("dark").tokens;
@@ -857,5 +782,62 @@ mod tests {
         let source_kids = col_kids[0].children();
         assert!(source_kids.len() >= 2);
         assert!(source_kids[1].size().height > 150.0);
+    }
+
+    fn form_layout(el: &mut Element<'_, ()>, max: iced::Size) -> iced::advanced::layout::Node {
+        use iced::advanced::layout::Limits;
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels};
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        el.as_widget_mut()
+            .layout(&mut tree, &renderer, &Limits::new(iced::Size::ZERO, max))
+    }
+
+    fn form_row_boxes(node: &iced::advanced::layout::Node) -> Vec<iced::Rectangle> {
+        node.children()
+            .first()
+            .map(|row| row.children().iter().map(|c| c.bounds()).collect())
+            .unwrap_or_default()
+    }
+
+    fn form_block<'a, M: 'a>(w: f32, h: f32) -> Element<'a, M> {
+        iced::widget::container(iced::widget::Space::new())
+            .width(Length::Fixed(w))
+            .height(Length::Fixed(h))
+            .into()
+    }
+
+    #[test]
+    fn form_fixed_gutter_gives_leftover_to_the_field() {
+        let mut el = form(
+            [(form_block(20.0, 10.0), form_block(10.0, 10.0))],
+            8,
+            crate::i18n::Direction::Ltr,
+        );
+        let node = form_layout(&mut el, iced::Size::new(400.0, 40.0));
+        let b = form_row_boxes(&node);
+        assert_eq!(b.len(), 2);
+        assert!((b[0].width - FORM_LABEL).abs() < 0.5);
+        assert!((b[1].width - (400.0 - FORM_LABEL - 8.0)).abs() < 1.0);
+        assert!((b[0].x - 0.0).abs() < 0.5);
+    }
+
+    #[test]
+    fn form_label_is_first_child_on_start_in_rtl() {
+        let mut el = form(
+            [(form_block(20.0, 10.0), form_block(10.0, 10.0))],
+            8,
+            crate::i18n::Direction::Rtl,
+        );
+        let node = form_layout(&mut el, iced::Size::new(400.0, 40.0));
+        let b = form_row_boxes(&node);
+        assert_eq!(b.len(), 2);
+        assert!((b[0].width - FORM_LABEL).abs() < 0.5);
+        assert!(b[0].x > b[1].x);
+        assert!((b[0].x + b[0].width - 400.0).abs() < 1.0);
     }
 }

@@ -12,11 +12,17 @@
   wall. Window direction puts the first child on the start edge.
   Callers pass slots, not a child width or the parent width.
 - `layout::wrap_per_row` and `layout::wrap_rows` are gone.
+- `layout::row_box` and `layout::column_box` are gone.
+- `layout::form_columns` is gone.
+- `layout::distribute` is gone.
 
 ### Bug fix
 
-- `layout::form_columns` keeps the label at its preferred width and
-  gives leftover to the field.
+- `layout::form` packs a `FORM_LABEL` gutter and gives leftover to the
+  field. The label stays the first child on the start edge.
+- `value_field` packs the label gutter, a sharing value, and an
+  optional hug Copy.
+- `secret_field` packs a sharing field and hug Reveal / Copy.
 
 ## 0.14.0 — 2026-08-23
 

@@ -9,11 +9,9 @@
 //! [`crate::widget::scroll`], not a raw iced scroller.
 //!
 //! ```
-//! use icedtea::layout::{allocate, distribute, SizePolicy};
-//! let sizes = distribute(100.0, &[SizePolicy::fixed(20.0), SizePolicy::expand(1.0)]);
-//! assert_eq!(sizes[0], 20.0);
-//! assert_eq!(sizes[1], 80.0);
+//! use icedtea::layout::{allocate, SizePolicy};
 //! let packed = allocate(100.0, &[SizePolicy::fixed(20.0), SizePolicy::expand(1.0)]);
+//! assert_eq!(packed[0], 20.0);
 //! assert!((packed[1] - 80.0).abs() < 0.01);
 //! ```
 
@@ -27,12 +25,11 @@ pub mod split;
 pub use breakpoint::Breakpoint;
 pub use flow::{pack, wrap, BoxOpts, Cross, Pack, Slot};
 pub use recipes::{
-    clamp, clamp_pad, clamp_width, column_box, dock, end_offset, fixed, form, form_columns, grid,
-    grid_spanned, overlay_card, overlay_center, pad, padding, row_box, split_sizes, split_view,
-    stack_child, stack_visible, stick_to_end, window_size_from_dock, DockSpec, FILL, FORM_LABEL,
-    LIST_PANE, SHRINK,
+    clamp, clamp_pad, clamp_width, dock, end_offset, fixed, form, grid, grid_spanned, overlay_card,
+    overlay_center, pad, padding, split_sizes, split_view, stack_child, stack_visible,
+    stick_to_end, window_size_from_dock, DockSpec, FILL, FORM_LABEL, LIST_PANE, SHRINK,
 };
-pub use size::{allocate, distribute, SizePolicy};
+pub use size::{allocate, SizePolicy};
 pub use span::{cell_geometry, grid_extent, span_occupies, GridCell};
 pub use split::{
     listen_cursor, listen_sash, sash_from_window_event, sash_pointer_pos, Axis, CursorEvent,

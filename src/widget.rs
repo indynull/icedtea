@@ -2481,12 +2481,24 @@ pub fn secret_field<'a, M: Clone + 'a>(
         ButtonOpts::SHRINK,
         A11y::button(copy.title.clone()).with_disabled(!copy.enabled || a11y.disabled),
     );
-    let kids = crate::i18n::order(dir, [field, toggle, copy_btn]);
-    let mut r = Row::new().spacing(gap(tok)).align_y(Alignment::Center);
-    for k in kids {
-        r = r.push(k);
-    }
-    a11y::attach(r.into(), &a11y)
+    a11y::attach(
+        crate::layout::pack(
+            [
+                crate::layout::Slot::share(field),
+                crate::layout::Slot::hug(toggle),
+                crate::layout::Slot::hug(copy_btn),
+            ],
+            crate::layout::BoxOpts {
+                gap: gap(tok),
+                cross: crate::layout::Cross::Center,
+                width: Length::Fill,
+                height: Length::Shrink,
+                ..crate::layout::BoxOpts::new()
+            },
+            dir,
+        ),
+        &a11y,
+    )
 }
 
 /// A labeled read-only value the user can select and copy.
@@ -2547,18 +2559,18 @@ pub fn value_field<'a, M: Clone + 'a>(
         tok,
         a11y.child(Role::Status).with_value(title.clone()),
     ))
-    .width(Length::Fixed(label_width.max(1.0)));
-    let value = container(selectable(
-        content,
-        on_action,
-        tok,
-        face,
-        a11y.child(Role::TextBox),
-    ))
-    .width(Length::Fill);
-    let mut kids: Vec<Element<'a, M>> = vec![label.into(), value.into()];
+    .width(Length::Fill)
+    .align_x(crate::i18n::align_start(dir));
+    let value = selectable(content, on_action, tok, face, a11y.child(Role::TextBox));
+    let mut slots = vec![
+        crate::layout::Slot::sized(
+            label,
+            crate::layout::SizePolicy::fixed(label_width.max(1.0)),
+        ),
+        crate::layout::Slot::share(value),
+    ];
     if let Some(copy) = copy {
-        kids.push(button(
+        slots.push(crate::layout::Slot::hug(button(
             copy.title.clone(),
             copy.invoke(),
             tok,
@@ -2566,17 +2578,22 @@ pub fn value_field<'a, M: Clone + 'a>(
             Icons::NONE,
             ButtonOpts::SHRINK,
             A11y::button(copy.title.clone()).with_disabled(!copy.enabled || a11y.disabled),
-        ));
+        )));
     }
-    let kids = crate::i18n::order(dir, kids);
-    let mut r = Row::new()
-        .spacing(gap(tok))
-        .align_y(Alignment::Center)
-        .width(Length::Fill);
-    for k in kids {
-        r = r.push(k);
-    }
-    a11y::attach(r.into(), &a11y)
+    a11y::attach(
+        crate::layout::pack(
+            slots,
+            crate::layout::BoxOpts {
+                gap: gap(tok),
+                cross: crate::layout::Cross::Center,
+                width: Length::Fill,
+                height: Length::Shrink,
+                ..crate::layout::BoxOpts::new()
+            },
+            dir,
+        ),
+        &a11y,
+    )
 }
 
 /// Multiline editor. `height` is icedtea size language ([`crate::layout::FILL`]
@@ -3579,16 +3596,9 @@ struct FormGroup<'a, Message> {
     dir: crate::i18n::Direction,
 }
 
-fn form_field_at(
-    layout: Layout<'_>,
-    active: usize,
-    dir: crate::i18n::Direction,
-) -> Option<Layout<'_>> {
-    let row = layout.children().nth(active)?;
-    match dir {
-        crate::i18n::Direction::Ltr => row.children().nth(1),
-        crate::i18n::Direction::Rtl => row.children().next(),
-    }
+fn form_field_at(layout: Layout<'_>, active: usize) -> Option<Layout<'_>> {
+    // `layout::form` packs label then field; direction only mirrors paint.
+    layout.children().nth(active)?.children().nth(1)
 }
 
 #[derive(Default)]
@@ -3695,7 +3705,7 @@ impl<'a, Message: Clone> Widget<Message, iced::Theme, iced::Renderer> for FormGr
                     .and_then(|id| id.as_ref())
                     .is_none()
             {
-                if let Some(field) = form_field_at(layout, self.active, self.dir) {
+                if let Some(field) = form_field_at(layout, self.active) {
                     let b = field.bounds();
                     let x = match self.dir {
                         crate::i18n::Direction::Ltr => b.x + 12.0,
@@ -11160,8 +11170,92 @@ mod tests {
             .split("pub fn textarea")
             .next()
             .unwrap();
-        assert!(vf_src.contains("label_width") && vf_src.contains("Length::Fixed"));
-        assert!(vf_src.contains("Length::Fill"));
+        assert!(vf_src.contains("label_width"));
+        assert!(vf_src.contains("pack("));
+        assert!(vf_src.contains("Slot::sized"));
+        assert!(vf_src.contains("Slot::share"));
+    }
+
+    #[test]
+    fn value_field_label_is_first_child_on_start_in_rtl() {
+        use iced::advanced::layout::Limits;
+        use iced::advanced::widget::Tree;
+        use iced::widget::text_editor::Content;
+        use iced::{Font, Pixels, Size};
+
+        let tok = named("dark")
+            .tokens
+            .with_direction(crate::i18n::Direction::Rtl);
+        let content = Content::with_text("a/b");
+        let mut el: Element<'_, ()> = value_field(
+            "Path",
+            &content,
+            |_| (),
+            None,
+            typo::FontFace::Mono,
+            crate::layout::FORM_LABEL,
+            tok,
+            crate::i18n::Direction::Rtl,
+            A11y::new("vf-rtl", Role::Group),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let node = el.as_widget_mut().layout(
+            &mut tree,
+            &renderer,
+            &Limits::new(Size::ZERO, Size::new(400.0, 40.0)),
+        );
+        let row = &node.children()[0];
+        let kids: Vec<_> = row.children().iter().map(|c| c.bounds()).collect();
+        assert_eq!(kids.len(), 2);
+        assert!((kids[0].width - crate::layout::FORM_LABEL).abs() < 0.5);
+        assert!(kids[0].x > kids[1].x);
+        assert!((kids[0].x + kids[0].width - 400.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn secret_field_value_is_first_child_on_start_in_rtl() {
+        use iced::advanced::layout::Limits;
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+
+        let tok = named("dark")
+            .tokens
+            .with_direction(crate::i18n::Direction::Rtl);
+        let copy = crate::action::Action::new("secret.copy", "Copy", ());
+        let mut el: Element<'_, ()> = secret_field(
+            "Token",
+            "abc",
+            |_| (),
+            false,
+            (),
+            "Show",
+            "Hide",
+            &copy,
+            tok,
+            crate::i18n::Direction::Rtl,
+            A11y::new("secret-rtl", Role::Group),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let node = el.as_widget_mut().layout(
+            &mut tree,
+            &renderer,
+            &Limits::new(Size::ZERO, Size::new(400.0, 40.0)),
+        );
+        let row = &node.children()[0];
+        let kids: Vec<_> = row.children().iter().map(|c| c.bounds()).collect();
+        assert_eq!(kids.len(), 3);
+        assert!(kids[0].width > kids[1].width);
+        assert!(kids[0].width > kids[2].width);
+        assert!(kids[0].x > kids[2].x);
+        assert!((kids[0].x + kids[0].width - 400.0).abs() < 1.0);
     }
 
     fn search_clear_row_len(value: &str, on_clear: Option<()>) -> usize {
