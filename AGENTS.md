@@ -33,12 +33,12 @@ just material-snapshot  # Material spec pages for gallery QA
 | --- | --- |
 | `src/` | Public library `icedtea` |
 | `icedtea-gallery/` | Shipping gallery; every `catalog::ENTRIES` id appears on a page |
-| `book/` | Guide (mdBook). Published from `master` to GitHub Pages |
+| `book/` | Guide (mdBook). Published from `main` to GitHub Pages |
 | `TODO.md` | Remaining work |
 | `assets/icons/` | Chrome SVGs |
 | `.github/workflows/ci.yml` | Linux lint, docs, and cargo-deny; tests with coverage on Linux, macOS, Windows |
 | `.github/workflows/publish.yml` | Tag `vX.Y.Z` publishes `icedtea` to crates.io and opens a GitHub release from that version's changelog |
-| `.github/workflows/book.yml` | `mdbook build`; deploys the guide on `master` |
+| `.github/workflows/book.yml` | `mdbook build`; deploys the guide on `main` |
 
 Workspace members: `icedtea`, `icedtea-gallery`.
 Rust 1.89, edition 2021, iced 0.14. License MIT.

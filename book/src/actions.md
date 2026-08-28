@@ -68,5 +68,5 @@ so those bare keys match too (`key::WhileInput::Chrome`).
 - [`ActionTable`](https://docs.rs/icedtea/latest/icedtea/action/struct.ActionTable.html)
 - [`key::handle`](https://docs.rs/icedtea/latest/icedtea/key/fn.handle.html)
 - [`key::listen`](https://docs.rs/icedtea/latest/icedtea/key/fn.listen.html)
-- [source](https://github.com/indynull/icedtea/blob/master/src/action.rs)
+- [source](https://github.com/indynull/icedtea/blob/main/src/action.rs)
 - [crates.io](https://crates.io/crates/icedtea)

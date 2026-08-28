@@ -25,5 +25,5 @@ List/detail, tab view, preferences, about, and status page are in
 — they return `Element`s. See [Patterns](reference/patterns.md).
 
 - [`NavStack`](https://docs.rs/icedtea/latest/icedtea/nav/struct.NavStack.html)
-- [source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs)
+- [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
 - [crates.io](https://crates.io/crates/icedtea)

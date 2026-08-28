@@ -2,7 +2,7 @@ name: check
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     tags-ignore: ["v*"]
     paths-ignore:
       - "book/**"

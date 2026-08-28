@@ -32,5 +32,5 @@ color, and font stay in-app (`dialog::InAppDialog`).
 
 - [`window`](https://docs.rs/icedtea/latest/icedtea/window/index.html)
 - [`Boot`](https://docs.rs/icedtea/latest/icedtea/app/struct.Boot.html)
-- [source](https://github.com/indynull/icedtea/blob/master/src/window.rs)
+- [source](https://github.com/indynull/icedtea/blob/main/src/window.rs)
 - [crates.io](https://crates.io/crates/icedtea)

@@ -4,7 +4,7 @@ Buttons, toggles, and a slider. Faces paint from M3 roles and
 `ControlState` (enabled, disabled, hovered, pressed, selected) via
 `style` and `Tokens::scheme()`.
 [rustdoc](https://docs.rs/icedtea/latest/icedtea/widget/index.html) ·
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -18,7 +18,7 @@ Each constructor takes `A11y` unless noted. iced 0.14 publishes the widget id on
 
 Constructor: [`widget::button`](https://docs.rs/icedtea/latest/icedtea/widget/fn.button.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -35,7 +35,7 @@ label, `{ width: Length::Fill, height }` for a pad tile).
 
 Constructor: [`widget::split_button`](https://docs.rs/icedtea/latest/icedtea/widget/fn.split_button.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -50,7 +50,7 @@ Pass `A11y`.
 
 Constructor: [`widget::toggle_button`](https://docs.rs/icedtea/latest/icedtea/widget/fn.toggle_button.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -65,7 +65,7 @@ Pass `A11y`.
 
 Constructor: [`widget::checkbox`](https://docs.rs/icedtea/latest/icedtea/widget/fn.checkbox.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -80,7 +80,7 @@ Pass `A11y`.
 
 Constructor: [`widget::radio`](https://docs.rs/icedtea/latest/icedtea/widget/fn.radio.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -95,7 +95,7 @@ Pass `A11y`.
 
 Constructor: [`widget::switch`](https://docs.rs/icedtea/latest/icedtea/widget/fn.switch.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -110,7 +110,7 @@ Pass `A11y`.
 
 Constructor: [`widget::slider`](https://docs.rs/icedtea/latest/icedtea/widget/fn.slider.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -126,7 +126,7 @@ Pass `A11y`.
 
 Constructor: [`widget::segmented_button`](https://docs.rs/icedtea/latest/icedtea/widget/fn.segmented_button.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -140,7 +140,7 @@ Pass `A11y`.
 
 Constructor: [`widget::button_group`](https://docs.rs/icedtea/latest/icedtea/widget/fn.button_group.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 Each cell is a label plus optional icon (`Cell`). Press sends the index.
@@ -154,7 +154,7 @@ Pass `A11y`.
 
 Constructor: [`widget::icon_button`](https://docs.rs/icedtea/latest/icedtea/widget/fn.icon_button.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -169,7 +169,7 @@ Pass `A11y`.
 
 Constructor: [`widget::icon_button_toggle`](https://docs.rs/icedtea/latest/icedtea/widget/fn.icon_button_toggle.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 Same wash as toggle button. Disabled keeps the face.
@@ -182,7 +182,7 @@ Pass `A11y`.
 
 Constructor: [`widget::range_slider`](https://docs.rs/icedtea/latest/icedtea/widget/fn.range_slider.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -196,7 +196,7 @@ Pass `A11y`.
 
 Constructor: [`widget::checkbox_indeterminate`](https://docs.rs/icedtea/latest/icedtea/widget/fn.checkbox_indeterminate.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 

@@ -439,7 +439,7 @@ mod tests {
                     format!("{} section must link rustdoc", e.id),
                 );
                 must(
-                    section.contains("github.com/indynull/icedtea/blob/master"),
+                    section.contains("github.com/indynull/icedtea/blob/main"),
                     format!("{} section must link source", e.id),
                 );
                 let tea = section.contains("crates.io/crates/icedtea");

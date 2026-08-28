@@ -11,7 +11,7 @@ defaults:
   run:
     shell: bash
 
-# Tag after master is green and the tour GIF is persisted
+# Tag after main is green and the tour GIF is persisted
 # (`just gallery-gif` then `just gallery-gif persist` in the version-cut
 # commit). Publishes crates.io and a GitHub release. Does not re-run the
 # check.

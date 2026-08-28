@@ -2,7 +2,7 @@
 
 Composed chrome.
 [rustdoc](https://docs.rs/icedtea/latest/icedtea/pattern/index.html) ·
-[source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -18,7 +18,7 @@ Window recipes take children and tokens. `nav_rail`, `tool_panel`,
 
 Constructor: [`pattern::dialog_sheet`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.dialog_sheet.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 Primary and optional cancel, plus extra actions and an optional header
@@ -32,7 +32,7 @@ with a 0–1 `progress` for enter/exit.
 
 Constructor: [`pattern::list_detail`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.list_detail.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 `sidebar` is `layout::fixed` or `layout::FILL`. Children fill their
@@ -44,7 +44,7 @@ panes. Pass `Direction` so the list sits on the start side.
 
 Constructor: [`pattern::inspector`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.inspector.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 Three panes. The application owns selection in the list.
@@ -55,7 +55,7 @@ Three panes. The application owns selection in the list.
 
 Constructor: [`pattern::drawer`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.drawer.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 `open` is the committed pane. `progress` is 0 (gone) to 1 (220 dp).
@@ -67,7 +67,7 @@ Closed at 0 paints content only.
 
 Constructor: [`pattern::workspace`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.workspace.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 `DockNode` is the layout tree (save, restore, `move_panel`).
@@ -83,7 +83,7 @@ Pass `A11y`.
 
 Constructor: [`pattern::tool_panel`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.tool_panel.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 Title plus body. `on_dock` is the Dock control. Empty body is title
@@ -97,7 +97,7 @@ Pass `A11y`.
 
 Constructor: [`pattern::nav_rail`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.nav_rail.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 Selected row uses the rail wash. Press emits the destination index.
@@ -113,7 +113,7 @@ Pass `A11y`.
 
 Constructor: [`pattern::navigation_view`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.navigation_view.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 `NavStack` is push / pop / replace. Pass window width.
@@ -126,7 +126,7 @@ Constructor: [`pattern::navigation_view`](https://docs.rs/icedtea/latest/icedtea
 
 Constructor: [`pattern::tab_view`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.tab_view.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 Select and close messages. The application paints the body for the
@@ -138,7 +138,7 @@ active tab.
 
 Constructor: [`pattern::preferences_page`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.preferences_page.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 `PrefGroup` is a title plus key/value rows. Empty query shows every
@@ -150,7 +150,7 @@ group.
 
 Constructor: [`pattern::about_page`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.about_page.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 Strings are the application's. Catalog supplies chrome labels
@@ -163,7 +163,7 @@ Arabic, Urdu).
 
 Constructor: [`pattern::status_page`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.status_page.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 Title, body, and an optional action. Use when a list has no rows.
@@ -174,7 +174,7 @@ Title, body, and an optional action. Use when a list has no rows.
 
 Constructor: [`pattern::command_palette_view`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.command_palette_view.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 `CommandPalette` owns the query and hits. Empty query shows
@@ -189,7 +189,7 @@ slides the panel. See [Overlay windows](../overlay-windows.md).
 
 Constructor: [`pattern::main_window`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.main_window.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 Pass the four regions as `Element`s. [First window](../first-window.md)
@@ -201,7 +201,7 @@ is the smaller form: toolbar plus one control.
 
 Constructor: [`pattern::side_sheet`](https://docs.rs/icedtea/latest/icedtea/pattern/fn.side_sheet.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/pattern.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 

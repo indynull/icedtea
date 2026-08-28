@@ -2,7 +2,7 @@
 
 Text, numbers, dates, and picks.
 [rustdoc](https://docs.rs/icedtea/latest/icedtea/widget/index.html) ·
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -16,7 +16,7 @@ Each constructor takes `A11y` unless noted. iced 0.14 publishes the widget id on
 
 Constructor: [`widget::text_input`](https://docs.rs/icedtea/latest/icedtea/widget/fn.text_input.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -38,7 +38,7 @@ Pass `A11y`.
 
 Constructor: [`widget::password_input`](https://docs.rs/icedtea/latest/icedtea/widget/fn.password_input.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -53,7 +53,7 @@ Pass `A11y`.
 
 Constructor: [`widget::secret_field`](https://docs.rs/icedtea/latest/icedtea/widget/fn.secret_field.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 Reveal toggles the mask. Copy is an `Action` whose message the
@@ -67,7 +67,7 @@ Pass `A11y`.
 
 Constructor: [`widget::value_field`](https://docs.rs/icedtea/latest/icedtea/widget/fn.value_field.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 Meta label in a fixed gutter, selectable value (fill), optional Copy
@@ -89,7 +89,7 @@ Pass `A11y`.
 
 Constructor: [`widget::textarea`](https://docs.rs/icedtea/latest/icedtea/widget/fn.textarea.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -104,7 +104,7 @@ Pass `A11y`.
 
 Constructor: [`widget::search_input`](https://docs.rs/icedtea/latest/icedtea/widget/fn.search_input.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -124,7 +124,7 @@ Pass `A11y`.
 
 Constructor: [`widget::search_view`](https://docs.rs/icedtea/latest/icedtea/widget/fn.search_view.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 The application owns the query and the hit list. Empty hits show
@@ -138,7 +138,7 @@ Pass `A11y`.
 
 Constructor: [`widget::suggest_field`](https://docs.rs/icedtea/latest/icedtea/widget/fn.suggest_field.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 The application owns the query and the suggestion list. Picking a
@@ -152,7 +152,7 @@ Pass `A11y`.
 
 Constructor: [`widget::pick_list`](https://docs.rs/icedtea/latest/icedtea/widget/fn.pick_list.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -172,7 +172,7 @@ Pass `A11y`.
 
 Constructor: [`widget::form_group`](https://docs.rs/icedtea/latest/icedtea/widget/fn.form_group.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 Tab and Shift+Tab walk the rows and wrap. The first text field can
@@ -191,7 +191,7 @@ Pass `A11y`.
 
 Constructor: [`widget::number_input`](https://docs.rs/icedtea/latest/icedtea/widget/fn.number_input.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 The application owns the number. Step messages bump it. Disabled
@@ -205,7 +205,7 @@ Pass `A11y`.
 
 Constructor: [`widget::date_stepper`](https://docs.rs/icedtea/latest/icedtea/widget/fn.date_stepper.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 The application owns the selected day. Disabled ignores picks.
@@ -218,7 +218,7 @@ Pass `A11y`.
 
 Constructor: [`widget::time_picker`](https://docs.rs/icedtea/latest/icedtea/widget/fn.time_picker.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 `TimeValue` is hour, minute, second. `TimeClock` is display only
@@ -233,7 +233,7 @@ Pass `A11y`.
 
 Constructor: [`widget::field_support`](https://docs.rs/icedtea/latest/icedtea/widget/fn.field_support.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 

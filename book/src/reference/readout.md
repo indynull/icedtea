@@ -2,7 +2,7 @@
 
 Progress, sparks, and a large reading.
 [rustdoc](https://docs.rs/icedtea/latest/icedtea/widget/index.html) ·
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -16,7 +16,7 @@ Each constructor takes `A11y` unless noted. iced 0.14 publishes the widget id on
 
 Constructor: [`widget::progress`](https://docs.rs/icedtea/latest/icedtea/widget/fn.progress.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -36,7 +36,7 @@ Pass `A11y`.
 
 Constructor: [`widget::progress_ring`](https://docs.rs/icedtea/latest/icedtea/widget/fn.progress_ring.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -51,7 +51,7 @@ Pass `A11y`.
 
 Constructor: [`widget::spinner`](https://docs.rs/icedtea/latest/icedtea/widget/fn.spinner.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 

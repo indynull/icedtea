@@ -38,7 +38,7 @@ fn main() -> icedtea::iced::Result {
 A four-function keypad on `layout::pad`, a large reading for the value,
 and `key::press` for digits and Shift+8 as `*` is the compact tool
 shape. The application owns the arithmetic. The first window is
-[`examples/hello.rs`](https://github.com/indynull/icedtea/blob/master/examples/hello.rs).
+[`examples/hello.rs`](https://github.com/indynull/icedtea/blob/main/examples/hello.rs).
 
 The caption on a tile can be a glyph; the accessible name stays
 readable (`⌫` on the face, name `Backspace`).
@@ -76,5 +76,5 @@ plus a copy `Action`. The application owns the copy message
 (`icedtea::copy_text`).
 
 - [`layout::pad`](https://docs.rs/icedtea/latest/icedtea/layout/fn.pad.html)
-- [source](https://github.com/indynull/icedtea/blob/master/src/layout/recipes.rs)
+- [source](https://github.com/indynull/icedtea/blob/main/src/layout/recipes.rs)
 - [crates.io](https://crates.io/crates/icedtea)

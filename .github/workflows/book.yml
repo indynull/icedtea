@@ -2,7 +2,7 @@ name: book
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
 
 permissions:
@@ -12,10 +12,10 @@ defaults:
   run:
     shell: bash
 
-# Cancel superseded pull-request book builds. Never cancel a master deploy.
+# Cancel superseded pull-request book builds. Never cancel a main deploy.
 concurrency:
   group: book-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   build:
@@ -27,12 +27,12 @@ jobs:
           tool: mdbook
       - run: mdbook build
       - uses: actions/upload-pages-artifact@v3
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
           path: book/book
 
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
     environment:

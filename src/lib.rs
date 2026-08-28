@@ -35,7 +35,7 @@
 //! settings on `iced::daemon`: no window until [`Prepared::open`],
 //! and the process stays up when the last window closes.
 //! The same program is
-//! [`examples/hello.rs`](https://github.com/indynull/icedtea/blob/master/examples/hello.rs).
+//! [`examples/hello.rs`](https://github.com/indynull/icedtea/blob/main/examples/hello.rs).
 //!
 //! ```ignore
 //! icedtea::run!(

@@ -16,7 +16,7 @@ You keep the data. Color and type follow
 once; the toolbar, menus, and shortcuts can all run it. A constructor
 is a function that draws one control and sends your message.
 
-![A themed icedtea window](https://github.com/indynull/icedtea/raw/master/assets/gallery.gif)
+![A themed icedtea window](https://github.com/indynull/icedtea/raw/main/assets/gallery.gif)
 
 ## First window
 
@@ -53,6 +53,6 @@ Xcode command-line tools. Windows needs the MSVC build tools.
 
 [documentation]: https://docs.rs/icedtea
 [crates-io]: https://crates.io/crates/icedtea
-[license]: https://github.com/indynull/icedtea/blob/master/LICENSE
+[license]: https://github.com/indynull/icedtea/blob/main/LICENSE
 [actions]: https://github.com/indynull/icedtea/actions
 [codecov]: https://app.codecov.io/gh/indynull/icedtea

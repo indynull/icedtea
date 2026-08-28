@@ -13,7 +13,7 @@ command = "python3 scripts/mdbook_version.py"
 
 [output.html]
 git-repository-url = "https://github.com/indynull/icedtea"
-edit-url-template = "https://github.com/indynull/icedtea/edit/master/book/src/{path}"
+edit-url-template = "https://github.com/indynull/icedtea/edit/main/book/src/{path}"
 site-url = "/icedtea/"
 no-section-label = true
 additional-css = ["book/sidebar.css"]

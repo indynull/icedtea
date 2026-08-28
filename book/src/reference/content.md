@@ -2,7 +2,7 @@
 
 Type, icons, documents, and images.
 [rustdoc](https://docs.rs/icedtea/latest/icedtea/widget/index.html) ·
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -34,7 +34,7 @@ drag-selectable. Drag across headings, paragraphs, and lists uses
 
 Constructor: [`widget::label`](https://docs.rs/icedtea/latest/icedtea/widget/fn.label.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 Platform sans. Empty string is an empty node; still pass `A11y`.
@@ -46,7 +46,7 @@ Platform sans. Empty string is an empty node; still pass `A11y`.
 
 Constructor: [`widget::icon_svg`](https://docs.rs/icedtea/latest/icedtea/widget/fn.icon_svg.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 `Icon` is the desktop chrome set (Material Symbols Sharp; see
@@ -66,7 +66,7 @@ Pass `A11y`.
 
 Constructor: [`widget::tooltip_wrap`](https://docs.rs/icedtea/latest/icedtea/widget/fn.tooltip_wrap.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -79,7 +79,7 @@ text is a no-op wrap. The child keeps its own `A11y`.
 
 Constructor: [`widget::tooltip_rich`](https://docs.rs/icedtea/latest/icedtea/widget/fn.tooltip_rich.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 Optional action button and `TooltipAnchor`. Empty title, body, and
@@ -91,7 +91,7 @@ action is a no-op wrap. The child keeps its own `A11y`.
 
 Constructor: [`widget::hyperlink`](https://docs.rs/icedtea/latest/icedtea/widget/fn.hyperlink.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 The application opens the URL or navigates. Disabled paints muted
@@ -105,7 +105,7 @@ Pass `A11y`.
 
 Constructor: [`widget::markdown_view`](https://docs.rs/icedtea/latest/icedtea/widget/fn.markdown_view.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -131,7 +131,7 @@ Pass `A11y`.
 
 Constructor: [`widget::highlighted_code`](https://docs.rs/icedtea/latest/icedtea/widget/fn.highlighted_code.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -149,7 +149,7 @@ Pass `A11y`.
 
 Constructor: [`widget::image_slot`](https://docs.rs/icedtea/latest/icedtea/widget/fn.image_slot.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -164,7 +164,7 @@ Pass `A11y`.
 
 Constructor: [`widget::selectable`](https://docs.rs/icedtea/latest/icedtea/widget/fn.selectable.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 

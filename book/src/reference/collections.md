@@ -2,7 +2,7 @@
 
 Lists, tables, trees, tabs, expanders, and pages.
 [rustdoc](https://docs.rs/icedtea/latest/icedtea/widget/index.html) ·
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
@@ -27,7 +27,7 @@ pane on `list_view`, `virtual_column`, and `data_table`.
 
 Constructor: [`widget::list_view`](https://docs.rs/icedtea/latest/icedtea/widget/fn.list_view.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 Window, row height, overscan, scroll, empty copy, meta color,
@@ -51,7 +51,7 @@ Pass `A11y`.
 
 Constructor: [`widget::virtual_column`](https://docs.rs/icedtea/latest/icedtea/widget/fn.virtual_column.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 Same windowing as list (overscan, rail, wheel) for app-built faces —
@@ -67,7 +67,7 @@ Pass `A11y`.
 
 Constructor: [`widget::log_view`](https://docs.rs/icedtea/latest/icedtea/widget/fn.log_view.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 Virtualizes long logs. Iced's end anchor reports offset 0, so the log
@@ -82,7 +82,7 @@ Pass `A11y`.
 
 Constructor: [`widget::item_grid`](https://docs.rs/icedtea/latest/icedtea/widget/fn.item_grid.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 Pass titles. Click sends the index. Empty grid is an empty column.
@@ -95,7 +95,7 @@ Pass `A11y`.
 
 Constructor: [`widget::data_table`](https://docs.rs/icedtea/latest/icedtea/widget/fn.data_table.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 `TableModel` holds headers and rows. `on_cell` is an `ItemClick` plus
@@ -114,7 +114,7 @@ Pass `A11y`.
 
 Constructor: [`widget::tree_view`](https://docs.rs/icedtea/latest/icedtea/widget/fn.tree_view.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 The application owns expand state. Leaf rows have no twisty. Empty
@@ -134,7 +134,7 @@ Pass `A11y`.
 
 Constructor: [`widget::tab_bar`](https://docs.rs/icedtea/latest/icedtea/widget/fn.tab_bar.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 `Tabs { closable: false }` is pinned sections. Titles use the meta type
@@ -154,7 +154,7 @@ Pass `A11y`.
 
 Constructor: [`widget::accordion_view`](https://docs.rs/icedtea/latest/icedtea/widget/fn.accordion_view.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 The application owns which row is open and a 0–1 `progress` for
@@ -169,7 +169,7 @@ Pass `A11y`.
 
 Constructor: [`widget::expander`](https://docs.rs/icedtea/latest/icedtea/widget/fn.expander.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 The application owns `open` and `progress` (0 peek, 1 full). Closed
@@ -186,7 +186,7 @@ Pass `A11y`.
 
 Constructor: [`widget::pagination`](https://docs.rs/icedtea/latest/icedtea/widget/fn.pagination.html)
 
-[source](https://github.com/indynull/icedtea/blob/master/src/widget.rs) ·
+[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 Pass page count and the current page. Messages are previous, next,

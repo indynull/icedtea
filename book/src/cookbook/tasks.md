@@ -14,7 +14,7 @@ your tasks.
 
 The finished program is about 200 lines. The same source lives in the
 repository as
-[`examples/tasks.rs`](https://github.com/indynull/icedtea/blob/master/examples/tasks.rs).
+[`examples/tasks.rs`](https://github.com/indynull/icedtea/blob/main/examples/tasks.rs).
 `cargo run --example tasks` from a checkout.
 
 ## What the words mean

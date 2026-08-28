@@ -130,5 +130,5 @@ let _ = tok.canvas;
 ```
 
 - [`theme`](https://docs.rs/icedtea/latest/icedtea/theme/index.html)
-- [source](https://github.com/indynull/icedtea/blob/master/src/theme.rs)
+- [source](https://github.com/indynull/icedtea/blob/main/src/theme.rs)
 - [crates.io](https://crates.io/crates/icedtea)

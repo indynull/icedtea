@@ -90,5 +90,5 @@ plus a Dock control. Perspectives are named `DockNode`
 snapshots.
 
 - [layout rustdoc](https://docs.rs/icedtea/latest/icedtea/layout/index.html)
-- [source](https://github.com/indynull/icedtea/blob/master/src/layout/mod.rs)
+- [source](https://github.com/indynull/icedtea/blob/main/src/layout/mod.rs)
 - [crates.io](https://crates.io/crates/icedtea)
