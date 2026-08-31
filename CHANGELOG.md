@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.15.0 — 2026-08-31
+
 ### Feature
 
 - `status_bar` paints each enabled shortcut as two faces: the chord in
