@@ -3350,9 +3350,10 @@ pub fn search_view<'a, M: Clone + 'a>(
 /// toolbar or HUD can nest a dropdown. Default keeps the field body
 /// look. The trailing mark is Material `arrow_drop_down` (24 dp, 20 dp
 /// Compact), inset `Density::inset` from the **end**. A press on the
-/// mark opens the menu. Placeholder shows when nothing is selected.
-/// Wheel over the control moves the selection. Disabled keeps the
-/// current face.
+/// mark opens the menu. The list uses Menu shape (extra-small under
+/// Soft and Pill) so the drawer is a box, not a stack of stadiums.
+/// Placeholder shows when nothing is selected. Wheel over the control
+/// moves the selection. Disabled keeps the current face.
 ///
 ///
 /// ```
@@ -3422,6 +3423,7 @@ where
         .handle(iced::widget::pick_list::Handle::None)
         .width(Length::Fill)
         .style(style::picker_style(tok))
+        .menu_style(style::overlay_menu_style(tok))
         .padding(pick_mark_pad(tok, face_pad, size))
         .text_size(type_px);
     let h = sized_control_height(tok, size);
@@ -15970,6 +15972,8 @@ mod tests {
         assert!(src.contains("PickFace::new"));
         assert!(src.contains("PickFace::new(picker, tok, size)"));
         assert!(src.contains("pick_mark_pad"));
+        assert!(src.contains("menu_style"));
+        assert!(src.contains("overlay_menu_style"));
     }
 
     fn pick_list_and_mark(

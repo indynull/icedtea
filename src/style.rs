@@ -1450,6 +1450,23 @@ mod tests {
         let _ = p(&theme, pick_list::Status::Hovered);
         let _ = p(&theme, pick_list::Status::Opened { is_hovered: true });
         let _ = overlay_menu_style(tok)(&theme);
+        let pill = tok.with_shape(crate::m3::ShapePolicy::Pill);
+        let soft = tok.with_shape(crate::m3::ShapePolicy::Soft);
+        assert_eq!(
+            overlay_menu_style(pill)(&theme).border.radius.top_left,
+            crate::m3::Shape::ExtraSmall.dp()
+        );
+        assert_eq!(
+            overlay_menu_style(soft)(&theme).border.radius.top_left,
+            crate::m3::Shape::ExtraSmall.dp()
+        );
+        assert!(
+            overlay_menu_style(pill)(&theme).border.radius.top_left
+                < picker_style(pill)(&theme, pick_list::Status::Active)
+                    .border
+                    .radius
+                    .top_left
+        );
         let c = checkbox_style(tok);
         let _ = c(&theme, checkbox::Status::Active { is_checked: true });
         let _ = c(&theme, checkbox::Status::Active { is_checked: false });

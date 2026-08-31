@@ -20,6 +20,9 @@
 
 ### Bug fix
 
+- `pick_list` paints its overlay list with `overlay_menu_style`.
+  Menu stays extra-small under Soft and Pill so rows are a box, not
+  a stack of stadiums.
 - `layout::form` packs a `FORM_LABEL` gutter and gives leftover to the
   field. The label stays the first child on the start edge.
 - `value_field` packs the label gutter, a sharing value, and an
