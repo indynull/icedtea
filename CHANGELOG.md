@@ -8,11 +8,13 @@
   `Tokens.text`, the title in `Tokens.muted` at meta size.
 - `layout::pack` measures each child and allocates leftover on a row
   or column (`Slot::hug` / `Slot::share`, `Pack` start / end / center
-  / between).
+  / between, `Cross` stretch / start / center / end). `BoxOpts` is the
+  extras on that call.
 - `layout::wrap` measures unequal children and starts a new line when
   the next does not fit. Share slots with a min width reflow a tile
   wall. Window direction puts the first child on the start edge.
   Callers pass slots, not a child width or the parent width.
+- `layout::allocate` shares leftover across `SizePolicy` items.
 - `layout::wrap_per_row` and `layout::wrap_rows` are gone.
 - `layout::row_box` and `layout::column_box` are gone.
 - `layout::form_columns` is gone.
@@ -20,14 +22,20 @@
 
 ### Bug fix
 
-- `pick_list` paints its overlay list with `overlay_menu_style`.
-  Menu stays extra-small under Soft and Pill so rows are a box, not
-  a stack of stadiums.
+- `pick_list` paints its overlay list with `overlay_menu_style`. Menu
+  stays extra-small under Soft and Pill so selected rows keep a 4 dp
+  box.
 - `layout::form` packs a `FORM_LABEL` gutter and gives leftover to the
   field. The label stays the first child on the start edge.
 - `value_field` packs the label gutter, a sharing value, and an
   optional hug Copy.
 - `secret_field` packs a sharing field and hug Reveal / Copy.
+
+### Chore
+
+- Workspace `debug` is `line-tables-only`. `cargo build --profile
+  debugging` is full debug. Release is thin LTO, stripped, eight
+  codegen units.
 
 ## 0.14.0 — 2026-08-23
 
