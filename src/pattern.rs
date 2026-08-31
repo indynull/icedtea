@@ -252,19 +252,25 @@ pub fn command_bar<'a, M: Clone + 'a>(
 /// Footer text plus shortcut hints from the same table.
 ///
 /// `tone` paints the left with [`crate::widget::info_bar`] when set,
-/// otherwise meta. `caption` is the right text; `None` uses
-/// `table.footer_hints()`.
+/// otherwise meta. `caption` is one right-rail string when set.
+/// `None` paints each enabled shortcut as two faces: the chord in
+/// [`Tokens::text`], the title in [`Tokens::muted`] at meta size.
+/// An empty table (and no caption) shows status only.
 ///
 ///
 /// ```
 /// use icedtea::action::{Action, ActionTable};
 /// use icedtea::i18n::Direction;
 /// use icedtea::pattern;
+/// use icedtea::shortcut::Shortcut;
 /// use icedtea::theme;
 /// use icedtea::toast::ToastKind;
 /// let tok = theme::named("dark").tokens;
 /// let mut table = ActionTable::new();
-/// table.insert(Action::new("file.save", "Save", ()));
+/// table.insert(
+///     Action::new("nav.down", "Down", ())
+///         .with_shortcut(Shortcut::parse("j").unwrap()),
+/// );
 /// let _: icedtea::Element<'_, ()> =
 ///     pattern::status_bar("ready", None, None, &table, tok, Direction::Ltr);
 /// let _: icedtea::Element<'_, ()> = pattern::status_bar(
@@ -285,32 +291,62 @@ pub fn status_bar<'a, M: Clone + 'a>(
     dir: Direction,
 ) -> Element<'a, M> {
     let status = status.into();
-    let right_s = caption.map(str::to_string).unwrap_or_else(|| {
-        let hints = table.footer_hints();
-        hints.join("  ·  ")
-    });
     let left: Element<'a, M> = if let Some(kind) = tone {
         crate::widget::info_bar(kind, status.clone(), tok, A11y::new(status, Role::Status))
     } else {
         meta(status.clone(), tok, A11y::new(status, Role::Status))
     };
-    let right = meta(right_s.clone(), tok, A11y::new(right_s, Role::Status));
-    let ends = order(dir, [left, right]);
-    let mut ends = ends.into_iter();
+    let right = match caption {
+        Some(s) => Some(meta(s.to_string(), tok, A11y::new(s, Role::Status))),
+        None => status_hint_rail(table, tok),
+    };
+    let fill: Element<'a, M> = iced::widget::Space::new().width(Length::Fill).into();
+    let line = match right {
+        Some(r) => {
+            let ends = order(dir, [left, r]);
+            let mut ends = ends.into_iter();
+            row![ends.next().unwrap(), fill, ends.next().unwrap()]
+        }
+        None => {
+            let ends = order(dir, [left, fill]);
+            let mut ends = ends.into_iter();
+            row![ends.next().unwrap(), ends.next().unwrap()]
+        }
+    };
     crate::a11y::attach(
-        container(
-            row![
-                ends.next().unwrap(),
-                iced::widget::Space::new().width(Length::Fill),
-                ends.next().unwrap(),
-            ]
-            .padding([tok.density.gap(), tok.density.inset()]),
-        )
-        .width(Length::Fill)
-        .style(move |_| style::footer(tok))
-        .into(),
+        container(line.padding([tok.density.gap(), tok.density.inset()]))
+            .width(Length::Fill)
+            .style(move |_| style::footer(tok))
+            .into(),
         &A11y::new("statusbar", Role::Status),
     )
+}
+
+fn status_hint_rail<'a, M: Clone + 'a>(
+    table: &ActionTable<M>,
+    tok: Tokens,
+) -> Option<Element<'a, M>> {
+    let pairs = table.footer_hint_pairs();
+    if pairs.is_empty() {
+        return None;
+    }
+    let name = pairs
+        .iter()
+        .map(|(key, title)| format!("{key} {title}"))
+        .collect::<Vec<_>>()
+        .join("  ·  ");
+    let mut spans: Vec<iced::advanced::text::Span<'static, (), iced::Font>> = Vec::new();
+    for (i, (key, title)) in pairs.into_iter().enumerate() {
+        if i > 0 {
+            spans.push(span("  ·  ").size(tok.meta()).color(tok.muted));
+        }
+        spans.push(span(key).size(tok.meta()).color(tok.text).font(typo::UI));
+        spans.push(span(format!(" {title}")).size(tok.meta()).color(tok.muted));
+    }
+    Some(a11y::attach(
+        rich_text(spans).into(),
+        &A11y::new(name, Role::Status),
+    ))
 }
 
 /// Fuzzy find over the action table.
@@ -2728,6 +2764,8 @@ mod tests {
         assert!(bar_src.contains("align_start(dir)"));
         let _: Element<'_, ()> = status_bar("ready", None, None, &table, tok, ltr);
         let _: Element<'_, ()> = status_bar("ready", None, None, &table, tok, rtl);
+        let _: Element<'_, ()> = status_bar("ready", None, None, &empty, tok, ltr);
+        let _: Element<'_, ()> = status_bar("ready", None, None, &empty, tok, rtl);
         let _: Element<'_, ()> = status_bar(
             "socket down",
             Some(crate::toast::ToastKind::Danger),
@@ -2864,6 +2902,15 @@ mod tests {
         paint(&mut tb);
         let mut sb = status_bar("ready", None, None, &table, tok, ltr);
         paint(&mut sb);
+        let mut empty_sb = status_bar("ready", None, None, &empty, tok, rtl);
+        paint(&mut empty_sb);
+        let mut two = ActionTable::new();
+        two.insert(
+            Action::new("nav.down", "Down", ()).with_shortcut(Shortcut::parse("j").unwrap()),
+        );
+        two.insert(Action::new("nav.up", "Up", ()).with_shortcut(Shortcut::parse("k").unwrap()));
+        let mut two_sb = status_bar("ready", None, None, &two, tok, ltr);
+        paint(&mut two_sb);
         let mut pal = command_palette_view(
             "",
             "Command",

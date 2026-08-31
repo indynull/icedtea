@@ -234,7 +234,10 @@ Constructor: [`pattern::status_bar`](https://docs.rs/icedtea/latest/icedtea/patt
 [icedtea](https://crates.io/crates/icedtea)
 
 Left is status copy (`meta`, or `info_bar` when a tone is set). Right
-is `table.footer_hints()`, or an optional caption string.
+is each enabled shortcut as two faces (chord in `Tokens.text`, title
+in `Tokens.muted` at meta size), or an optional caption string. An
+empty table shows status only. `ActionTable::footer_hints` returns
+the joined strings (`j down`) for tests.
 
 ### Scrollbar
 

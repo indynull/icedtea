@@ -4,6 +4,8 @@
 
 ### Feature
 
+- `status_bar` paints each enabled shortcut as two faces: the chord in
+  `Tokens.text`, the title in `Tokens.muted` at meta size.
 - `layout::pack` measures each child and allocates leftover on a row
   or column (`Slot::hug` / `Slot::share`, `Pack` start / end / center
   / between).

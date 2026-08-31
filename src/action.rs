@@ -234,15 +234,23 @@ impl<M: Clone> ActionTable<M> {
         })
     }
 
-    pub fn footer_hints(&self) -> Vec<String> {
+    /// Shortcut and lowercase title for each enabled action that has a key.
+    pub(crate) fn footer_hint_pairs(&self) -> Vec<(String, String)> {
         self.actions
             .iter()
             .filter(|a| a.enabled)
             .filter_map(|a| {
                 a.shortcut
                     .as_ref()
-                    .map(|s| format!("{s} {}", a.title.to_ascii_lowercase()))
+                    .map(|s| (s.to_string(), a.title.to_ascii_lowercase()))
             })
+            .collect()
+    }
+
+    pub fn footer_hints(&self) -> Vec<String> {
+        self.footer_hint_pairs()
+            .into_iter()
+            .map(|(key, title)| format!("{key} {title}"))
             .collect()
     }
 }
@@ -341,5 +349,29 @@ mod tests {
         assert!(same_seq
             .match_shortcut_in(&Shortcut::parse("ctrl+s").unwrap(), None)
             .is_none());
+    }
+
+    #[test]
+    fn footer_hints_split_chord_and_title() {
+        let mut table = ActionTable::new();
+        table.insert(
+            Action::new("nav.down", "Down", 1u8).with_shortcut(Shortcut::parse("j").unwrap()),
+        );
+        table.insert(Action::new("nav.up", "Up", 2u8).with_shortcut(Shortcut::parse("k").unwrap()));
+        table.insert(Action::new("file.noslot", "No slot", 3u8));
+        let mut quit =
+            Action::new("nav.quit", "Quit", 4u8).with_shortcut(Shortcut::parse("q").unwrap());
+        quit.enabled = false;
+        table.insert(quit);
+
+        assert_eq!(
+            table.footer_hint_pairs(),
+            vec![("j".into(), "down".into()), ("k".into(), "up".into()),]
+        );
+        assert_eq!(
+            table.footer_hints(),
+            vec!["j down".to_string(), "k up".to_string()]
+        );
+        assert!(ActionTable::<u8>::new().footer_hint_pairs().is_empty());
     }
 }
