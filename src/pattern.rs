@@ -3020,7 +3020,10 @@ mod tests {
         let theme = crate::theme::iced_theme("dark", pill);
         let row = style::menu_item_style(pill)(&theme, iced::widget::button::Status::Hovered);
         assert_ne!(row.border.radius.top_left, crate::m3::Shape::Full.dp());
-        assert_eq!(row.border.radius.top_left, crate::m3::Shape::Medium.dp());
+        assert_eq!(
+            row.border.radius.top_left,
+            crate::m3::Shape::ExtraSmall.dp()
+        );
         let card = context_card_size(table.iter().count(), vp, tok.density);
         let row_w = menu_row_width(&mut cm);
         let row_msg = format!("menu row {row_w} should fill the {card:?} card");

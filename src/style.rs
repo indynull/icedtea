@@ -1218,7 +1218,10 @@ mod tests {
             assert_eq!(joined.border.radius.top_left, 0.0);
             let hit = palette_hit(t, true)(&th, button::Status::Active);
             if policy == crate::m3::ShapePolicy::Pill {
-                assert_eq!(hit.border.radius.top_left, crate::m3::Shape::Medium.dp());
+                assert_eq!(
+                    hit.border.radius.top_left,
+                    crate::m3::Shape::ExtraSmall.dp()
+                );
                 assert_ne!(
                     hit.border.radius.top_left,
                     crate::m3::shape::Component::Button.shape_for(policy).dp()
@@ -1235,7 +1238,10 @@ mod tests {
         let tab = tab_style(pill, false)(&ptheme, button::Status::Active);
         assert_eq!(tab.border.radius.top_left, 0.0);
         let menu = menu_item_style(pill)(&ptheme, button::Status::Hovered);
-        assert_eq!(menu.border.radius.top_left, crate::m3::Shape::Medium.dp());
+        assert_eq!(
+            menu.border.radius.top_left,
+            crate::m3::Shape::ExtraSmall.dp()
+        );
         assert_ne!(menu.border.radius.top_left, crate::m3::Shape::Full.dp());
         let box_st = checkbox_style(pill)(&ptheme, checkbox::Status::Active { is_checked: false });
         assert_eq!(
