@@ -156,6 +156,7 @@ pub fn target<'a, M: Clone + 'a>(
         on_key: None,
         open_on_activate: false,
         keys_first: false,
+        paint_ring: true,
     }
     .into()
 }
@@ -174,6 +175,28 @@ pub fn target_keys<'a, M: Clone + 'a>(
         on_key: Some(Box::new(on_key)),
         open_on_activate: false,
         keys_first: false,
+        paint_ring: true,
+    }
+    .into()
+}
+
+/// [`target`] that is focusable without a painted ring.
+///
+/// A filling scroll pane takes arrows when focused. A ring around that
+/// pane is chrome, not a control.
+pub(crate) fn target_pane<'a, M: Clone + 'a>(
+    child: iced::Element<'a, M>,
+    tok: crate::theme::Tokens,
+    can_focus: bool,
+) -> iced::Element<'a, M> {
+    Target {
+        content: child,
+        tok,
+        can_focus,
+        on_key: None,
+        open_on_activate: false,
+        keys_first: false,
+        paint_ring: false,
     }
     .into()
 }
@@ -192,6 +215,7 @@ pub fn target_keys_open<'a, M: Clone + 'a>(
         on_key: Some(Box::new(on_key)),
         open_on_activate: true,
         keys_first: false,
+        paint_ring: true,
     }
     .into()
 }
@@ -224,6 +248,7 @@ pub fn intercept_keys<'a, M: Clone + 'a>(
         on_key: Some(Box::new(on_key)),
         open_on_activate: false,
         keys_first: true,
+        paint_ring: true,
     }
     .into()
 }
@@ -235,6 +260,7 @@ struct Target<'a, Message> {
     on_key: Option<Box<dyn Fn(crate::key::Press) -> Option<Message> + 'a>>,
     open_on_activate: bool,
     keys_first: bool,
+    paint_ring: bool,
 }
 
 #[derive(Default)]
@@ -410,7 +436,7 @@ impl<'a, Message: Clone> iced::advanced::Widget<Message, iced::Theme, iced::Rend
             viewport,
         );
         let focused = self.can_focus && tree.state.downcast_ref::<TargetState>().focused;
-        if !focused {
+        if !focused || !self.paint_ring {
             return;
         }
         let face = ring(self.tok, true);

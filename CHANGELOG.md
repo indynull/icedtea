@@ -35,6 +35,8 @@
 - The focus ring is a 2 dp mixed-primary stroke inside the target so
   a parent outline stays visible and a filling pane is not a solid
   brand box.
+- A focused `scroll` pane takes arrows without painting a ring around
+  the pane.
 
 ## 0.15.0 — 2026-08-31
 

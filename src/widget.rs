@@ -5620,6 +5620,8 @@ fn toast_style(
 /// after a press inside so a drag-select can finish outside.
 /// A nested [`scroll`] under the pointer takes the wheel first.
 /// Wheel lines are [`crate::chrome::SCROLL_LINE`] (60 px), same as iced.
+/// The pane is focusable for arrows, Page, Home, and End. It does not
+/// paint a focus ring: that ring is a control frame, not pane chrome.
 ///
 ///
 /// ```
@@ -5649,7 +5651,7 @@ where
 {
     let boxed = on_scroll.map(|f| Box::new(f) as Box<dyn Fn(f32) -> M + 'a>);
     a11y::attach(
-        crate::focus::target(
+        crate::focus::target_pane(
             ThemedScroll::new(child, tok, stick, scroll_id, boxed).into(),
             tok,
             !a11y.disabled,
