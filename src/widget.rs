@@ -3440,11 +3440,10 @@ pub fn search_view<'a, M: Clone + 'a>(
     a11y::attach(
         crate::focus::intercept_keys(
             column![field, body].spacing(4).width(Length::Fill).into(),
+            tok,
+            can,
             move |press| {
                 use crate::key::Press;
-                if !can {
-                    return None;
-                }
                 match press {
                     Press::ArrowDown | Press::ArrowRight => {
                         Some(on_pick(crate::focus::rove(cur, 1, n)))
@@ -7658,19 +7657,11 @@ pub fn tree_view<'a, M: Clone + 'a>(
     let off = a11y.disabled || n == 0;
     a11y::attach(
         crate::focus::intercept_keys(
-            scroll(
-                col.into(),
-                tok,
-                A11y::new("tree-scroll", Role::Group).with_disabled(off),
-                false,
-                None,
-                None::<fn(_) -> M>,
-            ),
+            ThemedScroll::new(col, tok, false, None, None).into(),
+            tok,
+            !off,
             move |press| {
                 use crate::key::Press;
-                if off {
-                    return None;
-                }
                 let (id, exp, kids) = ids[cur.min(n.saturating_sub(1))];
                 match press {
                     Press::ArrowDown => Some(on_select(ItemClick {
@@ -9090,6 +9081,58 @@ mod tests {
             keyboard::key::Named::ArrowDown,
         );
         assert!(quiet.is_empty());
+    }
+
+    #[test]
+    fn tree_view_arrows_leave_a_focused_field() {
+        use crate::collection::TreeNode;
+        let tok = named("dark").tokens;
+        let root = TreeNode::branch(1, "src", vec![TreeNode::leaf(2, "lib.rs")]);
+        #[derive(Clone, Debug, PartialEq)]
+        enum Ev {
+            Field(String),
+            Tree(u64),
+        }
+        let mut el: Element<'_, Ev> = iced::widget::column![
+            text_input(
+                "find",
+                "q",
+                Ev::Field,
+                None,
+                FieldOpts::NONE,
+                tok,
+                A11y::new("q", Role::TextBox),
+                None,
+            ),
+            tree_view(
+                &root,
+                Some(1),
+                None,
+                |_| Ev::Tree(0),
+                |c| Ev::Tree(c.id),
+                TreeFace::Outline,
+                tok,
+                A11y::new("tree", Role::Tree),
+            ),
+        ]
+        .into();
+        let quiet = pump_click_then_keys(
+            &mut el,
+            Size::new(280.0, 200.0),
+            iced::Point::new(20.0, 12.0),
+            [
+                keyboard::Key::Named(keyboard::key::Named::ArrowDown),
+                keyboard::Key::Named(keyboard::key::Named::PageDown),
+            ],
+        );
+        assert!(!quiet.iter().any(|e| matches!(e, Ev::Tree(_))));
+        let moved = pump_click_then_named(
+            &mut el,
+            Size::new(280.0, 200.0),
+            iced::Point::new(20.0, 80.0),
+            keyboard::key::Named::ArrowDown,
+        );
+        assert!(moved.iter().any(|e| matches!(e, Ev::Tree(_))));
     }
 
     #[test]

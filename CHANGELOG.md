@@ -29,6 +29,10 @@
 - `nav_rail` arrows move the selected dest. An open `drawer` closes
   on Escape. `ActionTable::seed_quit` inserts `app.quit`.
 
+### Bug fix
+
+- `tree_view` and `search_view` keys run only while that wrap is focused.
+
 ## 0.15.0 — 2026-08-31
 
 ### Feature

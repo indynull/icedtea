@@ -142,6 +142,7 @@ pub fn target<'a, M: Clone + 'a>(
         can_focus,
         on_key: None,
         open_on_activate: false,
+        keys_first: false,
     }
     .into()
 }
@@ -159,6 +160,7 @@ pub fn target_keys<'a, M: Clone + 'a>(
         can_focus,
         on_key: Some(Box::new(on_key)),
         open_on_activate: false,
+        keys_first: false,
     }
     .into()
 }
@@ -176,18 +178,39 @@ pub fn target_keys_open<'a, M: Clone + 'a>(
         can_focus,
         on_key: Some(Box::new(on_key)),
         open_on_activate: true,
+        keys_first: false,
     }
     .into()
 }
 
-/// Run `on_key` before the child so a field cannot swallow arrows.
+/// [`target_keys`] that runs `on_key` before the child while focused.
+///
+/// Use this when the child is a field or scroll that would swallow
+/// arrows. Unfocused, keys pass through. `can_focus` is false when the
+/// constructor is empty or disabled.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let body = widget::label("hits", tok, A11y::new("hits", Role::List));
+/// let _: icedtea::Element<'_, ()> =
+///     icedtea::focus::intercept_keys(body, tok, true, |_| None);
+/// ```
 pub fn intercept_keys<'a, M: Clone + 'a>(
     child: iced::Element<'a, M>,
+    tok: crate::theme::Tokens,
+    can_focus: bool,
     on_key: impl Fn(crate::key::Press) -> Option<M> + 'a,
 ) -> iced::Element<'a, M> {
-    InterceptKeys {
+    Target {
         content: child,
-        on_key: Box::new(on_key),
+        tok,
+        can_focus,
+        on_key: Some(Box::new(on_key)),
+        open_on_activate: false,
+        keys_first: true,
     }
     .into()
 }
@@ -198,6 +221,7 @@ struct Target<'a, Message> {
     can_focus: bool,
     on_key: Option<Box<dyn Fn(crate::key::Press) -> Option<Message> + 'a>>,
     open_on_activate: bool,
+    keys_first: bool,
 }
 
 #[derive(Default)]
@@ -216,6 +240,38 @@ impl iced::advanced::widget::operation::focusable::Focusable for TargetState {
 
     fn unfocus(&mut self) {
         self.focused = false;
+    }
+}
+
+impl<Message: Clone> Target<'_, Message> {
+    fn apply_keys(
+        &self,
+        tree: &iced::advanced::widget::Tree,
+        event: &iced::Event,
+        shell: &mut iced::advanced::Shell<'_, Message>,
+    ) -> bool {
+        if !self.can_focus {
+            return false;
+        }
+        let iced::Event::Keyboard(kev) = event else {
+            return false;
+        };
+        let state = tree.state.downcast_ref::<TargetState>();
+        if !state.focused || shell.is_event_captured() {
+            return false;
+        }
+        let Some(press) = crate::key::press(kev) else {
+            return false;
+        };
+        let Some(on_key) = &self.on_key else {
+            return false;
+        };
+        let Some(msg) = on_key(press) else {
+            return false;
+        };
+        shell.publish(msg);
+        shell.capture_event();
+        true
     }
 }
 
@@ -264,6 +320,9 @@ impl<'a, Message: Clone> iced::advanced::Widget<Message, iced::Theme, iced::Rend
         shell: &mut iced::advanced::Shell<'_, Message>,
         viewport: &iced::Rectangle,
     ) {
+        if self.keys_first && self.apply_keys(tree, event, shell) {
+            return;
+        }
         self.content.as_widget_mut().update(
             &mut tree.children[0],
             event,
@@ -277,43 +336,40 @@ impl<'a, Message: Clone> iced::advanced::Widget<Message, iced::Theme, iced::Rend
         if !self.can_focus {
             return;
         }
-        let state = tree.state.downcast_mut::<TargetState>();
         let over = cursor
             .position()
             .is_some_and(|p| layout.bounds().contains(p));
         match event {
             iced::Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left))
             | iced::Event::Touch(iced::touch::Event::FingerPressed { .. }) => {
-                let next = over;
-                if state.focused != next {
-                    state.focused = next;
+                let state = tree.state.downcast_mut::<TargetState>();
+                if state.focused != over {
+                    state.focused = over;
                     shell.request_redraw();
                 }
             }
-            iced::Event::Keyboard(kev) if state.focused && !shell.is_event_captured() => {
-                if let Some(press) = crate::key::press(kev) {
-                    if let Some(on_key) = &self.on_key {
-                        if let Some(msg) = on_key(press.clone()) {
-                            shell.publish(msg);
+            iced::Event::Keyboard(kev) if !self.keys_first => {
+                if self.apply_keys(tree, event, shell) {
+                    return;
+                }
+                if self.open_on_activate && !shell.is_event_captured() {
+                    if let Some(press) = crate::key::press(kev) {
+                        if activate_press(&press) {
+                            let at = iced::mouse::Cursor::Available(layout.bounds().center());
+                            self.content.as_widget_mut().update(
+                                &mut tree.children[0],
+                                &iced::Event::Mouse(iced::mouse::Event::ButtonPressed(
+                                    iced::mouse::Button::Left,
+                                )),
+                                layout,
+                                at,
+                                renderer,
+                                clipboard,
+                                shell,
+                                viewport,
+                            );
                             shell.capture_event();
-                            return;
                         }
-                    }
-                    if self.open_on_activate && activate_press(&press) {
-                        let at = iced::mouse::Cursor::Available(layout.bounds().center());
-                        self.content.as_widget_mut().update(
-                            &mut tree.children[0],
-                            &iced::Event::Mouse(iced::mouse::Event::ButtonPressed(
-                                iced::mouse::Button::Left,
-                            )),
-                            layout,
-                            at,
-                            renderer,
-                            clipboard,
-                            shell,
-                            viewport,
-                        );
-                        shell.capture_event();
                     }
                 }
             }
@@ -416,143 +472,6 @@ impl<'a, Message: Clone + 'a> From<Target<'a, Message>> for iced::Element<'a, Me
 fn activate_press(press: &crate::key::Press) -> bool {
     matches!(press, crate::key::Press::Enter)
         || matches!(press, crate::key::Press::Character(s) if s == " ")
-}
-
-struct InterceptKeys<'a, Message> {
-    content: iced::Element<'a, Message>,
-    on_key: Box<dyn Fn(crate::key::Press) -> Option<Message> + 'a>,
-}
-
-impl<'a, Message: Clone> iced::advanced::Widget<Message, iced::Theme, iced::Renderer>
-    for InterceptKeys<'a, Message>
-{
-    fn children(&self) -> Vec<iced::advanced::widget::Tree> {
-        vec![iced::advanced::widget::Tree::new(&self.content)]
-    }
-
-    fn diff(&self, tree: &mut iced::advanced::widget::Tree) {
-        tree.diff_children(std::slice::from_ref(&self.content));
-    }
-
-    fn size(&self) -> iced::Size<iced::Length> {
-        self.content.as_widget().size()
-    }
-
-    fn layout(
-        &mut self,
-        tree: &mut iced::advanced::widget::Tree,
-        renderer: &iced::Renderer,
-        limits: &iced::advanced::layout::Limits,
-    ) -> iced::advanced::layout::Node {
-        self.content
-            .as_widget_mut()
-            .layout(&mut tree.children[0], renderer, limits)
-    }
-
-    fn update(
-        &mut self,
-        tree: &mut iced::advanced::widget::Tree,
-        event: &iced::Event,
-        layout: iced::advanced::Layout<'_>,
-        cursor: iced::mouse::Cursor,
-        renderer: &iced::Renderer,
-        clipboard: &mut dyn iced::advanced::Clipboard,
-        shell: &mut iced::advanced::Shell<'_, Message>,
-        viewport: &iced::Rectangle,
-    ) {
-        if let iced::Event::Keyboard(kev) = event {
-            if let Some(press) = crate::key::press(kev) {
-                if let Some(msg) = (self.on_key)(press) {
-                    shell.publish(msg);
-                    shell.capture_event();
-                    return;
-                }
-            }
-        }
-        self.content.as_widget_mut().update(
-            &mut tree.children[0],
-            event,
-            layout,
-            cursor,
-            renderer,
-            clipboard,
-            shell,
-            viewport,
-        );
-    }
-
-    fn draw(
-        &self,
-        tree: &iced::advanced::widget::Tree,
-        renderer: &mut iced::Renderer,
-        theme: &iced::Theme,
-        style: &iced::advanced::renderer::Style,
-        layout: iced::advanced::Layout<'_>,
-        cursor: iced::mouse::Cursor,
-        viewport: &iced::Rectangle,
-    ) {
-        self.content.as_widget().draw(
-            &tree.children[0],
-            renderer,
-            theme,
-            style,
-            layout,
-            cursor,
-            viewport,
-        );
-    }
-
-    fn operate(
-        &mut self,
-        tree: &mut iced::advanced::widget::Tree,
-        layout: iced::advanced::Layout<'_>,
-        renderer: &iced::Renderer,
-        operation: &mut dyn iced::advanced::widget::Operation,
-    ) {
-        self.content
-            .as_widget_mut()
-            .operate(&mut tree.children[0], layout, renderer, operation);
-    }
-
-    fn mouse_interaction(
-        &self,
-        tree: &iced::advanced::widget::Tree,
-        layout: iced::advanced::Layout<'_>,
-        cursor: iced::mouse::Cursor,
-        viewport: &iced::Rectangle,
-        renderer: &iced::Renderer,
-    ) -> iced::mouse::Interaction {
-        self.content.as_widget().mouse_interaction(
-            &tree.children[0],
-            layout,
-            cursor,
-            viewport,
-            renderer,
-        )
-    }
-
-    fn overlay<'b>(
-        &'b mut self,
-        tree: &'b mut iced::advanced::widget::Tree,
-        layout: iced::advanced::Layout<'b>,
-        renderer: &iced::Renderer,
-        viewport: &iced::Rectangle,
-        translation: iced::Vector,
-    ) -> Option<iced::advanced::overlay::Element<'b, Message, iced::Theme, iced::Renderer>> {
-        self.content.as_widget_mut().overlay(
-            &mut tree.children[0],
-            layout,
-            renderer,
-            viewport,
-            translation,
-        )
-    }
-}
-
-impl<'a, Message: Clone + 'a> From<InterceptKeys<'a, Message>> for iced::Element<'a, Message> {
-    fn from(value: InterceptKeys<'a, Message>) -> Self {
-        Self::new(value)
-    }
 }
 
 /// Publish `on_escape` when Escape is pressed and the child did not capture it.
