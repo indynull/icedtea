@@ -8954,13 +8954,73 @@ mod tests {
             tok,
             A11y::new("find", Role::Group),
         );
-        let got = pump_click_then_named(
+        let got = pump_click_then_keys(
             &mut el,
+            Size::new(280.0, 120.0),
+            iced::Point::new(20.0, 16.0),
+            [
+                keyboard::Key::Named(keyboard::key::Named::ArrowDown),
+                keyboard::Key::Named(keyboard::key::Named::ArrowUp),
+                keyboard::Key::Named(keyboard::key::Named::Home),
+                keyboard::Key::Named(keyboard::key::Named::End),
+                keyboard::Key::Named(keyboard::key::Named::Enter),
+                keyboard::Key::Named(keyboard::key::Named::Escape),
+                keyboard::Key::Named(keyboard::key::Named::Insert),
+            ],
+        );
+        assert!(got.contains(&1));
+        assert!(got.contains(&0));
+        assert!(got.contains(&2));
+        let mut off: Element<'_, usize> = search_view(
+            "in",
+            ["Inbox", "Sent"],
+            Some(0),
+            |_| 99,
+            |i| i,
+            None,
+            "No matches",
+            tok,
+            A11y::new("find-off", Role::Group).with_disabled(true),
+        );
+        let none = pump_click_then_named(
+            &mut off,
             Size::new(280.0, 120.0),
             iced::Point::new(20.0, 16.0),
             keyboard::key::Named::ArrowDown,
         );
-        assert_eq!(got, vec![1]);
+        assert!(none.is_empty());
+        draw_once(&mut el);
+        {
+            use iced::advanced::layout::{Layout, Limits};
+            use iced::advanced::widget::operation::focusable;
+            use iced::advanced::widget::Tree;
+            use iced::{Font, Pixels, Rectangle};
+            let mut tree = Tree::new(el.as_widget());
+            el.as_widget_mut().diff(&mut tree);
+            let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+                Font::DEFAULT,
+                Pixels::from(16u32),
+            ));
+            let size = Size::new(280.0, 120.0);
+            let node =
+                el.as_widget_mut()
+                    .layout(&mut tree, &renderer, &Limits::new(Size::ZERO, size));
+            let layout = Layout::new(&node);
+            let vp = Rectangle::new(iced::Point::ORIGIN, size);
+            let _ = el.as_widget().mouse_interaction(
+                &tree,
+                layout,
+                mouse::Cursor::Available(iced::Point::new(8.0, 8.0)),
+                &vp,
+                &renderer,
+            );
+            let _ =
+                el.as_widget_mut()
+                    .overlay(&mut tree, layout, &renderer, &vp, iced::Vector::ZERO);
+            let mut op = focusable::unfocus::<()>();
+            el.as_widget_mut()
+                .operate(&mut tree, layout, &renderer, &mut op);
+        }
     }
 
     #[test]
@@ -8979,13 +9039,57 @@ mod tests {
             tok,
             A11y::new("tree", Role::Tree),
         );
-        let got = pump_click_then_named(
+        let got = pump_click_then_keys(
             &mut el,
             Size::new(280.0, 80.0),
             iced::Point::new(20.0, 12.0),
-            keyboard::key::Named::ArrowRight,
+            [
+                keyboard::Key::Named(keyboard::key::Named::ArrowRight),
+                keyboard::Key::Named(keyboard::key::Named::ArrowDown),
+                keyboard::Key::Named(keyboard::key::Named::ArrowUp),
+                keyboard::Key::Named(keyboard::key::Named::Home),
+                keyboard::Key::Named(keyboard::key::Named::End),
+                keyboard::Key::Named(keyboard::key::Named::Enter),
+                keyboard::Key::Named(keyboard::key::Named::Escape),
+            ],
         );
-        assert_eq!(got, vec![1]);
+        assert!(got.contains(&1));
+        draw_once(&mut el);
+        let open = TreeNode::branch(1, "src", vec![TreeNode::leaf(2, "lib.rs")]);
+        let mut el: Element<'_, u64> = tree_view(
+            &open,
+            Some(1),
+            None,
+            |id| id,
+            |c| c.id,
+            TreeFace::Outline,
+            tok,
+            A11y::new("tree-open", Role::Tree),
+        );
+        let left = pump_click_then_named(
+            &mut el,
+            Size::new(280.0, 80.0),
+            iced::Point::new(20.0, 12.0),
+            keyboard::key::Named::ArrowLeft,
+        );
+        assert_eq!(left, vec![1]);
+        let mut dead: Element<'_, u64> = tree_view(
+            &open,
+            Some(1),
+            None,
+            |id| id,
+            |c| c.id,
+            TreeFace::Outline,
+            tok,
+            A11y::new("tree-off", Role::Tree).with_disabled(true),
+        );
+        let quiet = pump_click_then_named(
+            &mut dead,
+            Size::new(280.0, 80.0),
+            iced::Point::new(20.0, 12.0),
+            keyboard::key::Named::ArrowDown,
+        );
+        assert!(quiet.is_empty());
     }
 
     #[test]
@@ -9058,6 +9162,32 @@ mod tests {
             el.as_widget_mut()
                 .overlay(&mut tree, layout, &renderer, &viewport, iced::Vector::ZERO);
         assert!(open.is_some());
+        drop(open);
+        {
+            let mut messages = Vec::<&str>::new();
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Character(" ".into()),
+                    modified_key: keyboard::Key::Character(" ".into()),
+                    physical_key: keyboard::key::Physical::Unidentified(
+                        keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: keyboard::Location::Standard,
+                    modifiers: keyboard::Modifiers::empty(),
+                    text: Some(" ".into()),
+                    repeat: false,
+                }),
+                layout,
+                mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
     }
 
     #[test]

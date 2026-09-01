@@ -2480,15 +2480,19 @@ mod tests {
                 );
             }
             let mut messages = Vec::new();
-            {
+            for named in [
+                iced::keyboard::key::Named::ArrowDown,
+                iced::keyboard::key::Named::ArrowUp,
+                iced::keyboard::key::Named::Home,
+                iced::keyboard::key::Named::End,
+                iced::keyboard::key::Named::Escape,
+            ] {
                 let mut shell = iced::advanced::Shell::new(&mut messages);
                 el.as_widget_mut().update(
                     &mut tree,
                     &Event::Keyboard(iced::keyboard::Event::KeyPressed {
-                        key: iced::keyboard::Key::Named(iced::keyboard::key::Named::ArrowDown),
-                        modified_key: iced::keyboard::Key::Named(
-                            iced::keyboard::key::Named::ArrowDown,
-                        ),
+                        key: iced::keyboard::Key::Named(named),
+                        modified_key: iced::keyboard::Key::Named(named),
                         physical_key: iced::keyboard::key::Physical::Unidentified(
                             iced::keyboard::key::NativeCode::Unidentified,
                         ),
@@ -2507,7 +2511,7 @@ mod tests {
             }
             messages
         };
-        assert_eq!(got, vec![1]);
+        assert_eq!(got, vec![1, 2, 0, 2]);
         let mut empty: Element<'_, usize> = nav_rail(
             Vec::<String>::new(),
             0,
