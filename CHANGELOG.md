@@ -38,6 +38,8 @@
 - A focused `scroll` pane takes arrows without painting a ring around
   the pane.
 - An unfocused `scroll` pane does not take arrows, Page, Home, or End.
+- A focused `search_view` and `tree_view` take arrows without painting
+  a ring around the stack.
 
 ### Chore
 

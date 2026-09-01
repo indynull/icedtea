@@ -203,7 +203,8 @@ pub fn target_keys_open<'a, M: Clone + 'a>(
 ///
 /// Use this when the child is a field or scroll that would swallow
 /// arrows. Unfocused, keys pass through. `can_focus` is false when the
-/// constructor is empty or disabled.
+/// constructor is empty or disabled. No focus ring: the child is a
+/// stack (field plus hits, tree plus rows), not one control face.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -227,7 +228,7 @@ pub fn intercept_keys<'a, M: Clone + 'a>(
         on_key: Some(Box::new(on_key)),
         open_on_activate: false,
         keys_first: true,
-        paint_ring: true,
+        paint_ring: false,
     }
     .into()
 }
@@ -1473,5 +1474,17 @@ mod tests {
                 &iced::Rectangle::new(iced::Point::ORIGIN, Size::new(200.0, 160.0)),
             );
         }
+    }
+
+    #[test]
+    fn intercept_keys_focuses_without_a_ring() {
+        let tok = crate::theme::named("dark").tokens;
+        let body = crate::widget::label(
+            "hits",
+            tok,
+            crate::a11y::A11y::new("hits", crate::a11y::Role::List),
+        );
+        let mut el: iced::Element<'_, ()> = intercept_keys(body, tok, true, |_| None);
+        assert!(pump_click(&mut el, true));
     }
 }
