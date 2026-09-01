@@ -127,6 +127,10 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   `scroll`, keys subscribe with `key::listen`, sidebar recipe
   is `Breakpoint::from_width`.
 - One path per feature. Pick it and delete the other. Fallbacks re-grow.
+  Pre-1.0: change the public constructor, `key::handle`, or `Boot`
+  field and update gallery, hello, book, and tests in the same cut.
+  Never add an opt-out, deprecated alias, or second constructor so an
+  old 0.x caller keeps compiling.
 - Always put optional extras on a constructor in one `*Opts` on that
   same call (`ButtonOpts`, `ListOpts`, `FieldOpts`). Never a second
   `pub fn` for the same catalog id.
