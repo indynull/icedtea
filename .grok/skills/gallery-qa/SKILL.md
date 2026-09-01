@@ -148,6 +148,13 @@ Shots land under `tmp/gallery-qa/<timestamp>/` (or `--out DIR`).
     icons, read the matching snapshot page. Do not invent Material
     values from memory. A documented desktop approximation in
     `src/m3` is not a miss.
+    Resting **drop**: read `Component::elevation()` and snapshot
+    `styles/elevation`. Score the painted shadow on Desktop
+    (`ElevationPolicy::Flat` zeros every drop). Elevated faces
+    (button, card, chip) are Level 1 on that constructor. A still
+    or `visual.md` line that matches a wrong assignment is not the
+    pass — fix the constructor, then recapture. The unit check is
+    `style::tests::resting_elevation_matches_material_table`.
 
 ## Loop (do this)
 
@@ -287,7 +294,9 @@ the modal, not a miss.
 
 - `references/visual.md` — still + must-show per page  
 - `references/rubric.md` — what counts as broken/ugly  
-- `references/material/INDEX.md` — Material spec snapshot (`just material-snapshot`)  
+- `references/material/INDEX.md` — Material spec snapshot (`just material-snapshot`)
+- `src/m3/shape.rs` `Component::elevation()` — resting drop table
+- `style::tests::resting_elevation_matches_material_table` — constructor assignment  
 - `references/m3-trailing-icon.md` — pick / menu / list trailing mark  
 - `references/rtl.md` — SCORE map  
 - `references/firefox-rtl.md` — Firefox RTL Guidelines  
