@@ -8170,19 +8170,28 @@ pub fn accordion_view<'a, M: Clone + 'a>(
     let n = titles.len();
     let open = state.open.unwrap_or(0);
     a11y::attach(
-        crate::focus::target_keys(col.into(), tok, !a11y.disabled && n > 0, move |press| {
-            use crate::key::Press;
-            match press {
-                p if activate_key(&p) => Some(on_toggle(open)),
-                Press::ArrowDown | Press::ArrowRight => {
-                    Some(on_toggle(crate::focus::rove(open, 1, n)))
+        container(crate::focus::target_keys(
+            col.into(),
+            tok,
+            !a11y.disabled && n > 0,
+            move |press| {
+                use crate::key::Press;
+                match press {
+                    p if activate_key(&p) => Some(on_toggle(open)),
+                    Press::ArrowDown | Press::ArrowRight => {
+                        Some(on_toggle(crate::focus::rove(open, 1, n)))
+                    }
+                    Press::ArrowUp | Press::ArrowLeft => {
+                        Some(on_toggle(crate::focus::rove(open, -1, n)))
+                    }
+                    _ => None,
                 }
-                Press::ArrowUp | Press::ArrowLeft => {
-                    Some(on_toggle(crate::focus::rove(open, -1, n)))
-                }
-                _ => None,
-            }
-        }),
+            },
+        ))
+        .padding(inset(tok))
+        .width(Length::Fill)
+        .style(move |_| style::card(tok, false))
+        .into(),
         &a11y,
     )
 }
@@ -8328,16 +8337,16 @@ pub fn expander<'a, M: Clone + 'a>(
         crate::motion::expand(child, t, peek_h, tok, A11y::new(title.clone(), Role::Group))
     };
     a11y::attach(
-        crate::focus::target_keys(
-            container(column![header, body].spacing(gap(tok)))
-                .padding(inset(tok))
-                .width(Length::Fill)
-                .style(move |_| style::card(tok, false))
-                .into(),
+        container(crate::focus::target_keys(
+            column![header, body].spacing(gap(tok)).into(),
             tok,
             !a11y.disabled,
             move |press| activate_key(&press).then_some(on_toggle(!open)),
-        ),
+        ))
+        .padding(inset(tok))
+        .width(Length::Fill)
+        .style(move |_| style::card(tok, false))
+        .into(),
         &a11y,
     )
 }

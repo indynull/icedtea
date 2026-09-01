@@ -101,6 +101,8 @@ pub fn trap_escape(press: &crate::key::Press) -> bool {
 /// 2 dp primary frame when the target is focused.
 ///
 /// Same wash [`crate::widget::form_group`] uses on the active row.
+/// The stroke sits inside the target so a parent card or pane outline
+/// stays visible.
 pub fn ring(tok: crate::theme::Tokens, focused: bool) -> iced::widget::container::Style {
     let s = tok.scheme();
     iced::widget::container::Style {
@@ -114,6 +116,17 @@ pub fn ring(tok: crate::theme::Tokens, focused: bool) -> iced::widget::container
             radius: tok.radius(crate::m3::shape::Component::Field),
         },
         ..iced::widget::container::Style::default()
+    }
+}
+
+/// Inset `bounds` by `width` so a stroke of that width stays inside.
+fn ring_bounds(bounds: iced::Rectangle, width: f32) -> iced::Rectangle {
+    let w = width.max(0.0);
+    iced::Rectangle {
+        x: bounds.x + w,
+        y: bounds.y + w,
+        width: (bounds.width - 2.0 * w).max(0.0),
+        height: (bounds.height - 2.0 * w).max(0.0),
     }
 }
 
@@ -404,7 +417,7 @@ impl<'a, Message: Clone> iced::advanced::Widget<Message, iced::Theme, iced::Rend
         iced::advanced::Renderer::fill_quad(
             renderer,
             iced::advanced::renderer::Quad {
-                bounds: layout.bounds(),
+                bounds: ring_bounds(layout.bounds(), face.border.width),
                 border: face.border,
                 ..iced::advanced::renderer::Quad::default()
             },
@@ -1047,6 +1060,20 @@ mod tests {
             assert_eq!(op.n, 0, "empty or disabled target is not focusable");
             false
         }
+    }
+
+    #[test]
+    fn ring_sits_inside_the_target_bounds() {
+        use iced::{Point, Rectangle, Size};
+        let outer = Rectangle::new(Point::new(10.0, 20.0), Size::new(100.0, 50.0));
+        let inner = ring_bounds(outer, 2.0);
+        assert_eq!(inner.x, 12.0);
+        assert_eq!(inner.y, 22.0);
+        assert_eq!(inner.width, 96.0);
+        assert_eq!(inner.height, 46.0);
+        let tiny = ring_bounds(Rectangle::new(Point::ORIGIN, Size::new(2.0, 2.0)), 2.0);
+        assert_eq!(tiny.width, 0.0);
+        assert_eq!(tiny.height, 0.0);
     }
 
     #[test]

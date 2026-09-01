@@ -32,6 +32,8 @@
 ### Bug fix
 
 - `tree_view` and `search_view` keys run only while that wrap is focused.
+- The focus ring sits inside the target so a parent card or pane
+  outline stays visible.
 
 ## 0.15.0 — 2026-08-31
 
