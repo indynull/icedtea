@@ -6611,7 +6611,10 @@ pub fn virtual_column<'a, M: Clone + 'a>(
     )
 }
 
-/// Emit [`ItemButton`] plus current modifiers when the child is pressed.
+/// Emit [`ItemButton`] plus current modifiers for a row or tile click.
+///
+/// Primary fires on release while the pointer is still over the child.
+/// Secondary (context) fires on press so a menu can open immediately.
 pub fn item_press<'a, M: Clone + 'a>(
     child: Element<'a, M>,
     on_click: impl Fn(ItemButton, keyboard::Modifiers) -> M + 'a,
@@ -6636,6 +6639,7 @@ struct ItemPress<'a, Message> {
 #[derive(Default)]
 struct PressState {
     modifiers: keyboard::Modifiers,
+    armed: Option<ItemButton>,
 }
 
 impl<'a, Message: Clone> Widget<Message, iced::Theme, iced::Renderer> for ItemPress<'a, Message> {
@@ -6712,7 +6716,30 @@ impl<'a, Message: Clone> Widget<Message, iced::Theme, iced::Renderer> for ItemPr
                     iced::mouse::Button::Right => ItemButton::Secondary,
                     _ => return,
                 };
-                shell.publish((self.on_click)(item, state.modifiers));
+                if item == ItemButton::Secondary {
+                    state.armed = None;
+                    shell.publish((self.on_click)(item, state.modifiers));
+                    shell.capture_event();
+                } else {
+                    state.armed = Some(item);
+                    shell.capture_event();
+                }
+            }
+            Event::Mouse(iced::mouse::Event::ButtonReleased(button)) => {
+                let armed = state.armed.take();
+                if *button != iced::mouse::Button::Left {
+                    return;
+                }
+                if armed != Some(ItemButton::Primary) {
+                    return;
+                }
+                let Some(pos) = cursor.position() else {
+                    return;
+                };
+                if !layout.bounds().contains(pos) {
+                    return;
+                }
+                shell.publish((self.on_click)(ItemButton::Primary, state.modifiers));
                 shell.capture_event();
             }
             _ => {}
@@ -9481,6 +9508,175 @@ mod tests {
                 modifiers: keyboard::Modifiers::SHIFT,
             }]
         );
+    }
+
+    #[test]
+    fn item_press_primary_fires_on_release() {
+        let tok = named("dark").tokens;
+        let face = label("row", tok, A11y::new("row", Role::ListItem));
+        let mut el: Element<'_, ItemClick> = item_press(face, |button, modifiers| ItemClick {
+            id: 1,
+            button,
+            modifiers,
+        });
+        let down = press_only(
+            &mut el,
+            iced::Point::new(8.0, 8.0),
+            iced::mouse::Button::Left,
+            Size::new(200.0, 40.0),
+        );
+        assert!(down.is_empty());
+        let got = press_messages(
+            &mut el,
+            iced::Point::new(8.0, 8.0),
+            iced::mouse::Button::Left,
+            Size::new(200.0, 40.0),
+        );
+        assert_eq!(got[0].button, ItemButton::Primary);
+    }
+
+    #[test]
+    fn item_press_primary_cancels_when_released_outside() {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Point, Rectangle, Size};
+        let tok = named("dark").tokens;
+        let face = label("row", tok, A11y::new("row", Role::ListItem));
+        let mut el: Element<'_, ItemClick> = item_press(face, |button, modifiers| ItemClick {
+            id: 1,
+            button,
+            modifiers,
+        });
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(200.0, 40.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let viewport = Rectangle::new(Point::ORIGIN, Size::new(200.0, 40.0));
+        let mut clipboard = clipboard::Null;
+        {
+            let mut messages = Vec::new();
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)),
+                layout,
+                iced::mouse::Cursor::Available(Point::new(8.0, 8.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+            assert!(messages.is_empty());
+        }
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(iced::mouse::Event::ButtonReleased(
+                    iced::mouse::Button::Left,
+                )),
+                layout,
+                iced::mouse::Cursor::Available(Point::new(900.0, 900.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(messages.is_empty());
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)),
+                layout,
+                iced::mouse::Cursor::Available(Point::new(8.0, 8.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(iced::mouse::Event::ButtonReleased(
+                    iced::mouse::Button::Right,
+                )),
+                layout,
+                iced::mouse::Cursor::Available(Point::new(8.0, 8.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(messages.is_empty());
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)),
+                layout,
+                iced::mouse::Cursor::Available(Point::new(8.0, 8.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(iced::mouse::Event::ButtonReleased(
+                    iced::mouse::Button::Left,
+                )),
+                layout,
+                iced::mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(messages.is_empty());
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)),
+                layout,
+                iced::mouse::Cursor::Available(Point::new(8.0, 8.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(iced::mouse::Event::ButtonReleased(
+                    iced::mouse::Button::Left,
+                )),
+                layout,
+                iced::mouse::Cursor::Available(Point::new(8.0, 8.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert_eq!(messages[0].button, ItemButton::Primary);
     }
 
     #[test]
@@ -18491,6 +18687,43 @@ mod tests {
         draw_once(&mut tv);
     }
 
+    fn press_only<M: Clone>(
+        el: &mut Element<'_, M>,
+        at: iced::Point,
+        button: iced::mouse::Button,
+        viewport: iced::Size,
+    ) -> Vec<M> {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Event, Font, Pixels, Rectangle};
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(iced::Size::ZERO, viewport);
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let vp = Rectangle::new(iced::Point::ORIGIN, viewport);
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(iced::mouse::Event::ButtonPressed(button)),
+                layout,
+                iced::mouse::Cursor::Available(at),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+        }
+        messages
+    }
+
     fn press_messages<M: Clone>(
         el: &mut Element<'_, M>,
         at: iced::Point,
@@ -18767,6 +19000,16 @@ mod tests {
             iced::Point::new(40.0, 12.0),
             iced::mouse::Button::Left,
             iced::Size::new(320.0, 80.0),
+        );
+        let context = press_only(
+            &mut list_el,
+            iced::Point::new(40.0, 12.0),
+            iced::mouse::Button::Right,
+            iced::Size::new(320.0, 80.0),
+        );
+        must(
+            context.iter().any(|c| c.button == ItemButton::Secondary),
+            format!("list row context must emit Secondary on press, got {context:?}"),
         );
         let _ = press_messages(
             &mut list_el,

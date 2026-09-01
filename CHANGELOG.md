@@ -21,6 +21,8 @@
   breadcrumb, number, date, time, accordion, expander, pick list,
   button group, pagination, and split sash handle arrows, Enter, and
   Space on the constructor.
+- `item_press` sends a primary click on release while the pointer is
+  still over the row. A secondary press is the list context click.
 
 ## 0.15.0 — 2026-08-31
 
