@@ -23,6 +23,9 @@ from role, name, and disabled. A screen reader does not receive
 role, value, or hint today.
 
 Keyboard order is the working desktop path. An open modal consumes
-keys first. A focused field owns unmodified typing. Otherwise
+keys first. A focused field owns unmodified typing. Otherwise the
+focused constructor owns arrows, Enter, and Space. Tab walks
+[`focus::cycle`](https://docs.rs/icedtea/latest/icedtea/focus/fn.cycle.html).
+Otherwise
 [`key::handle`](https://docs.rs/icedtea/latest/icedtea/key/fn.handle.html)
-matches the action table. See [Architecture](architecture.md).
+matches the action table. See [Architecture](architecture.md#keys).

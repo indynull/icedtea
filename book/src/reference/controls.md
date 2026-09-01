@@ -56,6 +56,7 @@ Constructor: [`widget::toggle_button`](https://docs.rs/icedtea/latest/icedtea/wi
 
 Pass the current on/off state. The message fires on press. Disabled
 keeps the face and drops the handler.
+Space and Enter toggle when the button is focused.
 
 Pass `A11y`.
 
@@ -71,6 +72,7 @@ Constructor: [`widget::checkbox`](https://docs.rs/icedtea/latest/icedtea/widget/
 
 The application owns the bool. The message carries the next value.
 Disabled keeps the box visible and ignores clicks.
+Space and Enter toggle when the box is focused.
 
 Pass `A11y`.
 
@@ -86,6 +88,7 @@ Constructor: [`widget::radio`](https://docs.rs/icedtea/latest/icedtea/widget/fn.
 
 Compare the selected value to this option. Disabled rows stay in the
 group and do not change the selection.
+Arrows move the selection when a radio in the group is focused.
 
 Pass `A11y`.
 
@@ -101,6 +104,7 @@ Constructor: [`widget::switch`](https://docs.rs/icedtea/latest/icedtea/widget/fn
 
 Same contract as checkbox: the application owns the bool. Disabled
 freezes the thumb.
+Space and Enter toggle when the switch is focused.
 
 Pass `A11y`.
 
@@ -117,6 +121,7 @@ Constructor: [`widget::slider`](https://docs.rs/icedtea/latest/icedtea/widget/fn
 Pass min, max, and the current value. `SliderMarks` paints ticks and
 end labels, a `vertical` rail, and an optional thumb value label. The
 message is the new value while the thumb moves. Disabled ignores drag.
+Arrows nudge the value when the slider is focused.
 
 Pass `A11y`.
 
@@ -131,6 +136,7 @@ Constructor: [`widget::segmented_button`](https://docs.rs/icedtea/latest/icedtea
 [iced](https://crates.io/crates/iced)
 
 The application owns the selected index. Cells may carry an icon. Press emits the new index. Disabled freezes every segment. `ControlSize::Compact` is the in-pane exclusive strip. `tab_bar` stays the pane chrome.
+Arrows move the segment. Enter and Space activate it.
 
 Pass `A11y`.
 
@@ -145,6 +151,7 @@ Constructor: [`widget::button_group`](https://docs.rs/icedtea/latest/icedtea/wid
 
 Each cell is a label plus optional icon (`Cell`). Press sends the index.
 Empty cells paint an empty row. Disabled drops every press.
+Arrows move along the strip. Enter and Space press the cell.
 
 Pass `A11y`.
 
@@ -187,6 +194,7 @@ Constructor: [`widget::range_slider`](https://docs.rs/icedtea/latest/icedtea/wid
 [iced](https://crates.io/crates/iced)
 
 Messages are the clamped pair with `low <= high`. Disabled freezes both thumbs.
+Each thumb is a slider: arrows nudge the focused end.
 
 Pass `A11y`.
 
@@ -201,6 +209,7 @@ Constructor: [`widget::checkbox_indeterminate`](https://docs.rs/icedtea/latest/i
 [iced](https://crates.io/crates/iced)
 
 Uses [`CheckState`](https://docs.rs/icedtea/latest/icedtea/widget/enum.CheckState.html). Press follows `CheckState::toggle`.
+Checked and unchecked states use the checkbox keys.
 
 Pass `A11y`.
 

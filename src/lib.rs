@@ -44,7 +44,6 @@
 //!     Hello::update,
 //!     Hello::view,
 //!     Hello::theme,
-//!     Hello::subscription
 //! )
 //! ```
 //!
@@ -52,8 +51,12 @@
 //!
 //! [`run!`] subscribes [`key::listen`]. Implement
 //! `From<keyboard::Event>` on the application message. Wrap `view`
-//! with [`focus::cycle`]. [`key::handle`] matches the table after an
-//! open modal and after focused text:
+//! with [`focus::cycle`]. A focused list, tree, slider, or pick owns
+//! arrows, Enter, and Space. Escape closes an open menu, pick,
+//! context menu, drawer, or cancel dialog. Application windows call
+//! [`ActionTable::seed_quit`](action::ActionTable::seed_quit).
+//! [`key::handle`] matches the table after an open modal and after
+//! focused text:
 //!
 //! ```
 //! use icedtea::action::{Action, ActionTable};

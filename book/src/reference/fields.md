@@ -129,6 +129,7 @@ Constructor: [`widget::search_view`](https://docs.rs/icedtea/latest/icedtea/widg
 
 The application owns the query and the hit list. Empty hits show
 `empty`. Disabled drops pick and clear.
+Arrows move the highlighted hit while the query field is focused.
 
 Pass `A11y`.
 
@@ -163,6 +164,8 @@ Compact), inset `Density::inset` from the end. A press on the mark
 opens the menu. Right-to-left puts the mark on the physical left.
 Placeholder shows when nothing is selected. Disabled keeps the
 current face.
+Enter and Space open the overlay. Arrows move the selection while
+the control is focused.
 
 Pass `A11y`.
 
@@ -196,6 +199,7 @@ Constructor: [`widget::number_input`](https://docs.rs/icedtea/latest/icedtea/wid
 
 The application owns the number. Step messages bump it. Disabled
 freezes the value.
+Arrows step the value when the field is focused.
 
 Pass `A11y`.
 
@@ -209,6 +213,7 @@ Constructor: [`widget::date_stepper`](https://docs.rs/icedtea/latest/icedtea/wid
 [icedtea](https://crates.io/crates/icedtea)
 
 The application owns the selected day. Disabled ignores picks.
+Arrows step the day when the control is focused.
 
 Pass `A11y`.
 
@@ -224,6 +229,7 @@ Constructor: [`widget::time_picker`](https://docs.rs/icedtea/latest/icedtea/widg
 `TimeValue` is hour, minute, second. `TimeClock` is display only
 (12-hour or 24-hour, optional seconds). `TimeField` is the unit that
 steps. Disabled freezes the fields.
+Arrows step the focused unit.
 
 Pass `A11y`.
 

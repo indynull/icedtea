@@ -12,9 +12,22 @@ You keep the data. Color and type follow
 [Material Design 3](https://m3.material.io/get-started) roles
 (`m3` module). Desktop chrome is rectangular (M3 shape None).
 
-`icedtea::run!` opens the window. One `Action` is a command you write
-once; the toolbar, menus, and shortcuts can all run it. A constructor
+`icedtea::run!` opens the window. An `Action` is a command you write
+once. The same row feeds the menu, the toolbar, shortcuts, the
+context menu, footer hints, and the command palette. A constructor
 is a function that draws one control and sends your message.
+
+Click focuses a control. Tab walks those targets. A focused list,
+tree, slider, or pick owns arrows, Enter, and Space. Escape closes
+an open menu, pick, context menu, drawer, or cancel dialog.
+`run!` listens for keys. `ActionTable::seed_quit` adds `ctrl+q`.
+Lists, tables, and trees virtualize. Markdown, code, and fields
+select and copy through the same `select` contract.
+
+Layout is Rust (`pack`, `split_view`, `form`). Patterns dock a list
+beside detail, a dialog sheet, a drawer, or a workspace of splits.
+Chrome follows the window direction. Tokens carry density and follow
+the host light/dark pair. Every drawing constructor takes `A11y`.
 
 ![A themed icedtea window](https://github.com/indynull/icedtea/raw/main/assets/gallery.gif)
 
@@ -24,7 +37,8 @@ is a function that draws one control and sends your message.
 the crate version.
 
 The program is [`examples/hello.rs`](examples/hello.rs): a notes buffer,
-Save on `ctrl+s`, a toolbar, and a status line.
+Save on `ctrl+s`, Quit on `ctrl+q`, a toolbar, Tab into the editor,
+and a status line.
 
 ```rust,ignore
 icedtea::run!(
@@ -33,7 +47,6 @@ icedtea::run!(
     Hello::update,
     Hello::view,
     Hello::theme,
-    Hello::subscription
 )
 ```
 

@@ -5,7 +5,8 @@ which row is selected. The clip owns the list offset. `on_scroll`
 reports `start..end` for the next `view`. Jump with `scroll_to` on
 `scroll_id`. Selecting a row
 outside the viewport moves the clip. Change `scroll_id` when the
-row set is a different list.
+row set is a different list. A focused list moves the primary row
+with arrows, Page, Home, and End.
 
 ```rust
 use icedtea::a11y::{A11y, Role};

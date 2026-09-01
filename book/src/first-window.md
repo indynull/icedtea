@@ -14,6 +14,11 @@ in the repository. `cargo run --example hello`.
 {{#include ../../examples/hello.rs}}
 ```
 
+`Message` implements `From<keyboard::Event>` so `run!` can subscribe
+`key::listen`. `view` wraps the column in `focus::cycle` so Tab
+reaches the editor. `seed_quit` inserts `app.quit` on `ctrl+q`.
+`key::handle` matches Save and Quit after the editor owns typing.
+
 `Boot` is the window name, size, colors, and look (density, type
 scale, corners, elevation). `run!` (and `daemon!`)
 also pick an installed sans face for UI text (normal and bold) and a

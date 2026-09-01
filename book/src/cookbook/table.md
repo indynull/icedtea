@@ -3,6 +3,7 @@
 A virtualized table. The clip owns the pixel offset. Sort writes
 application state. `on_scroll` reports the mounted range. Jump with
 `scroll_to` on `scroll_id`. `on_h_scroll` moves the unfrozen strip.
+A focused scroll pane moves with arrows, Page, Home, and End.
 
 ```rust
 use icedtea::a11y::{A11y, Role};

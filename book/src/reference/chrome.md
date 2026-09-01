@@ -50,8 +50,12 @@ Constructor: [`key::handle`](https://docs.rs/icedtea/latest/icedtea/key/fn.handl
 [icedtea](https://crates.io/crates/icedtea)
 
 Subscribe with [`key::listen`](https://docs.rs/icedtea/latest/icedtea/key/fn.listen.html).
-An open modal consumes. Focused text owns unmodified typing.
-Otherwise chords match the table. See [Actions](../actions.md).
+`run!` already does. Implement `From<keyboard::Event>` on the
+application message. An open modal consumes. Focused text owns
+unmodified typing. Otherwise the focused constructor owns arrows,
+Enter, and Space. Tab walks `focus::cycle`. Otherwise chords match
+the table. See [Actions](../actions.md) and
+[Architecture](../architecture.md#keys).
 
 ### Cheatsheet
 
@@ -182,9 +186,9 @@ Constructor: [`pattern::context_menu`](https://docs.rs/icedtea/latest/icedtea/pa
 [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Stack on the window with the click point. Click-away dismisses.
-Rows fill the card. Empty table still paints a card. `progress` is
-0 (gone) to 1 (rest).
+Stack on the window with the click point. Click-away and Escape
+dismiss. Rows fill the card. Empty table still paints a card.
+`progress` is 0 (gone) to 1 (rest).
 
 ### Breadcrumb
 
@@ -197,6 +201,7 @@ Constructor: [`widget::breadcrumb`](https://docs.rs/icedtea/latest/icedtea/widge
 
 Crumbs before the last send a message. The last crumb is the current
 page. Empty path is empty.
+Arrows move along the path when the trail is focused.
 
 Pass `A11y`.
 
@@ -237,7 +242,8 @@ Left is status copy (`meta`, or `info_bar` when a tone is set). Right
 is each enabled shortcut as two faces (chord in `Tokens.text`, title
 in `Tokens.muted` at meta size), or an optional caption string. An
 empty table shows status only. `ActionTable::footer_hints` returns
-the joined strings (`j down`) for tests.
+the joined strings (`j down`) for tests. A click on a hint chord
+invokes the same `Action`.
 
 ### Scrollbar
 
@@ -253,6 +259,8 @@ Lists and tables use a 24px rail. The rail sits on the end side
 (`Tokens.direction`: right in left-to-right, left in right-to-left).
 This constructor is the themed
 iced scroller for other panes.
+A focused pane moves with arrows, Page, Home, and End. It does not
+paint a focus ring.
 
 Pass `A11y`.
 

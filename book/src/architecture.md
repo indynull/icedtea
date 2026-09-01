@@ -14,6 +14,14 @@ A window is a loop you write in Rust:
 
 <img src="images/compose.svg" alt="Boot starts the window. Tokens color it. An ActionTable of many Actions feeds the toolbar and shortcuts. A list/detail pattern lays out the list_view and textarea constructors." width="800"/>
 
+The application owns state and any file on disk. Constructors return
+`Element`s and send messages. One `Action` is declared once. Paint is
+Material Design 3 roles on `Tokens` (density, type scale, shape,
+elevation). Persist follows the host light/dark pair. Chrome rows
+take `Direction` from `Boot` and mirror. Lists, tables, and trees
+virtualize. Select-and-copy is one `select` contract. Every drawing
+constructor takes `A11y`.
+
 ## Start the window
 
 [`Boot`](https://docs.rs/icedtea/latest/icedtea/app/struct.Boot.html)
@@ -73,6 +81,8 @@ is the box recipes: `layout::pack`, `layout::wrap`, `layout::dock`,
 `layout::split_view`, `layout::clamp`, `layout::form`. See
 [Layout](layout.md).
 
+## Keys
+
 An open modal consumes keys first. Otherwise a focused field owns
 unmodified typing. Otherwise the focused `focus::target` owns arrows,
 Page, Home, End, Enter, and Space. Tab walks targets (`focus::cycle`).
@@ -80,7 +90,8 @@ Page, Home, End, Enter, and Space. Tab walks targets (`focus::cycle`).
 `ActionTable::seed_quit`. Open menus, picks, context menus, drawers,
 and cancel dialogs close on Escape. `item_press` primary fires on
 release; `ListOpts.on_context` is the secondary click. Otherwise
-`key::handle` matches the action table.
+`key::handle` matches the action table. A filling `scroll` pane
+takes arrows without painting a ring. See [Actions](actions.md).
 
 [First window](first-window.md) is the smallest case of this compose.
 [Keep a task list](cookbook/tasks.md) is the same loop with a list and

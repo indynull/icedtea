@@ -22,9 +22,9 @@ Constructor: [`pattern::dialog_sheet`](https://docs.rs/icedtea/latest/icedtea/pa
 [icedtea](https://crates.io/crates/icedtea)
 
 Primary and optional cancel, plus extra actions and an optional header
-icon. Native file dialogs go through
-`icedtea::native_dialog`. In-window modals sit on `pattern::modal_card`
-with a 0–1 `progress` for enter/exit.
+icon. Escape sends Cancel when that button is set. Native file
+dialogs go through `icedtea::native_dialog`. In-window modals sit on
+`pattern::modal_card` with a 0–1 `progress` for enter/exit.
 
 ### List/detail
 
@@ -60,6 +60,7 @@ Constructor: [`pattern::drawer`](https://docs.rs/icedtea/latest/icedtea/pattern/
 
 `open` is the committed pane. `progress` is 0 (gone) to 1 (220 dp).
 Closed at 0 paints content only.
+Escape closes an open drawer when `on_close` is set.
 
 ### Workspace
 
@@ -104,6 +105,7 @@ Selected row uses the rail wash. Press emits the destination index.
 `RailDest` carries an optional icon and badge. `expanded` is the wide
 labeled rail; compact shows the icon or the first letter in a 72 px
 column. Empty items paint an empty column.
+Arrows move the selected destination when the rail is focused.
 
 Pass `A11y`.
 

@@ -40,6 +40,7 @@ enum Message {
     Draft(String),
     Add,
     Toggle(i64, bool),
+    Quit,
     Key(icedtea::iced::keyboard::Event),
 }
 
@@ -58,6 +59,7 @@ impl Tasks {
             Action::new("task.add", "Add", Message::Add)
                 .with_shortcut(Shortcut::parse("ctrl+n").unwrap()),
         );
+        table.seed_quit(Message::Quit);
         let db = open_db(DB_FILE);
         let rows = load_rows(&db);
         let n = rows.len();
@@ -94,6 +96,7 @@ impl Tasks {
                     self.reload(if done { "Done" } else { "Not done" });
                 }
             }
+            Message::Quit => return icedtea::iced::exit(),
             Message::Key(ev) => {
                 if let Some(next) = key::handle(KeyContext::default(), &self.table, &ev) {
                     return self.update(next);

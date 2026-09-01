@@ -6,7 +6,9 @@ role, value, hint, disabled, checked / selected / toggled, expanded,
 live, required, error). Chrome rows take an `ActionTable`. Layout
 recipes do not take `A11y`. iced 0.14 publishes the widget id only.
 Keyboard order is the working path: see
-[Accessibility](accessibility.md). The application owns state.
+[Architecture](architecture.md#keys) and
+[Accessibility](accessibility.md). Each constructor below owns the
+keys named on its page. The application owns state.
 
 | Group | Page |
 | --- | --- |

@@ -85,7 +85,9 @@ a successful write, `reload` reads the table again.
 
 `Message::Draft` is each keystroke in the field. `Message::Add` is the
 toolbar, `ctrl+n`, or Enter in the field. `Message::Toggle` is a
-checkbox. Empty titles are not saved.
+checkbox. Empty titles are not saved. `seed_quit` adds Quit on
+`ctrl+q`. `focus::cycle` wraps the column so Tab reaches the field
+and the list.
 
 `scroll` lets a long list move. `A11y` is the name a screen
 reader uses; every icedtea constructor takes one.

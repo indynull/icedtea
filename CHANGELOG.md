@@ -38,6 +38,11 @@
 - A focused `scroll` pane takes arrows without painting a ring around
   the pane.
 
+### Chore
+
+- Guide and README name constructor keys, `seed_quit`, and the book
+  layers.
+
 ## 0.15.0 — 2026-08-31
 
 ### Feature

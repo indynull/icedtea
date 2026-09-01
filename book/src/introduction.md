@@ -9,20 +9,35 @@ tasks, the file on disk). Paint follows
 rectangular (M3 shape None).
 
 `icedtea::run!` opens the window. An `ActionTable` is the list of
-commands you declare once; the toolbar, menus, and shortcuts read
-that list. A constructor is a function that draws one control and
-sends a **message** — a note about what the user did. Color, layout,
-and chrome are Rust values.
+commands you declare once; the toolbar, menus, shortcuts, context
+menus, footer hints, and the command palette read that list. A
+constructor is a function that draws one control and sends a
+**message** — a note about what the user did. Color, layout, and
+chrome are Rust values.
+
+Click focuses a control. Tab walks those targets. A focused list,
+tree, slider, or pick owns arrows, Enter, and Space. Escape closes
+an open menu, pick, context menu, drawer, or cancel dialog.
+`run!` listens. `ActionTable::seed_quit` adds `ctrl+q`. Lists,
+tables, and trees virtualize. Markdown, code, and fields select and
+copy through one `select` contract.
 
 ![A themed icedtea window](gallery.gif)
 
-[First window](first-window.md) is the shortest path: one `Action`, a
-toolbar, and a notes editor. [Install](install.md) has the crate line
-and host libraries. After that, [Keep a task list](cookbook/tasks.md)
-is a one-day job: list, add, mark done, remember rows in a SQLite
-file. Compose covers how the pieces fit. The
-[cookbook](cookbook/save.md) walks those jobs. The
-[reference](widgets.md) lists every public constructor.
+Read this book in layers:
+
+1. [First window](first-window.md) is the shortest path: one `Action`,
+   a toolbar, Tab into the editor, Save, and Quit.
+2. [Architecture](architecture.md) is how Boot, tokens, the action
+   table, constructors, keys, layout, and patterns fit. That page is
+   the window contract.
+3. [Keep a task list](cookbook/tasks.md) is the same loop with a list
+   and a SQLite file. The [cookbook](cookbook/save.md) walks those
+   jobs (save, list and detail, table, palette).
+4. The [reference](widgets.md) lists every public constructor. Keys
+   for that constructor sit on its page.
+
+[Install](install.md) has the crate line and host libraries.
 
 - [Crate docs](https://docs.rs/icedtea)
 - [crates.io](https://crates.io/crates/icedtea)

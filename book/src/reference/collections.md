@@ -42,6 +42,9 @@ line. `RowFace::Card` is a surface, wrapped title, and an optional
 `RowSlot::Check`, or `RowSlot::Text` (a small badge) on the same
 virtualized rows. `ListModel::indent` insets a row from start.
 `on_check` toggles a check slot.
+A focused list moves the primary row with arrows, Page, Home, and
+End. Primary click fires on release. `on_context` is the secondary
+click.
 
 Pass `A11y`.
 
@@ -125,6 +128,8 @@ and file marks from `dir`. Selected wash covers the full row. `Tokens.density` s
 pad, gap, and indent. `TreeNode::trailing` is the same
 [`RowSlot`](https://docs.rs/icedtea/latest/icedtea/collection/enum.RowSlot.html)
 as `list_view`; `Text` is a badge.
+A focused tree expands and collapses with arrows. Up and Down move
+the selection.
 
 Pass `A11y`.
 
@@ -145,6 +150,8 @@ freezes one tab so press is skipped. `tab_bar` takes
 is set and titles do not fit, extra enabled tabs move into a More list. Select
 sends the index. See also
 [`pattern::tab_view`](patterns.md#tab-view).
+A focused bar moves with arrows. Enter and Space activate the
+current tab.
 
 Pass `A11y`.
 
@@ -160,6 +167,8 @@ Constructor: [`widget::accordion_view`](https://docs.rs/icedtea/latest/icedtea/w
 The application owns which row is open and a 0–1 `progress` for
 height. Closed rows are headers only. The chevron sits on the
 trailing edge.
+A focused accordion moves with arrows. Enter and Space toggle the
+open row.
 
 Pass `A11y`.
 
@@ -177,6 +186,7 @@ shows a `Peek` of the child (pixels, or whole body lines with room
 for the last descent) and fades the cut. Title starts; optional
 `trail` sits after the title; the chevron sits on the trailing edge.
 Accordion is many headers; this is one card.
+Enter and Space toggle the header when the card is focused.
 
 Pass `A11y`.
 
@@ -191,6 +201,8 @@ Constructor: [`widget::pagination`](https://docs.rs/icedtea/latest/icedtea/widge
 
 Pass page count and the current page. Messages are previous, next,
 and jump. One page hides the control or disables the arrows.
+Arrows, Page, Home, and End move the page when the control is
+focused.
 
 Pass `A11y`.
 
