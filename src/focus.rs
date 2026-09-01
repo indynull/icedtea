@@ -180,27 +180,6 @@ pub fn target_keys<'a, M: Clone + 'a>(
     .into()
 }
 
-/// [`target`] that is focusable without a painted ring.
-///
-/// A filling scroll pane takes arrows when focused. A ring around that
-/// pane is chrome, not a control.
-pub(crate) fn target_pane<'a, M: Clone + 'a>(
-    child: iced::Element<'a, M>,
-    tok: crate::theme::Tokens,
-    can_focus: bool,
-) -> iced::Element<'a, M> {
-    Target {
-        content: child,
-        tok,
-        can_focus,
-        on_key: None,
-        open_on_activate: false,
-        keys_first: false,
-        paint_ring: false,
-    }
-    .into()
-}
-
 /// [`target_keys`] that also clicks the child on Enter or Space.
 pub fn target_keys_open<'a, M: Clone + 'a>(
     child: iced::Element<'a, M>,

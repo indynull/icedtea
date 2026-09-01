@@ -450,6 +450,7 @@ struct ThemedScrollState {
     content_h: f32,
     viewport_h: f32,
     last_wheel: Option<Instant>,
+    focused: bool,
 }
 
 impl Default for ThemedScrollState {
@@ -463,7 +464,22 @@ impl Default for ThemedScrollState {
             content_h: 0.0,
             viewport_h: 0.0,
             last_wheel: None,
+            focused: false,
         }
+    }
+}
+
+impl operation::focusable::Focusable for ThemedScrollState {
+    fn is_focused(&self) -> bool {
+        self.focused
+    }
+
+    fn focus(&mut self) {
+        self.focused = true;
+    }
+
+    fn unfocus(&mut self) {
+        self.focused = false;
     }
 }
 
@@ -506,6 +522,7 @@ pub struct ThemedScroll<'a, Message> {
     stick: bool,
     id: Option<Id>,
     on_scroll: Option<Box<dyn Fn(f32) -> Message + 'a>>,
+    can_focus: bool,
 }
 
 impl<'a, Message> ThemedScroll<'a, Message> {
@@ -522,7 +539,16 @@ impl<'a, Message> ThemedScroll<'a, Message> {
             stick,
             id,
             on_scroll,
+            can_focus: false,
         }
+    }
+
+    /// Public [`crate::widget::scroll`]: Tab and arrows own this pane.
+    /// Tree and nested clips leave this off so a wrapper is the one
+    /// focusable.
+    pub fn focusable(mut self) -> Self {
+        self.can_focus = true;
+        self
     }
 
     fn pane_width(total: f32) -> f32 {
@@ -624,6 +650,10 @@ where
         let bounds = layout.bounds();
         let mut children = layout.children();
         let content_layout = children.next().unwrap();
+        if self.can_focus {
+            let state = tree.state.downcast_mut::<ThemedScrollState>();
+            operation.focusable(self.id.as_ref(), bounds, state);
+        }
         let scroll = tree.state.downcast_ref::<ThemedScrollState>().scroll;
         let translation = Vector::new(0.0, -scroll);
         operation.scrollable(
@@ -684,6 +714,10 @@ where
         match event {
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
                 state.last_wheel = None;
+                if self.can_focus && state.focused != over_pane {
+                    state.focused = over_pane;
+                    shell.request_redraw();
+                }
                 if let Some(pos) = cursor.position() {
                     if rail.contains(pos) {
                         let y = pos.y - rail.y;
@@ -744,7 +778,9 @@ where
                     }
                 }
             }
-            Event::Keyboard(kev) if !shell.is_event_captured() => {
+            Event::Keyboard(kev)
+                if !shell.is_event_captured() && self.can_focus && state.focused =>
+            {
                 if let Some(press) = crate::key::press(kev) {
                     let page = view_h.max(1.0);
                     let next = match press {

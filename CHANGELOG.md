@@ -37,6 +37,7 @@
   brand box.
 - A focused `scroll` pane takes arrows without painting a ring around
   the pane.
+- An unfocused `scroll` pane does not take arrows, Page, Home, or End.
 
 ### Chore
 

@@ -5650,14 +5650,13 @@ where
     F: Fn(f32) -> M + 'a,
 {
     let boxed = on_scroll.map(|f| Box::new(f) as Box<dyn Fn(f32) -> M + 'a>);
-    a11y::attach(
-        crate::focus::target_pane(
-            ThemedScroll::new(child, tok, stick, scroll_id, boxed).into(),
-            tok,
-            !a11y.disabled,
-        ),
-        &a11y,
-    )
+    let pane = ThemedScroll::new(child, tok, stick, scroll_id, boxed);
+    let pane = if a11y.disabled {
+        pane
+    } else {
+        pane.focusable()
+    };
+    a11y::attach(pane.into(), &a11y)
 }
 
 /// Append-only lines. Sticks to the end. `window` virtualizes long logs.
@@ -9535,6 +9534,93 @@ mod tests {
     }
 
     #[test]
+    fn scroll_keys_run_only_while_focused() {
+        let tok = named("dark").tokens;
+        let tall = iced::widget::column![
+            label("a", tok, A11y::new("a", Role::Status)),
+            Space::new().height(400),
+        ]
+        .into();
+        let mut el: Element<'_, f32> = scroll(
+            tall,
+            tok,
+            A11y::new("pane", Role::Group),
+            false,
+            None,
+            Some(|y| y),
+        );
+        let size = Size::new(200.0, 80.0);
+        let cold = pump_click_then_keys(
+            &mut el,
+            size,
+            iced::Point::new(-10.0, -10.0),
+            [keyboard::Key::Named(keyboard::key::Named::PageDown)],
+        );
+        must(
+            cold.iter().all(|y| *y == 0.0),
+            format!("unfocused pane must not take PageDown, got {cold:?}"),
+        );
+        let hot = pump_click_then_keys(
+            &mut el,
+            size,
+            iced::Point::new(20.0, 20.0),
+            [keyboard::Key::Named(keyboard::key::Named::PageDown)],
+        );
+        assert!(hot.iter().any(|y| *y > 0.0), "focused PageDown {hot:?}");
+    }
+
+    #[test]
+    fn scroll_keys_leave_a_focused_sibling() {
+        let tok = named("dark").tokens;
+        let tall = iced::widget::column![
+            label("a", tok, A11y::new("a", Role::Status)),
+            Space::new().height(400),
+        ]
+        .into();
+        #[derive(Clone, Debug, PartialEq)]
+        enum Ev {
+            Check(bool),
+            Scroll(f32),
+        }
+        let mut el: Element<'_, Ev> = iced::widget::column![
+            checkbox(
+                "Accept",
+                false,
+                Ev::Check,
+                tok,
+                A11y::new("Accept", Role::Checkbox),
+            ),
+            scroll(
+                tall,
+                tok,
+                A11y::new("pane", Role::Group),
+                false,
+                None,
+                Some(Ev::Scroll),
+            ),
+        ]
+        .into();
+        let got = pump_click_then_keys(
+            &mut el,
+            Size::new(200.0, 200.0),
+            iced::Point::new(20.0, 12.0),
+            [
+                keyboard::Key::Named(keyboard::key::Named::PageDown),
+                keyboard::Key::Named(keyboard::key::Named::ArrowDown),
+                keyboard::Key::Named(keyboard::key::Named::Enter),
+            ],
+        );
+        must(
+            !got.iter().any(|e| matches!(e, Ev::Scroll(y) if *y > 0.0)),
+            format!("unfocused scroll must not steal keys from the checkbox, got {got:?}"),
+        );
+        must(
+            got.iter().any(|e| matches!(e, Ev::Check(_))),
+            format!("focused checkbox must still take Enter, got {got:?}"),
+        );
+    }
+
+    #[test]
     fn scroll_page_down_moves_offset() {
         let tok = named("dark").tokens;
         let tall = iced::widget::column![
@@ -9561,6 +9647,20 @@ mod tests {
                 .layout(&mut tree, &renderer, &layout::Limits::new(Size::ZERO, size));
         let layout = Layout::new(&node);
         let mut messages = Vec::<f32>::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(iced::Point::new(20.0, 20.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &iced::Rectangle::new(iced::Point::ORIGIN, size),
+            );
+        }
         {
             let mut shell = iced::advanced::Shell::new(&mut messages);
             let mut clipboard = iced::advanced::clipboard::Null;
@@ -9624,6 +9724,30 @@ mod tests {
             let mut clipboard = iced::advanced::clipboard::Null;
             el.as_widget_mut().update(
                 &mut tree,
+                &Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(keyboard::key::Named::Control),
+                    modified_key: keyboard::Key::Named(keyboard::key::Named::Control),
+                    physical_key: keyboard::key::Physical::Unidentified(
+                        keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: keyboard::Location::Standard,
+                    modifiers: keyboard::Modifiers::CTRL,
+                    text: None,
+                    repeat: false,
+                }),
+                layout,
+                mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &iced::Rectangle::new(iced::Point::ORIGIN, size),
+            );
+        }
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            el.as_widget_mut().update(
+                &mut tree,
                 &Event::Window(iced::window::Event::RedrawRequested(
                     std::time::Instant::now(),
                 )),
@@ -9635,6 +9759,74 @@ mod tests {
                 &iced::Rectangle::new(iced::Point::ORIGIN, size),
             );
         }
+    }
+
+    #[test]
+    fn scroll_disabled_is_not_focusable() {
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, ()> = scroll(
+            label("body", tok, A11y::new("body", Role::Group)),
+            tok,
+            A11y::new("pane", Role::Group).with_disabled(true),
+            false,
+            None,
+            None::<fn(f32) -> ()>,
+        );
+        let (n, focused) = focusable_after_click(
+            &mut el,
+            Size::new(200.0, 120.0),
+            iced::Point::new(10.0, 10.0),
+        );
+        assert_eq!(n, 0);
+        assert_eq!(focused, 0);
+    }
+
+    #[test]
+    fn scroll_tab_focus_operation_toggles() {
+        use iced::advanced::widget::operation::{focusable::Focusable, Operation};
+        struct Toggle {
+            n: usize,
+        }
+        impl Operation<()> for Toggle {
+            fn focusable(
+                &mut self,
+                _id: Option<&Id>,
+                _bounds: iced::Rectangle,
+                state: &mut dyn Focusable,
+            ) {
+                self.n += 1;
+                state.focus();
+                assert!(state.is_focused());
+                state.unfocus();
+                assert!(!state.is_focused());
+            }
+            fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<()>)) {
+                operate(self);
+            }
+        }
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, ()> = scroll(
+            label("body", tok, A11y::new("body", Role::Group)),
+            tok,
+            A11y::new("pane", Role::Group),
+            false,
+            None,
+            None::<fn(f32) -> ()>,
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            iced::Font::DEFAULT,
+            iced::Pixels::from(16u32),
+        ));
+        let size = Size::new(200.0, 120.0);
+        let node =
+            el.as_widget_mut()
+                .layout(&mut tree, &renderer, &layout::Limits::new(Size::ZERO, size));
+        let layout = Layout::new(&node);
+        let mut op = Toggle { n: 0 };
+        el.as_widget_mut()
+            .operate(&mut tree, layout, &renderer, &mut op);
+        assert_eq!(op.n, 1);
     }
 
     #[test]
