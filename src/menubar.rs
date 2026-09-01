@@ -260,12 +260,58 @@ where
                     shell.capture_event();
                 }
             }
-            Event::Keyboard(keyboard::Event::KeyPressed { key, .. })
-                if escape_closes(state.is_open)
-                    && matches!(key, keyboard::Key::Named(Named::Escape)) =>
-            {
-                state.is_open = false;
-                shell.capture_event();
+            Event::Keyboard(keyboard::Event::KeyPressed { key, .. }) if state.is_open => {
+                match key {
+                    keyboard::Key::Named(Named::Escape) if escape_closes(state.is_open) => {
+                        state.is_open = false;
+                        shell.capture_event();
+                    }
+                    keyboard::Key::Named(Named::ArrowDown) => {
+                        let n = self.options.len();
+                        if n > 0 {
+                            let i = state.hovered_option.unwrap_or(n - 1);
+                            state.hovered_option = Some((i + 1) % n);
+                            shell.capture_event();
+                            shell.request_redraw();
+                        }
+                    }
+                    keyboard::Key::Named(Named::ArrowUp) => {
+                        let n = self.options.len();
+                        if n > 0 {
+                            let i = state.hovered_option.unwrap_or(0);
+                            state.hovered_option = Some((i + n - 1) % n);
+                            shell.capture_event();
+                            shell.request_redraw();
+                        }
+                    }
+                    keyboard::Key::Named(Named::Enter) => {
+                        if let Some(i) = state.hovered_option {
+                            if let Some(opt) = self.options.get(i).cloned() {
+                                shell.publish(pick_and_close(
+                                    &mut state.is_open,
+                                    self.on_select.as_ref(),
+                                    opt,
+                                ));
+                                shell.capture_event();
+                            }
+                        }
+                    }
+                    keyboard::Key::Character(c) => {
+                        let ch = c.chars().next().map(|x| x.to_ascii_lowercase());
+                        if let Some(ch) = ch {
+                            if let Some(i) = self.options.iter().position(|o| {
+                                o.chars()
+                                    .next()
+                                    .is_some_and(|x| x.to_ascii_lowercase() == ch)
+                            }) {
+                                state.hovered_option = Some(i);
+                                shell.capture_event();
+                                shell.request_redraw();
+                            }
+                        }
+                    }
+                    _ => {}
+                }
             }
             _ => {}
         }
