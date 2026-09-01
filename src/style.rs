@@ -678,15 +678,18 @@ pub fn search_style_paint(
 pub fn picker_style(tok: Tokens) -> impl Fn(&iced::Theme, pick_list::Status) -> pick_list::Style {
     move |_theme, status| {
         let s = tok.scheme();
-        let hot = !matches!(status, pick_list::Status::Active);
+        let (border_color, width) = match status {
+            pick_list::Status::Hovered => (s.on_surface, 1.0),
+            pick_list::Status::Active | pick_list::Status::Opened { .. } => (s.outline, 1.0),
+        };
         pick_list::Style {
             text_color: s.on_surface,
             placeholder_color: s.on_surface_variant,
             handle_color: s.on_surface_variant,
             background: Background::Color(s.surface_container_highest),
             border: Border {
-                color: if hot { s.primary } else { s.outline },
-                width: if hot { 2.0 } else { 1.0 },
+                color: border_color,
+                width,
                 radius: component_radius(tok, Component::Field),
             },
         }
@@ -1454,7 +1457,9 @@ mod tests {
         let p = picker_style(tok);
         let _ = p(&theme, pick_list::Status::Active);
         let _ = p(&theme, pick_list::Status::Hovered);
-        let _ = p(&theme, pick_list::Status::Opened { is_hovered: true });
+        let open = p(&theme, pick_list::Status::Opened { is_hovered: true });
+        assert_eq!(open.border.width, 1.0);
+        assert_ne!(open.border.color, tok.scheme().primary);
         let _ = overlay_menu_style(tok)(&theme);
         let pill = tok.with_shape(crate::m3::ShapePolicy::Pill);
         let soft = tok.with_shape(crate::m3::ShapePolicy::Soft);

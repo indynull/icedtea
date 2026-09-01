@@ -4543,7 +4543,13 @@ pub fn markdown_view<'a, M: Clone + 'a>(
         };
         col = col.push(markdown::item(&viewer, settings, item, i).map(on_link));
     }
-    a11y::attach(markdown_listen(col.into(), on_pointer), &a11y)
+    a11y::attach(
+        container(markdown_listen(col.into(), on_pointer))
+            .padding(inset(tok))
+            .width(Length::Fill)
+            .into(),
+        &a11y,
+    )
 }
 
 /// One top-level markdown item. Highlight follows [`crate::select::MarkdownSpan`].
@@ -8170,28 +8176,19 @@ pub fn accordion_view<'a, M: Clone + 'a>(
     let n = titles.len();
     let open = state.open.unwrap_or(0);
     a11y::attach(
-        container(crate::focus::target_keys(
-            col.into(),
-            tok,
-            !a11y.disabled && n > 0,
-            move |press| {
-                use crate::key::Press;
-                match press {
-                    p if activate_key(&p) => Some(on_toggle(open)),
-                    Press::ArrowDown | Press::ArrowRight => {
-                        Some(on_toggle(crate::focus::rove(open, 1, n)))
-                    }
-                    Press::ArrowUp | Press::ArrowLeft => {
-                        Some(on_toggle(crate::focus::rove(open, -1, n)))
-                    }
-                    _ => None,
+        crate::focus::target_keys(col.into(), tok, !a11y.disabled && n > 0, move |press| {
+            use crate::key::Press;
+            match press {
+                p if activate_key(&p) => Some(on_toggle(open)),
+                Press::ArrowDown | Press::ArrowRight => {
+                    Some(on_toggle(crate::focus::rove(open, 1, n)))
                 }
-            },
-        ))
-        .padding(inset(tok))
-        .width(Length::Fill)
-        .style(move |_| style::card(tok, false))
-        .into(),
+                Press::ArrowUp | Press::ArrowLeft => {
+                    Some(on_toggle(crate::focus::rove(open, -1, n)))
+                }
+                _ => None,
+            }
+        }),
         &a11y,
     )
 }
@@ -8337,16 +8334,16 @@ pub fn expander<'a, M: Clone + 'a>(
         crate::motion::expand(child, t, peek_h, tok, A11y::new(title.clone(), Role::Group))
     };
     a11y::attach(
-        container(crate::focus::target_keys(
-            column![header, body].spacing(gap(tok)).into(),
+        crate::focus::target_keys(
+            container(column![header, body].spacing(gap(tok)))
+                .padding(inset(tok))
+                .width(Length::Fill)
+                .style(move |_| style::card(tok, false))
+                .into(),
             tok,
             !a11y.disabled,
             move |press| activate_key(&press).then_some(on_toggle(!open)),
-        ))
-        .padding(inset(tok))
-        .width(Length::Fill)
-        .style(move |_| style::card(tok, false))
-        .into(),
+        ),
         &a11y,
     )
 }
@@ -14016,7 +14013,8 @@ mod tests {
         let layout = Layout::new(&node);
         let viewport = Rectangle::new(Point::ORIGIN, Size::new(400.0, 240.0));
         let mut clipboard = clipboard::Null;
-        let at = Point::new(24.0, 12.0);
+        let pad = tok.density.inset();
+        let at = Point::new(24.0 + pad, 12.0 + pad);
         let mut first = Vec::new();
         {
             let mut shell = iced::advanced::Shell::new(&mut first);
@@ -14103,10 +14101,10 @@ mod tests {
             el.as_widget_mut().update(
                 &mut tree,
                 &Event::Mouse(mouse::Event::CursorMoved {
-                    position: Point::new(40.0, 20.0),
+                    position: Point::new(40.0 + pad, 20.0 + pad),
                 }),
                 layout,
-                mouse::Cursor::Available(Point::new(40.0, 20.0)),
+                mouse::Cursor::Available(Point::new(40.0 + pad, 20.0 + pad)),
                 &renderer,
                 &mut clipboard,
                 &mut shell,
@@ -14151,10 +14149,12 @@ mod tests {
                 &viewport,
             );
         }
+        let inner_w = bounds.width - 2.0 * pad;
+        let inner_h = bounds.height - 2.0 * pad;
         assert!(out_move.iter().any(|m| matches!(
             m,
             crate::select::MarkdownPointer::Move { x, y }
-                if (*x - bounds.width).abs() < 1.0 && (*y - bounds.height).abs() < 1.0
+                if (*x - inner_w).abs() < 1.0 && (*y - inner_h).abs() < 1.0
         )));
         let mut out_up = Vec::new();
         {

@@ -98,17 +98,17 @@ pub fn trap_escape(press: &crate::key::Press) -> bool {
     matches!(press, crate::key::Press::Escape)
 }
 
-/// 2 dp primary frame when the target is focused.
+/// 2 dp focus frame when the target is focused.
 ///
-/// Same wash [`crate::widget::form_group`] uses on the active row.
-/// The stroke sits inside the target so a parent card or pane outline
-/// stays visible.
+/// Primary mixed onto the surface, not a solid brand stroke. The
+/// stroke sits one density grid step inside the target so a parent
+/// 1 dp outline stays visible and glyphs are not under the ring.
 pub fn ring(tok: crate::theme::Tokens, focused: bool) -> iced::widget::container::Style {
     let s = tok.scheme();
     iced::widget::container::Style {
         border: iced::Border {
             color: if focused {
-                s.primary
+                crate::theme::mix(s.primary, s.surface, 0.45)
             } else {
                 iced::Color::TRANSPARENT
             },
@@ -417,7 +417,7 @@ impl<'a, Message: Clone> iced::advanced::Widget<Message, iced::Theme, iced::Rend
         iced::advanced::Renderer::fill_quad(
             renderer,
             iced::advanced::renderer::Quad {
-                bounds: ring_bounds(layout.bounds(), face.border.width),
+                bounds: ring_bounds(layout.bounds(), crate::m3::density::GRID as f32),
                 border: face.border,
                 ..iced::advanced::renderer::Quad::default()
             },
@@ -979,7 +979,10 @@ mod tests {
         let tok = crate::theme::named("dark").tokens;
         let on = ring(tok, true);
         assert_eq!(on.border.width, 2.0);
-        assert_eq!(on.border.color, tok.scheme().primary);
+        assert_eq!(
+            on.border.color,
+            crate::theme::mix(tok.scheme().primary, tok.scheme().surface, 0.45)
+        );
         let off = ring(tok, false);
         assert_eq!(off.border.width, 0.0);
     }
@@ -1066,11 +1069,11 @@ mod tests {
     fn ring_sits_inside_the_target_bounds() {
         use iced::{Point, Rectangle, Size};
         let outer = Rectangle::new(Point::new(10.0, 20.0), Size::new(100.0, 50.0));
-        let inner = ring_bounds(outer, 2.0);
-        assert_eq!(inner.x, 12.0);
-        assert_eq!(inner.y, 22.0);
-        assert_eq!(inner.width, 96.0);
-        assert_eq!(inner.height, 46.0);
+        let inner = ring_bounds(outer, crate::m3::density::GRID as f32);
+        assert_eq!(inner.x, 14.0);
+        assert_eq!(inner.y, 24.0);
+        assert_eq!(inner.width, 92.0);
+        assert_eq!(inner.height, 42.0);
         let tiny = ring_bounds(Rectangle::new(Point::ORIGIN, Size::new(2.0, 2.0)), 2.0);
         assert_eq!(tiny.width, 0.0);
         assert_eq!(tiny.height, 0.0);
