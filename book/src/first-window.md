@@ -8,7 +8,7 @@ only in memory until you build [Keep a task list](cookbook/tasks.md).
 The program is [`examples/hello.rs`](https://github.com/indynull/icedtea/blob/main/examples/hello.rs)
 in the repository. `cargo run --example hello`.
 
-![Notes: Save on the toolbar and a filling editor](images/first-window.png)
+![Notes: Save and Quit on the toolbar and a filling editor](images/first-window.png)
 
 ```rust
 {{#include ../../examples/hello.rs}}

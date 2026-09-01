@@ -68,7 +68,7 @@ In the same change:
 | about | `book/src/images/patterns.png` | Name, version, license. RTL: about card on the start; group title and credits start-aligned inside the card. Credits wrap inside the card; they do not overflow the group box. he/ar mixed-bidi `iced 0.14` sits on its own line under the locale blurb |
 | status-page | `book/src/images/patterns.png` | Empty or error copy. RTL: that copy sits on the start of a centered block |
 | palette | `book/src/images/patterns.png` | Field plus hits from the Action table. Locale: the filter hint is catalog fill, not leftover `Theme` / `Ask`. An empty filename, a status-page grab, or a previous-page twin is a recapture fail — walk in from beat 30 (`--beats 30,31`) |
-| main-window | `book/src/images/first-window.png` | Menu, tools, editor, status as one window. Locale: the inner status is catalog `ok` (حسناً / ٹھیک ہے / אישור / 确定 / ja `OK`), never the raw key `ok`. ja `OK` is catalog fill, same class as vi `Accordion` |
+| main-window | `book/src/images/first-window.png` | Save and Quit on the toolbar, filling Notes editor, status Ready with `ctrl+s save` and `ctrl+q quit`. Locale gallery main-window: the inner status is catalog `ok` (حسناً / ٹھیک ہے / אישור / 确定 / ja `OK`), never the raw key `ok`. ja `OK` is catalog fill, same class as vi `Accordion` |
 | motion | `book/src/images/chrome.png` | Overlay / fade / bounce / pulse / shake controls. RTL: Close overlay on the start. Locale: fade body is catalog fill, not `Slide::None` |
 | expand-motion | `book/src/images/chrome.png` | Peek face; open shows figure + body. RTL: Expand button on the start. Open body may name API ids (`iced::Animation`, `motion::expand`) — those are catalog, not leftover English |
 
