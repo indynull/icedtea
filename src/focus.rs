@@ -474,6 +474,23 @@ impl<'a, Message: Clone> iced::advanced::Widget<Message, iced::Theme, iced::Rend
             .operate(&mut tree.children[0], layout, renderer, operation);
     }
 
+    fn mouse_interaction(
+        &self,
+        tree: &iced::advanced::widget::Tree,
+        layout: iced::advanced::Layout<'_>,
+        cursor: iced::mouse::Cursor,
+        viewport: &iced::Rectangle,
+        renderer: &iced::Renderer,
+    ) -> iced::mouse::Interaction {
+        self.content.as_widget().mouse_interaction(
+            &tree.children[0],
+            layout,
+            cursor,
+            viewport,
+            renderer,
+        )
+    }
+
     fn overlay<'b>(
         &'b mut self,
         tree: &'b mut iced::advanced::widget::Tree,
@@ -894,6 +911,23 @@ mod tests {
         let mut op = Count { n: 0, focused: 0 };
         el.as_widget_mut()
             .operate(&mut tree, layout, &renderer, &mut op);
+        if can_focus && op.focused == 1 {
+            use iced::advanced::renderer::Style;
+            use iced::Theme;
+            let mut renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+                Font::DEFAULT,
+                Pixels::from(16u32),
+            ));
+            el.as_widget().draw(
+                &tree,
+                &mut renderer,
+                &Theme::Dark,
+                &Style::default(),
+                layout,
+                iced::mouse::Cursor::Unavailable,
+                &iced::Rectangle::new(Point::ORIGIN, Size::new(200.0, 80.0)),
+            );
+        }
         if can_focus {
             assert_eq!(op.n, 1, "enabled target is one focusable");
             op.focused == 1
@@ -913,6 +947,49 @@ mod tests {
         );
         let mut el: iced::Element<'_, ()> = target(body, tok, true);
         assert!(pump_click(&mut el, true));
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let node = el.as_widget_mut().layout(
+            &mut tree,
+            &renderer,
+            &Limits::new(Size::ZERO, Size::new(200.0, 80.0)),
+        );
+        let layout = Layout::new(&node);
+        let _ = el.as_widget().mouse_interaction(
+            &tree,
+            layout,
+            iced::mouse::Cursor::Unavailable,
+            &iced::Rectangle::new(iced::Point::ORIGIN, Size::new(200.0, 80.0)),
+            &renderer,
+        );
+        let _ = el.as_widget_mut().overlay(
+            &mut tree,
+            layout,
+            &renderer,
+            &iced::Rectangle::new(iced::Point::ORIGIN, Size::new(200.0, 80.0)),
+            iced::Vector::ZERO,
+        );
+        use iced::advanced::renderer::Style;
+        use iced::Theme;
+        let mut renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        el.as_widget().draw(
+            &tree,
+            &mut renderer,
+            &Theme::Dark,
+            &Style::default(),
+            layout,
+            iced::mouse::Cursor::Unavailable,
+            &iced::Rectangle::new(iced::Point::ORIGIN, Size::new(200.0, 80.0)),
+        );
     }
 
     #[test]
@@ -1050,5 +1127,204 @@ mod tests {
         assert_eq!(focused_indices(&mut el, Some(false)), vec![1]);
         let mut el = cycle(two_targets(), None);
         assert_eq!(focused_indices(&mut el, Some(true)), vec![1]);
+    }
+
+    #[test]
+    fn cycle_empty_and_named_and_overlay() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+        let tok = crate::theme::named("dark").tokens;
+        let empty = crate::widget::label(
+            "x",
+            tok,
+            crate::a11y::A11y::new("x", crate::a11y::Role::Status),
+        );
+        let mut el = cycle(empty, None);
+        assert!(focused_indices(&mut el, Some(false)).is_empty());
+        let id = iced::widget::Id::new("name");
+        let field = crate::widget::text_input(
+            "Name",
+            "Ada",
+            |_| (),
+            None,
+            crate::widget::FieldOpts::NONE,
+            tok,
+            crate::a11y::A11y::new("Name", crate::a11y::Role::TextBox),
+            Some(id.clone()),
+        );
+        let mut named = cycle(field, Some(id));
+        let _ = focused_indices(&mut named, None);
+        let mut tree = Tree::new(named.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let node = named.as_widget_mut().layout(
+            &mut tree,
+            &renderer,
+            &Limits::new(Size::ZERO, Size::new(200.0, 80.0)),
+        );
+        let layout = Layout::new(&node);
+        let _ = named.as_widget().mouse_interaction(
+            &tree,
+            layout,
+            iced::mouse::Cursor::Unavailable,
+            &iced::Rectangle::new(iced::Point::ORIGIN, Size::new(200.0, 80.0)),
+            &renderer,
+        );
+        let _ = named.as_widget_mut().overlay(
+            &mut tree,
+            layout,
+            &renderer,
+            &iced::Rectangle::new(iced::Point::ORIGIN, Size::new(200.0, 80.0)),
+            iced::Vector::ZERO,
+        );
+        named.as_widget_mut().diff(&mut tree);
+        let _ = focused_indices(&mut named, Some(false));
+        let mut esc = crate::focus::dismiss_on_escape(
+            crate::widget::label(
+                "x",
+                tok,
+                crate::a11y::A11y::new("x", crate::a11y::Role::Status),
+            ),
+            (),
+        );
+        let mut et = Tree::new(esc.as_widget());
+        let enode = esc.as_widget_mut().layout(
+            &mut et,
+            &renderer,
+            &Limits::new(Size::ZERO, Size::new(200.0, 40.0)),
+        );
+        let elayout = Layout::new(&enode);
+        let _ = esc.as_widget_mut().overlay(
+            &mut et,
+            elayout,
+            &renderer,
+            &iced::Rectangle::new(iced::Point::ORIGIN, Size::new(200.0, 40.0)),
+            iced::Vector::ZERO,
+        );
+        let _ = esc.as_widget().mouse_interaction(
+            &et,
+            elayout,
+            iced::mouse::Cursor::Unavailable,
+            &iced::Rectangle::new(iced::Point::ORIGIN, Size::new(200.0, 40.0)),
+            &renderer,
+        );
+        struct Nop;
+        impl iced::advanced::widget::Operation<()> for Nop {
+            fn traverse(
+                &mut self,
+                operate: &mut dyn FnMut(&mut dyn iced::advanced::widget::Operation<()>),
+            ) {
+                operate(self);
+            }
+        }
+        esc.as_widget_mut()
+            .operate(&mut et, elayout, &renderer, &mut Nop);
+        esc.as_widget_mut().diff(&mut et);
+        let nested = crate::focus::dismiss_on_escape(esc, ());
+        let mut nest = cycle(nested, None);
+        let _ = focused_indices(&mut nest, None);
+        let mut nt = Tree::new(nest.as_widget());
+        let nn = nest.as_widget_mut().layout(
+            &mut nt,
+            &renderer,
+            &Limits::new(Size::ZERO, Size::new(200.0, 40.0)),
+        );
+        let nl = Layout::new(&nn);
+        let mut messages = Vec::<()>::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            nest.as_widget_mut().update(
+                &mut nt,
+                &iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
+                    key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Escape),
+                    modified_key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Escape),
+                    physical_key: iced::keyboard::key::Physical::Unidentified(
+                        iced::keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: iced::keyboard::Location::Standard,
+                    modifiers: iced::keyboard::Modifiers::empty(),
+                    text: None,
+                    repeat: false,
+                }),
+                nl,
+                iced::mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &iced::Rectangle::new(iced::Point::ORIGIN, Size::new(200.0, 40.0)),
+            );
+        }
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            nest.as_widget_mut().update(
+                &mut nt,
+                &iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
+                    key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Tab),
+                    modified_key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Tab),
+                    physical_key: iced::keyboard::key::Physical::Unidentified(
+                        iced::keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: iced::keyboard::Location::Standard,
+                    modifiers: iced::keyboard::Modifiers::empty(),
+                    text: None,
+                    repeat: false,
+                }),
+                nl,
+                iced::mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &iced::Rectangle::new(iced::Point::ORIGIN, Size::new(200.0, 40.0)),
+            );
+        }
+        let mut keyed = cycle(two_targets(), None);
+        let _ = focused_indices(&mut keyed, None);
+        // Non-tab and ctrl+tab must not move.
+        let mut tree = Tree::new(keyed.as_widget());
+        let node = keyed.as_widget_mut().layout(
+            &mut tree,
+            &renderer,
+            &Limits::new(Size::ZERO, Size::new(200.0, 160.0)),
+        );
+        let layout = Layout::new(&node);
+        let mut messages = Vec::<()>::new();
+        for (key, mods) in [
+            (
+                iced::keyboard::Key::Named(iced::keyboard::key::Named::Enter),
+                iced::keyboard::Modifiers::empty(),
+            ),
+            (
+                iced::keyboard::Key::Named(iced::keyboard::key::Named::Tab),
+                iced::keyboard::Modifiers::CTRL,
+            ),
+        ] {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            keyed.as_widget_mut().update(
+                &mut tree,
+                &iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
+                    key: key.clone(),
+                    modified_key: key,
+                    physical_key: iced::keyboard::key::Physical::Unidentified(
+                        iced::keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: iced::keyboard::Location::Standard,
+                    modifiers: mods,
+                    text: None,
+                    repeat: false,
+                }),
+                layout,
+                iced::mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &iced::Rectangle::new(iced::Point::ORIGIN, Size::new(200.0, 160.0)),
+            );
+        }
     }
 }

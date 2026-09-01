@@ -144,36 +144,13 @@ fn passes_while_input(while_input: WhileInput, key: &iced::keyboard::Key, chord:
         WhileInput::Chrome => match key {
             iced::keyboard::Key::Named(n) => {
                 use iced::keyboard::key::Named;
-                matches!(
-                    n,
-                    Named::Enter
-                        | Named::Escape
-                        | Named::Tab
-                        | Named::F1
-                        | Named::F2
-                        | Named::F3
-                        | Named::F4
-                        | Named::F5
-                        | Named::F6
-                        | Named::F7
-                        | Named::F8
-                        | Named::F9
-                        | Named::F10
-                        | Named::F11
-                        | Named::F12
-                        | Named::F13
-                        | Named::F14
-                        | Named::F15
-                        | Named::F16
-                        | Named::F17
-                        | Named::F18
-                        | Named::F19
-                        | Named::F20
-                        | Named::F21
-                        | Named::F22
-                        | Named::F23
-                        | Named::F24
-                )
+                if matches!(n, Named::Tab) {
+                    return true;
+                }
+                if matches!(n, Named::Enter | Named::Escape) {
+                    return true;
+                }
+                crate::shortcut::function_number(*n).is_some()
             }
             _ => false,
         },
@@ -186,6 +163,23 @@ fn passes_while_input(while_input: WhileInput, key: &iced::keyboard::Key, chord:
 /// [`crate::window::should_hide`] on Escape from this stream.
 pub fn listen() -> Subscription<KeyEvent> {
     iced::event::listen_with(raw_keyboard)
+}
+
+/// Application subscription plus [`listen`], mapped with `From`.
+pub fn with_listen<M>(extra: Subscription<M>) -> Subscription<M>
+where
+    M: Clone + From<KeyEvent> + 'static,
+{
+    iced::Subscription::batch([listen().map(From::from), extra])
+}
+
+/// `run!` / `daemon!` subscription: [`with_listen`] around the app extra.
+pub fn bind_listen<S, M, F>(extra: F) -> impl Fn(&S) -> Subscription<M>
+where
+    F: Fn(&S) -> Subscription<M>,
+    M: Clone + From<KeyEvent> + 'static,
+{
+    move |state| with_listen(extra(state))
 }
 
 fn raw_keyboard(
@@ -598,6 +592,25 @@ mod tests {
         );
         let tab = press(Key::Named(Named::Tab), Modifiers::empty());
         assert_eq!(handle(chrome, &table, &tab), Some(6));
+    }
+
+    #[test]
+    fn with_listen_is_a_live_subscription() {
+        #[derive(Clone)]
+        struct Msg;
+        impl From<KeyEvent> for Msg {
+            fn from(_: KeyEvent) -> Self {
+                Self
+            }
+        }
+        let ev = press(
+            iced::keyboard::Key::Named(iced::keyboard::key::Named::Escape),
+            iced::keyboard::Modifiers::empty(),
+        );
+        let _ = Msg::from(ev);
+        let _ = super::with_listen(iced::Subscription::<Msg>::none());
+        let bound = super::bind_listen(|_: &()| iced::Subscription::<Msg>::none());
+        let _ = bound(&());
     }
 
     #[test]

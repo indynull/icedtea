@@ -264,12 +264,7 @@ macro_rules! run {
         $crate::iced::application($new, $update, $view)
             .title($crate::app::WindowTitle(__title))
             .theme($theme)
-            .subscription(move |__state| {
-                $crate::iced::Subscription::batch([
-                    $crate::key::listen().map($crate::iced::keyboard::Event::into),
-                    ($sub)(__state),
-                ])
-            })
+            .subscription($crate::key::bind_listen($sub))
             .settings(__prep.iced_settings)
             .window(__prep.window)
             .default_font($crate::typo::UI)
@@ -312,12 +307,7 @@ macro_rules! daemon {
         $crate::iced::daemon($new, $update, $view)
             .title($crate::app::WindowTitle(__title))
             .theme($theme)
-            .subscription(move |__state| {
-                $crate::iced::Subscription::batch([
-                    $crate::key::listen().map($crate::iced::keyboard::Event::into),
-                    ($sub)(__state),
-                ])
-            })
+            .subscription($crate::key::bind_listen($sub))
             .settings(__prep.iced_settings)
             .default_font($crate::typo::UI)
             .run()

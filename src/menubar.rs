@@ -1023,6 +1023,139 @@ mod tests {
             &viewport,
             &mut messages,
         );
+        pump_title(
+            &mut widget,
+            &mut tree,
+            &renderer,
+            &mut clipboard,
+            Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+            layout,
+            over,
+            &viewport,
+            &mut messages,
+        );
+        pump_title(
+            &mut widget,
+            &mut tree,
+            &renderer,
+            &mut clipboard,
+            key_press(Named::Enter),
+            layout,
+            over,
+            &viewport,
+            &mut messages,
+        );
+        pump_title(
+            &mut widget,
+            &mut tree,
+            &renderer,
+            &mut clipboard,
+            Event::Keyboard(keyboard::Event::KeyPressed {
+                key: keyboard::Key::Character("z".into()),
+                modified_key: keyboard::Key::Character("z".into()),
+                physical_key: keyboard::key::Physical::Unidentified(
+                    keyboard::key::NativeCode::Unidentified,
+                ),
+                location: keyboard::Location::Standard,
+                modifiers: keyboard::Modifiers::default(),
+                text: Some("z".into()),
+                repeat: false,
+            }),
+            layout,
+            over,
+            &viewport,
+            &mut messages,
+        );
+        pump_title(
+            &mut widget,
+            &mut tree,
+            &renderer,
+            &mut clipboard,
+            key_press(Named::F1),
+            layout,
+            over,
+            &viewport,
+            &mut messages,
+        );
+        pump_title(
+            &mut widget,
+            &mut tree,
+            &renderer,
+            &mut clipboard,
+            Event::Keyboard(keyboard::Event::KeyPressed {
+                key: keyboard::Key::Character("".into()),
+                modified_key: keyboard::Key::Character("".into()),
+                physical_key: keyboard::key::Physical::Unidentified(
+                    keyboard::key::NativeCode::Unidentified,
+                ),
+                location: keyboard::Location::Standard,
+                modifiers: keyboard::Modifiers::default(),
+                text: None,
+                repeat: false,
+            }),
+            layout,
+            over,
+            &viewport,
+            &mut messages,
+        );
+        pump_title(
+            &mut widget,
+            &mut tree,
+            &renderer,
+            &mut clipboard,
+            Event::Keyboard(keyboard::Event::KeyPressed {
+                key: keyboard::Key::Character("s".into()),
+                modified_key: keyboard::Key::Character("s".into()),
+                physical_key: keyboard::key::Physical::Unidentified(
+                    keyboard::key::NativeCode::Unidentified,
+                ),
+                location: keyboard::Location::Standard,
+                modifiers: keyboard::Modifiers::default(),
+                text: Some("s".into()),
+                repeat: false,
+            }),
+            layout,
+            over,
+            &viewport,
+            &mut messages,
+        );
+        pump_title(
+            &mut widget,
+            &mut tree,
+            &renderer,
+            &mut clipboard,
+            key_press(Named::ArrowUp),
+            layout,
+            over,
+            &viewport,
+            &mut messages,
+        );
+        pump_title(
+            &mut widget,
+            &mut tree,
+            &renderer,
+            &mut clipboard,
+            key_press(Named::Enter),
+            layout,
+            over,
+            &viewport,
+            &mut messages,
+        );
+        assert!(messages
+            .iter()
+            .any(|s| s == "Open" || s.starts_with("Save")));
+        messages.clear();
+        pump_title(
+            &mut widget,
+            &mut tree,
+            &renderer,
+            &mut clipboard,
+            key_press(Named::Escape),
+            layout,
+            over,
+            &viewport,
+            &mut messages,
+        );
         assert!(Widget::<String, Theme, iced_tiny_skia::Renderer>::overlay(
             &mut widget,
             &mut tree,
