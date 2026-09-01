@@ -74,7 +74,13 @@ is the box recipes: `layout::pack`, `layout::wrap`, `layout::dock`,
 [Layout](layout.md).
 
 An open modal consumes keys first. Otherwise a focused field owns
-unmodified typing. Otherwise `key::handle` matches the action table.
+unmodified typing. Otherwise the focused `focus::target` owns arrows,
+Page, Home, End, Enter, and Space. Tab walks targets (`focus::cycle`).
+`run!` subscribes `key::listen`. Application windows call
+`ActionTable::seed_quit`. Open menus, picks, context menus, drawers,
+and cancel dialogs close on Escape. `item_press` primary fires on
+release; `ListOpts.on_context` is the secondary click. Otherwise
+`key::handle` matches the action table.
 
 [First window](first-window.md) is the smallest case of this compose.
 [Keep a task list](cookbook/tasks.md) is the same loop with a list and

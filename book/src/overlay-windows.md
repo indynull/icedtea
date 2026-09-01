@@ -18,8 +18,11 @@ clamps onto `pin` even when the pointer has moved to another screen.
 Hide policy (`HidePolicy::EscapeOrFocusLoss`, and friends) is
 evaluated with `should_hide(policy, event, in_card)`. `in_card` (search
 field or result list) suppresses only `HideEvent::FocusLoss`. Escape
-still hides. Subscribe with `key::listen` and pass Escape into
-`should_hide`.
+still hides. `run!` already subscribes `key::listen`; pass Escape into
+`should_hide`. In-window overlays (`context_menu`, `dialog_sheet` with
+Cancel, an open `drawer`) close on Escape themselves. Overlay windows
+do not seed `app.quit`; application windows call
+`ActionTable::seed_quit`.
 
 `window::retarget` turns overlay settings into a decorated, resizable
 application window at `Level::Normal` (Dock / task switcher). Size and

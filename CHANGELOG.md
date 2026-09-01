@@ -22,7 +22,12 @@
   button group, pagination, and split sash handle arrows, Enter, and
   Space on the constructor.
 - `item_press` sends a primary click on release while the pointer is
-  still over the row. A secondary press is the list context click.
+  still over the row. `ListOpts.on_context` is the secondary click.
+- A focused `tree_view` expands and collapses with arrows. Arrows in
+  `search_view` move the hit list.
+- Closed `pick_list` Enter and Space open the overlay.
+- `nav_rail` arrows move the selected dest. An open `drawer` closes
+  on Escape. `ActionTable::seed_quit` inserts `app.quit`.
 
 ## 0.15.0 — 2026-08-31
 

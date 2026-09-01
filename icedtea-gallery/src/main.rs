@@ -1526,6 +1526,7 @@ enum Message {
     MdLink(String),
     MdPointer(icedtea::select::MarkdownPointer),
     ListCheck(usize),
+    KeysContext(usize),
     TableCheck(usize),
     Rail(usize),
     SearchPick(usize),
@@ -1681,6 +1682,7 @@ struct Gallery {
     query: String,
     search_query: String,
     view_query: String,
+    search_hit: Option<usize>,
     prefs_query: String,
     name: String,
     secret: String,
@@ -1910,6 +1912,7 @@ impl Gallery {
             query: String::new(),
             search_query: String::from("SELECT name FROM usres WHERE id = 1"),
             view_query: String::new(),
+            search_hit: None,
             prefs_query: String::new(),
             name: String::new(),
             form_active: 0,
@@ -3427,6 +3430,13 @@ impl Gallery {
                     );
                 }
             }
+            Message::KeysContext(i) => {
+                self.note = self.status_index("note.row", i);
+                self.context = Some(self.pointer);
+                self.context_closing = false;
+                self.context_anim
+                    .go_mut(true, icedtea::iced::time::Instant::now());
+            }
             Message::ListCheck(i) => {
                 if let Some(row) = self.list.items.get_mut(i) {
                     row.leading = match row.leading.clone() {
@@ -3451,7 +3461,10 @@ impl Gallery {
                 self.rail = i;
                 self.note = self.status_index("note.rail", i);
             }
-            Message::SearchPick(i) => self.note = self.status_index("note.hit", i),
+            Message::SearchPick(i) => {
+                self.search_hit = Some(i);
+                self.note = self.status_index("note.hit", i);
+            }
             Message::GroupPress(i) => {
                 self.note = self.status_index("note.group", i);
             }
@@ -5046,6 +5059,7 @@ impl Gallery {
                 widget::search_view(
                     &self.view_query,
                     hits,
+                    self.search_hit,
                     Message::ViewQuery,
                     Message::SearchPick,
                     Some(Message::ViewQuery(String::new())),
@@ -5715,14 +5729,7 @@ impl Gallery {
                     .last_press
                     .as_deref()
                     .unwrap_or_else(|| self.catalog.t("keys.type"));
-                let mut recent = column![].spacing(4);
-                for (i, line) in self.press_log.iter().rev().enumerate() {
-                    recent = recent.push(widget::meta(
-                        line.clone(),
-                        tok,
-                        A11y::new(format!("press-{i}"), Role::Status),
-                    ));
-                }
+                let muted = tok.muted;
                 column![
                     widget::label(last, tok, named("last-key", Role::Status)),
                     widget::meta(
@@ -5730,12 +5737,25 @@ impl Gallery {
                         tok,
                         named("keys-hint", Role::Status),
                     ),
-                    widget::label(
-                        self.catalog.t("hint.recent"),
+                    widget::list_view(
+                        &self.list,
+                        &self.list_sel,
+                        Message::ListSel,
                         tok,
-                        named("keys-recent", Role::Header)
+                        widget::ListOpts {
+                            window: icedtea::collection::VisibleWindow::new(120.0),
+                            row_h: 28.0,
+                            overscan: 1,
+                            on_scroll: Message::ListScroll,
+                            empty: self.catalog.t("hint.no-items"),
+                            meta_color: move |_| muted,
+                            scroll_id: None,
+                            face: icedtea::collection::RowFace::FLUSH,
+                            on_check: Message::ListCheck,
+                            on_context: Message::KeysContext,
+                        },
+                        named("keys-list", Role::List),
                     ),
-                    recent,
                 ]
                 .spacing(8)
                 .width(Length::Fill)
@@ -6060,6 +6080,7 @@ impl Gallery {
                             icedtea::collection::RowFace::FLUSH
                         },
                         on_check: Message::ListCheck,
+                        on_context: Message::ListCheck,
                     },
                     named("list", Role::List),
                 ))
@@ -7250,6 +7271,7 @@ impl Gallery {
                         scroll_id: Some(icedtea::iced::widget::Id::from("gallery-list-detail")),
                         face: icedtea::collection::RowFace::FLUSH,
                         on_check: Message::ListCheck,
+                        on_context: Message::ListCheck,
                     },
                     named("list", Role::List),
                 ),
@@ -7858,6 +7880,7 @@ impl Gallery {
                         named("drawer-main", Role::Status),
                     ),
                     Self::anim_progress(&self.drawer_anim),
+                    Message::DrawerToggle,
                     tok,
                 ),
             ]
