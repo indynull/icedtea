@@ -3588,19 +3588,6 @@ impl Gallery {
                 }
             }
             Message::Key(ev) => {
-                if self.page == "keys" {
-                    if let icedtea::iced::keyboard::Event::KeyPressed { .. } = &ev {
-                        let shown = icedtea::key::press(&ev)
-                            .map(|p| format!("{p:?}"))
-                            .unwrap_or_else(|| "none".into());
-                        self.last_press = Some(shown.clone());
-                        self.press_log.push(shown);
-                        if self.press_log.len() > 12 {
-                            self.press_log.remove(0);
-                        }
-                    }
-                    return Task::none();
-                }
                 if self.context.is_some() {
                     if matches!(icedtea::key::press(&ev), Some(icedtea::key::Press::Escape)) {
                         self.context = None;
@@ -3614,6 +3601,19 @@ impl Gallery {
                     if let Some(msg) = icedtea::key::handle(ctx, &menu, &ev) {
                         self.context = None;
                         return self.update(msg);
+                    }
+                    return Task::none();
+                }
+                if self.page == "keys" {
+                    if let icedtea::iced::keyboard::Event::KeyPressed { .. } = &ev {
+                        let shown = icedtea::key::press(&ev)
+                            .map(|p| format!("{p:?}"))
+                            .unwrap_or_else(|| "none".into());
+                        self.last_press = Some(shown.clone());
+                        self.press_log.push(shown);
+                        if self.press_log.len() > 12 {
+                            self.press_log.remove(0);
+                        }
                     }
                     return Task::none();
                 }
@@ -5737,6 +5737,13 @@ impl Gallery {
                         tok,
                         named("keys-hint", Role::Status),
                     ),
+                    widget::checkbox(
+                        self.catalog.t("check.accept"),
+                        self.checked,
+                        Message::Check,
+                        tok,
+                        named("keys-check", Role::Checkbox).with_checked(self.checked),
+                    ),
                     widget::list_view(
                         &self.list,
                         &self.list_sel,
@@ -5755,6 +5762,14 @@ impl Gallery {
                             on_context: Message::KeysContext,
                         },
                         named("keys-list", Role::List),
+                    ),
+                    pattern::status_bar(
+                        self.catalog.t("status.ready"),
+                        None,
+                        None,
+                        &self.actions,
+                        tok,
+                        self.direction,
                     ),
                 ]
                 .spacing(8)
@@ -9392,6 +9407,29 @@ mod tests {
         )));
         assert_eq!(g.last_press.as_deref(), Some("none"));
         assert_eq!(g.press_log, vec!["Enter".to_string(), "none".to_string()]);
+    }
+
+    #[test]
+    fn keys_page_is_live_list_footer_and_escape() {
+        let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
+        g.page = "keys";
+        let _ = g.view();
+        assert!(g.checked);
+        let _ = g.update(super::Message::Check(false));
+        assert!(!g.checked);
+        let _ = g.update(super::Message::ListSel(
+            icedtea::collection::ItemClick::primary(2),
+        ));
+        assert_eq!(g.list_sel.primary(), Some(2));
+        let _ = g.update(super::Message::StatusNew);
+        assert_eq!(g.status_n, 1);
+        let _ = g.update(super::Message::KeysContext(0));
+        assert!(g.context.is_some());
+        let _ = g.update(super::Message::Key(key_pressed(
+            Key::Named(Named::Escape),
+            Modifiers::empty(),
+        )));
+        assert!(g.context.is_none());
     }
 
     #[test]
