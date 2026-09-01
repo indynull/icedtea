@@ -19379,6 +19379,16 @@ mod tests {
             },
             A11y::new("list", Role::List),
         );
+        let down = press_only(
+            &mut list_el,
+            iced::Point::new(40.0, 12.0),
+            iced::mouse::Button::Left,
+            iced::Size::new(320.0, 80.0),
+        );
+        must(
+            down.is_empty(),
+            format!("list primary must wait for release through the clip, got {down:?}"),
+        );
         let list_msgs = press_messages(
             &mut list_el,
             iced::Point::new(40.0, 12.0),
