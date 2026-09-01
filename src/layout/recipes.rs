@@ -431,7 +431,18 @@ fn sash_grip<'a, M: Clone + 'a>(
         Axis::Horizontal => (Length::Fixed(sash), Length::Fill),
         Axis::Vertical => (Length::Fill, Length::Fixed(sash)),
     };
-    Stack::new().width(w).height(h).push(face).push(grip).into()
+    let stack: Element<'a, M> = Stack::new().width(w).height(h).push(face).push(grip).into();
+    let on_sash = std::rc::Rc::new(on_sash);
+    crate::focus::target_keys(stack, tok, true, move |press| {
+        use crate::key::Press;
+        let step = 8.0;
+        let delta = match press {
+            Press::ArrowRight | Press::ArrowDown => step,
+            Press::ArrowLeft | Press::ArrowUp => -step,
+            _ => return None,
+        };
+        Some(on_sash(SashEvent::Nudge(delta)))
+    })
 }
 
 /// Place children on a grid using [`GridCell`] spans (pixel offsets).

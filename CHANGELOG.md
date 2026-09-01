@@ -17,6 +17,11 @@
 - `context_menu` and `dialog_sheet` (when Cancel is set) close on
   Escape.
 - `status_bar` hint chords invoke the same `Action`.
+- Focused slider, checkbox, switch, radio, toggle, segmented, tabs,
+  breadcrumb, number, date, time, accordion, expander, pick list,
+  button group, pagination, and split sash handle arrows, Enter, and
+  Space on the constructor.
+
 ## 0.15.0 — 2026-08-31
 
 ### Feature

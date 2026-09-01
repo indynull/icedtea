@@ -70,6 +70,8 @@ pub enum SashEvent {
     Press,
     Move(f32),
     Release,
+    /// Keyboard nudge in pixels (signed).
+    Nudge(f32),
 }
 
 /// Window-space pointer while a sash is pressed (not the 6px grip local point).
@@ -179,6 +181,14 @@ impl SashDrag {
                 self.last = None;
                 false
             }
+            SashEvent::Nudge(delta) => {
+                let mut delta = delta;
+                if dir == crate::i18n::Direction::Rtl && state.axis == Axis::Horizontal {
+                    delta = -delta;
+                }
+                state.drag(delta, total);
+                true
+            }
             SashEvent::Move(pos) => {
                 let dragged = if self.pressed {
                     if let Some(prev) = self.last {
@@ -256,6 +266,22 @@ mod tests {
             crate::i18n::Direction::Ltr
         ));
         assert!(!drag.pressed);
+        let before = st.ratio;
+        assert!(drag.apply(
+            &mut st,
+            SashEvent::Nudge(16.0),
+            200.0,
+            crate::i18n::Direction::Ltr
+        ));
+        assert!(st.ratio > before);
+        let before = st.ratio;
+        assert!(drag.apply(
+            &mut st,
+            SashEvent::Nudge(16.0),
+            200.0,
+            crate::i18n::Direction::Rtl
+        ));
+        assert!(st.ratio < before);
 
         let moved = Event::Mouse(mouse::Event::CursorMoved {
             position: Point::new(120.0, 40.0),

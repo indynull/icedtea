@@ -66,6 +66,11 @@ use crate::toast::{Toast, ToastKind};
 use crate::typo;
 use crate::variant::Variant;
 
+fn activate_key(press: &crate::key::Press) -> bool {
+    matches!(press, crate::key::Press::Enter)
+        || matches!(press, crate::key::Press::Character(s) if s == " ")
+}
+
 /// Shared padding for controls. Vertical and horizontal follow token density.
 ///
 /// Vertical is `pad - 4` so Compact / Default / Comfortable stay distinct
@@ -771,9 +776,10 @@ pub fn toggle_button<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let title = title.into();
     let a11y = a11y.merge_checked(pressed).merge_selected(pressed);
-    button(
+    let can = !a11y.disabled;
+    let face = button(
         title,
-        (!a11y.disabled).then_some(msg),
+        can.then_some(msg.clone()),
         tok,
         if a11y.apply_checked(pressed) {
             Variant::Primary
@@ -783,7 +789,10 @@ pub fn toggle_button<'a, M: Clone + 'a>(
         icons,
         ButtonOpts::SHRINK,
         a11y,
-    )
+    );
+    crate::focus::target_keys(face, tok, can, move |press| {
+        activate_key(&press).then_some(msg.clone())
+    })
 }
 
 /// Check or clear a boolean.
@@ -819,15 +828,21 @@ pub fn checkbox<'a, M: Clone + 'a>(
     let empty = caption.is_empty();
     let name = a11y.apply_name(caption);
     let is_on = a11y.apply_checked(checked);
+    let msg = std::rc::Rc::new(msg);
     let mut c = iced_checkbox(is_on).style(style::checkbox_style(tok));
     if !a11y.disabled {
-        c = c.on_toggle(msg);
+        let msg = msg.clone();
+        c = c.on_toggle(move |v| msg(v));
     }
     let face: Element<'a, M> = if empty {
         c.into()
     } else {
         labeled_control(c.into(), name, tok, a11y.disabled)
     };
+    let can = !a11y.disabled;
+    let face = crate::focus::target_keys(face, tok, can, move |press| {
+        activate_key(&press).then_some(msg(!is_on))
+    });
     a11y::attach(face, &a11y)
 }
 
@@ -1210,13 +1225,31 @@ pub fn segmented_button<'a, M: Clone + 'a>(
                 .with_disabled(a11y.disabled),
         ));
     }
-    a11y::attach(r.into(), &a11y)
+    let n = cells.len();
+    a11y::attach(
+        crate::focus::target_keys(r.into(), tok, !a11y.disabled && n > 0, move |press| {
+            use crate::key::Press;
+            match press {
+                Press::ArrowRight | Press::ArrowDown => {
+                    Some(on_select(crate::focus::rove(selected, 1, n)))
+                }
+                Press::ArrowLeft | Press::ArrowUp => {
+                    Some(on_select(crate::focus::rove(selected, -1, n)))
+                }
+                p if activate_key(&p) => Some(on_select(selected)),
+                _ => None,
+            }
+        }),
+        &a11y,
+    )
 }
 
 /// Related actions in one strip (M3 button group). Not exclusive.
 ///
 /// Each label sends its index. Empty labels paint an empty row.
-/// Disabled drops every press.
+/// Disabled drops every press. The strip has no selected cell:
+/// focused Enter, Space, and Home send index 0; arrows send 1 when
+/// a second cell exists; End sends the last index.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -1268,21 +1301,37 @@ pub fn button_group<'a, M: Clone + 'a>(
             &A11y::button(label).with_disabled(a11y.disabled),
         ));
     }
+    let n = cells.len();
     a11y::attach(
-        container(r)
-            .width(Length::Fill)
-            .align_x(crate::i18n::align_start(tok.direction))
-            .style(move |_| {
-                let s = tok.scheme();
-                let mut st = style::fill(Color::TRANSPARENT, s.on_surface);
-                st.border = iced::border::Border {
-                    color: s.outline_variant,
-                    width: 1.0,
-                    radius: tok.radius(crate::m3::shape::Component::Button),
-                };
-                st
-            })
-            .into(),
+        crate::focus::target_keys(
+            container(r)
+                .width(Length::Fill)
+                .align_x(crate::i18n::align_start(tok.direction))
+                .style(move |_| {
+                    let s = tok.scheme();
+                    let mut st = style::fill(Color::TRANSPARENT, s.on_surface);
+                    st.border = iced::border::Border {
+                        color: s.outline_variant,
+                        width: 1.0,
+                        radius: tok.radius(crate::m3::shape::Component::Button),
+                    };
+                    st
+                })
+                .into(),
+            tok,
+            !a11y.disabled && n > 0,
+            move |press| {
+                use crate::key::Press;
+                match press {
+                    p if activate_key(&p) || matches!(p, Press::Home) => Some(on_press(0)),
+                    Press::ArrowRight | Press::ArrowDown => {
+                        Some(on_press(1.min(n.saturating_sub(1))))
+                    }
+                    Press::End => Some(on_press(n.saturating_sub(1))),
+                    _ => None,
+                }
+            },
+        ),
         &a11y,
     )
 }
@@ -1405,11 +1454,18 @@ pub fn switch<'a, M: Clone + 'a>(
     let a11y = a11y.merge_toggled(on).merge_checked(on);
     let name = a11y.apply_name(label_s);
     let on = a11y.apply_toggled(on);
+    let msg = std::rc::Rc::new(msg);
     let mut t = toggler(on).style(style::switch_style(tok));
     if !a11y.disabled {
-        t = t.on_toggle(msg);
+        let msg = msg.clone();
+        t = t.on_toggle(move |v| msg(v));
     }
-    a11y::attach(labeled_control(t.into(), name, tok, a11y.disabled), &a11y)
+    let face = labeled_control(t.into(), name, tok, a11y.disabled);
+    let can = !a11y.disabled;
+    let face = crate::focus::target_keys(face, tok, can, move |press| {
+        activate_key(&press).then_some(msg(!on))
+    });
+    a11y::attach(face, &a11y)
 }
 
 /// Pick one value from a small set.
@@ -1442,10 +1498,11 @@ pub fn radio<'a, V, M: Clone + 'a>(
     a11y: A11y,
 ) -> Element<'a, M>
 where
-    V: Copy + Eq,
+    V: Copy + Eq + 'static,
 {
     let a11y = a11y.merge_checked(selected == Some(value));
     let name = a11y.apply_name(label_s);
+    let msg = std::rc::Rc::new(msg);
     if a11y.disabled {
         let on = a11y.apply_checked(selected == Some(value));
         let mark = container(Space::new().width(8).height(8))
@@ -1456,14 +1513,16 @@ where
             .style(move |_| radio_idle_face(tok, on));
         return a11y::attach(labeled_control(mark.into(), name, tok, true), &a11y);
     }
+    let pick = {
+        let msg = msg.clone();
+        iced_radio(String::new(), value, selected, move |v| msg(v)).style(style::radio_style(tok))
+    };
     a11y::attach(
-        labeled_control(
-            iced_radio(String::new(), value, selected, msg)
-                .style(style::radio_style(tok))
-                .into(),
-            name,
+        crate::focus::target_keys(
+            labeled_control(pick.into(), name, tok, false),
             tok,
-            false,
+            true,
+            move |press| activate_key(&press).then_some(msg(value)),
         ),
         &a11y,
     )
@@ -1527,9 +1586,10 @@ impl SliderMarks<'static> {
 ///
 /// Pass min, max, and the current value. The message is the new value
 /// while the thumb moves. Wheel over the control steps by
-/// [`slider_step`]. Disabled ignores drag and wheel. `marks` paints
-/// ticks and end labels when set; min sits on start, max on end. The
-/// rail fills from start. Rail corners follow [`Tokens::shape`]
+/// [`slider_step`]. Focused arrows, Home, and End step the same way.
+/// Disabled ignores drag, wheel, and keys. `marks` paints ticks and
+/// end labels when set; min sits on start, max on end. The rail fills
+/// from start. Rail corners follow [`Tokens::shape`]
 /// ([`crate::m3::shape::Component::Track`]).
 ///
 ///
@@ -1649,7 +1709,24 @@ pub fn slider<'a, M: Clone + 'a>(
             })
             .into()
     };
-    a11y::attach(el, &a11y)
+    let can = !a11y.disabled;
+    let keys = if can {
+        let range_k = range.clone();
+        crate::focus::target_keys(el, tok, true, move |press| {
+            use crate::key::Press;
+            let next = match press {
+                Press::ArrowRight | Press::ArrowUp => slider_nudge(range_k.clone(), value, 1.0),
+                Press::ArrowLeft | Press::ArrowDown => slider_nudge(range_k.clone(), value, -1.0),
+                Press::Home => *range_k.start(),
+                Press::End => *range_k.end(),
+                _ => return None,
+            };
+            Some(msg(next))
+        })
+    } else {
+        crate::focus::target(el, tok, false)
+    };
+    a11y::attach(keys, &a11y)
 }
 
 fn disabled_slider_face(tok: Tokens) -> iced::widget::container::Style {
@@ -2139,11 +2216,22 @@ pub fn number_input<'a, M: Clone + 'a>(
     };
     // Id on this fill container. a11y::attach copies intrinsic size
     // and would drop the start park.
-    container(field)
+    let field = container(field)
         .width(Length::Fill)
         .height(Length::Fixed(control_height(tok)))
         .id(Id::from(a11y.node_id()))
-        .into()
+        .into();
+    crate::focus::target_keys(field, tok, !a11y.disabled, move |press| {
+        use crate::key::Press;
+        let dir = match press {
+            Press::ArrowUp | Press::ArrowRight => 1,
+            Press::ArrowDown | Press::ArrowLeft => -1,
+            _ => return None,
+        };
+        Some(on_change(
+            step_number(value, 1.0, f64::MIN, f64::MAX, dir).to_string(),
+        ))
+    })
 }
 
 /// Step a numeric value.
@@ -3440,23 +3528,49 @@ where
     let el: Element<'a, M> = if opts.is_empty() {
         picker
     } else {
+        let opts_w = opts.clone();
+        let sel_w = sel.clone();
+        let on_w = on_select.clone();
         mouse_area(picker)
             .on_scroll(move |delta| {
-                let n = opts.len();
-                let i = sel
+                let n = opts_w.len();
+                let i = sel_w
                     .as_ref()
-                    .and_then(|s| opts.iter().position(|o| o == s))
+                    .and_then(|s| opts_w.iter().position(|o| o == s))
                     .unwrap_or(0);
                 let j = if scroll_wheel_y(delta) < 0.0 {
                     i.saturating_add(1).min(n - 1)
                 } else {
                     i.saturating_sub(1)
                 };
-                on_select(opts[j].clone())
+                on_w(opts_w[j].clone())
             })
             .into()
     };
-    a11y::attach(el, &a11y)
+    let keys = if opts.is_empty() {
+        crate::focus::target(el, tok, false)
+    } else {
+        let opts_k = opts;
+        let sel_k = sel;
+        let on_k = on_select;
+        crate::focus::target_keys(el, tok, true, move |press| {
+            use crate::key::Press;
+            let n = opts_k.len();
+            let i = sel_k
+                .as_ref()
+                .and_then(|s| opts_k.iter().position(|o| o == s))
+                .unwrap_or(0);
+            let j = match press {
+                Press::ArrowDown | Press::ArrowRight => crate::focus::rove(i, 1, n),
+                Press::ArrowUp | Press::ArrowLeft => crate::focus::rove(i, -1, n),
+                Press::Home => 0,
+                Press::End => n.saturating_sub(1),
+                _ => return None,
+            };
+            Some(on_k(opts_k[j].clone()))
+        })
+    };
+    a11y::attach(keys, &a11y)
 }
 
 /// Next form row after Tab (`backward` is Shift+Tab). Wraps both ends.
@@ -3883,35 +3997,48 @@ pub fn date_stepper<'a, M: Clone + 'a>(
     let shown = format!("{:04}-{:02}-{:02}", v.year, v.month, v.day);
     // ISO date plus < > is an LTR island (Firefox). Do not reorder
     // the stepper; the parent start-aligns the whole control.
+    let can = !a11y.disabled;
     a11y::attach(
-        row![
-            button(
-                "<",
-                a11y.apply_message(Some(on_prev)),
-                tok,
-                Variant::Quiet,
-                Icons::NONE,
-                ButtonOpts::SHRINK,
-                A11y::button("previous-day").with_disabled(a11y.disabled),
-            ),
-            label(
-                shown.clone(),
-                tok,
-                a11y.child(Role::Status).with_value(shown),
-            ),
-            button(
-                ">",
-                a11y.apply_message(Some(on_next)),
-                tok,
-                Variant::Quiet,
-                Icons::NONE,
-                ButtonOpts::SHRINK,
-                A11y::button("next-day").with_disabled(a11y.disabled),
-            ),
-        ]
-        .spacing(gap(tok))
-        .align_y(Alignment::Center)
-        .into(),
+        crate::focus::target_keys(
+            row![
+                button(
+                    "<",
+                    a11y.apply_message(Some(on_prev.clone())),
+                    tok,
+                    Variant::Quiet,
+                    Icons::NONE,
+                    ButtonOpts::SHRINK,
+                    A11y::button("previous-day").with_disabled(a11y.disabled),
+                ),
+                label(
+                    shown.clone(),
+                    tok,
+                    a11y.child(Role::Status).with_value(shown),
+                ),
+                button(
+                    ">",
+                    a11y.apply_message(Some(on_next.clone())),
+                    tok,
+                    Variant::Quiet,
+                    Icons::NONE,
+                    ButtonOpts::SHRINK,
+                    A11y::button("next-day").with_disabled(a11y.disabled),
+                ),
+            ]
+            .spacing(gap(tok))
+            .align_y(Alignment::Center)
+            .into(),
+            tok,
+            can,
+            move |press| {
+                use crate::key::Press;
+                match press {
+                    Press::ArrowLeft | Press::ArrowDown => Some(on_prev.clone()),
+                    Press::ArrowRight | Press::ArrowUp => Some(on_next.clone()),
+                    _ => None,
+                }
+            },
+        ),
         &a11y,
     )
 }
@@ -4154,10 +4281,23 @@ pub fn time_picker<'a, M: Clone + 'a>(
         ));
     }
     a11y::attach(
-        container(row)
-            .width(Length::Fill)
-            .align_x(crate::i18n::align_start(tok.direction))
-            .into(),
+        crate::focus::target_keys(
+            container(row)
+                .width(Length::Fill)
+                .align_x(crate::i18n::align_start(tok.direction))
+                .into(),
+            tok,
+            !a11y.disabled,
+            move |press| {
+                use crate::key::Press;
+                match press {
+                    Press::ArrowUp | Press::ArrowDown => Some(on_field(TimeField::Hour)),
+                    Press::ArrowLeft => Some(on_field(TimeField::Minute)),
+                    Press::ArrowRight => Some(on_field(TimeField::Minute)),
+                    _ => None,
+                }
+            },
+        ),
         &a11y,
     )
 }
@@ -5358,7 +5498,23 @@ pub fn breadcrumb<'a, M: Clone + 'a>(
             ));
         }
     }
-    a11y::attach(r.into(), &a11y)
+    let hops: Vec<M> = parts.iter().filter_map(|(_, m)| m.clone()).collect();
+    let n = hops.len();
+    a11y::attach(
+        crate::focus::target_keys(r.into(), tok, !a11y.disabled && n > 0, move |press| {
+            use crate::key::Press;
+            match press {
+                p if activate_key(&p) => hops.first().cloned(),
+                Press::ArrowRight | Press::ArrowDown => {
+                    hops.get(1.min(n.saturating_sub(1))).cloned()
+                }
+                Press::Home => hops.first().cloned(),
+                Press::End => hops.last().cloned(),
+                _ => None,
+            }
+        }),
+        &a11y,
+    )
 }
 
 /// A transient notice.
@@ -7754,14 +7910,29 @@ pub fn tab_bar<'a, M: Clone + 'a>(
             .align_x(crate::i18n::align_start(tok.direction)),
         container(Space::new().width(Length::Fill).height(1)).style(move |_| style::hairline(tok)),
     ];
+    let n = tabs.titles.len();
+    let active = tabs.active;
     a11y::attach(
-        crate::focus::target(
+        crate::focus::target_keys(
             container(strip)
                 .width(Length::Fill)
                 .style(move |_| style::app_bar(tok))
                 .into(),
             tok,
-            !a11y.disabled && !tabs.titles.is_empty(),
+            !a11y.disabled && n > 0,
+            move |press| {
+                use crate::key::Press;
+                match press {
+                    Press::ArrowRight | Press::ArrowDown => {
+                        Some(on_select(crate::focus::rove(active, 1, n)))
+                    }
+                    Press::ArrowLeft | Press::ArrowUp => {
+                        Some(on_select(crate::focus::rove(active, -1, n)))
+                    }
+                    p if activate_key(&p) => Some(on_select(active)),
+                    _ => None,
+                }
+            },
         ),
         &a11y,
     )
@@ -7890,8 +8061,22 @@ pub fn accordion_view<'a, M: Clone + 'a>(
             ));
         }
     }
+    let n = titles.len();
+    let open = state.open.unwrap_or(0);
     a11y::attach(
-        crate::focus::target(col.into(), tok, !a11y.disabled && !titles.is_empty()),
+        crate::focus::target_keys(col.into(), tok, !a11y.disabled && n > 0, move |press| {
+            use crate::key::Press;
+            match press {
+                p if activate_key(&p) => Some(on_toggle(open)),
+                Press::ArrowDown | Press::ArrowRight => {
+                    Some(on_toggle(crate::focus::rove(open, 1, n)))
+                }
+                Press::ArrowUp | Press::ArrowLeft => {
+                    Some(on_toggle(crate::focus::rove(open, -1, n)))
+                }
+                _ => None,
+            }
+        }),
         &a11y,
     )
 }
@@ -8010,6 +8195,7 @@ pub fn expander<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let a11y = a11y.merge_expanded(open);
     let title = a11y.apply_name(title);
+    let on_toggle = std::rc::Rc::new(on_toggle);
     let header = disclosure_header(
         title.clone(),
         trail,
@@ -8036,7 +8222,7 @@ pub fn expander<'a, M: Clone + 'a>(
         crate::motion::expand(child, t, peek_h, tok, A11y::new(title.clone(), Role::Group))
     };
     a11y::attach(
-        crate::focus::target(
+        crate::focus::target_keys(
             container(column![header, body].spacing(gap(tok)))
                 .padding(inset(tok))
                 .width(Length::Fill)
@@ -8044,6 +8230,7 @@ pub fn expander<'a, M: Clone + 'a>(
                 .into(),
             tok,
             !a11y.disabled,
+            move |press| activate_key(&press).then_some(on_toggle(!open)),
         ),
         &a11y,
     )
@@ -8076,30 +8263,48 @@ pub fn pagination<'a, M: Clone + 'a>(
     let range = page_range(len, page, per_page);
     let status = format!("{}–{} / {len}", range.start, range.end);
     a11y::attach(
-        row![
-            button(
-                "Prev",
-                a11y.apply_message((page > 0).then(|| on_page(page - 1))),
-                tok,
-                Variant::Quiet,
-                Icons::NONE,
-                ButtonOpts::SHRINK,
-                A11y::button("Prev").with_disabled(a11y.disabled || page == 0),
-            ),
-            meta(status.clone(), tok, A11y::new(status, Role::Status)),
-            button(
-                "Next",
-                a11y.apply_message((page + 1 < pages).then(|| on_page(page + 1))),
-                tok,
-                Variant::Quiet,
-                Icons::NONE,
-                ButtonOpts::SHRINK,
-                A11y::button("Next").with_disabled(a11y.disabled || page + 1 >= pages),
-            ),
-        ]
-        .spacing(gap(tok))
-        .align_y(Alignment::Center)
-        .into(),
+        crate::focus::target_keys(
+            row![
+                button(
+                    "Prev",
+                    a11y.apply_message((page > 0).then(|| on_page(page - 1))),
+                    tok,
+                    Variant::Quiet,
+                    Icons::NONE,
+                    ButtonOpts::SHRINK,
+                    A11y::button("Prev").with_disabled(a11y.disabled || page == 0),
+                ),
+                meta(status.clone(), tok, A11y::new(status, Role::Status)),
+                button(
+                    "Next",
+                    a11y.apply_message((page + 1 < pages).then(|| on_page(page + 1))),
+                    tok,
+                    Variant::Quiet,
+                    Icons::NONE,
+                    ButtonOpts::SHRINK,
+                    A11y::button("Next").with_disabled(a11y.disabled || page + 1 >= pages),
+                ),
+            ]
+            .spacing(gap(tok))
+            .align_y(Alignment::Center)
+            .into(),
+            tok,
+            !a11y.disabled && pages > 0,
+            move |press| {
+                use crate::key::Press;
+                match press {
+                    Press::ArrowLeft | Press::ArrowUp | Press::PageUp if page > 0 => {
+                        Some(on_page(page - 1))
+                    }
+                    Press::ArrowRight | Press::ArrowDown | Press::PageDown if page + 1 < pages => {
+                        Some(on_page(page + 1))
+                    }
+                    Press::Home if page > 0 => Some(on_page(0)),
+                    Press::End if pages > 0 && page + 1 < pages => Some(on_page(pages - 1)),
+                    _ => None,
+                }
+            },
+        ),
         &a11y,
     )
 }
@@ -8195,6 +8400,527 @@ mod tests {
         )
     }
 
+    fn pump_click_then_keys<M: Clone>(
+        el: &mut Element<'_, M>,
+        size: Size,
+        click: iced::Point,
+        keys: impl IntoIterator<Item = keyboard::Key>,
+    ) -> Vec<M> {
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            iced::Font::DEFAULT,
+            iced::Pixels::from(16u32),
+        ));
+        let limits = layout::Limits::new(Size::ZERO, size);
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let viewport = iced::Rectangle::new(iced::Point::ORIGIN, size);
+        let mut messages = Vec::<M>::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(click),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        messages.clear();
+        for key in keys {
+            let text = match &key {
+                keyboard::Key::Character(s) => Some(s.clone()),
+                _ => None,
+            };
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: key.clone(),
+                    modified_key: key,
+                    physical_key: keyboard::key::Physical::Unidentified(
+                        keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: keyboard::Location::Standard,
+                    modifiers: keyboard::Modifiers::empty(),
+                    text,
+                    repeat: false,
+                }),
+                layout,
+                mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        messages
+    }
+
+    fn pump_click_then_named<M: Clone>(
+        el: &mut Element<'_, M>,
+        size: Size,
+        click: iced::Point,
+        key: keyboard::key::Named,
+    ) -> Vec<M> {
+        pump_click_then_keys(el, size, click, [keyboard::Key::Named(key)])
+    }
+
+    #[test]
+    fn slider_arrow_nudges_when_focused() {
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, f32> = slider(
+            0.0..=100.0,
+            10.0,
+            |v| v,
+            SliderMarks::NONE,
+            tok,
+            A11y::new("vol", Role::Slider),
+        );
+        let got = pump_click_then_keys(
+            &mut el,
+            Size::new(240.0, 48.0),
+            iced::Point::new(40.0, 8.0),
+            [
+                keyboard::Key::Named(keyboard::key::Named::ArrowRight),
+                keyboard::Key::Named(keyboard::key::Named::ArrowLeft),
+                keyboard::Key::Named(keyboard::key::Named::Home),
+                keyboard::Key::Named(keyboard::key::Named::End),
+                keyboard::Key::Named(keyboard::key::Named::Escape),
+            ],
+        );
+        must(got.iter().any(|v| *v > 10.0), format!("up {got:?}"));
+        must(got.iter().any(|v| *v < 10.0), format!("down {got:?}"));
+        must(got.contains(&0.0), format!("home {got:?}"));
+        must(got.contains(&100.0), format!("end {got:?}"));
+    }
+
+    #[test]
+    fn checkbox_enter_toggles_when_focused() {
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, bool> = checkbox(
+            "Accept",
+            false,
+            |on| on,
+            tok,
+            A11y::new("Accept", Role::Checkbox),
+        );
+        let got = pump_click_then_keys(
+            &mut el,
+            Size::new(200.0, 40.0),
+            iced::Point::new(12.0, 12.0),
+            [
+                keyboard::Key::Named(keyboard::key::Named::Enter),
+                keyboard::Key::Character(" ".into()),
+            ],
+        );
+        assert_eq!(got, vec![true, true]);
+    }
+
+    #[test]
+    fn number_input_arrow_steps_when_focused() {
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, String> =
+            number_input(3.0, |s| s, tok, A11y::new("n", Role::SpinButton));
+        let got = pump_click_then_keys(
+            &mut el,
+            Size::new(200.0, 40.0),
+            iced::Point::new(20.0, 16.0),
+            [
+                keyboard::Key::Named(keyboard::key::Named::ArrowUp),
+                keyboard::Key::Named(keyboard::key::Named::ArrowDown),
+                keyboard::Key::Named(keyboard::key::Named::ArrowLeft),
+                keyboard::Key::Named(keyboard::key::Named::ArrowRight),
+                keyboard::Key::Named(keyboard::key::Named::F1),
+            ],
+        );
+        must(
+            got.iter().any(|s| s.parse::<f64>() == Ok(4.0)),
+            format!("up {got:?}"),
+        );
+        must(
+            got.iter().any(|s| s.parse::<f64>() == Ok(2.0)),
+            format!("down {got:?}"),
+        );
+    }
+
+    #[test]
+    fn date_stepper_arrow_sends_next() {
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, i8> = date_stepper(
+            DateValue {
+                year: 2026,
+                month: 8,
+                day: 31,
+            },
+            -1,
+            1,
+            tok,
+            A11y::new("day", Role::SpinButton),
+        );
+        let got = pump_click_then_keys(
+            &mut el,
+            Size::new(280.0, 40.0),
+            iced::Point::new(80.0, 16.0),
+            [
+                keyboard::Key::Named(keyboard::key::Named::ArrowRight),
+                keyboard::Key::Named(keyboard::key::Named::ArrowLeft),
+                keyboard::Key::Named(keyboard::key::Named::ArrowDown),
+                keyboard::Key::Named(keyboard::key::Named::ArrowUp),
+                keyboard::Key::Named(keyboard::key::Named::Escape),
+            ],
+        );
+        assert_eq!(got, vec![1, -1, -1, 1]);
+    }
+
+    #[test]
+    fn segmented_arrow_moves_when_focused() {
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, usize> = segmented_button(
+            ["A", "B", "C"],
+            0,
+            |i| i,
+            tok,
+            ControlSize::Default,
+            A11y::new("seg", Role::Group),
+        );
+        let got = pump_click_then_keys(
+            &mut el,
+            Size::new(280.0, 40.0),
+            iced::Point::new(20.0, 16.0),
+            [
+                keyboard::Key::Named(keyboard::key::Named::ArrowRight),
+                keyboard::Key::Named(keyboard::key::Named::ArrowLeft),
+                keyboard::Key::Named(keyboard::key::Named::ArrowDown),
+                keyboard::Key::Named(keyboard::key::Named::ArrowUp),
+                keyboard::Key::Named(keyboard::key::Named::Enter),
+                keyboard::Key::Named(keyboard::key::Named::Escape),
+            ],
+        );
+        assert_eq!(got, vec![1, 2, 1, 2, 0]);
+    }
+
+    #[test]
+    fn switch_enter_toggles_when_focused() {
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, bool> = switch(
+            "Sounds",
+            false,
+            |on| on,
+            tok,
+            A11y::new("Sounds", Role::Switch),
+        );
+        let got = pump_click_then_named(
+            &mut el,
+            Size::new(200.0, 40.0),
+            iced::Point::new(12.0, 12.0),
+            keyboard::key::Named::Enter,
+        );
+        assert_eq!(got, vec![true]);
+    }
+
+    #[test]
+    fn radio_enter_selects_when_focused() {
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, u8> =
+            radio("A", 1u8, None, |v| v, tok, A11y::new("A", Role::Radio));
+        let got = pump_click_then_named(
+            &mut el,
+            Size::new(200.0, 40.0),
+            iced::Point::new(12.0, 12.0),
+            keyboard::key::Named::Enter,
+        );
+        assert_eq!(got, vec![1]);
+    }
+
+    #[test]
+    fn toggle_button_enter_when_focused() {
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, ()> = toggle_button(
+            "Bold",
+            false,
+            (),
+            tok,
+            Icons::NONE,
+            A11y::new("Bold", Role::Button),
+        );
+        let got = pump_click_then_named(
+            &mut el,
+            Size::new(120.0, 40.0),
+            iced::Point::new(12.0, 12.0),
+            keyboard::key::Named::Enter,
+        );
+        assert_eq!(got, vec![()]);
+    }
+
+    #[test]
+    fn time_picker_arrow_when_focused() {
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, TimeField> = time_picker(
+            TimeValue::hm(9, 30),
+            TimeClock::HOURS_MINUTES,
+            |f| f,
+            tok,
+            A11y::new("time", Role::Group),
+        );
+        let got = pump_click_then_keys(
+            &mut el,
+            Size::new(240.0, 48.0),
+            iced::Point::new(20.0, 16.0),
+            [
+                keyboard::Key::Named(keyboard::key::Named::ArrowRight),
+                keyboard::Key::Named(keyboard::key::Named::ArrowUp),
+                keyboard::Key::Named(keyboard::key::Named::ArrowDown),
+                keyboard::Key::Named(keyboard::key::Named::ArrowLeft),
+                keyboard::Key::Named(keyboard::key::Named::Escape),
+            ],
+        );
+        assert_eq!(
+            got,
+            vec![
+                TimeField::Minute,
+                TimeField::Hour,
+                TimeField::Hour,
+                TimeField::Minute
+            ]
+        );
+    }
+
+    #[test]
+    fn expander_enter_toggles_when_focused() {
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, bool> = expander(
+            "Notes",
+            None,
+            label("body", tok, A11y::new("body", Role::Group)),
+            Peek::Pixels(0.0),
+            false,
+            0.0,
+            |open| open,
+            tok,
+            A11y::new("Notes", Role::Group),
+        );
+        let got = pump_click_then_named(
+            &mut el,
+            Size::new(320.0, 80.0),
+            iced::Point::new(20.0, 16.0),
+            keyboard::key::Named::Enter,
+        );
+        assert_eq!(got, vec![true]);
+    }
+
+    #[test]
+    fn pick_list_arrow_cycles_when_focused() {
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, &str> = pick_list(
+            ["a", "b", "c"],
+            Some("a"),
+            |s| s,
+            tok,
+            ControlSize::Default,
+            A11y::new("pick", Role::ComboBox),
+        );
+        let got = pump_click_then_keys(
+            &mut el,
+            Size::new(200.0, 40.0),
+            iced::Point::new(20.0, 16.0),
+            [
+                keyboard::Key::Named(keyboard::key::Named::ArrowDown),
+                keyboard::Key::Named(keyboard::key::Named::ArrowUp),
+                keyboard::Key::Named(keyboard::key::Named::Home),
+                keyboard::Key::Named(keyboard::key::Named::End),
+                keyboard::Key::Named(keyboard::key::Named::ArrowRight),
+                keyboard::Key::Named(keyboard::key::Named::ArrowLeft),
+                keyboard::Key::Named(keyboard::key::Named::Escape),
+            ],
+        );
+        assert_eq!(got, vec!["b", "c", "a", "c", "b", "c"]);
+    }
+
+    #[test]
+    fn pagination_arrow_pages_when_focused() {
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, usize> =
+            pagination(40, 1, 10, |i| i, tok, A11y::new("pages", Role::Group));
+        let got = pump_click_then_keys(
+            &mut el,
+            Size::new(280.0, 40.0),
+            iced::Point::new(20.0, 16.0),
+            [
+                keyboard::Key::Named(keyboard::key::Named::ArrowRight),
+                keyboard::Key::Named(keyboard::key::Named::ArrowLeft),
+                keyboard::Key::Named(keyboard::key::Named::Home),
+                keyboard::Key::Named(keyboard::key::Named::End),
+                keyboard::Key::Named(keyboard::key::Named::PageDown),
+                keyboard::Key::Named(keyboard::key::Named::PageUp),
+                keyboard::Key::Named(keyboard::key::Named::ArrowDown),
+                keyboard::Key::Named(keyboard::key::Named::ArrowUp),
+                keyboard::Key::Named(keyboard::key::Named::Escape),
+            ],
+        );
+        assert_eq!(got, vec![2, 0, 0, 3, 2, 0, 2, 0]);
+    }
+
+    #[test]
+    fn button_group_enter_when_focused() {
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, usize> = button_group(
+            ["Cut", "Copy", "Paste"],
+            |i| i,
+            tok,
+            A11y::new("edit", Role::Group),
+        );
+        let got = pump_click_then_keys(
+            &mut el,
+            Size::new(280.0, 40.0),
+            iced::Point::new(20.0, 16.0),
+            [
+                keyboard::Key::Named(keyboard::key::Named::Enter),
+                keyboard::Key::Named(keyboard::key::Named::Home),
+                keyboard::Key::Named(keyboard::key::Named::ArrowRight),
+                keyboard::Key::Named(keyboard::key::Named::ArrowDown),
+                keyboard::Key::Named(keyboard::key::Named::End),
+                keyboard::Key::Named(keyboard::key::Named::Escape),
+            ],
+        );
+        assert_eq!(got, vec![0, 0, 1, 1, 2]);
+    }
+
+    #[test]
+    fn accordion_enter_toggles_when_focused() {
+        let tok = named("dark").tokens;
+        let titles = ["A".to_string(), "B".to_string()];
+        let state = Accordion { open: Some(0) };
+        let mut el: Element<'_, usize> = accordion_view(
+            &titles,
+            vec![
+                label("one", tok, A11y::new("one", Role::Group)),
+                label("two", tok, A11y::new("two", Role::Group)),
+            ],
+            &state,
+            1.0,
+            |i| i,
+            tok,
+            A11y::new("acc", Role::Group),
+        );
+        let got = pump_click_then_keys(
+            &mut el,
+            Size::new(320.0, 160.0),
+            iced::Point::new(20.0, 12.0),
+            [
+                keyboard::Key::Named(keyboard::key::Named::Enter),
+                keyboard::Key::Named(keyboard::key::Named::ArrowDown),
+                keyboard::Key::Named(keyboard::key::Named::ArrowRight),
+                keyboard::Key::Named(keyboard::key::Named::ArrowUp),
+                keyboard::Key::Named(keyboard::key::Named::ArrowLeft),
+                keyboard::Key::Named(keyboard::key::Named::Escape),
+            ],
+        );
+        assert_eq!(got, vec![0, 1, 1, 1, 1]);
+    }
+
+    #[test]
+    fn split_view_arrow_nudges_sash() {
+        use crate::layout::{self, Axis, SashEvent, SplitState};
+        let tok = named("dark").tokens;
+        let st = SplitState::new(Axis::Horizontal, 0.4);
+        let mut el: Element<'_, SashEvent> = layout::split_view(
+            label("a", tok, A11y::new("a", Role::Group)),
+            label("b", tok, A11y::new("b", Role::Group)),
+            st,
+            400.0,
+            |e| e,
+            crate::i18n::Direction::Ltr,
+            tok,
+        );
+        let got = pump_click_then_keys(
+            &mut el,
+            Size::new(400.0, 120.0),
+            iced::Point::new(160.0, 40.0),
+            [
+                keyboard::Key::Named(keyboard::key::Named::ArrowRight),
+                keyboard::Key::Named(keyboard::key::Named::ArrowDown),
+                keyboard::Key::Named(keyboard::key::Named::ArrowLeft),
+                keyboard::Key::Named(keyboard::key::Named::ArrowUp),
+                keyboard::Key::Named(keyboard::key::Named::Escape),
+            ],
+        );
+        must(
+            got.iter()
+                .any(|e| matches!(e, SashEvent::Nudge(d) if *d > 0.0)),
+            format!("right {got:?}"),
+        );
+        must(
+            got.iter()
+                .any(|e| matches!(e, SashEvent::Nudge(d) if *d < 0.0)),
+            format!("left {got:?}"),
+        );
+    }
+
+    #[test]
+    fn breadcrumb_keys_when_focused() {
+        let tok = named("dark").tokens;
+        let crumbs = [
+            ("Home".into(), Some(0usize)),
+            ("Notes".into(), Some(1)),
+            ("Here".into(), None),
+        ];
+        let mut el: Element<'_, usize> = breadcrumb(
+            &crumbs,
+            tok,
+            crate::i18n::Direction::Ltr,
+            A11y::new("path", Role::Group),
+        );
+        let got = pump_click_then_keys(
+            &mut el,
+            Size::new(320.0, 40.0),
+            iced::Point::new(20.0, 16.0),
+            [
+                keyboard::Key::Named(keyboard::key::Named::Enter),
+                keyboard::Key::Named(keyboard::key::Named::ArrowRight),
+                keyboard::Key::Named(keyboard::key::Named::Home),
+                keyboard::Key::Named(keyboard::key::Named::End),
+                keyboard::Key::Named(keyboard::key::Named::ArrowDown),
+                keyboard::Key::Named(keyboard::key::Named::Escape),
+            ],
+        );
+        assert_eq!(got, vec![0, 1, 0, 1, 1]);
+    }
+
+    #[test]
+    fn tab_bar_keys_when_focused() {
+        let tok = named("dark").tokens;
+        let tabs = crate::collection::Tabs::new(["One", "Two", "Three"]);
+        let mut el: Element<'_, usize> = tab_bar(
+            &tabs,
+            |i| i,
+            |_| 99,
+            400.0,
+            false,
+            tok,
+            A11y::new("tabs", Role::Tab),
+        );
+        let got = pump_click_then_keys(
+            &mut el,
+            Size::new(400.0, 48.0),
+            iced::Point::new(20.0, 16.0),
+            [
+                keyboard::Key::Named(keyboard::key::Named::ArrowRight),
+                keyboard::Key::Named(keyboard::key::Named::ArrowDown),
+                keyboard::Key::Named(keyboard::key::Named::ArrowLeft),
+                keyboard::Key::Named(keyboard::key::Named::ArrowUp),
+                keyboard::Key::Named(keyboard::key::Named::Enter),
+                keyboard::Key::Named(keyboard::key::Named::Escape),
+            ],
+        );
+        assert_eq!(got, vec![1, 1, 2, 2, 0]);
+    }
+
     #[test]
     fn list_view_arrow_moves_primary_when_focused() {
         let list = VecList::titles(["a", "b", "c"]);
@@ -8269,6 +8995,86 @@ mod tests {
             );
         }
         assert_eq!(messages, vec![1]);
+        messages.clear();
+        for named in [
+            keyboard::key::Named::Enter,
+            keyboard::key::Named::PageDown,
+            keyboard::key::Named::Home,
+            keyboard::key::Named::End,
+        ] {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(named),
+                    modified_key: keyboard::Key::Named(named),
+                    physical_key: keyboard::key::Physical::Unidentified(
+                        keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: keyboard::Location::Standard,
+                    modifiers: keyboard::Modifiers::empty(),
+                    text: None,
+                    repeat: false,
+                }),
+                layout,
+                mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Character(" ".into()),
+                    modified_key: keyboard::Key::Character(" ".into()),
+                    physical_key: keyboard::key::Physical::Unidentified(
+                        keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: keyboard::Location::Standard,
+                    modifiers: keyboard::Modifiers::empty(),
+                    text: Some(" ".into()),
+                    repeat: false,
+                }),
+                layout,
+                mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert!(messages.contains(&0));
+        assert!(messages.contains(&98));
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(keyboard::key::Named::Backspace),
+                    modified_key: keyboard::Key::Named(keyboard::key::Named::Backspace),
+                    physical_key: keyboard::key::Physical::Unidentified(
+                        keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: keyboard::Location::Standard,
+                    modifiers: keyboard::Modifiers::empty(),
+                    text: None,
+                    repeat: false,
+                }),
+                layout,
+                mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
     }
 
     #[test]
@@ -8308,6 +9114,109 @@ mod tests {
         );
         assert_eq!(n, 0);
         assert_eq!(focused, 0);
+    }
+
+    #[test]
+    fn scroll_page_down_moves_offset() {
+        let tok = named("dark").tokens;
+        let tall = iced::widget::column![
+            label("a", tok, A11y::new("a", Role::Status)),
+            Space::new().height(400),
+        ]
+        .into();
+        let mut el: Element<'_, f32> = scroll(
+            tall,
+            tok,
+            A11y::new("pane", Role::Group),
+            false,
+            None,
+            Some(|y| y),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            iced::Font::DEFAULT,
+            iced::Pixels::from(16u32),
+        ));
+        let size = Size::new(200.0, 80.0);
+        let node =
+            el.as_widget_mut()
+                .layout(&mut tree, &renderer, &layout::Limits::new(Size::ZERO, size));
+        let layout = Layout::new(&node);
+        let mut messages = Vec::<f32>::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(keyboard::key::Named::PageDown),
+                    modified_key: keyboard::Key::Named(keyboard::key::Named::PageDown),
+                    physical_key: keyboard::key::Physical::Unidentified(
+                        keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: keyboard::Location::Standard,
+                    modifiers: keyboard::Modifiers::empty(),
+                    text: None,
+                    repeat: false,
+                }),
+                layout,
+                mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &iced::Rectangle::new(iced::Point::ORIGIN, size),
+            );
+        }
+        assert!(messages.iter().any(|y| *y > 0.0));
+        for named in [
+            keyboard::key::Named::ArrowDown,
+            keyboard::key::Named::ArrowUp,
+            keyboard::key::Named::ArrowLeft,
+            keyboard::key::Named::ArrowRight,
+            keyboard::key::Named::Home,
+            keyboard::key::Named::End,
+            keyboard::key::Named::PageUp,
+            keyboard::key::Named::Enter,
+        ] {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(named),
+                    modified_key: keyboard::Key::Named(named),
+                    physical_key: keyboard::key::Physical::Unidentified(
+                        keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: keyboard::Location::Standard,
+                    modifiers: keyboard::Modifiers::empty(),
+                    text: None,
+                    repeat: false,
+                }),
+                layout,
+                mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &iced::Rectangle::new(iced::Point::ORIGIN, size),
+            );
+        }
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Window(iced::window::Event::RedrawRequested(
+                    std::time::Instant::now(),
+                )),
+                layout,
+                mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &iced::Rectangle::new(iced::Point::ORIGIN, size),
+            );
+        }
     }
 
     #[test]
@@ -14324,6 +15233,9 @@ mod tests {
                 &mut shell,
                 &vp,
             );
+        }
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
             el.as_widget_mut().update(
                 &mut tree,
                 &Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
@@ -17612,18 +18524,19 @@ mod tests {
                 &mut shell,
                 &vp,
             );
-            if button == iced::mouse::Button::Left {
-                el.as_widget_mut().update(
-                    &mut tree,
-                    &Event::Mouse(iced::mouse::Event::ButtonReleased(button)),
-                    layout,
-                    iced::mouse::Cursor::Available(at),
-                    &renderer,
-                    &mut clipboard,
-                    &mut shell,
-                    &vp,
-                );
-            }
+        }
+        if button == iced::mouse::Button::Left {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(iced::mouse::Event::ButtonReleased(button)),
+                layout,
+                iced::mouse::Cursor::Available(at),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
         }
         messages
     }
