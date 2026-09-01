@@ -192,6 +192,19 @@ impl<M: Clone> ActionTable<M> {
         self.get(id).and_then(Action::invoke)
     }
 
+    /// Insert `app.quit` with the host accelerator when the table has none.
+    ///
+    /// Application windows call this. Overlay windows do not.
+    pub fn seed_quit(&mut self, quit: M) {
+        if self.get("app.quit").is_some() {
+            return;
+        }
+        self.insert(
+            Action::new("app.quit", "Quit", quit)
+                .with_shortcut(Shortcut::parse("ctrl+q").expect("ctrl+q")),
+        );
+    }
+
     pub fn match_shortcut(&self, shortcut: &Shortcut) -> Option<&Action<M>> {
         self.match_shortcut_in(shortcut, None)
     }
@@ -259,6 +272,18 @@ impl<M: Clone> ActionTable<M> {
 mod tests {
     use super::*;
     use crate::shortcut::Shortcut;
+
+    #[test]
+    fn seed_quit_inserts_host_accelerator_once() {
+        let mut table = ActionTable::new();
+        table.seed_quit(7u8);
+        table.seed_quit(9u8);
+        assert_eq!(table.invoke("app.quit"), Some(7));
+        assert_eq!(
+            table.get("app.quit").and_then(|a| a.shortcut.clone()),
+            Shortcut::parse("ctrl+q")
+        );
+    }
 
     #[test]
     fn enable_invoke_and_table() {

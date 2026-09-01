@@ -32,6 +32,7 @@ use crate::layout::{window_size_from_dock, DockSpec};
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WindowKind {
+    /// Desktop tool. Call [`crate::action::ActionTable::seed_quit`].
     Application,
     Dialog,
     Overlay,

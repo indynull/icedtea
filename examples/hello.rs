@@ -48,10 +48,7 @@ impl Hello {
             Action::new("file.save", "Save", Message::Save)
                 .with_shortcut(Shortcut::parse("ctrl+s").unwrap()),
         );
-        table.insert(
-            Action::new("app.quit", "Quit", Message::Quit)
-                .with_shortcut(Shortcut::parse("ctrl+q").unwrap()),
-        );
+        table.seed_quit(Message::Quit);
         (
             Self {
                 doc: Content::with_text("Notes"),

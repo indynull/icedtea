@@ -1194,15 +1194,30 @@ pub fn nav_rail<'a, M: Clone + 'a>(
             .style(move |_| style::nav_rail(tok, on));
         col = col.push(face);
     }
+    let n = items.len();
     crate::a11y::attach(
-        crate::focus::target(
+        crate::focus::target_keys(
             container(col)
                 .width(if expanded { 220 } else { 72 })
                 .padding(tok.density.gap())
                 .style(move |_| style::panel(tok))
                 .into(),
             tok,
-            !a11y.disabled && !items.is_empty(),
+            !a11y.disabled && n > 0,
+            move |press| {
+                use crate::key::Press;
+                match press {
+                    Press::ArrowDown | Press::ArrowRight => {
+                        Some(on_select(crate::focus::rove(selected, 1, n)))
+                    }
+                    Press::ArrowUp | Press::ArrowLeft => {
+                        Some(on_select(crate::focus::rove(selected, -1, n)))
+                    }
+                    Press::Home => Some(on_select(0)),
+                    Press::End => Some(on_select(n.saturating_sub(1))),
+                    _ => None,
+                }
+            },
         ),
         &a11y,
     )
@@ -2216,26 +2231,32 @@ pub fn tool_panel<'a, M: Clone + 'a>(
 ///     widget::label("nav", tok, A11y::new("nav", Role::Group)),
 ///     widget::label("main", tok, A11y::new("main", Role::Status)),
 ///     1.0,
+///     (),
 ///     tok,
 /// );
 /// ```
-pub fn drawer<'a, M: 'a>(
+pub fn drawer<'a, M: Clone + 'a>(
     open: bool,
     pane: Element<'a, M>,
     content: Element<'a, M>,
     progress: f32,
+    on_close: M,
     tok: Tokens,
 ) -> Element<'a, M> {
     let t = crate::motion::visual(progress, tok.reduced_motion);
     if !open && t <= 0.0 {
+        let _ = on_close;
         content
     } else {
-        list_detail(
-            pane,
-            content,
-            layout::fixed((220.0 * t).max(1.0)),
-            tok,
-            tok.direction,
+        crate::focus::dismiss_on_escape(
+            list_detail(
+                pane,
+                content,
+                layout::fixed((220.0 * t).max(1.0)),
+                tok,
+                tok.direction,
+            ),
+            on_close,
         )
     }
 }
@@ -2419,6 +2440,74 @@ mod tests {
         );
         assert!(n >= 1);
         assert!(focused >= 1);
+        let got = {
+            use iced::advanced::clipboard;
+            use iced::advanced::layout::{Layout, Limits};
+            use iced::advanced::widget::Tree;
+            use iced::{Event, Font, Pixels, Rectangle, Size};
+            let mut el: Element<'_, usize> = nav_rail(
+                ["Inbox", "Sent", "Drafts"],
+                0,
+                |i| i,
+                true,
+                tok,
+                A11y::new("rail-keys", Role::List),
+            );
+            let mut tree = Tree::new(el.as_widget());
+            let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+                Font::DEFAULT,
+                Pixels::from(16u32),
+            ));
+            let size = Size::new(220.0, 200.0);
+            let node =
+                el.as_widget_mut()
+                    .layout(&mut tree, &renderer, &Limits::new(Size::ZERO, size));
+            let layout = Layout::new(&node);
+            let vp = Rectangle::new(iced::Point::ORIGIN, size);
+            let mut clipboard = clipboard::Null;
+            {
+                let mut messages = Vec::new();
+                let mut shell = iced::advanced::Shell::new(&mut messages);
+                el.as_widget_mut().update(
+                    &mut tree,
+                    &Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)),
+                    layout,
+                    iced::mouse::Cursor::Available(iced::Point::new(20.0, 20.0)),
+                    &renderer,
+                    &mut clipboard,
+                    &mut shell,
+                    &vp,
+                );
+            }
+            let mut messages = Vec::new();
+            {
+                let mut shell = iced::advanced::Shell::new(&mut messages);
+                el.as_widget_mut().update(
+                    &mut tree,
+                    &Event::Keyboard(iced::keyboard::Event::KeyPressed {
+                        key: iced::keyboard::Key::Named(iced::keyboard::key::Named::ArrowDown),
+                        modified_key: iced::keyboard::Key::Named(
+                            iced::keyboard::key::Named::ArrowDown,
+                        ),
+                        physical_key: iced::keyboard::key::Physical::Unidentified(
+                            iced::keyboard::key::NativeCode::Unidentified,
+                        ),
+                        location: iced::keyboard::Location::Standard,
+                        modifiers: iced::keyboard::Modifiers::empty(),
+                        text: None,
+                        repeat: false,
+                    }),
+                    layout,
+                    iced::mouse::Cursor::Unavailable,
+                    &renderer,
+                    &mut clipboard,
+                    &mut shell,
+                    &vp,
+                );
+            }
+            messages
+        };
+        assert_eq!(got, vec![1]);
         let mut empty: Element<'_, usize> = nav_rail(
             Vec::<String>::new(),
             0,
@@ -2434,6 +2523,60 @@ mod tests {
         );
         assert_eq!(n, 0);
         assert_eq!(focused, 0);
+    }
+
+    #[test]
+    fn drawer_escape_closes_when_open() {
+        let tok = crate::theme::named("dark").tokens;
+        let mut el: Element<'_, u8> = drawer(
+            true,
+            crate::widget::label("n", tok, A11y::new("n", Role::Group)),
+            crate::widget::label("c", tok, A11y::new("c", Role::Status)),
+            1.0,
+            1,
+            tok,
+        );
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Event, Font, Pixels, Rectangle, Size};
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let size = Size::new(400.0, 200.0);
+        let node = el
+            .as_widget_mut()
+            .layout(&mut tree, &renderer, &Limits::new(Size::ZERO, size));
+        let layout = Layout::new(&node);
+        let vp = Rectangle::new(iced::Point::ORIGIN, size);
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = clipboard::Null;
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Keyboard(iced::keyboard::Event::KeyPressed {
+                    key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Escape),
+                    modified_key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Escape),
+                    physical_key: iced::keyboard::key::Physical::Unidentified(
+                        iced::keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: iced::keyboard::Location::Standard,
+                    modifiers: iced::keyboard::Modifiers::empty(),
+                    text: None,
+                    repeat: false,
+                }),
+                layout,
+                iced::mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+        }
+        assert_eq!(messages, vec![1]);
     }
 
     #[test]
@@ -3287,13 +3430,13 @@ mod tests {
             A11y::new("tp", Role::Group),
         );
         paint(&mut tp);
-        let mut dr = drawer(true, lab("n"), lab("c"), 1.0, tok);
+        let mut dr = drawer(true, lab("n"), lab("c"), 1.0, (), tok);
         paint(&mut dr);
-        let mut mid = drawer(true, lab("n"), lab("c"), 0.4, tok);
+        let mut mid = drawer(true, lab("n"), lab("c"), 0.4, (), tok);
         paint(&mut mid);
-        let mut shut = drawer(false, lab("n"), lab("c"), 0.0, tok);
+        let mut shut = drawer(false, lab("n"), lab("c"), 0.0, (), tok);
         paint(&mut shut);
-        let mut closing = drawer(false, lab("n"), lab("c"), 0.5, tok);
+        let mut closing = drawer(false, lab("n"), lab("c"), 0.5, (), tok);
         paint(&mut closing);
         let mut sheet = cheatsheet(&table, "sa", tok);
         paint(&mut sheet);

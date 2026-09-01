@@ -3360,7 +3360,8 @@ impl<'a, Message: Clone> Widget<Message, iced::Theme, iced::Renderer>
 /// Docked search results under a search field (M3 search view, desktop).
 ///
 /// Hits are application-filtered. Empty `hits` shows `empty`. Disabled
-/// drops pick and clear.
+/// drops pick and clear. `selected` is the highlighted hit; arrows
+/// from the query field move it (Spotlight).
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -3372,6 +3373,7 @@ impl<'a, Message: Clone> Widget<Message, iced::Theme, iced::Renderer>
 /// let _: icedtea::Element<'_, String> = widget::search_view(
 ///     "in",
 ///     ["Inbox", "Sent"],
+///     Some(0),
 ///     on_input,
 ///     on_pick,
 ///     Some(String::new()),
@@ -3384,6 +3386,7 @@ impl<'a, Message: Clone> Widget<Message, iced::Theme, iced::Renderer>
 pub fn search_view<'a, M: Clone + 'a>(
     query: &str,
     hits: impl IntoIterator<Item = impl Into<String>>,
+    selected: Option<usize>,
     on_input: impl Fn(String) -> M + 'a,
     on_pick: impl Fn(usize) -> M + Copy + 'a,
     on_clear: Option<M>,
@@ -3431,8 +3434,31 @@ pub fn search_view<'a, M: Clone + 'a>(
         }
         col.into()
     };
+    let n = hits.len();
+    let cur = selected.unwrap_or(0);
+    let can = !a11y.disabled && n > 0;
     a11y::attach(
-        column![field, body].spacing(4).width(Length::Fill).into(),
+        crate::focus::intercept_keys(
+            column![field, body].spacing(4).width(Length::Fill).into(),
+            move |press| {
+                use crate::key::Press;
+                if !can {
+                    return None;
+                }
+                match press {
+                    Press::ArrowDown | Press::ArrowRight => {
+                        Some(on_pick(crate::focus::rove(cur, 1, n)))
+                    }
+                    Press::ArrowUp | Press::ArrowLeft => {
+                        Some(on_pick(crate::focus::rove(cur, -1, n)))
+                    }
+                    Press::Home => Some(on_pick(0)),
+                    Press::End => Some(on_pick(n.saturating_sub(1))),
+                    p if activate_key(&p) => Some(on_pick(cur.min(n.saturating_sub(1)))),
+                    _ => None,
+                }
+            },
+        ),
         &a11y,
     )
 }
@@ -3443,7 +3469,7 @@ pub fn search_view<'a, M: Clone + 'a>(
 /// toolbar or HUD can nest a dropdown. Default keeps the field body
 /// look. The trailing mark is Material `arrow_drop_down` (24 dp, 20 dp
 /// Compact), inset `Density::inset` from the **end**. A press on the
-/// mark opens the menu. The list uses Menu shape (extra-small under
+/// mark opens the menu. Focused Enter and Space open it too. The list uses Menu shape (extra-small under)
 /// Soft and Pill) so the drawer is a box, not a stack of stadiums.
 /// Placeholder shows when nothing is selected. Wheel over the control
 /// moves the selection. Disabled keeps the current face.
@@ -3553,7 +3579,7 @@ where
         let opts_k = opts;
         let sel_k = sel;
         let on_k = on_select;
-        crate::focus::target_keys(el, tok, true, move |press| {
+        crate::focus::target_keys_open(el, tok, true, move |press| {
             use crate::key::Press;
             let n = opts_k.len();
             let i = sel_k
@@ -6186,7 +6212,12 @@ impl<'a, Message: 'a> Widget<Message, iced::Theme, iced::Renderer> for VirtualCl
             }
             _ => {}
         }
-        if !shell.is_event_captured() {
+        let skip_rows = shell.is_event_captured()
+            && !matches!(
+                event,
+                Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left))
+            );
+        if !skip_rows {
             let laid_cursor = state.cursor_for_laid(cursor);
             self.rows.update(
                 &mut tree.children[0],
@@ -6923,7 +6954,7 @@ impl<'a, Message: 'a> From<CapturePress<'a, Message>> for Element<'a, Message> {
 }
 
 /// Window, row height, empty copy, and other extras for [`list_view`].
-pub struct ListOpts<'a, Rh, Scroll, Color, FaceH, Check> {
+pub struct ListOpts<'a, Rh, Scroll, Color, FaceH, Check, Ctx> {
     pub window: VisibleWindow,
     pub row_h: Rh,
     pub overscan: usize,
@@ -6933,6 +6964,7 @@ pub struct ListOpts<'a, Rh, Scroll, Color, FaceH, Check> {
     pub scroll_id: Option<Id>,
     pub face: RowFace<FaceH>,
     pub on_check: Check,
+    pub on_context: Ctx,
 }
 
 /// A virtualized row list.
@@ -6967,6 +6999,7 @@ pub struct ListOpts<'a, Rh, Scroll, Color, FaceH, Check> {
 ///     Select(icedtea::collection::ItemClick),
 ///     Scroll(VisibleWindow),
 ///     Check(usize),
+///     Context(usize),
 /// }
 /// let on_select = Msg::Select;
 /// let on_scroll = Msg::Scroll;
@@ -6985,16 +7018,17 @@ pub struct ListOpts<'a, Rh, Scroll, Color, FaceH, Check> {
 ///         scroll_id: None,
 ///         face: icedtea::collection::RowFace::FLUSH,
 ///         on_check: Msg::Check,
+///         on_context: Msg::Context,
 ///     },
 ///     A11y::new("list", Role::List),
 /// );
 /// ```
-pub fn list_view<'a, M, L, Rh, Scroll, Color, FaceH, Check>(
+pub fn list_view<'a, M, L, Rh, Scroll, Color, FaceH, Check, Ctx>(
     model: &'a L,
     selection: &'a Selection,
     on_select: impl Fn(ItemClick) -> M + Copy + 'a,
     tok: Tokens,
-    opts: ListOpts<'a, Rh, Scroll, Color, FaceH, Check>,
+    opts: ListOpts<'a, Rh, Scroll, Color, FaceH, Check, Ctx>,
     a11y: A11y,
 ) -> Element<'a, M>
 where
@@ -7005,6 +7039,7 @@ where
     Color: Fn(usize) -> iced::Color + Copy + 'a,
     FaceH: Fn(usize) -> f32 + Copy + 'a,
     Check: Fn(usize) -> M + Copy + 'a,
+    Ctx: Fn(usize) -> M + Copy + 'a,
 {
     let ListOpts {
         window,
@@ -7016,6 +7051,7 @@ where
         scroll_id,
         face,
         on_check,
+        on_context,
     } = opts;
     let cover = selection.primary();
     let heights = row_h.into();
@@ -7078,11 +7114,15 @@ where
                                 painted
                             } else {
                                 item_press(painted, move |button, modifiers| {
-                                    on_select(ItemClick {
-                                        id: i,
-                                        button,
-                                        modifiers,
-                                    })
+                                    if button == ItemButton::Secondary {
+                                        on_context(i)
+                                    } else {
+                                        on_select(ItemClick {
+                                            id: i,
+                                            button,
+                                            modifiers,
+                                        })
+                                    }
                                 })
                             };
                             let mut line = Row::new()
@@ -7567,7 +7607,6 @@ pub fn tree_view<'a, M: Clone + 'a>(
     let closing = animating.map(|(id, _)| id);
     let progress = animating.map(|(_, p)| p).unwrap_or(1.0);
     let anim_id = animating.map(|(id, _)| id);
-    let visible = root.flatten_during(closing).len();
     let mut col = Column::new()
         .spacing(0)
         .width(Length::Fill)
@@ -7607,14 +7646,63 @@ pub fn tree_view<'a, M: Clone + 'a>(
         }
     }
     col = tree_push_branch(col, branch, progress, tok);
+    let rows = root.flatten_during(closing);
+    let ids: Vec<(u64, bool, bool)> = rows
+        .iter()
+        .map(|(_, id, _, exp, kids)| (*id, *exp, *kids))
+        .collect();
+    let n = ids.len();
+    let cur = selected
+        .and_then(|s| ids.iter().position(|(id, _, _)| *id == s))
+        .unwrap_or(0);
+    let off = a11y.disabled || n == 0;
     a11y::attach(
-        scroll(
-            col.into(),
-            tok,
-            A11y::new("tree-scroll", Role::Group).with_disabled(a11y.disabled || visible == 0),
-            false,
-            None,
-            None::<fn(_) -> M>,
+        crate::focus::intercept_keys(
+            scroll(
+                col.into(),
+                tok,
+                A11y::new("tree-scroll", Role::Group).with_disabled(off),
+                false,
+                None,
+                None::<fn(_) -> M>,
+            ),
+            move |press| {
+                use crate::key::Press;
+                if off {
+                    return None;
+                }
+                let (id, exp, kids) = ids[cur.min(n.saturating_sub(1))];
+                match press {
+                    Press::ArrowDown => Some(on_select(ItemClick {
+                        id: ids[crate::focus::rove(cur, 1, n)].0,
+                        button: ItemButton::Primary,
+                        modifiers: keyboard::Modifiers::empty(),
+                    })),
+                    Press::ArrowUp => Some(on_select(ItemClick {
+                        id: ids[crate::focus::rove(cur, -1, n)].0,
+                        button: ItemButton::Primary,
+                        modifiers: keyboard::Modifiers::empty(),
+                    })),
+                    Press::ArrowRight if kids && !exp => Some(on_toggle(id)),
+                    Press::ArrowLeft if kids && exp => Some(on_toggle(id)),
+                    Press::Home => Some(on_select(ItemClick {
+                        id: ids[0].0,
+                        button: ItemButton::Primary,
+                        modifiers: keyboard::Modifiers::empty(),
+                    })),
+                    Press::End => Some(on_select(ItemClick {
+                        id: ids[n.saturating_sub(1)].0,
+                        button: ItemButton::Primary,
+                        modifiers: keyboard::Modifiers::empty(),
+                    })),
+                    p if activate_key(&p) => Some(on_select(ItemClick {
+                        id,
+                        button: ItemButton::Primary,
+                        modifiers: keyboard::Modifiers::empty(),
+                    })),
+                    _ => None,
+                }
+            },
         ),
         &a11y,
     )
@@ -8422,6 +8510,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: move |_| window,
+                on_context: move |_| window,
             },
             A11y::new("list", Role::List).with_disabled(disabled),
         )
@@ -8852,6 +8941,126 @@ mod tests {
     }
 
     #[test]
+    fn search_view_arrow_moves_hit_from_query() {
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, usize> = search_view(
+            "in",
+            ["Inbox", "Sent", "Drafts"],
+            Some(0),
+            |_| 99,
+            |i| i,
+            None,
+            "No matches",
+            tok,
+            A11y::new("find", Role::Group),
+        );
+        let got = pump_click_then_named(
+            &mut el,
+            Size::new(280.0, 120.0),
+            iced::Point::new(20.0, 16.0),
+            keyboard::key::Named::ArrowDown,
+        );
+        assert_eq!(got, vec![1]);
+    }
+
+    #[test]
+    fn tree_view_arrow_expands_and_moves() {
+        use crate::collection::TreeNode;
+        let tok = named("dark").tokens;
+        let mut branch = TreeNode::branch(1, "src", vec![TreeNode::leaf(2, "lib.rs")]);
+        branch.expanded = false;
+        let mut el: Element<'_, u64> = tree_view(
+            &branch,
+            Some(1),
+            None,
+            |id| id,
+            |c| c.id,
+            TreeFace::Outline,
+            tok,
+            A11y::new("tree", Role::Tree),
+        );
+        let got = pump_click_then_named(
+            &mut el,
+            Size::new(280.0, 80.0),
+            iced::Point::new(20.0, 12.0),
+            keyboard::key::Named::ArrowRight,
+        );
+        assert_eq!(got, vec![1]);
+    }
+
+    #[test]
+    fn pick_list_enter_opens_overlay() {
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, &str> = pick_list(
+            ["a", "b"],
+            Some("a"),
+            |s| s,
+            tok,
+            ControlSize::Default,
+            A11y::new("pick", Role::ComboBox),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            iced::Font::DEFAULT,
+            iced::Pixels::from(16u32),
+        ));
+        let size = Size::new(200.0, 40.0);
+        let limits = layout::Limits::new(Size::ZERO, size);
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let viewport = iced::Rectangle::new(iced::Point::ORIGIN, size);
+        {
+            use iced::advanced::widget::operation::{focusable::Focusable, Operation};
+            struct FocusAll;
+            impl Operation<()> for FocusAll {
+                fn focusable(
+                    &mut self,
+                    _id: Option<&Id>,
+                    _bounds: iced::Rectangle,
+                    state: &mut dyn Focusable,
+                ) {
+                    state.focus();
+                }
+                fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<()>)) {
+                    operate(self);
+                }
+            }
+            let mut op = FocusAll;
+            el.as_widget_mut()
+                .operate(&mut tree, layout, &renderer, &mut op);
+        }
+        {
+            let mut messages = Vec::<&str>::new();
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(keyboard::key::Named::Enter),
+                    modified_key: keyboard::Key::Named(keyboard::key::Named::Enter),
+                    physical_key: keyboard::key::Physical::Unidentified(
+                        keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: keyboard::Location::Standard,
+                    modifiers: keyboard::Modifiers::empty(),
+                    text: None,
+                    repeat: false,
+                }),
+                layout,
+                mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        let open =
+            el.as_widget_mut()
+                .overlay(&mut tree, layout, &renderer, &viewport, iced::Vector::ZERO);
+        assert!(open.is_some());
+    }
+
+    #[test]
     fn split_view_arrow_nudges_sash() {
         use crate::layout::{self, Axis, SashEvent, SplitState};
         let tok = named("dark").tokens;
@@ -8968,6 +9177,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| 98,
+                on_context: |_| 98,
             },
             A11y::new("list", Role::List),
         );
@@ -10883,6 +11093,7 @@ mod tests {
         let mut sv: Element<'_, ()> = search_view(
             "in",
             ["Inbox", "Sent"],
+            Some(0),
             |_| (),
             |_| (),
             Some(()),
@@ -10894,6 +11105,7 @@ mod tests {
         let mut empty_sv: Element<'_, ()> = search_view(
             "zz",
             Vec::<String>::new(),
+            None,
             |_| (),
             |_| (),
             None,
@@ -10905,6 +11117,7 @@ mod tests {
         let mut disabled_hits: Element<'_, ()> = search_view(
             "in",
             ["Inbox", "Sent"],
+            Some(0),
             |_| (),
             |_| (),
             Some(()),
@@ -11269,6 +11482,7 @@ mod tests {
                 scroll_id: Some(Id::from("list-host")),
                 face: RowFace::FLUSH,
                 on_check: |_| (),
+                on_context: |_| (),
             },
             role("list", Role::List),
         );
@@ -11287,6 +11501,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| (),
+                on_context: |_| (),
             },
             role("list", Role::List),
         );
@@ -11311,6 +11526,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| (),
+                on_context: |_| (),
             },
             role("list", Role::List),
         );
@@ -11330,6 +11546,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| (),
+                on_context: |_| (),
             },
             role("list-sep", Role::List),
         );
@@ -12383,6 +12600,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| (),
+                on_context: |_| (),
             },
             role("list", Role::List),
         );
@@ -12403,6 +12621,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| (),
+                on_context: |_| (),
             },
             role("list-empty", Role::List),
         );
@@ -12434,6 +12653,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| (),
+                on_context: |_| (),
             },
             role("list-color", Role::List),
         );
@@ -12453,6 +12673,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| (),
+                on_context: |_| (),
             },
             role("list", Role::List).with_disabled(true),
         );
@@ -13847,6 +14068,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |i| i,
+                on_context: |i| i,
             },
             A11y::new("slotted", Role::List),
         );
@@ -13867,6 +14089,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| (),
+                on_context: |_| (),
             },
             A11y::new("empty-slots", Role::List),
         );
@@ -13983,6 +14206,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| (),
+                on_context: |_| (),
             },
             A11y::new("dead-check", Role::List).with_disabled(true),
         );
@@ -14053,6 +14277,7 @@ mod tests {
                 scroll_id: Some(Id::from("list-scroll")),
                 face: RowFace::FLUSH,
                 on_check: |_| window,
+                on_context: |_| window,
             },
             A11y::new("list", Role::List),
         );
@@ -14166,6 +14391,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| window,
+                on_context: |_| window,
             },
             A11y::new("list", Role::List),
         );
@@ -14805,6 +15031,7 @@ mod tests {
                 scroll_id: Some(Id::from("list-rail")),
                 face: RowFace::FLUSH,
                 on_check: |_| window,
+                on_context: |_| window,
             },
             A11y::new("list", Role::List),
         );
@@ -15130,6 +15357,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| window,
+                on_context: |_| window,
             },
             A11y::new("list", Role::List),
         );
@@ -15262,6 +15490,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| window,
+                on_context: |_| window,
             },
             A11y::new("list", Role::List),
         );
@@ -15309,6 +15538,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| window,
+                on_context: |_| window,
             },
             A11y::new("list", Role::List),
         );
@@ -15368,6 +15598,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: Ev::Pick,
+                on_context: Ev::Pick,
             },
             A11y::new("list", Role::List),
         );
@@ -15502,6 +15733,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| top,
+                on_context: |_| top,
             },
             A11y::new("list", Role::List),
         );
@@ -15552,6 +15784,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| top,
+                on_context: |_| top,
             },
             A11y::new("list", Role::List),
         );
@@ -15604,6 +15837,7 @@ mod tests {
                 scroll_id: Some(id.clone()),
                 face: RowFace::FLUSH,
                 on_check: |_| top,
+                on_context: |_| top,
             },
             A11y::new("list", Role::List),
         );
@@ -15664,6 +15898,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| top,
+                on_context: |_| top,
             },
             A11y::new("list", Role::List),
         );
@@ -15689,6 +15924,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| deep,
+                on_context: |_| deep,
             },
             A11y::new("list", Role::List),
         );
@@ -15742,6 +15978,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| top,
+                on_context: |_| top,
             },
             A11y::new("list", Role::List),
         );
@@ -15788,6 +16025,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| top,
+                on_context: |_| top,
             },
             A11y::new("list", Role::List),
         );
@@ -15841,6 +16079,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| window,
+                on_context: |_| window,
             },
             A11y::new("list", Role::List),
         );
@@ -15926,6 +16165,7 @@ mod tests {
                 scroll_id: Some(id.clone()),
                 face: RowFace::FLUSH,
                 on_check: |_| window,
+                on_context: |_| window,
             },
             A11y::new("list", Role::List),
         );
@@ -15984,6 +16224,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| sep_win,
+                on_context: |_| sep_win,
             },
             A11y::new("sep-list", Role::List),
         );
@@ -16038,6 +16279,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| 0.0,
+                on_context: |_| 0.0,
             },
             A11y::new("var-list", Role::List),
         );
@@ -16079,6 +16321,7 @@ mod tests {
                     meter: Some(|i| if i == 0 { 0.8 } else { 0.2 }),
                 },
                 on_check: |_| (),
+                on_context: |_| (),
             },
             A11y::new("card-list", Role::List),
         );
@@ -16122,6 +16365,7 @@ mod tests {
                     meter: None::<fn(usize) -> f32>,
                 },
                 on_check: |_| (),
+                on_context: |_| (),
             },
             A11y::new("card-bare", Role::List).with_disabled(true),
         );
@@ -16420,6 +16664,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| 0,
+                on_context: |_| 0,
             },
             A11y::new("mail", Role::List),
         );
@@ -16455,6 +16700,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| 0,
+                on_context: |_| 0,
             },
             A11y::new("mail", Role::List),
         );
@@ -16473,6 +16719,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| 0,
+                on_context: |_| 0,
             },
             A11y::new("mail", Role::List),
         );
@@ -18341,6 +18588,7 @@ mod tests {
         let mut search_el: Element<'_, usize> = search_view(
             "q",
             ["Inbox", "Sent"],
+            Some(0),
             query_len,
             |i| i,
             None,
@@ -18391,6 +18639,7 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| 0,
+                on_context: |_| 0,
             },
             A11y::new("mail", Role::List),
         );
@@ -18992,6 +19241,11 @@ mod tests {
                 scroll_id: None,
                 face: RowFace::FLUSH,
                 on_check: |_| list_side(),
+                on_context: |_| ItemClick {
+                    id: 7,
+                    button: ItemButton::Secondary,
+                    modifiers: keyboard::Modifiers::empty(),
+                },
             },
             A11y::new("list", Role::List),
         );
@@ -19008,8 +19262,10 @@ mod tests {
             iced::Size::new(320.0, 80.0),
         );
         must(
-            context.iter().any(|c| c.button == ItemButton::Secondary),
-            format!("list row context must emit Secondary on press, got {context:?}"),
+            context
+                .iter()
+                .any(|c| c.id == 7 && c.button == ItemButton::Secondary),
+            format!("list row context must emit on_context, got {context:?}"),
         );
         let _ = press_messages(
             &mut list_el,
