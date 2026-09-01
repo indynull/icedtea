@@ -155,6 +155,36 @@ pub fn install_platform_faces() {
     });
 }
 
+/// Current SansSerif family name in the font database.
+pub fn sans_family() -> String {
+    let lock = font_system();
+    let mut system = lock.write().expect("font system");
+    system
+        .raw()
+        .db()
+        .family_name(&DbFamily::SansSerif)
+        .to_string()
+}
+
+/// Point [`UI`] / `Font::DEFAULT` at a family already in the database.
+///
+/// Load the face on the iced application ([`crate::Boot::fonts`] or
+/// `font::load`) first. Empty `name` is ignored. Call again to switch.
+///
+/// ```
+/// icedtea::typo::bind_sans_family("Noto Sans");
+/// assert!(!icedtea::typo::sans_family().is_empty());
+/// ```
+pub fn bind_sans_family(name: impl AsRef<str>) {
+    let name = name.as_ref();
+    if name.is_empty() {
+        return;
+    }
+    let lock = font_system();
+    let mut system = lock.write().expect("font system");
+    system.raw().db_mut().set_sans_serif_family(name);
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FamilyKind {
     Ui,
@@ -342,6 +372,10 @@ mod tests {
         assert_eq!(FontFace::Ui.font(), UI);
         assert_eq!(FontFace::Mono.font(), MONO);
         let _ = UI_ITALIC;
+        bind_sans_family("");
+        assert!(!sans_family().is_empty());
+        bind_sans_family("Noto Sans");
+        assert_eq!(sans_family(), "Noto Sans");
     }
 
     #[test]

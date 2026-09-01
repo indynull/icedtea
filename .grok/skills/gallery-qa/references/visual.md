@@ -73,8 +73,8 @@ In the same change:
 | expand-motion | `book/src/images/chrome.png` | Peek face; open shows figure + body. RTL: Expand button on the start. Open body may name API ids (`iced::Animation`, `motion::expand`) — those are catalog, not leftover English |
 
 Look strip: theme pick and dark/light meta are one group; Language
-is a separate group with a wider gap so the two metas do not read
-as one word. Nav page names use the locale fill (`page.markdown`
+and Face (Noto Sans / System) are separate groups with a wider gap
+so the metas do not read as one word. Noto Sans is the family id. Nav page names use the locale fill (`page.markdown`
 is マークダウン / ماركداون / مارک ڈاؤن / מרקדאון, not leftover Latin
 on ja/ar/ur/he).
 

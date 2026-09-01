@@ -1,5 +1,7 @@
 //! Bootstrap: theme, locale, window settings for iced's application builder.
 
+use std::borrow::Cow;
+
 use iced::{Font, Pixels, Settings, Size};
 
 use crate::density::{Density, DensityName};
@@ -44,6 +46,8 @@ pub struct Boot {
     pub displays: Vec<DisplayBounds>,
     pub transparent: bool,
     pub decorations: Option<bool>,
+    /// Face bytes loaded at iced start. Empty unless [`Self::fonts`].
+    pub fonts: Vec<Cow<'static, [u8]>>,
 }
 
 impl Boot {
@@ -65,6 +69,7 @@ impl Boot {
             displays: Vec::new(),
             transparent: false,
             decorations: None,
+            fonts: Vec::new(),
         }
     }
 
@@ -153,6 +158,20 @@ impl Boot {
         self.decorations = Some(on);
         self
     }
+
+    /// Named faces for the iced font database (then [`crate::typo::bind_sans_family`]).
+    ///
+    /// icedtea does not ship a font file. The application owns these bytes.
+    ///
+    /// ```
+    /// use std::borrow::Cow;
+    /// let boot = icedtea::Boot::new("demo", "dev.demo").fonts([Cow::Borrowed(&b"\0"[..])]);
+    /// assert_eq!(icedtea::bootstrap(&boot).iced_settings.fonts.len(), 1);
+    /// ```
+    pub fn fonts(mut self, fonts: impl Into<Vec<Cow<'static, [u8]>>>) -> Self {
+        self.fonts = fonts.into();
+        self
+    }
 }
 
 /// Resolved boot data used by `run`.
@@ -190,7 +209,7 @@ pub fn bootstrap_with_catalog(boot: &Boot, themes: &ThemeCatalog) -> Prepared {
     let iced_theme = theme::iced_theme(&named.name, tokens);
     let iced_settings = Settings {
         id: Some(boot.application_id.clone()),
-        fonts: vec![],
+        fonts: boot.fonts.clone(),
         default_font: typo::UI,
         default_text_size: Pixels(tokens.body()),
         antialiasing: true,

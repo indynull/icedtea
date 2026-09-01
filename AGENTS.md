@@ -73,7 +73,8 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
 - User-facing text uses `typo::UI` (`Font::DEFAULT`, platform sans).
   Code uses `typo::MONO` (`Font::MONOSPACE`). Never bundle a font
   file. Apps that want a named family load it on the iced application
-  themselves. `run!` / `daemon!` call `typo::install_platform_faces`
+  themselves (`Boot::fonts`) and may call `typo::bind_sans_family`.
+  `run!` / `daemon!` call `typo::install_platform_faces`
   so those generics bind to installed faces (normal + bold for UI).
   Apps that start iced without those macros must call it before the
   first frame.

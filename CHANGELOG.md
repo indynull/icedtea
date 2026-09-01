@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Feature
+
+- `Boot::fonts` loads application face bytes into iced at start.
+- `typo::bind_sans_family` points `Font::DEFAULT` at a loaded family.
+  `typo::sans_family` reads the current SansSerif name.
+
 ### Bug fix
 
 - Resting elevation follows the Material component table: toolbar

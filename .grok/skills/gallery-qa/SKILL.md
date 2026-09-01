@@ -120,7 +120,7 @@ Shots land under `tmp/gallery-qa/<timestamp>/` (or `--out DIR`).
     **broken**. Do not score “constructors present” as clean.
 16. **Catalog fill is not leftover English.** Score the still’s
     must-show: vi may keep loanwords (`Markdown`, `Accordion`, `hover`);
-    colorway ids (`dark`) and icon slugs (`chevron`) stay ids. Do not
+    colorway ids (`dark`), the gallery face id (`Noto Sans`), and icon slugs (`chevron`) stay ids. Do not
     park those as residual and do not invent translations for them.
     Leftover Latin is broken only where the still names it (`Markdown`
     on ja/zh/ar/ur/he, `Enter` / `Contain, cover`, raw key `ok`,
