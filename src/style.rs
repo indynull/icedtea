@@ -38,7 +38,7 @@ pub fn fill(bg: Color, fg: Color) -> container::Style {
     }
 }
 
-/// M3 filled / elevated card (surface container; desktop Component radius).
+/// M3 filled card (Level 0). Outline marks the edge; no drop.
 pub fn card(tok: Tokens, focus: bool) -> container::Style {
     let s = tok.scheme();
     container::Style {
@@ -49,7 +49,7 @@ pub fn card(tok: Tokens, focus: bool) -> container::Style {
             width: if focus { 2.0 } else { 1.0 },
             radius: component_radius(tok, Component::Card),
         },
-        shadow: tok.shadow(Elevation::Level1),
+        shadow: tok.shadow(Elevation::Level0),
         snap: false,
     }
 }
@@ -70,18 +70,34 @@ pub fn outlined_card(tok: Tokens) -> container::Style {
     }
 }
 
-/// M3 elevated card (level 2 surface + shadow).
+/// M3 elevated card (Level 1 surface + drop).
 pub fn raised_card(tok: Tokens) -> container::Style {
     let s = tok.scheme();
     container::Style {
-        background: Some(Background::Color(Elevation::Level2.surface(s))),
+        background: Some(Background::Color(Elevation::Level1.surface(s))),
         text_color: Some(s.on_surface),
         border: Border {
             color: s.outline_variant,
             width: 0.0,
             radius: component_radius(tok, Component::Card),
         },
-        shadow: tok.shadow(Elevation::Level2),
+        shadow: tok.shadow(Component::Card.elevation()),
+        snap: false,
+    }
+}
+
+/// M3 menu / overlay sheet (Level 2).
+pub fn menu_sheet(tok: Tokens) -> container::Style {
+    let s = tok.scheme();
+    container::Style {
+        background: Some(Background::Color(Elevation::Level2.surface(s))),
+        text_color: Some(s.on_surface),
+        border: Border {
+            color: s.outline_variant,
+            width: 1.0,
+            radius: component_radius(tok, Component::Menu),
+        },
+        shadow: tok.shadow(Component::Menu.elevation()),
         snap: false,
     }
 }
@@ -209,17 +225,19 @@ pub fn table_cell(tok: Tokens, selected: bool, focused: bool, zebra: bool) -> co
     st
 }
 
-/// Page banner: callout wash, banner family corners (flush under Material).
+/// Page banner: callout wash, Level 1 drop, banner family corners.
 pub fn banner(tok: Tokens) -> container::Style {
     let mut st = callout(tok, crate::toast::ToastKind::Info);
     st.border.radius = component_radius(tok, Component::Banner);
+    st.shadow = tok.shadow(Component::Banner.elevation());
     st
 }
 
-/// Hover tip (M3 tooltip): raised card fill, tooltip family corners.
+/// Hover tip (M3 rich tooltip): Level 2 surface + drop.
 pub fn tooltip(tok: Tokens) -> container::Style {
-    let mut st = raised_card(tok);
+    let mut st = menu_sheet(tok);
     st.border.radius = component_radius(tok, Component::Tooltip);
+    st.shadow = tok.shadow(Component::Tooltip.elevation());
     st
 }
 
@@ -252,6 +270,13 @@ pub fn callout(tok: Tokens, kind: crate::toast::ToastKind) -> container::Style {
     }
 }
 
+/// Snackbar: callout wash plus Level 3 drop. Inline [`callout`] stays flat.
+pub fn toast_face(tok: Tokens, kind: crate::toast::ToastKind) -> container::Style {
+    let mut st = callout(tok, kind);
+    st.shadow = tok.shadow(Component::Toast.elevation());
+    st
+}
+
 pub fn skeleton(tok: Tokens) -> container::Style {
     let s = tok.scheme();
     fill(s.surface_container_highest, s.on_surface_variant)
@@ -276,6 +301,15 @@ fn button_border(tok: Tokens, comp: Component) -> Border {
     }
 }
 
+/// Material: filled / tonal / outlined / elevated raise one level on hover.
+fn button_state_shadow(tok: Tokens, rest: Elevation, state: ControlState) -> Shadow {
+    let level = match state {
+        ControlState::Hovered | ControlState::Pressed | ControlState::Focused => rest.raise(),
+        _ => rest,
+    };
+    tok.shadow(level)
+}
+
 /// Map icedtea [`Variant`] onto M3 button color styles.
 ///
 /// - Primary → filled
@@ -295,7 +329,12 @@ fn button_face(
     match variant {
         Variant::Primary => {
             let (bg, fg) = face(s.primary, s.on_primary, surface, state);
-            (bg, fg, pill, Shadow::default())
+            (
+                bg,
+                fg,
+                pill,
+                button_state_shadow(tok, Component::Button.elevation(), state),
+            )
         }
         Variant::Quiet => {
             let (bg, fg) = face(
@@ -304,7 +343,12 @@ fn button_face(
                 surface,
                 state,
             );
-            (bg, fg, pill, Shadow::default())
+            (
+                bg,
+                fg,
+                pill,
+                button_state_shadow(tok, Component::Button.elevation(), state),
+            )
         }
         Variant::Ghost => {
             let (bg, fg) = match state {
@@ -328,20 +372,35 @@ fn button_face(
                 bg,
                 fg,
                 button_border(tok, Component::Chip),
-                Shadow::default(),
+                button_state_shadow(tok, Component::Chip.elevation(), state),
             )
         }
         Variant::Danger => {
             let (bg, fg) = face(s.error, s.on_error, surface, state);
-            (bg, fg, pill, Shadow::default())
+            (
+                bg,
+                fg,
+                pill,
+                button_state_shadow(tok, Component::Button.elevation(), state),
+            )
         }
         Variant::Success => {
             let (bg, fg) = face(s.success, s.on_success, surface, state);
-            (bg, fg, pill, Shadow::default())
+            (
+                bg,
+                fg,
+                pill,
+                button_state_shadow(tok, Component::Button.elevation(), state),
+            )
         }
         Variant::Warning => {
             let (bg, fg) = face(s.warning, s.on_warning, surface, state);
-            (bg, fg, pill, Shadow::default())
+            (
+                bg,
+                fg,
+                pill,
+                button_state_shadow(tok, Component::Button.elevation(), state),
+            )
         }
         Variant::Outlined => {
             let (bg, fg) = match state {
@@ -364,21 +423,17 @@ fn button_face(
                     width: 1.0,
                     radius: pill.radius,
                 },
-                Shadow::default(),
+                button_state_shadow(tok, Component::Button.elevation(), state),
             )
         }
         Variant::Elevated => {
             let (bg, fg) = face(s.surface_container_high, s.primary, surface, state);
-            let level = crate::m3::Elevation::Level1;
-            let level = if matches!(
-                state,
-                ControlState::Hovered | ControlState::Pressed | ControlState::Focused
-            ) {
-                level.raise()
-            } else {
-                level
-            };
-            (bg, fg, pill, tok.shadow(level))
+            (
+                bg,
+                fg,
+                pill,
+                button_state_shadow(tok, Elevation::Level1, state),
+            )
         }
     }
 }
@@ -494,13 +549,13 @@ pub fn segment_style(
         } else {
             Variant::Quiet
         };
-        let (bg, fg, mut border, shadow) = button_face(tok, variant, button_status(status));
+        let (bg, fg, mut border, _) = button_face(tok, variant, button_status(status));
         border.radius = component_radius(tok, Component::Segment);
         button::Style {
             background: Some(Background::Color(bg)),
             text_color: fg,
             border,
-            shadow,
+            shadow: Shadow::default(),
             snap: false,
         }
     }
@@ -513,13 +568,13 @@ pub fn joined_button_style(
     variant: Variant,
 ) -> impl Fn(&iced::Theme, button::Status) -> button::Style {
     move |_theme, status| {
-        let (bg, fg, mut border, shadow) = button_face(tok, variant, button_status(status));
+        let (bg, fg, mut border, _) = button_face(tok, variant, button_status(status));
         border.radius = component_radius(tok, Component::Segment);
         button::Style {
             background: Some(Background::Color(bg)),
             text_color: fg,
             border,
-            shadow,
+            shadow: Shadow::default(),
             snap: false,
         }
     }
@@ -546,9 +601,25 @@ pub fn dialog_sheet_face(tok: Tokens) -> container::Style {
             width: 0.0,
             radius: component_radius(tok, Component::Dialog),
         },
-        shadow: tok.shadow(Elevation::Level3),
+        shadow: tok.shadow(Component::Dialog.elevation()),
         snap: false,
     }
+}
+
+/// Modal side sheet: Level 1 (docked sheets stay on the caller).
+pub fn side_sheet_face(tok: Tokens) -> container::Style {
+    let s = tok.scheme();
+    let mut st = dialog_sheet_face(tok);
+    st.background = Some(Background::Color(Elevation::Level1.surface(s)));
+    st.shadow = tok.shadow(Elevation::Level1);
+    st
+}
+
+/// M3 toolbar (Level 2). Unscrolled app bar is [`app_bar`].
+pub fn toolbar(tok: Tokens) -> container::Style {
+    let mut st = app_bar(tok);
+    st.shadow = tok.shadow(Elevation::Level2);
+    st
 }
 
 /// M3 top app bar / menu strip: surface container.
@@ -562,7 +633,7 @@ pub fn app_bar(tok: Tokens) -> container::Style {
             width: 0.0,
             radius: component_radius(tok, Component::AppBar),
         },
-        shadow: tok.shadow(Elevation::Level0),
+        shadow: tok.shadow(Component::AppBar.elevation()),
         snap: false,
     }
 }
@@ -707,7 +778,7 @@ pub fn overlay_menu_style(tok: Tokens) -> impl Fn(&iced::Theme) -> overlay_menu:
             text_color: s.on_surface,
             selected_text_color: s.on_secondary_container,
             selected_background: Background::Color(s.secondary_container),
-            shadow: tok.shadow(Elevation::Level2),
+            shadow: tok.shadow(Component::Menu.elevation()),
         }
     }
 }
@@ -1028,6 +1099,75 @@ mod tests {
         );
         assert!(hover.shadow.blur_radius > rest.shadow.blur_radius);
         assert!(rest.shadow.blur_radius > 0.0);
+    }
+
+    #[test]
+    fn resting_elevation_matches_material_table() {
+        use crate::m3::shape::Component;
+        use crate::m3::Elevation;
+        let tok = named("dark").tokens;
+        let theme = crate::theme::iced_theme("dark", tok);
+        assert_eq!(card(tok, false).shadow.blur_radius, 0.0);
+        assert_eq!(
+            raised_card(tok).shadow.blur_radius,
+            tok.shadow(Component::Card.elevation()).blur_radius
+        );
+        assert_eq!(
+            menu_sheet(tok).shadow.blur_radius,
+            tok.shadow(Component::Menu.elevation()).blur_radius
+        );
+        assert_eq!(
+            banner(tok).shadow.blur_radius,
+            tok.shadow(Component::Banner.elevation()).blur_radius
+        );
+        assert_eq!(
+            tooltip(tok).shadow.blur_radius,
+            tok.shadow(Component::Tooltip.elevation()).blur_radius
+        );
+        assert_eq!(
+            dialog_sheet_face(tok).shadow.blur_radius,
+            tok.shadow(Component::Dialog.elevation()).blur_radius
+        );
+        assert_eq!(
+            side_sheet_face(tok).shadow.blur_radius,
+            tok.shadow(Elevation::Level1).blur_radius
+        );
+        assert_eq!(
+            toolbar(tok).shadow.blur_radius,
+            tok.shadow(Elevation::Level2).blur_radius
+        );
+        assert_eq!(app_bar(tok).shadow.blur_radius, 0.0);
+        assert_eq!(
+            toast_face(tok, crate::toast::ToastKind::Info)
+                .shadow
+                .blur_radius,
+            tok.shadow(Component::Toast.elevation()).blur_radius
+        );
+        assert_eq!(
+            callout(tok, crate::toast::ToastKind::Info)
+                .shadow
+                .blur_radius,
+            0.0
+        );
+        let primary = button_style(tok, Variant::Primary);
+        assert_eq!(
+            primary(&theme, button::Status::Active).shadow.blur_radius,
+            0.0
+        );
+        assert_eq!(
+            primary(&theme, button::Status::Hovered).shadow.blur_radius,
+            tok.shadow(Elevation::Level1).blur_radius
+        );
+        let ghost = button_style(tok, Variant::Ghost);
+        assert_eq!(
+            ghost(&theme, button::Status::Hovered).shadow.blur_radius,
+            0.0
+        );
+        let segment = segment_style(tok, true);
+        assert_eq!(
+            segment(&theme, button::Status::Hovered).shadow.blur_radius,
+            0.0
+        );
     }
 
     #[test]

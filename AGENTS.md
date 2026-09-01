@@ -64,7 +64,12 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   0 dp). `UiState::look` and `Boot` apply the same fields. High-contrast
   and community colorways remain; apps may register more that implement
   the same roles. See `m3::mapping` for catalog inventory.
-  `theme::mix` builds washes.
+  `theme::mix` builds washes. Resting drop comes from
+  `Component::elevation()` (snapshot `styles/elevation`). Elevated
+  faces (button, card, chip) are Level 1 on that constructor. Search
+  is Level 0. Never a hardcoded shadow that disagrees with that
+  table. `style::tests::resting_elevation_matches_material_table`
+  is the check.
 - User-facing text uses `typo::UI` (`Font::DEFAULT`, platform sans).
   Code uses `typo::MONO` (`Font::MONOSPACE`). Never bundle a font
   file. Apps that want a named family load it on the iced application

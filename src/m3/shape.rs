@@ -196,14 +196,18 @@ impl Component {
         self.shape_for(policy).radius()
     }
 
-    /// Material resting elevation (snapshot component table).
+    /// Material resting elevation (snapshot `styles/elevation`).
+    ///
+    /// Search is Level 0: the current Search page dropped the old
+    /// 6 dp island and paints no shadow. Toast (snackbar) is Level 3.
+    /// Elevated *faces* (elevated button, elevated card, elevated chip)
+    /// are Level 1 on the constructor, not this family rest.
     pub fn elevation(self) -> crate::m3::Elevation {
         use crate::m3::Elevation;
         match self {
-            Self::Dialog | Self::Search => Elevation::Level3,
+            Self::Dialog | Self::Toast => Elevation::Level3,
             Self::Menu | Self::Tooltip => Elevation::Level2,
-            Self::Card => Elevation::Level1,
-            Self::Banner => Elevation::Level1,
+            Self::Card | Self::Banner => Elevation::Level1,
             _ => Elevation::Level0,
         }
     }
@@ -389,12 +393,14 @@ mod tests {
             Shape::Full
         );
         assert_eq!(Component::Dialog.elevation(), crate::m3::Elevation::Level3);
-        assert_eq!(Component::Search.elevation(), crate::m3::Elevation::Level3);
+        assert_eq!(Component::Toast.elevation(), crate::m3::Elevation::Level3);
+        assert_eq!(Component::Search.elevation(), crate::m3::Elevation::Level0);
         assert_eq!(Component::Menu.elevation(), crate::m3::Elevation::Level2);
         assert_eq!(Component::Tooltip.elevation(), crate::m3::Elevation::Level2);
         assert_eq!(Component::Card.elevation(), crate::m3::Elevation::Level1);
         assert_eq!(Component::Banner.elevation(), crate::m3::Elevation::Level1);
         assert_eq!(Component::Button.elevation(), crate::m3::Elevation::Level0);
+        assert_eq!(Component::Chip.elevation(), crate::m3::Elevation::Level0);
         assert_eq!(Component::Field.elevation(), crate::m3::Elevation::Level0);
         assert_eq!(Component::AppBar.elevation(), crate::m3::Elevation::Level0);
         assert_eq!(

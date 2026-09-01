@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Bug fix
+
+- Resting elevation follows the Material component table: toolbar
+  Level 2, toast Level 3, banner Level 1, elevated card Level 1,
+  modal side sheet Level 1. Filled cards, search, and list rows sit
+  at Level 0. Filled, tonal, and outlined buttons raise one level
+  on hover. Elevated chips paint a Level 1 drop.
+
 ## 0.15.0 — 2026-08-31
 
 ### Feature
