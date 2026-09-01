@@ -744,6 +744,30 @@ where
                     }
                 }
             }
+            Event::Keyboard(kev) if !shell.is_event_captured() => {
+                if let Some(press) = crate::key::press(kev) {
+                    let page = view_h.max(1.0);
+                    let next = match press {
+                        crate::key::Press::ArrowDown | crate::key::Press::ArrowRight => {
+                            (state.scroll + 24.0).min(max_scroll)
+                        }
+                        crate::key::Press::ArrowUp | crate::key::Press::ArrowLeft => {
+                            (state.scroll - 24.0).max(0.0)
+                        }
+                        crate::key::Press::PageDown => (state.scroll + page).min(max_scroll),
+                        crate::key::Press::PageUp => (state.scroll - page).max(0.0),
+                        crate::key::Press::Home => 0.0,
+                        crate::key::Press::End => max_scroll,
+                        _ => state.scroll,
+                    };
+                    if (next - state.scroll).abs() > f32::EPSILON {
+                        state.scroll = next;
+                        state.pinned_end = self.stick && (max_scroll - next) < 1.0;
+                        moved = true;
+                        shell.capture_event();
+                    }
+                }
+            }
             _ => {}
         }
 

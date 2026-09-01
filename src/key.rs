@@ -89,7 +89,7 @@ pub enum WhileInput {
     /// Only chords with control, alt, or logo (default).
     #[default]
     ChordsOnly,
-    /// Chords plus Escape, Enter, and F1–F24 without modifiers.
+    /// Chords plus Escape, Enter, Tab, and F1–F24 without modifiers.
     Chrome,
 }
 
@@ -148,6 +148,7 @@ fn passes_while_input(while_input: WhileInput, key: &iced::keyboard::Key, chord:
                     n,
                     Named::Enter
                         | Named::Escape
+                        | Named::Tab
                         | Named::F1
                         | Named::F2
                         | Named::F3
@@ -596,7 +597,7 @@ mod tests {
             Action::new("focus.next", "Next", 6u8).with_shortcut(Shortcut::parse("tab").unwrap()),
         );
         let tab = press(Key::Named(Named::Tab), Modifiers::empty());
-        assert_eq!(handle(chrome, &table, &tab), None);
+        assert_eq!(handle(chrome, &table, &tab), Some(6));
     }
 
     #[test]

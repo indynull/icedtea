@@ -50,8 +50,10 @@
 //!
 //! # Keys
 //!
-//! Subscribe with [`key::listen`]. [`key::handle`] matches the table
-//! after an open modal and after focused text:
+//! [`run!`] subscribes [`key::listen`]. Implement
+//! `From<keyboard::Event>` on the application message. Wrap `view`
+//! with [`focus::cycle`]. [`key::handle`] matches the table after an
+//! open modal and after focused text:
 //!
 //! ```
 //! use icedtea::action::{Action, ActionTable};
@@ -245,12 +247,12 @@ pub use iced::{self, Element, Task};
 /// ```
 #[macro_export]
 macro_rules! run {
-    ($boot:expr, $new:expr, $update:expr, $view:expr, $theme:expr) => {
+    ($boot:expr, $new:expr, $update:expr, $view:expr, $theme:expr $(,)?) => {
         $crate::run!($boot, $new, $update, $view, $theme, |_| {
             $crate::iced::Subscription::none()
         })
     };
-    ($boot:expr, $new:expr, $update:expr, $view:expr, $theme:expr, $sub:expr) => {{
+    ($boot:expr, $new:expr, $update:expr, $view:expr, $theme:expr, $sub:expr $(,)?) => {{
         let __prep = $crate::bootstrap(&$boot);
         let __title = __prep.title.clone();
         let __direction = __prep.direction();
@@ -262,7 +264,12 @@ macro_rules! run {
         $crate::iced::application($new, $update, $view)
             .title($crate::app::WindowTitle(__title))
             .theme($theme)
-            .subscription($sub)
+            .subscription(move |__state| {
+                $crate::iced::Subscription::batch([
+                    $crate::key::listen().map($crate::iced::keyboard::Event::into),
+                    ($sub)(__state),
+                ])
+            })
             .settings(__prep.iced_settings)
             .window(__prep.window)
             .default_font($crate::typo::UI)
@@ -288,12 +295,12 @@ macro_rules! run {
 /// ```
 #[macro_export]
 macro_rules! daemon {
-    ($boot:expr, $new:expr, $update:expr, $view:expr, $theme:expr) => {
+    ($boot:expr, $new:expr, $update:expr, $view:expr, $theme:expr $(,)?) => {
         $crate::daemon!($boot, $new, $update, $view, $theme, |_| {
             $crate::iced::Subscription::none()
         })
     };
-    ($boot:expr, $new:expr, $update:expr, $view:expr, $theme:expr, $sub:expr) => {{
+    ($boot:expr, $new:expr, $update:expr, $view:expr, $theme:expr, $sub:expr $(,)?) => {{
         let __prep = $crate::bootstrap(&$boot);
         let __title = __prep.title.clone();
         let __direction = __prep.direction();
@@ -305,7 +312,12 @@ macro_rules! daemon {
         $crate::iced::daemon($new, $update, $view)
             .title($crate::app::WindowTitle(__title))
             .theme($theme)
-            .subscription($sub)
+            .subscription(move |__state| {
+                $crate::iced::Subscription::batch([
+                    $crate::key::listen().map($crate::iced::keyboard::Event::into),
+                    ($sub)(__state),
+                ])
+            })
             .settings(__prep.iced_settings)
             .default_font($crate::typo::UI)
             .run()

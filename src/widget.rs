@@ -2873,6 +2873,7 @@ pub fn search_input<'a, M: Clone + 'a>(
         .padding(pad(tok))
         .size(tok.body())
         .align_x(crate::i18n::align_x_start(tok.direction));
+    let mount_id = input_id.clone();
     if let Some(id) = input_id {
         i = i.id(id);
     }
@@ -2907,7 +2908,11 @@ pub fn search_input<'a, M: Clone + 'a>(
     for kid in crate::i18n::order(tok.direction, kids) {
         r = r.push(kid);
     }
-    a11y::attach(r.into(), &a11y)
+    let el = a11y::attach(r.into(), &a11y);
+    match mount_id {
+        Some(id) => crate::focus::cycle(el, Some(id)),
+        None => el,
+    }
 }
 
 fn field_runs_hide_value(value: &str, runs: &[FieldRun]) -> bool {
@@ -3575,19 +3580,7 @@ pub fn form_group<'a, M: Clone + 'a>(
 }
 
 fn form_active_frame(tok: Tokens, active: bool) -> iced::widget::container::Style {
-    let s = tok.scheme();
-    iced::widget::container::Style {
-        border: iced::Border {
-            color: if active {
-                s.primary
-            } else {
-                Color::TRANSPARENT
-            },
-            width: if active { 2.0 } else { 0.0 },
-            radius: tok.radius(crate::m3::shape::Component::Field),
-        },
-        ..iced::widget::container::Style::default()
-    }
+    crate::focus::ring(tok, active)
 }
 
 struct FormGroup<'a, Message> {
@@ -5464,12 +5457,16 @@ pub fn scroll<'a, M, F>(
     on_scroll: Option<F>,
 ) -> Element<'a, M>
 where
-    M: 'a,
+    M: Clone + 'a,
     F: Fn(f32) -> M + 'a,
 {
     let boxed = on_scroll.map(|f| Box::new(f) as Box<dyn Fn(f32) -> M + 'a>);
     a11y::attach(
-        ThemedScroll::new(child, tok, stick, scroll_id, boxed).into(),
+        crate::focus::target(
+            ThemedScroll::new(child, tok, stick, scroll_id, boxed).into(),
+            tok,
+            !a11y.disabled,
+        ),
         &a11y,
     )
 }
@@ -6432,23 +6429,27 @@ pub fn virtual_column<'a, M: Clone + 'a>(
     let len = heights.len();
     let prev = window;
     a11y::attach(
-        virtual_clip(
-            prev,
-            RowHeights::PerRow(heights),
-            len,
-            overscan,
-            cover,
-            on_scroll,
-            scroll_id,
+        crate::focus::target(
+            virtual_clip(
+                prev,
+                RowHeights::PerRow(heights),
+                len,
+                overscan,
+                cover,
+                on_scroll,
+                scroll_id,
+                tok,
+                move |win| {
+                    let mut col = Column::new();
+                    for i in win.range() {
+                        let h = heights.get(i).copied().unwrap_or(0.0);
+                        col = col.push(container(row(i)).width(Length::Fill).height(h).clip(true));
+                    }
+                    col
+                },
+            ),
             tok,
-            move |win| {
-                let mut col = Column::new();
-                for i in win.range() {
-                    let h = heights.get(i).copied().unwrap_or(0.0);
-                    col = col.push(container(row(i)).width(Length::Fill).height(h).clip(true));
-                }
-                col
-            },
+            !heights.is_empty(),
         ),
         &a11y,
     )
@@ -6838,98 +6839,130 @@ where
     let len = model.len();
     let prev = window;
     let disabled = a11y.disabled;
+    let row = heights.at(0).max(1.0);
+    let page = (window.viewport / row).max(1.0) as usize;
+    let primary = selection.primary().unwrap_or(0);
     a11y::attach(
-        virtual_clip(
-            prev,
-            heights,
-            len,
-            overscan,
-            cover,
-            on_scroll,
-            scroll_id,
-            tok,
-            move |win| {
-                let gap = match face {
-                    RowFace::Flush => 0.0,
-                    RowFace::Card { .. } => 2.0,
-                };
-                let mut col = Column::new().spacing(gap);
-                if model.is_empty() {
-                    col = col.push(meta(empty, tok, A11y::new(empty, Role::Status)));
-                } else {
-                    for i in win.range() {
-                        let h = heights.at(i);
-                        if model.is_separator(i) {
-                            col = col.push(
-                                container(rule_h(tok, A11y::new("sep", Role::Separator)))
-                                    .width(Length::Fill)
-                                    .height(h)
-                                    .center_y(h),
-                            );
-                            continue;
-                        }
-                        let selected = selection.contains(i);
-                        let title = model.title(i);
-                        let meta_s = model.meta(i);
-                        let name = title.to_string();
-                        let painted = match face {
-                            RowFace::Flush => {
-                                two_line_row(title, meta_s, meta_color(i), selected, h, tok)
+        crate::focus::target_keys(
+            virtual_clip(
+                prev,
+                heights,
+                len,
+                overscan,
+                cover,
+                on_scroll,
+                scroll_id,
+                tok,
+                move |win| {
+                    let gap = match face {
+                        RowFace::Flush => 0.0,
+                        RowFace::Card { .. } => 2.0,
+                    };
+                    let mut col = Column::new().spacing(gap);
+                    if model.is_empty() {
+                        col = col.push(meta(empty, tok, A11y::new(empty, Role::Status)));
+                    } else {
+                        for i in win.range() {
+                            let h = heights.at(i);
+                            if model.is_separator(i) {
+                                col = col.push(
+                                    container(rule_h(tok, A11y::new("sep", Role::Separator)))
+                                        .width(Length::Fill)
+                                        .height(h)
+                                        .center_y(h),
+                                );
+                                continue;
                             }
-                            RowFace::Card { meter } => card_row(
-                                title,
-                                meta_s,
-                                meta_color(i),
-                                selected,
-                                h,
-                                meter.map(|m| m(i)),
-                                tok,
-                            ),
-                        };
-                        let body: Element<'a, M> = if disabled {
-                            painted
-                        } else {
-                            item_press(painted, move |button, modifiers| {
-                                on_select(ItemClick {
-                                    id: i,
-                                    button,
-                                    modifiers,
+                            let selected = selection.contains(i);
+                            let title = model.title(i);
+                            let meta_s = model.meta(i);
+                            let name = title.to_string();
+                            let painted = match face {
+                                RowFace::Flush => {
+                                    two_line_row(title, meta_s, meta_color(i), selected, h, tok)
+                                }
+                                RowFace::Card { meter } => card_row(
+                                    title,
+                                    meta_s,
+                                    meta_color(i),
+                                    selected,
+                                    h,
+                                    meter.map(|m| m(i)),
+                                    tok,
+                                ),
+                            };
+                            let body: Element<'a, M> = if disabled {
+                                painted
+                            } else {
+                                item_press(painted, move |button, modifiers| {
+                                    on_select(ItemClick {
+                                        id: i,
+                                        button,
+                                        modifiers,
+                                    })
                                 })
-                            })
-                        };
-                        let mut line = Row::new()
-                            .spacing(4)
-                            .align_y(Alignment::Center)
-                            .width(Length::Fill);
-                        for kid in crate::i18n::order(
-                            tok.direction,
-                            [
-                                row_slot_el(model.leading(i), i, on_check, tok, disabled),
-                                body,
-                                row_slot_el(model.trailing(i), i, on_check, tok, disabled),
-                            ],
-                        ) {
-                            line = line.push(kid);
+                            };
+                            let mut line = Row::new()
+                                .spacing(4)
+                                .align_y(Alignment::Center)
+                                .width(Length::Fill);
+                            for kid in crate::i18n::order(
+                                tok.direction,
+                                [
+                                    row_slot_el(model.leading(i), i, on_check, tok, disabled),
+                                    body,
+                                    row_slot_el(model.trailing(i), i, on_check, tok, disabled),
+                                ],
+                            ) {
+                                line = line.push(kid);
+                            }
+                            let indent = model.indent(i).max(0.0);
+                            let (pad_l, pad_r) =
+                                crate::i18n::inline_pad(tok.direction, indent, 0.0);
+                            let row: Element<'a, M> = container(line)
+                                .padding(Padding {
+                                    top: 0.0,
+                                    right: pad_r,
+                                    bottom: 0.0,
+                                    left: pad_l,
+                                })
+                                .into();
+                            col = col.push(a11y::attach(
+                                row,
+                                &A11y::new(name, Role::ListItem)
+                                    .with_checked(selected)
+                                    .with_disabled(disabled),
+                            ));
                         }
-                        let indent = model.indent(i).max(0.0);
-                        let (pad_l, pad_r) = crate::i18n::inline_pad(tok.direction, indent, 0.0);
-                        let row: Element<'a, M> = container(line)
-                            .padding(Padding {
-                                top: 0.0,
-                                right: pad_r,
-                                bottom: 0.0,
-                                left: pad_l,
-                            })
-                            .into();
-                        col = col.push(a11y::attach(
-                            row,
-                            &A11y::new(name, Role::ListItem)
-                                .with_checked(selected)
-                                .with_disabled(disabled),
-                        ));
                     }
+                    col
+                },
+            ),
+            tok,
+            !disabled && len > 0,
+            move |press| {
+                use crate::key::Press;
+                match press {
+                    Press::Enter => Some(on_select(ItemClick {
+                        id: primary,
+                        button: ItemButton::Primary,
+                        modifiers: keyboard::Modifiers::empty(),
+                    })),
+                    Press::Character(ref s) if s == " " => Some(on_check(primary)),
+                    Press::ArrowUp
+                    | Press::ArrowDown
+                    | Press::ArrowLeft
+                    | Press::ArrowRight
+                    | Press::PageUp
+                    | Press::PageDown
+                    | Press::Home
+                    | Press::End => Some(on_select(ItemClick {
+                        id: press.step_index(primary, len, page),
+                        button: ItemButton::Primary,
+                        modifiers: keyboard::Modifiers::empty(),
+                    })),
+                    _ => None,
                 }
-                col
             },
         ),
         &a11y,
@@ -7016,7 +7049,10 @@ pub fn item_grid<'a, M: Clone + 'a>(
         }
         rows = rows.push(r);
     }
-    a11y::attach(rows.into(), &a11y)
+    a11y::attach(
+        crate::focus::target(rows.into(), tok, !a11y.disabled && !labels.is_empty()),
+        &a11y,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -7181,110 +7217,114 @@ where
         header = header.push(kid);
     }
     a11y::attach(
-        column![
-            header,
-            virtual_clip(
-                prev,
-                RowHeights::Uniform(h),
-                n,
-                overscan,
-                cover,
-                on_scroll,
-                scroll_id,
-                tok,
-                move |win| {
-                    let mut body = Column::new().spacing(0);
-                    for i in win.range() {
-                        let selected = selection.contains(i);
-                        let stripe = zebra && i % 2 == 1;
-                        let paint_cell = |line: Row<'a, M>, c: usize| {
-                            let focused = cursor == Some((i, c));
-                            let value = model.cell(i, c).to_string();
-                            let w = col_w(c);
-                            let cell_style = style::table_cell(tok, selected, focused, stripe);
-                            let ink = cell_style.text_color.unwrap_or(tok.scheme().on_surface);
-                            let face = container(start_label(
-                                value.clone(),
-                                tok.body(),
-                                ink,
-                                typo::UI,
-                                iced::widget::text::Wrapping::None,
-                                tok.direction,
-                            ))
-                            .width(w)
-                            .height(h)
-                            .padding([gap(tok), gap(tok)])
-                            .style(move |_| cell_style);
-                            let cell: Element<'a, M> = if disabled {
-                                face.into()
-                            } else {
-                                item_press(face.into(), move |button, modifiers| {
-                                    on_cell(
-                                        ItemClick {
-                                            id: i,
-                                            button,
-                                            modifiers,
-                                        },
-                                        c,
-                                    )
-                                })
-                            };
-                            line.push(a11y::attach(
-                                cell,
-                                &A11y::new(format!("{i}:{c}"), Role::ListItem)
-                                    .with_value(value)
-                                    .with_checked(focused || selected)
-                                    .with_disabled(disabled),
-                            ))
-                        };
-                        let mut pin_line = Row::new().spacing(0);
-                        if show_checks {
-                            let on = model.row_checked(i).unwrap_or(false);
-                            pin_line = pin_line.push(
-                                container(row_slot_el(
-                                    crate::collection::RowSlot::Check(on),
-                                    i,
-                                    on_check,
-                                    tok,
-                                    disabled,
+        crate::focus::target(
+            column![
+                header,
+                virtual_clip(
+                    prev,
+                    RowHeights::Uniform(h),
+                    n,
+                    overscan,
+                    cover,
+                    on_scroll,
+                    scroll_id,
+                    tok,
+                    move |win| {
+                        let mut body = Column::new().spacing(0);
+                        for i in win.range() {
+                            let selected = selection.contains(i);
+                            let stripe = zebra && i % 2 == 1;
+                            let paint_cell = |line: Row<'a, M>, c: usize| {
+                                let focused = cursor == Some((i, c));
+                                let value = model.cell(i, c).to_string();
+                                let w = col_w(c);
+                                let cell_style = style::table_cell(tok, selected, focused, stripe);
+                                let ink = cell_style.text_color.unwrap_or(tok.scheme().on_surface);
+                                let face = container(start_label(
+                                    value.clone(),
+                                    tok.body(),
+                                    ink,
+                                    typo::UI,
+                                    iced::widget::text::Wrapping::None,
+                                    tok.direction,
                                 ))
-                                .width(36)
-                                .center_x(36)
-                                .center_y(h),
-                            );
+                                .width(w)
+                                .height(h)
+                                .padding([gap(tok), gap(tok)])
+                                .style(move |_| cell_style);
+                                let cell: Element<'a, M> = if disabled {
+                                    face.into()
+                                } else {
+                                    item_press(face.into(), move |button, modifiers| {
+                                        on_cell(
+                                            ItemClick {
+                                                id: i,
+                                                button,
+                                                modifiers,
+                                            },
+                                            c,
+                                        )
+                                    })
+                                };
+                                line.push(a11y::attach(
+                                    cell,
+                                    &A11y::new(format!("{i}:{c}"), Role::ListItem)
+                                        .with_value(value)
+                                        .with_checked(focused || selected)
+                                        .with_disabled(disabled),
+                                ))
+                            };
+                            let mut pin_line = Row::new().spacing(0);
+                            if show_checks {
+                                let on = model.row_checked(i).unwrap_or(false);
+                                pin_line = pin_line.push(
+                                    container(row_slot_el(
+                                        crate::collection::RowSlot::Check(on),
+                                        i,
+                                        on_check,
+                                        tok,
+                                        disabled,
+                                    ))
+                                    .width(36)
+                                    .center_x(36)
+                                    .center_y(h),
+                                );
+                            }
+                            for c in &pin {
+                                pin_line = paint_cell(pin_line, *c);
+                            }
+                            let mut rest_line = Row::new().spacing(0);
+                            for c in &rest {
+                                rest_line = paint_cell(rest_line, *c);
+                            }
+                            let rest_line = container(rest_line)
+                                .width(Length::Fill)
+                                .padding(Padding {
+                                    top: 0.0,
+                                    right: h_pad_r,
+                                    bottom: 0.0,
+                                    left: h_pad_l,
+                                })
+                                .clip(true);
+                            let pin_line: Element<'a, M> = pin_line.into();
+                            let rest_line: Element<'a, M> = rest_line.into();
+                            let mut line = Row::new().width(crate::layout::FILL);
+                            for kid in crate::i18n::order(tok.direction, [pin_line, rest_line]) {
+                                line = line.push(kid);
+                            }
+                            body = body.push(line);
                         }
-                        for c in &pin {
-                            pin_line = paint_cell(pin_line, *c);
-                        }
-                        let mut rest_line = Row::new().spacing(0);
-                        for c in &rest {
-                            rest_line = paint_cell(rest_line, *c);
-                        }
-                        let rest_line = container(rest_line)
-                            .width(Length::Fill)
-                            .padding(Padding {
-                                top: 0.0,
-                                right: h_pad_r,
-                                bottom: 0.0,
-                                left: h_pad_l,
-                            })
-                            .clip(true);
-                        let pin_line: Element<'a, M> = pin_line.into();
-                        let rest_line: Element<'a, M> = rest_line.into();
-                        let mut line = Row::new().width(crate::layout::FILL);
-                        for kid in crate::i18n::order(tok.direction, [pin_line, rest_line]) {
-                            line = line.push(kid);
-                        }
-                        body = body.push(line);
-                    }
-                    body
-                },
-            )
-        ]
-        .spacing(4)
-        .width(crate::layout::FILL)
-        .height(crate::layout::FILL)
-        .into(),
+                        body
+                    },
+                )
+            ]
+            .spacing(4)
+            .width(crate::layout::FILL)
+            .height(crate::layout::FILL)
+            .into(),
+            tok,
+            !disabled && n > 0,
+        ),
         &a11y,
     )
 }
@@ -7344,6 +7384,7 @@ pub fn tree_view<'a, M: Clone + 'a>(
     let closing = animating.map(|(id, _)| id);
     let progress = animating.map(|(_, p)| p).unwrap_or(1.0);
     let anim_id = animating.map(|(id, _)| id);
+    let visible = root.flatten_during(closing).len();
     let mut col = Column::new()
         .spacing(0)
         .width(Length::Fill)
@@ -7387,7 +7428,7 @@ pub fn tree_view<'a, M: Clone + 'a>(
         scroll(
             col.into(),
             tok,
-            A11y::new("tree-scroll", Role::Group),
+            A11y::new("tree-scroll", Role::Group).with_disabled(a11y.disabled || visible == 0),
             false,
             None,
             None::<fn(_) -> M>,
@@ -7714,10 +7755,14 @@ pub fn tab_bar<'a, M: Clone + 'a>(
         container(Space::new().width(Length::Fill).height(1)).style(move |_| style::hairline(tok)),
     ];
     a11y::attach(
-        container(strip)
-            .width(Length::Fill)
-            .style(move |_| style::app_bar(tok))
-            .into(),
+        crate::focus::target(
+            container(strip)
+                .width(Length::Fill)
+                .style(move |_| style::app_bar(tok))
+                .into(),
+            tok,
+            !a11y.disabled && !tabs.titles.is_empty(),
+        ),
         &a11y,
     )
 }
@@ -7845,7 +7890,10 @@ pub fn accordion_view<'a, M: Clone + 'a>(
             ));
         }
     }
-    a11y::attach(col.into(), &a11y)
+    a11y::attach(
+        crate::focus::target(col.into(), tok, !a11y.disabled && !titles.is_empty()),
+        &a11y,
+    )
 }
 
 /// How much of the child a closed [`expander`] shows.
@@ -7988,11 +8036,15 @@ pub fn expander<'a, M: Clone + 'a>(
         crate::motion::expand(child, t, peek_h, tok, A11y::new(title.clone(), Role::Group))
     };
     a11y::attach(
-        container(column![header, body].spacing(gap(tok)))
-            .padding(inset(tok))
-            .width(Length::Fill)
-            .style(move |_| style::card(tok, false))
-            .into(),
+        crate::focus::target(
+            container(column![header, body].spacing(gap(tok)))
+                .padding(inset(tok))
+                .width(Length::Fill)
+                .style(move |_| style::card(tok, false))
+                .into(),
+            tok,
+            !a11y.disabled,
+        ),
         &a11y,
     )
 }
@@ -8063,6 +8115,374 @@ mod tests {
         if !ok {
             panic!("{msg}");
         }
+    }
+
+    fn focusable_after_click<M: Clone>(
+        el: &mut Element<'_, M>,
+        size: iced::Size,
+        click: iced::Point,
+    ) -> (usize, usize) {
+        use iced::advanced::widget::operation::{focusable::Focusable, Operation};
+        struct Count {
+            n: usize,
+            focused: usize,
+        }
+        impl Operation<()> for Count {
+            fn focusable(
+                &mut self,
+                _id: Option<&Id>,
+                _bounds: iced::Rectangle,
+                state: &mut dyn Focusable,
+            ) {
+                self.n += 1;
+                if state.is_focused() {
+                    self.focused += 1;
+                }
+            }
+            fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<()>)) {
+                operate(self);
+            }
+        }
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            iced::Font::DEFAULT,
+            iced::Pixels::from(16u32),
+        ));
+        let limits = layout::Limits::new(Size::ZERO, size);
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let mut messages = Vec::<M>::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(click),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &iced::Rectangle::new(iced::Point::ORIGIN, size),
+            );
+        }
+        let mut op = Count { n: 0, focused: 0 };
+        el.as_widget_mut()
+            .operate(&mut tree, layout, &renderer, &mut op);
+        (op.n, op.focused)
+    }
+
+    fn sample_list_view<'a>(list: &'a VecList, disabled: bool) -> Element<'a, VisibleWindow> {
+        let tok = named("dark").tokens;
+        let window = VisibleWindow::new(120.0);
+        list_view(
+            list,
+            &Sel::None,
+            move |_| window,
+            tok,
+            ListOpts {
+                window,
+                row_h: 24.0,
+                overscan: 2,
+                on_scroll: |w| w,
+                empty: "No rows",
+                meta_color: move |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: move |_| window,
+            },
+            A11y::new("list", Role::List).with_disabled(disabled),
+        )
+    }
+
+    #[test]
+    fn list_view_arrow_moves_primary_when_focused() {
+        let list = VecList::titles(["a", "b", "c"]);
+        let tok = named("dark").tokens;
+        let window = VisibleWindow::new(120.0);
+        let mut el: Element<'_, usize> = list_view(
+            &list,
+            &Sel::Single(0),
+            |c| c.id,
+            tok,
+            ListOpts {
+                window,
+                row_h: 24.0,
+                overscan: 2,
+                on_scroll: |_| 99,
+                empty: "No rows",
+                meta_color: |_| tok.muted,
+                scroll_id: None,
+                face: RowFace::FLUSH,
+                on_check: |_| 98,
+            },
+            A11y::new("list", Role::List),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            iced::Font::DEFAULT,
+            iced::Pixels::from(16u32),
+        ));
+        let size = Size::new(240.0, 160.0);
+        let limits = layout::Limits::new(Size::ZERO, size);
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let viewport = iced::Rectangle::new(iced::Point::ORIGIN, size);
+        let mut messages = Vec::<usize>::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(iced::Point::new(20.0, 20.0)),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        messages.clear();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(keyboard::key::Named::ArrowDown),
+                    modified_key: keyboard::Key::Named(keyboard::key::Named::ArrowDown),
+                    physical_key: keyboard::key::Physical::Unidentified(
+                        keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: keyboard::Location::Standard,
+                    modifiers: keyboard::Modifiers::empty(),
+                    text: None,
+                    repeat: false,
+                }),
+                layout,
+                mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        assert_eq!(messages, vec![1]);
+    }
+
+    #[test]
+    fn list_view_click_focuses_when_it_has_rows() {
+        let list = VecList::titles(["a", "b"]);
+        let mut el = sample_list_view(&list, false);
+        let (n, focused) = focusable_after_click(
+            &mut el,
+            Size::new(240.0, 160.0),
+            iced::Point::new(20.0, 20.0),
+        );
+        assert_eq!(n, 1);
+        assert_eq!(focused, 1);
+    }
+
+    #[test]
+    fn list_view_empty_is_not_focusable() {
+        let list = VecList::titles(Vec::<String>::new());
+        let mut el = sample_list_view(&list, false);
+        let (n, focused) = focusable_after_click(
+            &mut el,
+            Size::new(240.0, 160.0),
+            iced::Point::new(20.0, 20.0),
+        );
+        assert_eq!(n, 0);
+        assert_eq!(focused, 0);
+    }
+
+    #[test]
+    fn list_view_disabled_is_not_focusable() {
+        let list = VecList::titles(["a"]);
+        let mut el = sample_list_view(&list, true);
+        let (n, focused) = focusable_after_click(
+            &mut el,
+            Size::new(240.0, 160.0),
+            iced::Point::new(20.0, 20.0),
+        );
+        assert_eq!(n, 0);
+        assert_eq!(focused, 0);
+    }
+
+    #[test]
+    fn scroll_click_focuses() {
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, ()> = scroll(
+            label("body", tok, A11y::new("body", Role::Group)),
+            tok,
+            A11y::new("pane", Role::Group),
+            false,
+            None,
+            None::<fn(f32) -> ()>,
+        );
+        let (n, focused) = focusable_after_click(
+            &mut el,
+            Size::new(200.0, 120.0),
+            iced::Point::new(10.0, 10.0),
+        );
+        assert_eq!(n, 1);
+        assert_eq!(focused, 1);
+    }
+
+    #[test]
+    fn item_grid_click_focuses_when_it_has_tiles() {
+        let tok = named("dark").tokens;
+        let labels = vec!["Inbox".into(), "Mail".into()];
+        let mut el: Element<'_, usize> = item_grid(
+            &labels,
+            |c| c.id,
+            Some(0),
+            tok,
+            A11y::new("grid", Role::List),
+        );
+        let (n, focused) = focusable_after_click(
+            &mut el,
+            Size::new(320.0, 80.0),
+            iced::Point::new(20.0, 20.0),
+        );
+        assert!(n >= 1);
+        assert!(focused >= 1);
+    }
+
+    #[test]
+    fn tab_bar_click_focuses() {
+        let tok = named("dark").tokens;
+        let tabs = Tabs::new(["One", "Two"]);
+        let mut el: Element<'_, usize> = tab_bar(
+            &tabs,
+            |_| 0,
+            |_| 0,
+            480.0,
+            false,
+            tok,
+            A11y::new("tabs", Role::Tab),
+        );
+        let (n, focused) = focusable_after_click(
+            &mut el,
+            Size::new(400.0, 48.0),
+            iced::Point::new(20.0, 12.0),
+        );
+        assert!(n >= 1);
+        assert!(focused >= 1);
+    }
+
+    #[test]
+    fn virtual_column_click_focuses() {
+        let tok = named("dark").tokens;
+        let heights = [24.0_f32, 24.0];
+        let win = VisibleWindow::new(80.0);
+        let mut el: Element<'_, VisibleWindow> = virtual_column(
+            &heights,
+            win,
+            2,
+            None,
+            |w| w,
+            None,
+            tok,
+            |_| label("row", tok, A11y::new("r", Role::ListItem)),
+            A11y::new("cards", Role::List),
+        );
+        let (n, focused) = focusable_after_click(
+            &mut el,
+            Size::new(200.0, 80.0),
+            iced::Point::new(10.0, 10.0),
+        );
+        assert_eq!(n, 1);
+        assert_eq!(focused, 1);
+    }
+
+    #[test]
+    fn tree_view_click_focuses() {
+        let tok = named("dark").tokens;
+        let tree = crate::collection::TreeNode::leaf(1, "lib.rs");
+        let mut el: Element<'_, ()> = tree_view(
+            &tree,
+            None,
+            None,
+            |_| (),
+            |_| (),
+            TreeFace::Outline,
+            tok,
+            A11y::new("tree", Role::Tree),
+        );
+        let (n, focused) = focusable_after_click(
+            &mut el,
+            Size::new(240.0, 160.0),
+            iced::Point::new(20.0, 20.0),
+        );
+        assert_eq!(n, 1);
+        assert_eq!(focused, 1);
+    }
+
+    #[test]
+    fn accordion_click_focuses() {
+        let tok = named("dark").tokens;
+        let titles = ["A".to_string(), "B".to_string()];
+        let state = Accordion { open: Some(0) };
+        let mut el: Element<'_, usize> = accordion_view(
+            &titles,
+            vec![
+                label("one", tok, A11y::new("one", Role::Group)),
+                label("two", tok, A11y::new("two", Role::Group)),
+            ],
+            &state,
+            1.0,
+            |i| i,
+            tok,
+            A11y::new("acc", Role::Group),
+        );
+        let (n, focused) = focusable_after_click(
+            &mut el,
+            Size::new(320.0, 200.0),
+            iced::Point::new(20.0, 12.0),
+        );
+        assert!(n >= 1);
+        assert!(focused >= 1);
+    }
+
+    #[test]
+    fn data_table_click_focuses() {
+        let tok = named("dark").tokens;
+        let table = TableModel {
+            headers: vec!["Name".into()],
+            rows: vec![vec!["lib.rs".into()]],
+            sort_col: None,
+            sort_asc: true,
+            checks: vec![false],
+        };
+        let cols = crate::collection::ColumnLayout::new(vec![120.0]);
+        let win = VisibleWindow::new(80.0);
+        let mut el: Element<'_, VisibleWindow> = data_table(
+            &table,
+            &Sel::None,
+            None,
+            &cols,
+            false,
+            win,
+            24.0,
+            2,
+            |_, _| win,
+            |_| win,
+            |w| w,
+            |_| win,
+            None,
+            |_| win,
+            tok,
+            A11y::new("table", Role::Table),
+        );
+        let (n, focused) = focusable_after_click(
+            &mut el,
+            Size::new(320.0, 160.0),
+            iced::Point::new(20.0, 40.0),
+        );
+        assert_eq!(n, 1);
+        assert_eq!(focused, 1);
     }
 
     fn jump_clip(
@@ -13904,6 +14324,16 @@ mod tests {
                 &mut shell,
                 &vp,
             );
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(mouse::Event::ButtonReleased(mouse::Button::Left)),
+                layout,
+                mouse::Cursor::Available(hover),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
         }
         must(
             messages.iter().any(|e| matches!(e, Ev::Pick(1))),
@@ -17182,6 +17612,18 @@ mod tests {
                 &mut shell,
                 &vp,
             );
+            if button == iced::mouse::Button::Left {
+                el.as_widget_mut().update(
+                    &mut tree,
+                    &Event::Mouse(iced::mouse::Event::ButtonReleased(button)),
+                    layout,
+                    iced::mouse::Cursor::Available(at),
+                    &renderer,
+                    &mut clipboard,
+                    &mut shell,
+                    &vp,
+                );
+            }
         }
         messages
     }

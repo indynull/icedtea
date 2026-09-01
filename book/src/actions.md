@@ -6,8 +6,11 @@ menus, toolbars, shortcuts, footer hints, and the command palette.
 
 `key::handle` plus `KeyContext` is the default path. An open modal
 consumes (even if a field is focused). Otherwise focused text owns
-unmodified typing. Otherwise chords hit the action table, so Save
-works while the caret is in an editor.
+unmodified typing. Otherwise the focused `focus::target` owns arrows,
+Page, Home, End, Enter, and Space. Wrap the window `view` with
+`focus::cycle` so Tab walks those targets. `run!` already listens;
+implement `From<keyboard::Event>` on the application message so
+`handle` still sees Save.
 
 ```rust
 use icedtea::action::{Action, ActionTable};

@@ -326,27 +326,49 @@ fn status_hint_rail<'a, M: Clone + 'a>(
     table: &ActionTable<M>,
     tok: Tokens,
 ) -> Option<Element<'a, M>> {
-    let pairs = table.footer_hint_pairs();
-    if pairs.is_empty() {
+    let actions: Vec<_> = table
+        .iter()
+        .filter(|a| a.enabled && a.shortcut.is_some())
+        .cloned()
+        .collect();
+    if actions.is_empty() {
         return None;
     }
-    let name = pairs
+    let name = actions
         .iter()
-        .map(|(key, title)| format!("{key} {title}"))
+        .filter_map(|a| {
+            a.shortcut
+                .as_ref()
+                .map(|s| format!("{} {}", s, a.title.to_ascii_lowercase()))
+        })
         .collect::<Vec<_>>()
         .join("  ·  ");
-    let mut spans: Vec<iced::advanced::text::Span<'static, (), iced::Font>> = Vec::new();
-    for (i, (key, title)) in pairs.into_iter().enumerate() {
+    let mut row = Row::new()
+        .spacing(tok.density.gap())
+        .align_y(Alignment::Center);
+    for (i, a) in actions.into_iter().enumerate() {
         if i > 0 {
-            spans.push(span("  ·  ").size(tok.meta()).color(tok.muted));
+            row = row.push(meta("·", tok, A11y::new("sep", Role::Status)));
         }
-        spans.push(span(key).size(tok.meta()).color(tok.text).font(typo::UI));
-        spans.push(span(format!(" {title}")).size(tok.meta()).color(tok.muted));
+        let chord = a
+            .shortcut
+            .as_ref()
+            .map(|s| s.to_string())
+            .unwrap_or_default();
+        let title = a.title.to_ascii_lowercase();
+        let face = row![
+            text(chord).size(tok.meta()).color(tok.text).font(typo::UI),
+            text(format!(" {title}")).size(tok.meta()).color(tok.muted),
+        ];
+        let mut b = iced_button(face)
+            .padding(0)
+            .style(style::joined_button_style(tok, Variant::Ghost));
+        if let Some(m) = a.invoke() {
+            b = b.on_press(m);
+        }
+        row = row.push(b);
     }
-    Some(a11y::attach(
-        rich_text(spans).into(),
-        &A11y::new(name, Role::Status),
-    ))
+    Some(a11y::attach(row.into(), &A11y::new(name, Role::Status)))
 }
 
 /// Fuzzy find over the action table.
@@ -1173,11 +1195,15 @@ pub fn nav_rail<'a, M: Clone + 'a>(
         col = col.push(face);
     }
     crate::a11y::attach(
-        container(col)
-            .width(if expanded { 220 } else { 72 })
-            .padding(tok.density.gap())
-            .style(move |_| style::panel(tok))
-            .into(),
+        crate::focus::target(
+            container(col)
+                .width(if expanded { 220 } else { 72 })
+                .padding(tok.density.gap())
+                .style(move |_| style::panel(tok))
+                .into(),
+            tok,
+            !a11y.disabled && !items.is_empty(),
+        ),
         &a11y,
     )
 }
@@ -1365,6 +1391,7 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let title = title.into();
     let body = body.into();
+    let escape = cancel.as_ref().map(|(_, m)| m.clone());
     // M3 dialog: extra, cancel (text) then confirm (filled), toward the end.
     let mut acts: Vec<Element<'a, M>> = Vec::new();
     for (t, m) in extra {
@@ -1427,7 +1454,7 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
     for el in order(tok.direction, head_parts) {
         head = head.push(el);
     }
-    crate::a11y::attach(
+    let sheet = crate::a11y::attach(
         container(
             column![
                 head,
@@ -1442,7 +1469,11 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
         .style(move |_| style::dialog_sheet_face(tok))
         .into(),
         &A11y::new(title, Role::Dialog),
-    )
+    );
+    match escape {
+        Some(m) => crate::focus::dismiss_on_escape(sheet, m),
+        None => sheet,
+    }
 }
 /// One titled group of menu actions (M3 menu section).
 #[derive(Debug, Clone)]
@@ -1873,10 +1904,10 @@ pub fn context_menu<'a, M: Clone + 'a>(
         Space::new().height(Length::Fixed(at.y)),
         row![Space::new().width(Length::Fixed(at.x)), card],
     ];
-    Stack::new()
+    let stack = Stack::new()
         .push(crate::widget::capture_press(
             mouse_area(Space::new().width(Length::Fill).height(Length::Fill))
-                .on_press(on_dismiss)
+                .on_press(on_dismiss.clone())
                 .into(),
         ))
         .push(crate::motion::overlay(
@@ -1888,7 +1919,8 @@ pub fn context_menu<'a, M: Clone + 'a>(
         ))
         .width(Length::Fill)
         .height(Length::Fill)
-        .into()
+        .into();
+    crate::focus::dismiss_on_escape(stack, on_dismiss)
 }
 
 /// Master, detail, and a side inspector stay in one row.
@@ -2285,6 +2317,64 @@ mod tests {
     use crate::shortcut::Shortcut;
     use crate::theme::named;
 
+    fn focusable_after_click<M: Clone>(
+        el: &mut Element<'_, M>,
+        size: iced::Size,
+        click: iced::Point,
+    ) -> (usize, usize) {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::operation::{focusable::Focusable, Operation};
+        use iced::advanced::widget::Tree;
+        use iced::{Event, Font, Pixels, Point, Rectangle};
+        struct Count {
+            n: usize,
+            focused: usize,
+        }
+        impl Operation<()> for Count {
+            fn focusable(
+                &mut self,
+                _id: Option<&iced::widget::Id>,
+                _bounds: Rectangle,
+                state: &mut dyn Focusable,
+            ) {
+                self.n += 1;
+                if state.is_focused() {
+                    self.focused += 1;
+                }
+            }
+            fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<()>)) {
+                operate(self);
+            }
+        }
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(iced::Size::ZERO, size);
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let mut messages = Vec::<M>::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left)),
+                layout,
+                iced::mouse::Cursor::Available(click),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &Rectangle::new(Point::ORIGIN, size),
+            );
+        }
+        let mut op = Count { n: 0, focused: 0 };
+        el.as_widget_mut()
+            .operate(&mut tree, layout, &renderer, &mut op);
+        (op.n, op.focused)
+    }
+
     fn draw_once<M: Clone>(el: &mut Element<'_, M>) {
         use iced::advanced::layout::{Layout, Limits};
         use iced::advanced::renderer::Style;
@@ -2309,6 +2399,41 @@ mod tests {
             mouse::Cursor::Unavailable,
             &viewport,
         );
+    }
+
+    #[test]
+    fn nav_rail_click_focuses_when_it_has_items() {
+        let tok = crate::theme::named("dark").tokens;
+        let mut rail: Element<'_, usize> = nav_rail(
+            ["Inbox", "Sent"],
+            0,
+            |i| i,
+            true,
+            tok,
+            A11y::new("rail", Role::List),
+        );
+        let (n, focused) = focusable_after_click(
+            &mut rail,
+            iced::Size::new(220.0, 200.0),
+            iced::Point::new(20.0, 20.0),
+        );
+        assert!(n >= 1);
+        assert!(focused >= 1);
+        let mut empty: Element<'_, usize> = nav_rail(
+            Vec::<String>::new(),
+            0,
+            |i| i,
+            true,
+            tok,
+            A11y::new("rail-empty", Role::List),
+        );
+        let (n, focused) = focusable_after_click(
+            &mut empty,
+            iced::Size::new(220.0, 200.0),
+            iced::Point::new(20.0, 20.0),
+        );
+        assert_eq!(n, 0);
+        assert_eq!(focused, 0);
     }
 
     #[test]
@@ -3356,6 +3481,57 @@ mod tests {
         assert!(on_row.contains(&Msg::Save), "{save_msg}");
         let dismiss_msg = format!("row press must not be dismiss-only, got {on_row:?}");
         assert!(!on_row.iter().all(|m| *m == Msg::Dismiss), "{dismiss_msg}");
+    }
+
+    #[test]
+    fn context_menu_escape_dismisses() {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Event, Font, Pixels, Point, Rectangle, Size};
+        let tok = crate::theme::named("dark").tokens;
+        let mut el = context_menu(
+            std::iter::empty::<Action<()>>(),
+            Point::new(24.0, 48.0),
+            Size::new(640.0, 400.0),
+            (),
+            1.0,
+            tok,
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(640.0, 400.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = clipboard::Null;
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Keyboard(iced::keyboard::Event::KeyPressed {
+                    key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Escape),
+                    modified_key: iced::keyboard::Key::Named(iced::keyboard::key::Named::Escape),
+                    physical_key: iced::keyboard::key::Physical::Unidentified(
+                        iced::keyboard::key::NativeCode::Unidentified,
+                    ),
+                    location: iced::keyboard::Location::Standard,
+                    modifiers: iced::keyboard::Modifiers::empty(),
+                    text: None,
+                    repeat: false,
+                }),
+                layout,
+                iced::mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &Rectangle::new(Point::ORIGIN, Size::new(640.0, 400.0)),
+            );
+        }
+        assert_eq!(messages, vec![()]);
     }
 
     fn layout_palette(

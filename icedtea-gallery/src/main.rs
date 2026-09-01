@@ -1637,6 +1637,12 @@ enum Message {
     Nop,
 }
 
+impl From<icedtea::iced::keyboard::Event> for Message {
+    fn from(ev: icedtea::iced::keyboard::Event) -> Self {
+        Self::Key(ev)
+    }
+}
+
 fn window_width((_id, size): (icedtea::iced::window::Id, icedtea::iced::Size)) -> Message {
     Message::WindowSize(size.width)
 }
@@ -4054,7 +4060,6 @@ impl Gallery {
 
     fn subscription(&self) -> Subscription<Message> {
         let mut subs = vec![
-            icedtea::key::listen().map(Message::Key),
             icedtea::dnd::listen_files().map(Message::Drop),
             icedtea::iced::time::every(std::time::Duration::from_secs(1)).map(|_| Message::Tick),
             icedtea::iced::system::theme_changes().map(Message::OsMode),
@@ -4192,7 +4197,7 @@ impl Gallery {
         } else {
             Space::new().width(0).height(0).into()
         };
-        icedtea::iced::widget::stack![shell, overlay].into()
+        icedtea::focus::cycle(icedtea::iced::widget::stack![shell, overlay].into(), None)
     }
 
     fn page_view(&self) -> Element<'_, Message> {

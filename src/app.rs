@@ -44,6 +44,8 @@ pub struct Boot {
     pub displays: Vec<DisplayBounds>,
     pub transparent: bool,
     pub decorations: Option<bool>,
+    /// Widget id focused on the first frame. Empty: first focus target.
+    pub focus: Option<String>,
 }
 
 impl Boot {
@@ -65,7 +67,14 @@ impl Boot {
             displays: Vec::new(),
             transparent: false,
             decorations: None,
+            focus: None,
         }
+    }
+
+    /// Focus this iced widget id on the first frame.
+    pub fn focus(mut self, id: impl Into<String>) -> Self {
+        self.focus = Some(id.into());
+        self
     }
 
     pub fn overlay(mut self) -> Self {
@@ -167,6 +176,7 @@ pub struct Prepared {
     pub iced_settings: Settings,
     pub window: iced::window::Settings,
     pub iced_theme: iced::Theme,
+    pub focus: Option<iced::widget::Id>,
 }
 
 /// Load theme and window settings. Does not open a window.
@@ -231,6 +241,7 @@ pub fn bootstrap_with_catalog(boot: &Boot, themes: &ThemeCatalog) -> Prepared {
             win
         },
         iced_theme,
+        focus: boot.focus.clone().map(iced::widget::Id::from),
     }
 }
 
@@ -399,6 +410,15 @@ mod tests {
             <WindowTitle as iced::daemon::TitleFn<()>>::title(&t, &(), iced::window::Id::unique()),
             "demo"
         );
+    }
+
+    #[test]
+    fn bootstrap_copies_focus_id() {
+        let prep = bootstrap(&Boot::new("demo", "dev.icedtea.demo").focus("palette-query"));
+        assert_eq!(prep.focus, Some(iced::widget::Id::new("palette-query")));
+        assert!(bootstrap(&Boot::new("demo", "dev.icedtea.demo"))
+            .focus
+            .is_none());
     }
 
     #[test]

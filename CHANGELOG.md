@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Feature
+
+- `focus::target` is a click-to-focus wrap with a 2 dp primary ring.
+  Empty and disabled collections are not focusable.
+- `focus::cycle` walks Tab / Shift+Tab across targets and focuses the
+  first target (or a named iced id) on the first frame.
+- `run!` and `daemon!` subscribe `key::listen`. The application
+  message implements `From<keyboard::Event>`.
+- A focused `list_view` moves the primary row with arrows, Page, Home,
+  and End.
+- A focused `scroll` pane moves the offset with arrows, Page, Home,
+  and End.
+- `context_menu` and `dialog_sheet` (when Cancel is set) close on
+  Escape.
+- `status_bar` hint chords invoke the same `Action`.
 ## 0.15.0 — 2026-08-31
 
 ### Feature

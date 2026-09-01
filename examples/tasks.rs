@@ -18,7 +18,6 @@ fn main() -> icedtea::iced::Result {
         Tasks::update,
         Tasks::view,
         Tasks::theme,
-        Tasks::subscription
     )
 }
 
@@ -42,6 +41,12 @@ enum Message {
     Add,
     Toggle(i64, bool),
     Key(icedtea::iced::keyboard::Event),
+}
+
+impl From<icedtea::iced::keyboard::Event> for Message {
+    fn from(ev: icedtea::iced::keyboard::Event) -> Self {
+        Self::Key(ev)
+    }
 }
 
 const DB_FILE: &str = "tasks.db";
@@ -130,41 +135,40 @@ impl Tasks {
                 ));
             }
         }
-        icedtea::iced::widget::column![
-            pattern::toolbar(self.table.iter(), tok, Direction::Ltr),
-            widget::text_input(
-                "New task",
-                &self.draft,
-                Message::Draft,
-                Some(Message::Add),
-                widget::FieldOpts::NONE,
-                tok,
-                A11y::new("new-task", Role::TextBox),
-                None,
-            ),
-            widget::scroll(
-                list.into(),
-                tok,
-                A11y::new("tasks", Role::List),
-                false,
-                None,
-                None::<fn(_) -> Message>,
-            ),
-            pattern::status_bar(&self.status, None, None, &self.table, tok, Direction::Ltr),
-        ]
-        .spacing(8)
-        .padding(12)
-        .width(icedtea::layout::FILL)
-        .height(icedtea::layout::FILL)
-        .into()
+        icedtea::focus::cycle(
+            icedtea::iced::widget::column![
+                pattern::toolbar(self.table.iter(), tok, Direction::Ltr),
+                widget::text_input(
+                    "New task",
+                    &self.draft,
+                    Message::Draft,
+                    Some(Message::Add),
+                    widget::FieldOpts::NONE,
+                    tok,
+                    A11y::new("new-task", Role::TextBox),
+                    None,
+                ),
+                widget::scroll(
+                    list.into(),
+                    tok,
+                    A11y::new("tasks", Role::List),
+                    false,
+                    None,
+                    None::<fn(_) -> Message>,
+                ),
+                pattern::status_bar(&self.status, None, None, &self.table, tok, Direction::Ltr),
+            ]
+            .spacing(8)
+            .padding(12)
+            .width(icedtea::layout::FILL)
+            .height(icedtea::layout::FILL)
+            .into(),
+            None,
+        )
     }
 
     fn theme(&self) -> icedtea::iced::Theme {
         theme::iced_theme("dark", theme::named("dark").tokens)
-    }
-
-    fn subscription(&self) -> icedtea::iced::Subscription<Message> {
-        key::listen().map(Message::Key)
     }
 }
 

@@ -111,8 +111,12 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   `align_x(align_start)`, or the caption lands on physical left and
   the page looks empty. Form labels: Fixed gutter plus `align_start`.
 - Key order: an open modal consumes (even if a field is focused);
-  otherwise focused text owns unmodified typing; otherwise
-  `key::handle` matches the action table. `ctrl` in a shortcut is the
+  otherwise focused text owns unmodified typing; otherwise the
+  focused `focus::target` owns arrows, Page, Home, End, Enter, and
+  Space; otherwise `key::handle` matches the action table. Tab /
+  Shift+Tab walk targets via `focus::cycle` (wrap the window `view`).
+  `run!` / `daemon!` subscribe `key::listen`; the application message
+  implements `From<keyboard::Event>`. `ctrl` in a shortcut is the
   host accelerator (Command on macOS, Control elsewhere). `key::press`
   and `Shortcut::parse` cover F1-F24. `KeyContext::capturing_layer`
   reports the same three states `handle` uses.
