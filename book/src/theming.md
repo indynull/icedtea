@@ -31,8 +31,12 @@ community colorways (Solarized, Gruvbox, Catppuccin, Nord, Tokyo Night,
 Dracula, Everforest, Kanagawa, Ayu, GitHub, and others).
 [`theme::named`](https://docs.rs/icedtea/latest/icedtea/theme/fn.named.html)
 and `theme::code_highlight` pick UI tokens and the iced highlighter
-face together. Register more on `ThemeCatalog`. `Boot.theme` is a
-concrete name and defaults to `dark`.
+face together. Catalog paper, accents, and status stay hex. Body and
+mute ink are
+[`theme::auto_ink`](https://docs.rs/icedtea/latest/icedtea/theme/fn.auto_ink.html)
+on the canvas (87% / 60%). A dumped terminal foreground is not body
+copy. `high-contrast` is defined in Rust. Register more on
+`ThemeCatalog`. `Boot.theme` is a concrete name and defaults to `dark`.
 `Boot::transparent` asks iced for an ARGB buffer.
 `Boot::decorations` sets the client title bar. `light` and `dark` are a
 neutral desktop pair. Persist defaults `follow_os` on, so host chrome

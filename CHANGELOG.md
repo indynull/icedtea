@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Feature
+
+- `theme::auto_ink` mixes white or black onto a canvas (Textual
+  `auto` 87% / 60% for body and mute).
+
+### Bug fix
+
+- Named catalog colorways use that ink, not the dumped Textual
+  foreground.
+
 ## 0.16.0 — 2026-09-02
 
 ### Feature

@@ -64,7 +64,9 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   0 dp). `UiState::look` and `Boot` apply the same fields. High-contrast
   and community colorways remain; apps may register more that implement
   the same roles. See `m3::mapping` for catalog inventory.
-  `theme::mix` builds washes. Resting drop comes from
+  Always derive catalog `text` / `muted` with `theme::auto_ink` on the
+  canvas (87% / 60%). Never dump a terminal `foreground` into those
+  fields. `theme::mix` builds washes. Resting drop comes from
   `Component::elevation()` (snapshot `styles/elevation`). Elevated
   faces (button, card, chip) are Level 1 on that constructor. Search
   is Level 0. Never a hardcoded shadow that disagrees with that

@@ -583,7 +583,8 @@ fn catalog_from_json(raw: &str) -> BTreeMap<&'static str, NamedTheme> {
             };
             let rec = Value::Object(obj.clone());
             let canvas = hex_of(&rec, "canvas", rgb(0x20, 0x20, 0x20));
-            let text = hex_of(&rec, "text", rgb(0xF2, 0xF2, 0xF2));
+            let text = auto_ink(canvas, 0.87);
+            let muted = auto_ink(canvas, 0.60);
             let primary = hex_of(&rec, "primary", rgb(0x6B, 0x9E, 0xFF));
             let panel = hex_of(&rec, "panel", mix(text, canvas, 0.10));
             let surface = hex_of(&rec, "surface", panel);
@@ -598,7 +599,7 @@ fn catalog_from_json(raw: &str) -> BTreeMap<&'static str, NamedTheme> {
                         surface,
                         panel,
                         text,
-                        hex_of(&rec, "muted", mix(text, canvas, 0.55)),
+                        muted,
                         primary,
                         hex_of(&rec, "accent", rgb(0x5E, 0xEA, 0xD4)),
                         hex_of(&rec, "success", rgb(0x4A, 0xDE, 0x80)),
@@ -652,6 +653,31 @@ pub fn builtin_names() -> Vec<&'static str> {
 /// Rec. 709 luma in 0..1.
 pub fn relative_luma(c: Color) -> f32 {
     0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
+}
+
+/// Textual `Color.brightness` (Rec. 601). Auto ink picks black or white on this.
+fn rec601_brightness(c: Color) -> f32 {
+    (299.0 * c.r + 587.0 * c.g + 114.0 * c.b) / 1000.0
+}
+
+/// Body or mute ink on *canvas*: white or black mixed toward the paper.
+///
+/// Textual `$text` is `auto 87%` and `$text-muted` is `auto 60%`. Catalog
+/// `foreground` is often a mid-gray (Solarized base0) that fails on the
+/// same paper.
+///
+/// ```
+/// let paper = iced::Color::from_rgb8(0x07, 0x36, 0x42);
+/// let body = icedtea::theme::auto_ink(paper, 0.87);
+/// assert!(body.r > 0.8);
+/// ```
+pub fn auto_ink(canvas: Color, amount: f32) -> Color {
+    let ink = if rec601_brightness(canvas) < 0.5 {
+        Color::WHITE
+    } else {
+        Color::BLACK
+    };
+    mix(ink, canvas, amount)
 }
 
 impl Tokens {
@@ -1460,6 +1486,28 @@ mod tests {
         let _ = listen_os_chrome();
         // Snapshot is safe off the main thread (returns empty fields if host panics).
         let _ = apply_os_chrome(tok, true, os_chrome());
+    }
+
+    #[test]
+    fn catalog_body_and_mute_follow_auto_ink() {
+        for name in [
+            "solarized-dark",
+            "solarized-light",
+            "nord",
+            "gruvbox",
+            "tokyo-night",
+            "dark",
+            "light",
+        ] {
+            let t = named(name).tokens;
+            assert_eq!(t.text, auto_ink(t.canvas, 0.87), "{name} text");
+            assert_eq!(t.muted, auto_ink(t.canvas, 0.60), "{name} muted");
+            assert_ne!(t.text, t.muted, "{name}");
+        }
+        let solar = named("solarized-dark").tokens;
+        let raw_fg = Color::from_rgb8(0x83, 0x94, 0x96);
+        assert_ne!(solar.text, raw_fg);
+        assert!(relative_luma(solar.text) > relative_luma(raw_fg));
     }
 
     #[test]
