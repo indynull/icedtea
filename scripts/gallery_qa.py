@@ -1666,9 +1666,13 @@ def live_clip_pass(
         table_x, table_y = fx + 920, fy + 360
 
         capture_window(display, wid, shots / "list-00-idle.png")
+        click_at(display, vc_x, vc_y)
+        time.sleep(0.1)
         wheel_at(display, vc_x, vc_y, clicks=18, down=True)
         time.sleep(0.45)
         capture_window(display, wid, shots / "list-01-vc-wheel.png")
+        click_at(display, list_x, list_y)
+        time.sleep(0.1)
         wheel_at(display, list_x, list_y, clicks=20, down=True)
         time.sleep(0.45)
         capture_window(display, wid, shots / "list-02-list-wheel.png")
