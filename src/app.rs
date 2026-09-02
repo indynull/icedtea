@@ -441,6 +441,14 @@ mod tests {
     }
 
     #[test]
+    fn bootstrap_loads_application_fonts() {
+        let bytes: Cow<'static, [u8]> = Cow::Borrowed(&b"\0"[..]);
+        let prep = bootstrap(&Boot::new("demo", "dev.demo").fonts([bytes]));
+        assert_eq!(prep.iced_settings.fonts.len(), 1);
+        assert_eq!(prep.iced_settings.fonts[0].as_ref(), b"\0");
+    }
+
+    #[test]
     fn bootstrap_transparent_and_decorations_follow_boot() {
         let app = bootstrap(&Boot::new("App", "dev.x"));
         assert!(!app.window.transparent);
