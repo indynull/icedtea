@@ -22,27 +22,32 @@
   button group, pagination, and split sash handle arrows, Enter, and
   Space on the constructor.
 - `item_press` sends a primary click on release while the pointer is
-  still over the row. `ListOpts.on_context` is the secondary click.
-- A focused `tree_view` expands and collapses with arrows. Arrows in
-  `search_view` move the hit list.
+  still over the row.
+- `ListOpts.on_context` is the secondary click.
+- A focused `tree_view` expands and collapses with arrows.
+- Arrows in `search_view` move the hit list.
 - Closed `pick_list` Enter and Space open the overlay.
-- `nav_rail` arrows move the selected dest. An open `drawer` closes
-  on Escape. `ActionTable::seed_quit` inserts `app.quit`.
+- `nav_rail` arrows move the selected dest.
+- An open `drawer` closes on Escape.
+- `ActionTable::seed_quit` inserts `app.quit`.
 - `Boot::fonts` loads application face bytes into iced at start.
 - `typo::bind_sans_family` points `Font::DEFAULT` at a loaded family.
   `typo::sans_family` reads the current SansSerif name.
 
 ### Bug fix
 
-- `tree_view` and `search_view` keys run only while that wrap is focused.
+- `tree_view` keys run only while that wrap is focused.
+- `search_view` keys run only while that wrap is focused.
 - The focus ring is a 2 dp mixed-primary stroke inside the target so
   a parent outline stays visible and a filling pane is not a solid
   brand box.
 - A focused `scroll` pane takes arrows without painting a ring around
   the pane.
 - An unfocused `scroll` pane does not take arrows, Page, Home, or End.
-- A focused `search_view` and `tree_view` take arrows without painting
-  a ring around the stack.
+- A focused `search_view` takes arrows without painting a ring around
+  the stack.
+- A focused `tree_view` takes arrows without painting a ring around
+  the stack.
 - Resting elevation follows the Material component table: toolbar
   Level 2, toast Level 3, banner Level 1, elevated card Level 1,
   modal side sheet Level 1. Filled cards, search, and list rows sit
@@ -51,8 +56,8 @@
 
 ### Chore
 
-- Guide and README name constructor keys, `seed_quit`, and the book
-  layers.
+- Guide and README name constructor keys and `seed_quit`.
+- Guide chapters name the book layers.
 
 ## 0.15.0 — 2026-08-31
 
