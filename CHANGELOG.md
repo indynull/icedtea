@@ -12,23 +12,22 @@
   message implements `From<keyboard::Event>`.
 - A focused `list_view` moves the primary row with arrows, Page, Home,
   and End.
+- A focused `tree_view` expands and collapses with arrows.
+- Arrows in `search_view` move the hit list.
 - A focused `scroll` pane moves the offset with arrows, Page, Home,
   and End.
+- Focused controls handle arrows, Enter, and Space on the constructor.
+- Open menus, pick overlays, and context menus move the hover with
+  arrows, pick with Enter, and jump on the first letter.
+- Closed `pick_list` Enter and Space open the overlay.
 - `context_menu` and `dialog_sheet` (when Cancel is set) close on
   Escape.
+- An open `drawer` closes on Escape.
 - `status_bar` hint chords invoke the same `Action`.
-- Focused slider, checkbox, switch, radio, toggle, segmented, tabs,
-  breadcrumb, number, date, time, accordion, expander, pick list,
-  button group, pagination, and split sash handle arrows, Enter, and
-  Space on the constructor.
 - `item_press` sends a primary click on release while the pointer is
   still over the row.
 - `ListOpts.on_context` is the secondary click.
-- A focused `tree_view` expands and collapses with arrows.
-- Arrows in `search_view` move the hit list.
-- Closed `pick_list` Enter and Space open the overlay.
 - `nav_rail` arrows move the selected dest.
-- An open `drawer` closes on Escape.
 - `ActionTable::seed_quit` inserts `app.quit`.
 - `Boot::fonts` loads application face bytes into iced at start.
 - `typo::bind_sans_family` points `Font::DEFAULT` at a loaded family.
@@ -36,18 +35,11 @@
 
 ### Bug fix
 
-- `tree_view` keys run only while that wrap is focused.
-- `search_view` keys run only while that wrap is focused.
+- Collection, search, and scroll keys run only while that wrap is
+  focused.
 - The focus ring is a 2 dp mixed-primary stroke inside the target so
   a parent outline stays visible and a filling pane is not a solid
   brand box.
-- A focused `scroll` pane takes arrows without painting a ring around
-  the pane.
-- An unfocused `scroll` pane does not take arrows, Page, Home, or End.
-- A focused `search_view` takes arrows without painting a ring around
-  the stack.
-- A focused `tree_view` takes arrows without painting a ring around
-  the stack.
 - Resting elevation follows the Material component table: toolbar
   Level 2, toast Level 3, banner Level 1, elevated card Level 1,
   modal side sheet Level 1. Filled cards, search, and list rows sit

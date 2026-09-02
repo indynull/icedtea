@@ -218,7 +218,8 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   Write each version section as bullets under Feature, Bug fix, and
   Chore (omit an empty heading). One public thing per bullet. Never
   topic subheadings (controls, collections, theme). Never a prose
-  paragraph that lists several adds.
+  paragraph that lists several adds. Unreleased is those version
+  notes. Splitting a diary is not the pass.
 - Gallery fixtures (sample documents, language snippets, bitmaps) live
   in `icedtea-gallery`. Never export them from `icedtea`.
 - Never ship a document undo stack. The application owns document
