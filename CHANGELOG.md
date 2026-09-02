@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.16.0 — 2026-09-02
+
 ### Feature
 
 - `focus::target` is a click-to-focus wrap with a 2 dp primary ring.
