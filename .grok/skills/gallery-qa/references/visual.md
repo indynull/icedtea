@@ -56,8 +56,8 @@ In the same change:
 | keys | `book/src/images/chrome.png` | Type-a-key title, a checkbox, a list, and a status bar. Locale: the type-a-key hint is catalog fill (エンター / إدخال / داخلہ / אנטר), not leftover Latin `Enter` / `Escape`. RTL: Type-a-key title and hint under the heading on the start (right), not across the gutter; checkbox and list on the start; status chords on the end. Locale density matches English |
 | layout | `book/src/images/layout.png` | Idle first screen is pack then wrap: Find hug, filling search, Go hug on one row; unequal chips wrap to a second line; min-width tiles share leftover and sit more than one across. RTL: Find and the first chip sit on the start (right); Go on the end (left); first tile on the start. Locale: Find / Go / tile titles are catalog fill, not leftover English `Find` / `Go` / `Inbox` |
 | marks | `book/src/images/chrome.png` | Filter chips selected vs idle on the first screen. Card is a two-up row: rail document card (notes.txt, markdown/local tags, Open, saved badge on the header end) beside an outlined empty neighbor (Empty card / No items) on that same first screen. Locale: the document card tag is catalog fill (マークダウン / 标记 / ماركداون / مارک ڈاؤن / מרקדאון). vi keeps the loanword `markdown` — that is catalog fill, not a missing row. Leftover Latin `markdown` on ja/zh/ar/ur/he is broken |
-| chrome-rows | `book/src/images/chrome.png` | Menu, toolbar, status. Status rail is chord then title (`ctrl+n` in body ink, action title muted at meta). RTL: titles one line; action order from start. Status key chords (`ctrl+n`) stay LTR, not leftover English |
-| feedback | `book/src/images/chrome.png` | Busy overlay + toast + scroller; rail on the end in RTL. Scroll lines start-align (right in RTL), not flush to the rail |
+| chrome-rows | `book/src/images/chrome.png` | Menu, toolbar, status. Toolbar has a Level 2 drop. Status rail is chord then title (`ctrl+n` in body ink, action title muted at meta). RTL: titles one line; action order from start. Status key chords (`ctrl+n`) stay LTR, not leftover English |
+| feedback | `book/src/images/chrome.png` | Busy overlay + toast + scroller. Toast has a Level 3 drop. Rail on the end in RTL. Scroll lines start-align (right in RTL), not flush to the rail |
 | dialogs | `book/src/images/patterns.png` | Side sheet and confirm on a dim wash. The confirm card stays centered on that wash (modal) — start-aligning it is wrong. Locale: every dialog action label is fully visible (sheet fills the caller width). Filename `notes.txt` is an LTR island, not leftover English. RTL: Open-sheet action on the start; after `sheet true` the sheet docks on the end (left) with close on the sheet end, not physical right |
 | list-detail | `book/src/images/patterns.png` | List beside detail; padding not kissing the sash. Job names the detail pane, not a physical side |
 | inspector | `book/src/images/patterns.png` | Tree, body, properties. RTL: tree on the start (right), properties on the end; property labels start-align inside that pane. Job names the properties pane, not a physical side |
@@ -73,8 +73,8 @@ In the same change:
 | expand-motion | `book/src/images/chrome.png` | Peek face; open shows figure + body. RTL: Expand button on the start. Open body may name API ids (`iced::Animation`, `motion::expand`) — those are catalog, not leftover English |
 
 Look strip: theme pick and dark/light meta are one group; Language
-is a separate group with a wider gap so the two metas do not read
-as one word. Nav page names use the locale fill (`page.markdown`
+and Face (Noto Sans / System) are separate groups with a wider gap
+so the metas do not read as one word. Noto Sans is the family id. Nav page names use the locale fill (`page.markdown`
 is マークダウン / ماركداون / مارک ڈاؤن / מרקדאון, not leftover Latin
 on ja/ar/ur/he).
 

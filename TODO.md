@@ -2,6 +2,16 @@
 
 ## Do
 
+- macOS `typo::UI`: `install_platform_faces` asks Core Text for the
+  system family, then keeps a face only when fontdb has discrete
+  400 and 700. San Francisco is a variable file, so the picker
+  rejects `.SF NS` and binds Helvetica Neue, Lucida Grande, or
+  Arial. Load the host files (`/System/Library/Fonts/SFNS.ttf`,
+  `SFNSItalic.ttf`, `SFNSMono.ttf`, `SFNSMonoItalic.ttf`) into
+  the font database and bind SansSerif / Monospace to those
+  families. Do not vendor a face. Apps that want a named family
+  still load it themselves.
+
 ### Blocked on iced
 
 - RTL `textarea`: iced 0.14 `text_editor` has no writing direction

@@ -28,6 +28,9 @@
 - Closed `pick_list` Enter and Space open the overlay.
 - `nav_rail` arrows move the selected dest. An open `drawer` closes
   on Escape. `ActionTable::seed_quit` inserts `app.quit`.
+- `Boot::fonts` loads application face bytes into iced at start.
+- `typo::bind_sans_family` points `Font::DEFAULT` at a loaded family.
+  `typo::sans_family` reads the current SansSerif name.
 
 ### Bug fix
 
@@ -40,6 +43,11 @@
 - An unfocused `scroll` pane does not take arrows, Page, Home, or End.
 - A focused `search_view` and `tree_view` take arrows without painting
   a ring around the stack.
+- Resting elevation follows the Material component table: toolbar
+  Level 2, toast Level 3, banner Level 1, elevated card Level 1,
+  modal side sheet Level 1. Filled cards, search, and list rows sit
+  at Level 0. Filled, tonal, and outlined buttons raise one level
+  on hover. Elevated chips paint a Level 1 drop.
 
 ### Chore
 

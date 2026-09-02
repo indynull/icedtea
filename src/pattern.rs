@@ -183,7 +183,7 @@ pub fn toolbar<'a, M: Clone + 'a>(
         container(r)
             .width(Length::Fill)
             .align_x(crate::i18n::align_start(dir))
-            .style(move |_| style::app_bar(tok))
+            .style(move |_| style::toolbar(tok))
             .into(),
         &A11y::new("toolbar", Role::Group),
     )
@@ -527,7 +527,7 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
         .width(opts.width)
         .max_height(opts.max_height)
         .align_x(align_start(dir))
-        .style(move |_| style::fade_face(style::raised_card(tok), t));
+        .style(move |_| style::fade_face(style::menu_sheet(tok), t));
     crate::motion::overlay(
         panel.into(),
         t,
@@ -1586,9 +1586,7 @@ pub fn sectioned_menu<'a, M: Clone + 'a>(
         }
     }
     crate::a11y::attach(
-        container(col)
-            .style(move |_| style::raised_card(tok))
-            .into(),
+        container(col).style(move |_| style::menu_sheet(tok)).into(),
         &a11y,
     )
 }
@@ -1661,7 +1659,7 @@ pub fn cascade_menu<'a, M: Clone + 'a>(
         ));
     }
     let left = container(primary)
-        .style(move |_| style::raised_card(tok))
+        .style(move |_| style::menu_sheet(tok))
         .width(Length::Fixed(200.0));
     let mut row = Row::new().spacing(4).align_y(Alignment::Start).push(left);
     if let Some(i) = open_sub {
@@ -1751,7 +1749,7 @@ pub fn side_sheet<'a, M: Clone + 'a>(
     .padding(paint.density.sheet())
     .width(Length::Fixed(width.max(200.0)))
     .height(Length::Fill)
-    .style(move |_| style::fade_face(style::dialog_sheet_face(tok), t));
+    .style(move |_| style::fade_face(style::side_sheet_face(tok), t));
     // Slide is a physical pixel offset. Map logical start/end through
     // window direction so RTL end comes from the left.
     let from_physical_end = match tok.direction {
@@ -1912,7 +1910,7 @@ pub fn context_menu<'a, M: Clone + 'a>(
     };
     let card = crate::widget::capture_press(
         container(inner)
-            .style(move |_| style::fade_face(style::raised_card(tok), t))
+            .style(move |_| style::fade_face(style::menu_sheet(tok), t))
             .into(),
     );
     let placed = column![

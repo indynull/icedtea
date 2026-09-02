@@ -17,7 +17,7 @@ pub enum Variant {
     Warning,
     /// M3 outlined: transparent fill, outline ink.
     Outlined,
-    /// M3 elevated: surface fill plus a level-1 shadow.
+    /// M3 elevated: surface fill plus a Level 1 shadow.
     Elevated,
 }
 

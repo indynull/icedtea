@@ -5030,7 +5030,7 @@ pub fn dismiss_button<'a, M: Clone + 'a>(msg: M, tok: Tokens, a11y: A11y) -> Ele
 pub fn chip_face(
     tok: Tokens,
     variant: Variant,
-) -> (iced::Color, iced::Color, iced::border::Border) {
+) -> (iced::Color, iced::Color, iced::border::Border, iced::Shadow) {
     let s = tok.scheme();
     let r = tok.radius(crate::m3::shape::Component::Chip);
     match variant {
@@ -5044,6 +5044,7 @@ pub fn chip_face(
                 width: 0.0,
                 radius: r,
             },
+            iced::Shadow::default(),
         ),
         // Idle filter outline (must differ from selected fill)
         Variant::Quiet | Variant::Ghost => (
@@ -5054,6 +5055,7 @@ pub fn chip_face(
                 width: 1.0,
                 radius: r,
             },
+            iced::Shadow::default(),
         ),
         Variant::Danger => (
             s.error_container,
@@ -5063,6 +5065,7 @@ pub fn chip_face(
                 width: 0.0,
                 radius: r,
             },
+            iced::Shadow::default(),
         ),
         Variant::Success => {
             let wash = crate::theme::mix(s.success, s.surface, 0.20);
@@ -5074,6 +5077,7 @@ pub fn chip_face(
                     width: 0.0,
                     radius: r,
                 },
+                iced::Shadow::default(),
             )
         }
         Variant::Warning => {
@@ -5086,9 +5090,10 @@ pub fn chip_face(
                     width: 0.0,
                     radius: r,
                 },
+                iced::Shadow::default(),
             )
         }
-        Variant::Outlined | Variant::Elevated => (
+        Variant::Outlined => (
             Color::TRANSPARENT,
             s.on_surface,
             iced::border::Border {
@@ -5096,6 +5101,17 @@ pub fn chip_face(
                 width: 1.0,
                 radius: r,
             },
+            iced::Shadow::default(),
+        ),
+        Variant::Elevated => (
+            s.surface_container_low,
+            s.on_surface,
+            iced::border::Border {
+                color: Color::TRANSPARENT,
+                width: 0.0,
+                radius: r,
+            },
+            tok.shadow(crate::m3::Elevation::Level1),
         ),
     }
 }
@@ -5152,7 +5168,7 @@ pub fn chip<'a, M: Clone + 'a>(
         ChipKind::Filter => variant,
         ChipKind::Input | ChipKind::Suggestion => Variant::Quiet,
     };
-    let (wash, ink, border) = chip_face(tok, variant);
+    let (wash, ink, border, shadow) = chip_face(tok, variant);
     let mut line = Row::new().spacing(4).align_y(Alignment::Center);
     if let Some(ic) = icons.leading {
         line = line.push(icon_svg(ic, tok, A11y::new(title.clone(), Role::Image)));
@@ -5168,6 +5184,7 @@ pub fn chip<'a, M: Clone + 'a>(
     let face = container(line).padding(pad(tok)).style(move |_| {
         let mut st = style::fill(wash, ink);
         st.border = border;
+        st.shadow = shadow;
         st
     });
     let body: Element<'a, M> = if let Some(msg) = a11y.apply_message(press) {
@@ -5258,7 +5275,7 @@ pub fn badge<'a, M: 'a>(
     a11y: A11y,
 ) -> Element<'a, M> {
     let title = tok.clock_digits.map_str(&a11y.apply_name(title));
-    let (wash, ink, mut border) = chip_face(tok, variant);
+    let (wash, ink, mut border, _) = chip_face(tok, variant);
     border.radius = tok.radius(crate::m3::shape::Component::Badge);
     let pad = match size {
         BadgeSize::Small => [2, 5],
@@ -5608,7 +5625,7 @@ fn toast_style(
     tok: Tokens,
     kind: ToastKind,
 ) -> impl Fn(&iced::Theme) -> iced::widget::container::Style {
-    move |_| style::callout(tok, kind)
+    move |_| style::toast_face(tok, kind)
 }
 
 /// A themed scroller with a usable handle.
@@ -10432,7 +10449,7 @@ mod tests {
     fn badge_primary_ink_contrasts_with_fill() {
         let tok = named("dark").tokens;
         let s = tok.scheme();
-        let (wash, ink, _) = chip_face(tok, Variant::Primary);
+        let (wash, ink, _, _) = chip_face(tok, Variant::Primary);
         assert_eq!(wash, s.primary);
         assert_eq!(ink, s.on_primary);
         assert_ne!(ink, wash);
@@ -11153,21 +11170,27 @@ mod tests {
             role("fc-d", Role::Group).with_disabled(true),
         );
         // Selected filter chip (Primary) must paint differently from idle (Quiet).
-        let (on_bg, on_ink, on_border) = chip_face(tok, Variant::Primary);
-        let (off_bg, off_ink, off_border) = chip_face(tok, Variant::Quiet);
+        let (on_bg, on_ink, on_border, _) = chip_face(tok, Variant::Primary);
+        let (off_bg, off_ink, off_border, _) = chip_face(tok, Variant::Quiet);
         assert_ne!(on_bg, off_bg);
         assert_ne!(on_ink, off_ink);
         assert_ne!(on_border.color, off_border.color);
         assert!(on_border.width < off_border.width || off_border.width >= 1.0);
+        let (_, _, elevated_border, elevated_shadow) = chip_face(tok, Variant::Elevated);
+        assert_eq!(elevated_border.width, 0.0);
+        assert_eq!(
+            elevated_shadow.blur_radius,
+            tok.shadow(crate::m3::Elevation::Level1).blur_radius
+        );
         for v in Variant::ALL {
-            let (bg, ink, border) = chip_face(tok, v);
+            let (bg, ink, border, _) = chip_face(tok, v);
             assert_ne!(bg, ink);
             let _ = border.width;
         }
         for name in ["dark", "light"] {
             let t = named(name).tokens;
             for v in [Variant::Success, Variant::Warning] {
-                let (wash, ink, _) = chip_face(t, v);
+                let (wash, ink, _, _) = chip_face(t, v);
                 must(
                     crate::m3::color::contrast_ratio(ink, wash) >= 4.5,
                     format!("{name} {v:?} chip ink on wash"),

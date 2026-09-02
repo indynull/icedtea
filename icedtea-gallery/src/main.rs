@@ -1,6 +1,7 @@
 //! Living catalog: one page per `icedtea::catalog` entry.
 
 mod copy;
+mod fonts;
 mod samples;
 
 use std::collections::HashSet;
@@ -1285,6 +1286,7 @@ fn parse_inject_line(line: &str) -> Option<Message> {
         "type" | "font-scale" | "font_scale" => Some(Message::FontScale(parts.next()?.to_string())),
         "shape" => Some(Message::Shape(parts.next()?.to_string())),
         "elevation" => Some(Message::Elevation(parts.next()?.to_string())),
+        "ui-face" | "ui_face" => Some(Message::UiFace(parts.next()?.to_string())),
         "direction" => Some(Message::Direction(parts.next()?.replace('-', " "))),
         "language" => Some(Message::Language(parts.next()?.to_string())),
         "page" => Some(Message::Page(parts.next()?.parse().ok()?)),
@@ -1423,6 +1425,7 @@ fn main() -> icedtea::iced::Result {
         // Look strip + menu stay one line at a human-opened size.
         boot = boot.size(1280.0, 800.0).min_size(1100.0, 700.0);
     }
+    boot = boot.fonts(fonts::bytes());
     let direction = icedtea::bootstrap(&boot).direction();
     icedtea::run!(
         boot,
@@ -1553,6 +1556,7 @@ enum Message {
     FontScale(String),
     Shape(String),
     Elevation(String),
+    UiFace(String),
     Direction(String),
     Language(String),
     Spin,
@@ -1773,6 +1777,8 @@ struct Gallery {
     font_scale: f32,
     shape: ShapePolicy,
     elevation: ElevationPolicy,
+    ui_face: fonts::UiFace,
+    system_sans: String,
     spin: f32,
     appearance: Appearance,
     os_chrome: OsChrome,
@@ -2108,6 +2114,8 @@ impl Gallery {
             font_scale: 1.0,
             shape: ShapePolicy::Desktop,
             elevation: ElevationPolicy::Desktop,
+            ui_face: fonts::UiFace::Noto,
+            system_sans: icedtea::typo::sans_family(),
             spin: 0.0,
             appearance: Appearance::Dark,
             os_chrome: theme::os_chrome(),
@@ -2221,6 +2229,7 @@ impl Gallery {
             .with_reduced_motion(self.reduced_motion)
             .with_direction(self.direction)
             .with_clock_digits(icedtea::i18n::ClockDigits::for_lang(&self.lang));
+        self.ui_face.bind(&self.system_sans);
     }
 
     fn apply_locale(&mut self) {
@@ -2527,7 +2536,23 @@ impl Gallery {
         let mut theme_row = icedtea::iced::widget::Row::new()
             .spacing(24)
             .align_y(Alignment::Center);
-        for kid in icedtea::i18n::order(self.direction, [theme_cluster.into(), language_pick]) {
+        let face = match self.ui_face {
+            fonts::UiFace::System => self.catalog.t("face.system"),
+            fonts::UiFace::Noto => self.catalog.t("face.noto"),
+        };
+        let face_pick = pick(
+            self.catalog.t("look.face"),
+            ["face.noto", "face.system"]
+                .into_iter()
+                .map(|k| self.catalog.t(k).to_string())
+                .collect(),
+            face,
+            Message::UiFace,
+        );
+        for kid in icedtea::i18n::order(
+            self.direction,
+            [theme_cluster.into(), language_pick, face_pick],
+        ) {
             theme_row = theme_row.push(kid);
         }
         let mut look_row = icedtea::iced::widget::Row::new()
@@ -3060,6 +3085,16 @@ impl Gallery {
                     ElevationPolicy::Desktop
                 };
                 self.apply_look();
+            }
+            Message::UiFace(name) => {
+                let system =
+                    name == self.catalog.t("face.system") || name.eq_ignore_ascii_case("system");
+                self.ui_face = if system {
+                    fonts::UiFace::System
+                } else {
+                    fonts::UiFace::Noto
+                };
+                self.ui_face.bind(&self.system_sans);
             }
             Message::Direction(name) => {
                 self.direction = if name == self.catalog.t("dir.rtl") || name == "Right to left" {
@@ -4110,6 +4145,7 @@ impl Gallery {
     }
 
     fn view(&self) -> Element<'_, Message> {
+        self.ui_face.bind(&self.system_sans);
         let tok = self.tokens;
         let sidebar = column![
             container(catalog_header(&self.catalog_query, tok, &self.catalog))
@@ -8499,6 +8535,11 @@ mod tests {
         assert_eq!(g.tokens.elevation, icedtea::m3::ElevationPolicy::Flat);
         let _ = g.update(super::Message::Elevation("Desktop".into()));
         assert_eq!(g.tokens.elevation, icedtea::m3::ElevationPolicy::Desktop);
+        assert_eq!(g.ui_face, super::fonts::UiFace::Noto);
+        let _ = g.update(super::Message::UiFace("system".into()));
+        assert_eq!(g.ui_face, super::fonts::UiFace::System);
+        let _ = g.update(super::Message::UiFace("Noto Sans".into()));
+        assert_eq!(g.ui_face, super::fonts::UiFace::Noto);
         let _ = g.update(super::Message::Direction("Right to left".into()));
         assert_eq!(g.direction, icedtea::i18n::Direction::Rtl);
         let _ = g.update(super::Message::Direction("Left to right".into()));
@@ -8937,6 +8978,10 @@ mod tests {
         assert!(matches!(
             super::parse_inject_line("elevation Flat"),
             Some(super::Message::Elevation(s)) if s == "Flat"
+        ));
+        assert!(matches!(
+            super::parse_inject_line("ui-face system"),
+            Some(super::Message::UiFace(s)) if s == "system"
         ));
         assert!(matches!(
             super::parse_inject_line("direction Right-to-left"),
@@ -9639,6 +9684,7 @@ mod tests {
                 || key.starts_with("density.")
                 || key.starts_with("shape.")
                 || key.starts_with("elevation.")
+                || key.starts_with("face.")
                 || key.starts_with("dir.")
             {
                 continue;
