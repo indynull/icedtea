@@ -15,7 +15,7 @@ use icedtea::collection::{
 };
 use icedtea::i18n::{order, Catalog, Direction, Locale};
 use icedtea::iced::widget::text_editor::Content;
-use icedtea::iced::widget::{button, column, container, mouse_area, row, text, Space};
+use icedtea::iced::widget::{button, column, container, row, text, Space};
 use icedtea::iced::{Alignment, Length, Padding, Subscription, Theme};
 use icedtea::key::KeyContext;
 use icedtea::layout;
@@ -1522,6 +1522,7 @@ enum Message {
     TableScroll(VisibleWindow),
     ListSel(icedtea::collection::ItemClick),
     VcScroll(VisibleWindow),
+    VcClick(icedtea::collection::ItemClick),
     ExpandCard(usize),
     TableCell(icedtea::collection::ItemClick, usize),
     OptSel(usize),
@@ -1847,6 +1848,7 @@ struct Gallery {
     list_card: bool,
     vc_window: VisibleWindow,
     vc_heights: Vec<f32>,
+    vc_sel: Option<usize>,
     expand_open: Option<usize>,
 }
 
@@ -2182,6 +2184,7 @@ impl Gallery {
             list_card: true,
             vc_window: VisibleWindow::new(220.0),
             vc_heights: Vec::new(),
+            vc_sel: None,
             expand_open: None,
         };
         gallery.apply_locale();
@@ -3407,6 +3410,11 @@ impl Gallery {
                 }
             }
             Message::VcScroll(w) => self.vc_window = w,
+            Message::VcClick(click) => {
+                if click.button == icedtea::collection::ItemButton::Primary {
+                    self.vc_sel = Some(click.id);
+                }
+            }
             Message::ExpandCard(i) => {
                 self.expand_open = if self.expand_open == Some(i) {
                     None
@@ -6145,6 +6153,7 @@ impl Gallery {
                     .map(|i| self.list_all.title(i).to_string())
                     .collect();
                 let open_at = self.expand_open;
+                let sel_at = self.vc_sel;
                 let vc_open = self.catalog.t("vc.open").to_string();
                 column![
                     widget::meta(
@@ -6156,14 +6165,16 @@ impl Gallery {
                         &self.vc_heights,
                         self.vc_window,
                         OVERSCAN,
-                        open_at,
+                        open_at.or(sel_at),
                         Message::VcScroll,
+                        Message::VcClick,
                         Some(icedtea::iced::widget::Id::from("gallery-vc")),
                         tok,
                         move |i| {
                             let title =
                                 titles.get(i).cloned().unwrap_or_else(|| format!("row {i}"));
                             let open = open_at == Some(i);
+                            let selected = sel_at == Some(i);
                             let face: Element<'_, Message> = if open {
                                 column![
                                     widget::label(
@@ -6182,16 +6193,13 @@ impl Gallery {
                             } else {
                                 widget::label(title, tok, named(&format!("vc-{i}"), Role::ListItem))
                             };
-                            mouse_area(
-                                container(face)
-                                    .width(Length::Fill)
-                                    .height(Length::Fill)
-                                    .align_x(icedtea::i18n::align_start(tok.direction))
-                                    .padding(8)
-                                    .style(move |_| icedtea::style::card(tok, open)),
-                            )
-                            .on_press(Message::ExpandCard(i))
-                            .into()
+                            container(face)
+                                .width(Length::Fill)
+                                .height(Length::Fill)
+                                .align_x(icedtea::i18n::align_start(tok.direction))
+                                .padding(8)
+                                .style(move |_| icedtea::style::card(tok, selected || open))
+                                .into()
                         },
                         named("vc", Role::List),
                     ))

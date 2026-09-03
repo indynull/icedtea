@@ -60,7 +60,10 @@ Constructor: [`widget::virtual_column`](https://docs.rs/icedtea/latest/icedtea/w
 Same windowing as list (overscan, rail, wheel) for app-built faces —
 expand cards, custom bodies. Build heights with
 `collection::expand_card_heights` (closed estimate plus open-row
-heights). Title/meta model lists stay on `list_view`.
+heights). `on_click` is the same `ItemClick` as `list_view`: primary
+on release is select; secondary on press is context. Activate stays
+Enter or an application message. Title/meta model lists stay on
+`list_view`.
 
 Pass `A11y`.
 

@@ -6615,8 +6615,10 @@ fn card_row<'a, M: 'a>(
 /// (or any per-row slice), keep a [`VisibleWindow`], and build each
 /// mounted index. The clip keeps the pixel offset; `on_scroll` fires
 /// when the mounted range changes or the scroll arrives at 0 or max.
-/// Pass `window.start..window.end` so `view` can build the last
-/// published range. Jump with `scroll_to`
+/// `on_click` is the same [`ItemClick`] as [`list_view`]: primary on
+/// release (select only), secondary on press. Activate stays Enter or
+/// an application message. Pass `window.start..window.end` so `view`
+/// can build the last published range. Jump with `scroll_to`
 /// on `scroll_id`. A new `cover` index that sits outside the viewport
 /// moves the clip so that row is in view. Change `scroll_id` when the
 /// row set is a different list so the clip remounts at 0. This reuses
@@ -6626,19 +6628,21 @@ fn card_row<'a, M: 'a>(
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
-/// use icedtea::collection::{expand_card_heights, VisibleWindow};
+/// use icedtea::collection::{expand_card_heights, ItemClick, VisibleWindow};
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let heights = expand_card_heights(3, 48.0, &[(1, 120.0)]);
 /// let win = VisibleWindow::new(200.0);
-/// let on_scroll = |w| w;
-/// let _: icedtea::Element<'_, _> = widget::virtual_column(
+/// let on_scroll = |_| ();
+/// let on_click = |_: ItemClick| ();
+/// let _: icedtea::Element<'_, ()> = widget::virtual_column(
 ///     &heights,
 ///     win,
 ///     2,
 ///     None,
 ///     on_scroll,
+///     on_click,
 ///     None,
 ///     tok,
 ///     |i| widget::label(format!("row {i}"), tok, A11y::new("r", Role::ListItem)),
@@ -6652,6 +6656,7 @@ pub fn virtual_column<'a, M: Clone + 'a>(
     overscan: usize,
     cover: Option<usize>,
     on_scroll: impl Fn(VisibleWindow) -> M + Copy + 'a,
+    on_click: impl Fn(ItemClick) -> M + Copy + 'a,
     scroll_id: Option<Id>,
     tok: Tokens,
     row: impl Fn(usize) -> Element<'a, M> + 'a,
@@ -6659,6 +6664,7 @@ pub fn virtual_column<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let len = heights.len();
     let prev = window;
+    let disabled = a11y.disabled;
     a11y::attach(
         crate::focus::target(
             virtual_clip(
@@ -6674,7 +6680,19 @@ pub fn virtual_column<'a, M: Clone + 'a>(
                     let mut col = Column::new();
                     for i in win.range() {
                         let h = heights.get(i).copied().unwrap_or(0.0);
-                        col = col.push(container(row(i)).width(Length::Fill).height(h).clip(true));
+                        let face = container(row(i)).width(Length::Fill).height(h).clip(true);
+                        let face: Element<'a, M> = if disabled {
+                            face.into()
+                        } else {
+                            item_press(face.into(), move |button, modifiers| {
+                                on_click(ItemClick {
+                                    id: i,
+                                    button,
+                                    modifiers,
+                                })
+                            })
+                        };
+                        col = col.push(face);
                     }
                     col
                 },
@@ -9940,6 +9958,7 @@ mod tests {
             2,
             None,
             |w| w,
+            |_click| win,
             None,
             tok,
             |_| label("row", tok, A11y::new("r", Role::ListItem)),
@@ -9952,6 +9971,89 @@ mod tests {
         );
         assert_eq!(n, 1);
         assert_eq!(focused, 1);
+    }
+
+    #[test]
+    fn virtual_column_primary_click_selects_on_release() {
+        let tok = named("dark").tokens;
+        let heights = [40.0_f32, 40.0];
+        let win = VisibleWindow::new(80.0);
+        let mut el: Element<'_, ItemClick> = virtual_column(
+            &heights,
+            win,
+            1,
+            None,
+            |_| ItemClick::primary(99),
+            |click| click,
+            None,
+            tok,
+            |i| label(format!("r{i}"), tok, A11y::new("r", Role::ListItem)),
+            A11y::new("cards", Role::List),
+        );
+        let down = press_only(
+            &mut el,
+            iced::Point::new(12.0, 12.0),
+            iced::mouse::Button::Left,
+            Size::new(200.0, 80.0),
+        );
+        assert!(
+            down.iter().all(|c| c.id == 99),
+            "primary must not fire on press, got {down:?}"
+        );
+        let got = press_messages(
+            &mut el,
+            iced::Point::new(12.0, 12.0),
+            iced::mouse::Button::Left,
+            Size::new(200.0, 80.0),
+        );
+        assert!(
+            got.iter().any(|c| c == &ItemClick::primary(0)),
+            "primary release must select the row, got {got:?}"
+        );
+        let right = press_only(
+            &mut el,
+            iced::Point::new(12.0, 12.0),
+            iced::mouse::Button::Right,
+            Size::new(200.0, 80.0),
+        );
+        assert!(
+            right
+                .iter()
+                .any(|c| { c.id == 0 && c.button == ItemButton::Secondary }),
+            "secondary must fire on press, got {right:?}"
+        );
+        let src = include_str!("widget.rs")
+            .split("pub fn virtual_column")
+            .nth(1)
+            .unwrap()
+            .split("/// Emit [`ItemButton`]")
+            .next()
+            .unwrap();
+        assert!(src.contains("item_press"));
+        assert!(src.contains("ItemClick"));
+        assert!(src.contains("on_click"));
+        let mut dead: Element<'_, ItemClick> = virtual_column(
+            &heights,
+            win,
+            1,
+            None,
+            |_| ItemClick::primary(99),
+            |click| click,
+            None,
+            tok,
+            |i| label(format!("r{i}"), tok, A11y::new("r", Role::ListItem)),
+            A11y::new("cards", Role::List).with_disabled(true),
+        );
+        let dead_got = press_messages(
+            &mut dead,
+            iced::Point::new(12.0, 12.0),
+            iced::mouse::Button::Left,
+            Size::new(200.0, 80.0),
+        );
+        assert!(
+            dead_got.iter().all(|c| c.id == 99),
+            "disabled rows must not emit ItemClick, got {dead_got:?}"
+        );
     }
 
     #[test]
@@ -14093,6 +14195,7 @@ mod tests {
             2,
             Some(2),
             |_| (),
+            |_| (),
             Some(Id::from("vc-scroll")),
             tok,
             |i| label(format!("r{i}"), tok, A11y::new("r", Role::ListItem)),
@@ -14105,6 +14208,7 @@ mod tests {
             VisibleWindow::new(80.0),
             0,
             None,
+            |_| (),
             |_| (),
             None,
             tok,
@@ -14146,6 +14250,7 @@ mod tests {
             4,
             None,
             |w| w,
+            |_| window,
             None,
             tok,
             |i| label(format!("r{i}"), tok, A11y::new("r", Role::ListItem)),

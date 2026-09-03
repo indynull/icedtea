@@ -8,6 +8,8 @@
   `auto` 87% / 60% for body and mute).
 - `search_input` is one Search-radius bar: leading glass, value, and
   optional clear sit inside that face at control height.
+- `virtual_column` emits `ItemClick` on each mounted row, the same
+  click as `list_view`. Primary is select on release.
 
 ### Bug fix
 
