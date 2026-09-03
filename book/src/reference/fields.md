@@ -109,12 +109,13 @@ Constructor: [`widget::search_input`](https://docs.rs/icedtea/latest/icedtea/wid
 [iced](https://crates.io/crates/iced)
 
 Use for palette and list filters. Empty query means “show all”.
-The placeholder is the a11y name. Pass submit for Enter and an
-input id when the application must focus the field. Pass
-`highlight` to run a syntax highlighter on the typed query
-(`FieldRun` slices, same roles as `FieldOpts`). The application
-owns the matcher. Pass `on_clear` for the trailing clear mark; it
-paints only when the value is non-empty.
+One Search-radius bar at control height: leading glass, value, and
+optional clear sit inside that face. The placeholder is the a11y
+name. Pass submit for Enter and an input id when the application
+must focus the field. Pass `highlight` to run a syntax highlighter
+on the typed query (`FieldRun` slices, same roles as `FieldOpts`).
+The application owns the matcher. Pass `on_clear` for the trailing
+clear mark; it paints only when the value is non-empty.
 
 Pass `A11y`.
 

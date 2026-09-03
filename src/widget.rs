@@ -2908,14 +2908,15 @@ pub fn editor_style(
     }
 }
 
-/// A query field with a search icon.
+/// A query field: one Search-radius bar with the glass inside.
 ///
 /// Use for palette and list filters. Empty query means show all.
 /// Placeholder is the a11y name. `on_submit` is Enter. `input_id`
 /// focuses the field (palette, find-in-page).
 /// `highlight` is a syntax highlighter: byte ranges the application
 /// computed. Empty is one ink. Corners follow [`Tokens::shape`]
-/// ([`crate::m3::shape::Component::Search`]).
+/// ([`crate::m3::shape::Component::Search`]). Leading glass, value,
+/// and optional clear sit inside that face at one control height.
 ///
 ///
 /// ```
@@ -2956,9 +2957,15 @@ pub fn search_input<'a, M: Clone + 'a>(
     };
     let field_a11y = a11y.child(Role::TextBox).merge_value(value.to_string());
     let hide_value = field_runs_hide_value(value, highlight);
+    let paint = style::search_style_paint(tok, hide_value);
     let mut i = iced_text_input(&placeholder, value)
-        .style(style::search_style_paint(tok, hide_value))
-        .padding(pad(tok))
+        .style(move |theme, status| {
+            let mut face = paint(theme, status);
+            face.background = iced::Background::Color(iced::Color::TRANSPARENT);
+            face.border.width = 0.0;
+            face
+        })
+        .padding(Padding::from([0.0, 0.0]))
         .size(tok.body())
         .align_x(crate::i18n::align_x_start(tok.direction));
     let mount_id = input_id.clone();
@@ -2975,7 +2982,7 @@ pub fn search_input<'a, M: Clone + 'a>(
     let field: Element<'a, M> = a11y::attach(
         container(painted)
             .width(Length::Fill)
-            .height(Length::Fixed(control_height(tok)))
+            .height(Length::Fill)
             .into(),
         &field_a11y,
     );
@@ -2987,16 +2994,30 @@ pub fn search_input<'a, M: Clone + 'a>(
                 if a11y.disabled { None } else { Some(clear) },
                 tok,
                 Variant::Ghost,
-                ControlSize::Default,
+                ControlSize::Compact,
                 A11y::button("Clear search").with_disabled(a11y.disabled),
             ));
         }
     }
-    let mut r = Row::new().spacing(gap(tok)).align_y(Alignment::Center);
+    let (pl, pr) = crate::i18n::inline_pad(tok.direction, inset(tok), inset(tok));
+    let mut r = Row::new()
+        .spacing(crate::m3::density::GRID as f32)
+        .align_y(Alignment::Center)
+        .padding(Padding {
+            top: 0.0,
+            right: pr,
+            bottom: 0.0,
+            left: pl,
+        });
     for kid in crate::i18n::order(tok.direction, kids) {
         r = r.push(kid);
     }
-    let el = a11y::attach(r.into(), &a11y);
+    let disabled = a11y.disabled;
+    let face = container(r)
+        .width(Length::Fill)
+        .height(Length::Fixed(control_height(tok)))
+        .style(move |_| style::search_face(tok, disabled));
+    let el = a11y::attach(face.into(), &a11y);
     match mount_id {
         Some(id) => crate::focus::cycle(el, Some(id)),
         None => el,
@@ -13402,11 +13423,15 @@ mod tests {
         assert!((kids[0].x + kids[0].width - 400.0).abs() < 1.0);
     }
 
-    fn search_clear_row_len(value: &str, on_clear: Option<()>) -> usize {
+    fn search_layout(
+        value: &str,
+        on_clear: Option<()>,
+        dir: crate::i18n::Direction,
+    ) -> iced::advanced::layout::Node {
         use iced::advanced::layout::Limits;
         use iced::advanced::widget::Tree;
         use iced::{Font, Pixels, Size};
-        let tok = named("dark").tokens;
+        let tok = named("dark").tokens.with_direction(dir);
         let mut el: Element<'_, ()> = search_input(
             value,
             |_| (),
@@ -13422,18 +13447,95 @@ mod tests {
             Font::DEFAULT,
             Pixels::from(16u32),
         ));
-        let limits = Limits::new(Size::ZERO, Size::new(400.0, 80.0));
-        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
-        let row = node.children().first().expect("search a11y row");
-        row.children().len()
+        el.as_widget_mut().layout(
+            &mut tree,
+            &renderer,
+            &Limits::new(Size::ZERO, Size::new(400.0, 80.0)),
+        )
+    }
+
+    fn search_row(node: &iced::advanced::layout::Node) -> Option<&iced::advanced::layout::Node> {
+        let kids = node.children();
+        if (kids.len() == 2 || kids.len() == 3)
+            && kids.iter().any(|k| k.bounds().width <= 32.0)
+            && kids.iter().any(|k| k.bounds().width > 80.0)
+        {
+            return Some(node);
+        }
+        kids.iter().find_map(search_row)
+    }
+
+    fn search_row_marks(node: &iced::advanced::layout::Node) -> Vec<iced::Rectangle> {
+        search_row(node)
+            .map(|row| {
+                row.children()
+                    .iter()
+                    .map(|k| k.bounds())
+                    .filter(|b| b.width <= 32.0)
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    fn search_clear_mark_count(value: &str, on_clear: Option<()>) -> usize {
+        search_row_marks(&search_layout(value, on_clear, crate::i18n::Direction::Ltr)).len()
     }
 
     #[test]
     fn search_clear_omits_the_mark_when_the_value_is_empty() {
-        assert_eq!(search_clear_row_len("", Some(())), 2);
-        assert_eq!(search_clear_row_len("q", Some(())), 3);
-        assert_eq!(search_clear_row_len("q", None), 2);
-        assert_eq!(search_clear_row_len("", None), 2);
+        assert_eq!(search_clear_mark_count("", Some(())), 1);
+        assert_eq!(search_clear_mark_count("q", Some(())), 2);
+        assert_eq!(search_clear_mark_count("q", None), 1);
+        assert_eq!(search_clear_mark_count("", None), 1);
+    }
+
+    #[test]
+    fn search_glass_and_clear_sit_inside_the_face() {
+        use crate::i18n::Direction;
+        let empty = search_layout("", None, Direction::Ltr);
+        let filled = search_layout("query", Some(()), Direction::Ltr);
+        must(
+            (empty.bounds().height - filled.bounds().height).abs() <= 1.0,
+            format!(
+                "search with clear ({}) must stay one control height ({})",
+                filled.bounds().height,
+                empty.bounds().height
+            ),
+        );
+        let face = filled.bounds();
+        let marks = search_row_marks(&filled);
+        must(
+            marks.len() == 2,
+            format!("glass and clear, got {}", marks.len()),
+        );
+        for mark in &marks {
+            must(
+                mark.x >= face.x + 1.0
+                    && mark.y >= face.y - 0.5
+                    && mark.x + mark.width <= face.x + face.width - 1.0
+                    && mark.y + mark.height <= face.y + face.height + 0.5,
+                format!("mark {mark:?} must sit inside the search face {face:?}"),
+            );
+        }
+        let rtl = search_layout("", None, Direction::Rtl);
+        let glass = search_row_marks(&rtl)
+            .into_iter()
+            .next()
+            .expect("search glass");
+        must(
+            glass.x > rtl.bounds().width / 2.0,
+            format!("RTL glass must sit on start, got x={}", glass.x),
+        );
+        let src = include_str!("widget.rs")
+            .split("pub fn search_input")
+            .nth(1)
+            .unwrap()
+            .split("pub fn pick_list")
+            .next()
+            .unwrap();
+        assert!(src.contains("search_style_paint"));
+        assert!(src.contains("search_face"));
+        assert!(src.contains("border.width = 0.0") || src.contains("width: 0.0"));
     }
 
     #[test]

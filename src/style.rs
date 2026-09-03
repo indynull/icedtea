@@ -746,6 +746,29 @@ pub fn search_style_paint(
     }
 }
 
+/// One Search-radius bar. Inner `text_input` chrome is off; this is the face.
+pub fn search_face(tok: Tokens, disabled: bool) -> container::Style {
+    let s = tok.scheme();
+    let (bg, border_c) = if disabled {
+        (
+            layer_on(s.surface, s.on_surface, 0.04),
+            s.on_surface.scale_alpha(0.12),
+        )
+    } else {
+        (s.surface_container_highest, s.outline)
+    };
+    container::Style {
+        background: Some(Background::Color(bg)),
+        border: Border {
+            color: border_c,
+            width: 1.0,
+            radius: component_radius(tok, Component::Search),
+        },
+        snap: false,
+        ..container::Style::default()
+    }
+}
+
 pub fn picker_style(tok: Tokens) -> impl Fn(&iced::Theme, pick_list::Status) -> pick_list::Style {
     move |_theme, status| {
         let s = tok.scheme();
@@ -1601,23 +1624,29 @@ mod tests {
         assert_eq!(open.border.width, 1.0);
         assert_ne!(open.border.color, tok.scheme().primary);
         let _ = overlay_menu_style(tok)(&theme);
-        let pill = tok.with_shape(crate::m3::ShapePolicy::Pill);
-        let soft = tok.with_shape(crate::m3::ShapePolicy::Soft);
-        assert_eq!(
-            overlay_menu_style(pill)(&theme).border.radius.top_left,
-            crate::m3::Shape::ExtraSmall.dp()
-        );
-        assert_eq!(
-            overlay_menu_style(soft)(&theme).border.radius.top_left,
-            crate::m3::Shape::ExtraSmall.dp()
-        );
-        assert!(
-            overlay_menu_style(pill)(&theme).border.radius.top_left
-                < picker_style(pill)(&theme, pick_list::Status::Active)
+        for policy in [
+            crate::m3::ShapePolicy::Desktop,
+            crate::m3::ShapePolicy::Tight,
+            crate::m3::ShapePolicy::Soft,
+            crate::m3::ShapePolicy::Pill,
+            crate::m3::ShapePolicy::Material,
+        ] {
+            let look = tok.with_shape(policy);
+            assert_eq!(
+                overlay_menu_style(look)(&theme).border.radius.top_left,
+                picker_style(look)(&theme, pick_list::Status::Active)
                     .border
                     .radius
-                    .top_left
-        );
+                    .top_left,
+                "menu radius matches the closed field on {policy:?}"
+            );
+            assert_eq!(
+                search_face(look, false).border.radius.top_left,
+                crate::m3::Component::Search.radius_for(policy).top_left,
+                "search face follows Search on {policy:?}"
+            );
+            let _ = search_face(look, true);
+        }
         let c = checkbox_style(tok);
         let _ = c(&theme, checkbox::Status::Active { is_checked: true });
         let _ = c(&theme, checkbox::Status::Active { is_checked: false });

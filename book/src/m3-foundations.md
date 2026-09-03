@@ -48,12 +48,10 @@ on `Tokens` picks the map:
 - **Desktop** — every family is shape **None** (0 dp). This is the default.
 - **Tight / Soft** — one corner (4 / 12 dp) on rounded families. Tabs,
   app bars, banners, and exclusive segments stay flush (0 dp).
-  Checkbox and menus stay extra-small (4 dp): iced paints the menu
-  radius on each selected row, so Medium reads as a stack of pills.
+  Checkbox stays extra-small (4 dp) so the box is not a circle.
 - **Pill** — buttons, chips, badges, search, and tracks are full; cards,
-  fields, dialogs, toasts, and tooltips stay boxes (12 dp); menus stay
-  extra-small (4 dp); tabs, app bars, banners, and exclusive segments
-  stay flush.
+  fields, menus, dialogs, toasts, and tooltips stay boxes (12 dp);
+  tabs, app bars, banners, and exclusive segments stay flush.
 - **Material** — buttons extra-small, chips and badges small (8 dp),
   toasts and tooltips extra-small (4 dp), cards medium, dialogs and
   search extra-large (28 dp), tracks full, flush chrome None.

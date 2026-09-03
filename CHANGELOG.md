@@ -6,11 +6,18 @@
 
 - `theme::auto_ink` mixes white or black onto a canvas (Textual
   `auto` 87% / 60% for body and mute).
+- `search_input` is one Search-radius bar: leading glass, value, and
+  optional clear sit inside that face at control height.
 
 ### Bug fix
 
 - Named catalog colorways use that ink, not the dumped Textual
   foreground.
+- `focus::target` paints the ring on a layer above the child, so a
+  selected wash on the first or last `virtual_column` row cannot cover
+  it.
+- Menu corners follow the closed field on every `ShapePolicy`
+  (Desktop, Tight, Soft, Pill, and Material).
 
 ## 0.16.0 — 2026-09-02
 

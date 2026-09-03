@@ -419,16 +419,24 @@ impl<'a, Message: Clone> iced::advanced::Widget<Message, iced::Theme, iced::Rend
         if !focused || !self.paint_ring {
             return;
         }
+        let bounds = layout.bounds();
+        let Some(layer) = bounds.intersection(viewport) else {
+            return;
+        };
         let face = ring(self.tok, true);
-        iced::advanced::Renderer::fill_quad(
-            renderer,
-            iced::advanced::renderer::Quad {
-                bounds: ring_bounds(layout.bounds(), crate::m3::density::GRID as f32),
-                border: face.border,
-                ..iced::advanced::renderer::Quad::default()
-            },
-            iced::Background::Color(iced::Color::TRANSPARENT),
-        );
+        // Later layer than a child's `with_layer` clip so a selected
+        // wash on the first or last row cannot cover the stroke.
+        iced::advanced::Renderer::with_layer(renderer, layer, |renderer| {
+            iced::advanced::Renderer::fill_quad(
+                renderer,
+                iced::advanced::renderer::Quad {
+                    bounds: ring_bounds(bounds, crate::m3::density::GRID as f32),
+                    border: face.border,
+                    ..iced::advanced::renderer::Quad::default()
+                },
+                iced::Background::Color(iced::Color::TRANSPARENT),
+            );
+        });
     }
 
     fn operate(
@@ -1069,6 +1077,28 @@ mod tests {
             assert_eq!(op.n, 0, "empty or disabled target is not focusable");
             false
         }
+    }
+
+    #[test]
+    fn focused_ring_paints_on_a_layer_above_the_child() {
+        let src = include_str!("focus.rs");
+        let body = src
+            .split("for Target<'a, Message>")
+            .nth(1)
+            .expect("Target widget")
+            .split("fn operate(")
+            .next()
+            .expect("Target draw");
+        let child = body
+            .find("self.content.as_widget().draw")
+            .expect("target draws the child");
+        let layer = body
+            .find("with_layer")
+            .expect("ring must use with_layer so a clip row cannot cover it");
+        assert!(
+            layer > child,
+            "ring layer must start after the child so first and last rows stay under the stroke"
+        );
     }
 
     #[test]

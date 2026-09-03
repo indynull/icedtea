@@ -112,9 +112,7 @@ pub enum ShapePolicy {
     /// Checkbox stays extra-small so the box is not a circle.
     Soft,
     /// Full stadium on buttons, chips, badges, search, and tracks.
-    /// Cards, fields, dialogs, toasts, and tooltips stay boxes.
-    /// Menus stay extra-small: iced paints that radius on each selected
-    /// row, so Medium reads as a stack of pills.
+    /// Cards, fields, menus, dialogs, toasts, and tooltips stay boxes.
     /// Tabs, app bars, banners, and exclusive segments stay flush.
     Pill,
     /// Documented Material map (buttons extra-small, chips and badges
@@ -143,7 +141,7 @@ impl Component {
             ShapePolicy::Soft => {
                 if self.is_flush() {
                     Shape::None
-                } else if matches!(self, Self::Checkbox | Self::Menu) {
+                } else if matches!(self, Self::Checkbox) {
                     Shape::ExtraSmall
                 } else {
                     Shape::Medium
@@ -167,8 +165,9 @@ impl Component {
             Self::Button | Self::Chip | Self::Badge | Self::Search | Self::Track => Shape::Full,
             Self::AppBar | Self::Shell | Self::Tab | Self::Banner | Self::Segment => Shape::None,
             Self::Checkbox => Shape::ExtraSmall,
-            Self::Menu => Shape::ExtraSmall,
-            Self::Field | Self::Card | Self::Dialog | Self::Toast | Self::Tooltip => Shape::Medium,
+            Self::Field | Self::Card | Self::Menu | Self::Dialog | Self::Toast | Self::Tooltip => {
+                Shape::Medium
+            }
         }
     }
 
@@ -290,7 +289,7 @@ mod tests {
                 assert_eq!(c.shape_for(ShapePolicy::Soft), Shape::None, "{c:?}");
                 assert_eq!(c.shape_for(ShapePolicy::Pill), Shape::None, "{c:?}");
                 assert_eq!(c.shape_for(ShapePolicy::Material), Shape::None, "{c:?}");
-            } else if matches!(c, Component::Checkbox | Component::Menu) {
+            } else if matches!(c, Component::Checkbox) {
                 assert_eq!(c.shape_for(ShapePolicy::Tight), Shape::ExtraSmall);
                 assert_eq!(c.shape_for(ShapePolicy::Soft), Shape::ExtraSmall);
             } else {
@@ -302,10 +301,7 @@ mod tests {
         assert_eq!(Component::Chip.shape_for(ShapePolicy::Pill), Shape::Full);
         assert_eq!(Component::Badge.shape_for(ShapePolicy::Pill), Shape::Full);
         assert_eq!(Component::Card.shape_for(ShapePolicy::Pill), Shape::Medium);
-        assert_eq!(
-            Component::Menu.shape_for(ShapePolicy::Pill),
-            Shape::ExtraSmall
-        );
+        assert_eq!(Component::Menu.shape_for(ShapePolicy::Pill), Shape::Medium);
         assert_eq!(
             Component::Dialog.shape_for(ShapePolicy::Pill),
             Shape::Medium
@@ -407,6 +403,19 @@ mod tests {
             Component::Field.radius_for(ShapePolicy::Tight).top_left,
             4.0
         );
+        for policy in [
+            ShapePolicy::Desktop,
+            ShapePolicy::Tight,
+            ShapePolicy::Soft,
+            ShapePolicy::Pill,
+            ShapePolicy::Material,
+        ] {
+            assert_eq!(
+                Component::Menu.shape_for(policy),
+                Component::Field.shape_for(policy),
+                "menu overlay matches the closed field on {policy:?}"
+            );
+        }
         assert_eq!(ShapePolicy::default(), ShapePolicy::Desktop);
     }
 
