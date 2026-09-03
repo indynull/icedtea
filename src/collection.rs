@@ -248,7 +248,21 @@ pub enum RowSlot {
     Icon(crate::icon::Icon),
     Check(bool),
     /// Short caption; `list_view` paints it with [`crate::widget::badge`].
-    Text(String),
+    /// [`Self::text`] is Quiet. Pass `variant` for state or priority ink.
+    Text {
+        title: String,
+        variant: crate::variant::Variant,
+    },
+}
+
+impl RowSlot {
+    /// Quiet text badge. Use [`Self::Text`] when the mark needs a role.
+    pub fn text(title: impl Into<String>) -> Self {
+        Self::Text {
+            title: title.into(),
+            variant: crate::variant::Variant::Quiet,
+        }
+    }
 }
 
 pub trait ListModel {
@@ -1342,12 +1356,12 @@ mod tests {
         assert!(folder.dir);
         assert!(folder.children.is_empty());
         assert!(!TreeNode::leaf(8, "file").dir);
-        let marked = TreeNode::leaf(2, "lib.rs").with_trailing(RowSlot::Text("rs".into()));
-        assert_eq!(marked.trailing, RowSlot::Text("rs".into()));
+        let marked = TreeNode::leaf(2, "lib.rs").with_trailing(RowSlot::text("rs"));
+        assert_eq!(marked.trailing, RowSlot::text("rs"));
         let root = TreeNode::branch(1, "src", vec![marked]);
         assert_eq!(
             root.find(2).map(|n| n.trailing.clone()),
-            Some(RowSlot::Text("rs".into()))
+            Some(RowSlot::text("rs"))
         );
         assert_eq!(
             root.find(1).map(|n| n.trailing.clone()),
@@ -1370,13 +1384,27 @@ mod tests {
         assert_eq!(list.leading(9), RowSlot::Empty);
         let marked = ListRow::new("child")
             .with_indent(16)
-            .with_trailing(RowSlot::Text("A".into()));
+            .with_trailing(RowSlot::text("A"));
         assert_eq!(marked.indent, 16);
         let forest = VecList {
             items: vec![marked],
         };
         assert_eq!(forest.indent(0), 16.0);
-        assert_eq!(forest.trailing(0), RowSlot::Text("A".into()));
+        assert_eq!(forest.trailing(0), RowSlot::text("A"));
+        assert_eq!(
+            RowSlot::text("A"),
+            RowSlot::Text {
+                title: "A".into(),
+                variant: crate::variant::Variant::Quiet,
+            }
+        );
+        assert_ne!(
+            RowSlot::Text {
+                title: "A".into(),
+                variant: crate::variant::Variant::Danger,
+            },
+            RowSlot::text("A")
+        );
         assert_eq!(forest.indent(3), 0.0);
         let mut tabs = Tabs::new(["A", "B", "C"]).with_badge(0, "2");
         assert_eq!(tabs.badges[0], "2");

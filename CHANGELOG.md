@@ -10,6 +10,9 @@
   optional clear sit inside that face at control height.
 - `virtual_column` emits `ItemClick` on each mounted row, the same
   click as `list_view`. Primary is select on release.
+- Outline `tree_view` wraps the title in the leftover row width.
+  Files stays one clipped line.
+- `RowSlot::Text` takes a `Variant`. `RowSlot::text` is Quiet.
 
 ### Bug fix
 

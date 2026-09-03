@@ -1000,7 +1000,10 @@ fn sample_mail_localized(i: usize, cat: &Catalog) -> ListRow {
         .with_leading(icedtea::collection::RowSlot::Check(i % 4 == 0));
     if i % 6 == 1 {
         row.with_indent(16)
-            .with_trailing(icedtea::collection::RowSlot::Text("A".into()))
+            .with_trailing(icedtea::collection::RowSlot::Text {
+                title: "A".into(),
+                variant: icedtea::variant::Variant::Danger,
+            })
     } else {
         row.with_trailing(icedtea::collection::RowSlot::Icon(
             icedtea::icon::Icon::Search,
@@ -1969,22 +1972,22 @@ impl Gallery {
                         2,
                         "src",
                         vec![
-                            TreeNode::leaf(3, "lib.rs").with_trailing(RowSlot::Text("rs".into())),
+                            TreeNode::leaf(3, "lib.rs").with_trailing(RowSlot::text("rs")),
                             TreeNode::leaf(4, "catalog.rs")
-                                .with_trailing(RowSlot::Text("rs".into())),
+                                .with_trailing(RowSlot::text("rs")),
                             TreeNode::leaf(5, "widget.rs")
-                                .with_trailing(RowSlot::Text("rs".into())),
+                                .with_trailing(RowSlot::text("rs")),
                         ],
                     )
-                    .with_trailing(RowSlot::Text("3".into())),
+                    .with_trailing(RowSlot::text("3")),
                     TreeNode::branch(
                         6,
                         "book",
                         vec![
                             TreeNode::leaf(7, "install.md")
-                                .with_trailing(RowSlot::Text("md".into())),
+                                .with_trailing(RowSlot::text("md")),
                             TreeNode::leaf(8, "introduction.md")
-                                .with_trailing(RowSlot::Text("md".into())),
+                                .with_trailing(RowSlot::text("md")),
                         ],
                     ),
                     TreeNode::folder(9, "assets"),

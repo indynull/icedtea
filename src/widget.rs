@@ -916,10 +916,10 @@ pub enum CardFace {
 
 /// How each tree row is painted.
 ///
-/// [`Self::Outline`] is a tight heading tree: no folder marks.
-/// [`Self::Files`] is an explorer: folder and file marks from `dir`.
-/// Both paint the selected wash across the full row. Density still
-/// scales pad and indent.
+/// [`Self::Outline`] is a tight heading tree: no folder marks; the
+/// title wraps. [`Self::Files`] is an explorer: folder and file marks
+/// from `dir`, one clipped title line. Both paint the selected wash
+/// across the full row. Density still scales pad and indent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TreeFace {
     #[default]
@@ -6424,13 +6424,13 @@ fn row_slot_face<'a, M: Clone + 'a>(
         crate::collection::RowSlot::Icon(icon) => {
             icon_svg(icon, tok, A11y::new("row-icon", Role::Image))
         }
-        crate::collection::RowSlot::Text(mark) => badge(
-            mark.clone(),
+        crate::collection::RowSlot::Text { title, variant } => badge(
+            title.clone(),
             None,
             tok,
-            Variant::Quiet,
+            variant,
             BadgeSize::Small,
-            A11y::new(mark, Role::Status),
+            A11y::new(title, Role::Status),
         ),
         crate::collection::RowSlot::Check(on) => {
             let s = tok.scheme();
@@ -7048,7 +7048,8 @@ pub struct ListOpts<'a, Rh, Scroll, Color, FaceH, Check, Ctx> {
 /// the row set is a different list (filter, page, session) so the clip
 /// remounts at 0. `scroll_id` names the clip pane. The
 /// 24px rail sits beside it. `ListModel::indent` insets
-/// the row from start. `RowSlot::Text` paints a small badge.
+/// the row from start. `RowSlot::Text` paints a small badge
+/// (`RowSlot::text` is Quiet).
 ///
 ///
 /// ```
@@ -7626,7 +7627,9 @@ where
 /// `animating` is the branch that is opening or closing and its 0–1
 /// height progress. `None` paints the committed tree.
 /// `TreeNode::trailing` is the same [`crate::collection::RowSlot`] as
-/// `list_view`; [`crate::collection::RowSlot::Text`] is a badge.
+/// `list_view`; [`crate::collection::RowSlot::Text`] is a badge
+/// (`RowSlot::text` is Quiet). Outline wraps the title; Files stays
+/// one clipped line.
 ///
 ///
 /// ```
@@ -7636,7 +7639,7 @@ where
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let tree = TreeNode::leaf(1, "lib.rs")
-///     .with_trailing(icedtea::collection::RowSlot::Text("rs".into()));
+///     .with_trailing(icedtea::collection::RowSlot::text("rs"));
 /// #[derive(Clone, Copy)]
 /// enum Msg {
 ///     Toggle(u64),
@@ -7823,18 +7826,24 @@ fn tree_line<'a, M: Clone + 'a>(
     };
     let start = crate::i18n::align_start(tok.direction);
     let v = gap(tok);
-    let title = container(start_label(
+    let wrap = match face {
+        TreeFace::Outline => iced::widget::text::Wrapping::Word,
+        TreeFace::Files => iced::widget::text::Wrapping::None,
+    };
+    let mut title = container(start_label(
         label_s.clone(),
         tok.body(),
         tok.scheme().on_surface,
         typo::UI,
-        iced::widget::text::Wrapping::None,
+        wrap,
         tok.direction,
     ))
     .width(Length::Fill)
     .align_x(start)
-    .padding([v / 2.0, v])
-    .clip(true);
+    .padding([v / 2.0, v]);
+    if face == TreeFace::Files {
+        title = title.clip(true);
+    }
     let pick: Element<'a, M> = if a11y.disabled {
         title.into()
     } else {
@@ -13906,12 +13915,12 @@ mod tests {
         let marked = TreeNode::branch(
             1,
             "src",
-            vec![TreeNode::leaf(2, "lib.rs").with_trailing(RowSlot::Text("rs".into()))],
+            vec![TreeNode::leaf(2, "lib.rs").with_trailing(RowSlot::text("rs"))],
         );
         assert_eq!(empty.find(2).map(|n| &n.trailing), Some(&RowSlot::Empty));
         assert_eq!(
             marked.find(2).map(|n| n.trailing.clone()),
-            Some(RowSlot::Text("rs".into()))
+            Some(RowSlot::text("rs"))
         );
         for face in [TreeFace::Outline, TreeFace::Files] {
             let mut bare: Element<'_, ()> = tree_view(
@@ -13959,7 +13968,7 @@ mod tests {
         let root = TreeNode::branch(
             1,
             "src",
-            vec![TreeNode::leaf(2, "introduction.md").with_trailing(RowSlot::Text("md".into()))],
+            vec![TreeNode::leaf(2, "introduction.md").with_trailing(RowSlot::text("md"))],
         );
         let mut el: Element<'_, ()> = tree_view(
             &root,
@@ -13994,6 +14003,76 @@ mod tests {
         assert_eq!(pairs.len(), 1, "expected the Files leaf title and badge");
         let (title, badge) = pairs[0];
         assert!(title.x + title.width <= badge.x + 0.5);
+    }
+
+    #[test]
+    fn outline_tree_wraps_the_title_files_stay_one_line() {
+        use iced::advanced::layout::Limits;
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+        let tok = named("dark").tokens;
+        let long = "A long heading that must wrap inside a narrow outline pane";
+        let root = TreeNode::leaf(1, long);
+        fn row_h(node: &iced::advanced::layout::Node) -> f32 {
+            let b = node.bounds();
+            let mut h = if b.width > 80.0 && b.height > 8.0 && b.height < 200.0 {
+                b.height
+            } else {
+                0.0
+            };
+            for kid in node.children() {
+                h = h.max(row_h(kid));
+            }
+            h
+        }
+        let height = |face: TreeFace| {
+            let mut el: Element<'_, ()> = tree_view(
+                &root,
+                None,
+                None,
+                |_| (),
+                |_| (),
+                face,
+                tok,
+                A11y::new("tree", Role::Tree),
+            );
+            let mut tree = Tree::new(el.as_widget());
+            let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+                Font::DEFAULT,
+                Pixels::from(16u32),
+            ));
+            let node = el.as_widget_mut().layout(
+                &mut tree,
+                &renderer,
+                &Limits::new(Size::ZERO, Size::new(160.0, 400.0)),
+            );
+            row_h(&node)
+        };
+        let outline = height(TreeFace::Outline);
+        let files = height(TreeFace::Files);
+        must(
+            outline > files + 4.0,
+            format!("outline ({outline}) must wrap taller than files ({files})"),
+        );
+        let line_src = include_str!("widget.rs")
+            .split("fn tree_line")
+            .nth(1)
+            .unwrap()
+            .split("fn tree_push_branch")
+            .next()
+            .unwrap();
+        assert!(line_src.contains("Wrapping::Word"));
+        assert!(line_src.contains("Wrapping::None"));
+        assert!(line_src.contains("TreeFace::Files"));
+        let slot_src = include_str!("widget.rs")
+            .split("fn row_slot_face")
+            .nth(1)
+            .unwrap()
+            .split("fn row_slot_el")
+            .next()
+            .unwrap();
+        assert!(slot_src.contains("variant"));
+        assert!(!slot_src.contains("Variant::Quiet"));
     }
 
     #[test]
@@ -17289,7 +17368,7 @@ mod tests {
             items: vec![crate::collection::ListRow::new("child")
                 .with_indent(16)
                 .with_leading(crate::collection::RowSlot::Check(false))
-                .with_trailing(crate::collection::RowSlot::Text("A".into()))],
+                .with_trailing(crate::collection::RowSlot::text("A"))],
         };
         let mut flat_el: Element<'_, usize> = list_view(
             &check_only,

@@ -39,7 +39,8 @@ selected row keeps the selection. Disabled drops row messages. Pass `RowHeights:
 row heights (`visible_range_var`). `RowFace::Flush` is one clipped
 line. `RowFace::Card` is a surface, wrapped title, and an optional
 3px meter. `ListModel::leading` / `trailing` paint `RowSlot::Icon`,
-`RowSlot::Check`, or `RowSlot::Text` (a small badge) on the same
+`RowSlot::Check`, or `RowSlot::Text` (a small badge; `RowSlot::text`
+is Quiet, or pass a `Variant` for role ink) on the same
 virtualized rows. `ListModel::indent` insets a row from start.
 `on_check` toggles a check slot.
 A focused list moves the primary row with arrows, Page, Home, and
@@ -126,11 +127,12 @@ Constructor: [`widget::tree_view`](https://docs.rs/icedtea/latest/icedtea/widget
 The application owns expand state. Leaf rows have no twisty. Empty
 tree is an empty column. `animating` is the branch that is opening or
 closing and its 0–1 height progress. [`TreeFace::Outline`](https://docs.rs/icedtea/latest/icedtea/widget/enum.TreeFace.html)
-is a tight heading tree. `TreeFace::Files` is an explorer: folder
-and file marks from `dir`. Selected wash covers the full row. `Tokens.density` scales
+is a tight heading tree; titles wrap in the leftover row width.
+`TreeFace::Files` is an explorer: folder and file marks from `dir`,
+one clipped title line. Selected wash covers the full row. `Tokens.density` scales
 pad, gap, and indent. `TreeNode::trailing` is the same
 [`RowSlot`](https://docs.rs/icedtea/latest/icedtea/collection/enum.RowSlot.html)
-as `list_view`; `Text` is a badge.
+as `list_view`; `Text` is a badge (`RowSlot::text` is Quiet).
 A focused tree expands and collapses with arrows. Up and Down move
 the selection.
 
