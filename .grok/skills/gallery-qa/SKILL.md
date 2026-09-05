@@ -155,6 +155,13 @@ Shots land under `tmp/gallery-qa/<timestamp>/` (or `--out DIR`).
     or `visual.md` line that matches a wrong assignment is not the
     pass — fix the constructor, then recapture. The unit check is
     `style::tests::resting_elevation_matches_material_table`.
+18. **Composite focus.** A list, virtual column, grid, table, or tree
+    must not grow a Field-radius ring around the pane. Score the item
+    face (row wash, outlined tile). A second stadium wrapping two
+    cards or the whole tile wall is **broken**.
+19. **Icon fields.** After changing pad, icon size, or field height,
+    `read_file` the still. Search glass and placeholder share the bar
+    midline. A layout test is not that look.
 
 ## Loop (do this)
 

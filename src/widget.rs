@@ -350,18 +350,23 @@ fn sized_control_height(tok: Tokens, size: ControlSize) -> f32 {
 }
 
 /// Control on the start edge, label after it (box then text in LTR).
-fn labeled_control<'a, M: 'a>(
+/// `on_label` is the same press as the mark so the caption stays live.
+fn labeled_control<'a, M: Clone + 'a>(
     control: Element<'a, M>,
     name: String,
     tok: Tokens,
     muted: bool,
+    on_label: Option<M>,
 ) -> Element<'a, M> {
     let ink = if muted {
         tok.scheme().on_surface_variant
     } else {
         tok.scheme().on_surface
     };
-    let label: Element<'a, M> = text(name).size(tok.body()).color(ink).into();
+    let mut label: Element<'a, M> = text(name).size(tok.body()).color(ink).into();
+    if let Some(msg) = on_label {
+        label = mouse_area(label).on_press(msg).into();
+    }
     let mut r = Row::new().spacing(gap(tok)).align_y(Alignment::Center);
     for kid in crate::i18n::order(tok.direction, [control, label]) {
         r = r.push(kid);
@@ -834,15 +839,19 @@ pub fn checkbox<'a, M: Clone + 'a>(
         let msg = msg.clone();
         c = c.on_toggle(move |v| msg(v));
     }
-    let face: Element<'a, M> = if empty {
-        c.into()
-    } else {
-        labeled_control(c.into(), name, tok, a11y.disabled)
-    };
     let can = !a11y.disabled;
-    let face = crate::focus::target_keys(face, tok, can, move |press| {
-        activate_key(&press).then_some(msg(!is_on))
-    });
+    let keys_msg = msg.clone();
+    let on_key = move |press| activate_key(&press).then_some(keys_msg(!is_on));
+    let face = if empty {
+        crate::focus::target_keys(c.into(), tok, can, on_key)
+    } else {
+        crate::focus::target_keys_start(
+            labeled_control(c.into(), name, tok, a11y.disabled, can.then(|| msg(!is_on))),
+            tok,
+            can,
+            on_key,
+        )
+    };
     a11y::attach(face, &a11y)
 }
 
@@ -1138,7 +1147,7 @@ pub fn checkbox_indeterminate<'a, M: Clone + 'a>(
             .center_x(16)
             .center_y(16)
             .style(move |_| indeterminate_box_face(tok));
-            let row = labeled_control(box_face.into(), name.clone(), tok, a11y.disabled);
+            let row = labeled_control(box_face.into(), name.clone(), tok, a11y.disabled, None);
             if a11y.disabled {
                 return a11y::attach(row, &a11y);
             }
@@ -1227,7 +1236,7 @@ pub fn segmented_button<'a, M: Clone + 'a>(
     }
     let n = cells.len();
     a11y::attach(
-        crate::focus::target_keys(r.into(), tok, !a11y.disabled && n > 0, move |press| {
+        crate::focus::group_keys(r.into(), tok, !a11y.disabled && n > 0, move |press| {
             use crate::key::Press;
             match press {
                 Press::ArrowRight | Press::ArrowDown => {
@@ -1247,9 +1256,9 @@ pub fn segmented_button<'a, M: Clone + 'a>(
 /// Related actions in one strip (M3 button group). Not exclusive.
 ///
 /// Each label sends its index. Empty labels paint an empty row.
-/// Disabled drops every press. The strip has no selected cell:
-/// focused Enter, Space, and Home send index 0; arrows send 1 when
-/// a second cell exists; End sends the last index.
+/// Disabled drops every press. The outline hugs the cells. The strip
+/// has no selected cell: focused Enter, Space, and Home send index 0;
+/// arrows send 1 when a second cell exists; End sends the last index.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
@@ -1303,9 +1312,8 @@ pub fn button_group<'a, M: Clone + 'a>(
     }
     let n = cells.len();
     a11y::attach(
-        crate::focus::target_keys(
+        crate::focus::group_keys(
             container(r)
-                .width(Length::Fill)
                 .align_x(crate::i18n::align_start(tok.direction))
                 .style(move |_| {
                     let s = tok.scheme();
@@ -1460,12 +1468,17 @@ pub fn switch<'a, M: Clone + 'a>(
         let msg = msg.clone();
         t = t.on_toggle(move |v| msg(v));
     }
-    let face = labeled_control(t.into(), name, tok, a11y.disabled);
     let can = !a11y.disabled;
-    let face = crate::focus::target_keys(face, tok, can, move |press| {
-        activate_key(&press).then_some(msg(!on))
-    });
-    a11y::attach(face, &a11y)
+    let keys_msg = msg.clone();
+    a11y::attach(
+        crate::focus::target_keys_start(
+            labeled_control(t.into(), name, tok, a11y.disabled, can.then(|| msg(!on))),
+            tok,
+            can,
+            move |press| activate_key(&press).then_some(keys_msg(!on)),
+        ),
+        &a11y,
+    )
 }
 
 /// Pick one value from a small set.
@@ -1511,18 +1524,21 @@ where
             .center_x(16)
             .center_y(16)
             .style(move |_| radio_idle_face(tok, on));
-        return a11y::attach(labeled_control(mark.into(), name, tok, true), &a11y);
+        return a11y::attach(labeled_control(mark.into(), name, tok, true, None), &a11y);
     }
     let pick = {
         let msg = msg.clone();
         iced_radio(String::new(), value, selected, move |v| msg(v)).style(style::radio_style(tok))
     };
     a11y::attach(
-        crate::focus::target_keys(
-            labeled_control(pick.into(), name, tok, false),
+        crate::focus::target_keys_start(
+            labeled_control(pick.into(), name, tok, false, Some(msg(value))),
             tok,
             true,
-            move |press| activate_key(&press).then_some(msg(value)),
+            {
+                let keys_msg = msg.clone();
+                move |press| activate_key(&press).then_some(keys_msg(value))
+            },
         ),
         &a11y,
     )
@@ -1678,10 +1694,27 @@ pub fn slider<'a, M: Clone + 'a>(
         }
         col = col.push(ticks);
     }
-    if marks.vertical {
-        col = col.push(container(slider_el).height(Length::Fixed(160.0)).width(32));
+    let can = !a11y.disabled;
+    let rail = if can {
+        let range_k = range.clone();
+        crate::focus::group_keys(slider_el, tok, true, move |press| {
+            use crate::key::Press;
+            let next = match press {
+                Press::ArrowRight | Press::ArrowUp => slider_nudge(range_k.clone(), value, 1.0),
+                Press::ArrowLeft | Press::ArrowDown => slider_nudge(range_k.clone(), value, -1.0),
+                Press::Home => *range_k.start(),
+                Press::End => *range_k.end(),
+                _ => return None,
+            };
+            Some(msg(next))
+        })
     } else {
-        col = col.push(slider_el);
+        crate::focus::group(slider_el, tok, false)
+    };
+    if marks.vertical {
+        col = col.push(container(rail).height(Length::Fixed(160.0)).width(32));
+    } else {
+        col = col.push(rail);
     }
     if !marks.min.is_empty() || !marks.max.is_empty() {
         let min_el: Element<'a, M> =
@@ -1709,24 +1742,7 @@ pub fn slider<'a, M: Clone + 'a>(
             })
             .into()
     };
-    let can = !a11y.disabled;
-    let keys = if can {
-        let range_k = range.clone();
-        crate::focus::target_keys(el, tok, true, move |press| {
-            use crate::key::Press;
-            let next = match press {
-                Press::ArrowRight | Press::ArrowUp => slider_nudge(range_k.clone(), value, 1.0),
-                Press::ArrowLeft | Press::ArrowDown => slider_nudge(range_k.clone(), value, -1.0),
-                Press::Home => *range_k.start(),
-                Press::End => *range_k.end(),
-                _ => return None,
-            };
-            Some(msg(next))
-        })
-    } else {
-        crate::focus::target(el, tok, false)
-    };
-    a11y::attach(keys, &a11y)
+    a11y::attach(el, &a11y)
 }
 
 fn disabled_slider_face(tok: Tokens) -> iced::widget::container::Style {
@@ -2221,7 +2237,7 @@ pub fn number_input<'a, M: Clone + 'a>(
         .height(Length::Fixed(control_height(tok)))
         .id(Id::from(a11y.node_id()))
         .into();
-    crate::focus::target_keys(field, tok, !a11y.disabled, move |press| {
+    crate::focus::group_keys(field, tok, !a11y.disabled, move |press| {
         use crate::key::Press;
         let dir = match press {
             Press::ArrowUp | Press::ArrowRight => 1,
@@ -2949,7 +2965,20 @@ pub fn search_input<'a, M: Clone + 'a>(
     input_id: Option<Id>,
     highlight: &[FieldRun],
 ) -> Element<'a, M> {
-    let search_ic: Element<'a, M> = icon_svg(Icon::Search, tok, A11y::new("search", Role::Image));
+    let mark = pick_handle_size(tok, ControlSize::Default);
+    let search_ic: Element<'a, M> = {
+        let handle = svg::Handle::from_memory(Icon::Search.bytes());
+        a11y::attach(
+            svg(handle)
+                .width(mark)
+                .height(mark)
+                .style(move |_t, _s| svg::Style {
+                    color: Some(tok.scheme().on_surface_variant),
+                })
+                .into(),
+            &A11y::new("search", Role::Image),
+        )
+    };
     let placeholder = if a11y.name.is_empty() {
         "Search".to_string()
     } else {
@@ -2979,13 +3008,10 @@ pub fn search_input<'a, M: Clone + 'a>(
         }
     }
     let painted = paint_field_value(i.into(), value, highlight, tok);
-    let field: Element<'a, M> = a11y::attach(
-        container(painted)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into(),
-        &field_a11y,
-    );
+    // Hug the input. Fill height plus zero pad parks the placeholder
+    // on the top of the bar while the glass sits on the midline.
+    let field: Element<'a, M> =
+        a11y::attach(container(painted).width(Length::Fill).into(), &field_a11y);
     let mut kids: Vec<Element<'a, M>> = vec![search_ic, field];
     if let Some(clear) = on_clear {
         if !value.is_empty() {
@@ -3016,6 +3042,7 @@ pub fn search_input<'a, M: Clone + 'a>(
     let face = container(r)
         .width(Length::Fill)
         .height(Length::Fixed(control_height(tok)))
+        .align_y(Alignment::Center)
         .style(move |_| style::search_face(tok, disabled));
     let el = a11y::attach(face.into(), &a11y);
     match mount_id {
@@ -3594,12 +3621,12 @@ where
             .into()
     };
     let keys = if opts.is_empty() {
-        crate::focus::target(el, tok, false)
+        crate::focus::group(el, tok, false)
     } else {
         let opts_k = opts;
         let sel_k = sel;
         let on_k = on_select;
-        crate::focus::target_keys_open(el, tok, true, move |press| {
+        crate::focus::group_keys_open(el, tok, true, move |press| {
             use crate::key::Press;
             let n = opts_k.len();
             let i = sel_k
@@ -4045,7 +4072,7 @@ pub fn date_stepper<'a, M: Clone + 'a>(
     // the stepper; the parent start-aligns the whole control.
     let can = !a11y.disabled;
     a11y::attach(
-        crate::focus::target_keys(
+        crate::focus::group_keys(
             row![
                 button(
                     "<",
@@ -4327,7 +4354,7 @@ pub fn time_picker<'a, M: Clone + 'a>(
         ));
     }
     a11y::attach(
-        crate::focus::target_keys(
+        crate::focus::group_keys(
             container(row)
                 .width(Length::Fill)
                 .align_x(crate::i18n::align_start(tok.direction))
@@ -5570,7 +5597,7 @@ pub fn breadcrumb<'a, M: Clone + 'a>(
     let hops: Vec<M> = parts.iter().filter_map(|(_, m)| m.clone()).collect();
     let n = hops.len();
     a11y::attach(
-        crate::focus::target_keys(r.into(), tok, !a11y.disabled && n > 0, move |press| {
+        crate::focus::group_keys(r.into(), tok, !a11y.disabled && n > 0, move |press| {
             use crate::key::Press;
             match press {
                 p if activate_key(&p) => hops.first().cloned(),
@@ -6604,7 +6631,13 @@ fn card_row<'a, M: 'a>(
             left: pad_l,
         })
         .clip(true)
-        .style(move |_| style::card(tok, selected))
+        .style(move |_| {
+            if selected {
+                style::card(tok, true)
+            } else {
+                style::outlined_card(tok)
+            }
+        })
         .into()
 }
 
@@ -6634,9 +6667,9 @@ fn card_row<'a, M: 'a>(
 /// let tok = theme::named("dark").tokens;
 /// let heights = expand_card_heights(3, 48.0, &[(1, 120.0)]);
 /// let win = VisibleWindow::new(200.0);
-/// let on_scroll = |_| ();
-/// let on_click = |_: ItemClick| ();
-/// let _: icedtea::Element<'_, ()> = widget::virtual_column(
+/// let on_scroll = |_w: VisibleWindow| 0usize;
+/// let on_click = |c: ItemClick| c.id;
+/// let _: icedtea::Element<'_, usize> = widget::virtual_column(
 ///     &heights,
 ///     win,
 ///     2,
@@ -6666,7 +6699,7 @@ pub fn virtual_column<'a, M: Clone + 'a>(
     let prev = window;
     let disabled = a11y.disabled;
     a11y::attach(
-        crate::focus::target(
+        crate::focus::group(
             virtual_clip(
                 prev,
                 RowHeights::PerRow(heights),
@@ -7125,7 +7158,7 @@ where
     let page = (window.viewport / row).max(1.0) as usize;
     let primary = selection.primary().unwrap_or(0);
     a11y::attach(
-        crate::focus::target_keys(
+        crate::focus::group_keys(
             virtual_clip(
                 prev,
                 heights,
@@ -7336,7 +7369,7 @@ pub fn item_grid<'a, M: Clone + 'a>(
         rows = rows.push(r);
     }
     a11y::attach(
-        crate::focus::target(rows.into(), tok, !a11y.disabled && !labels.is_empty()),
+        crate::focus::group(rows.into(), tok, !a11y.disabled && !labels.is_empty()),
         &a11y,
     )
 }
@@ -7503,7 +7536,7 @@ where
         header = header.push(kid);
     }
     a11y::attach(
-        crate::focus::target(
+        crate::focus::group(
             column![
                 header,
                 virtual_clip(
@@ -8091,7 +8124,7 @@ pub fn tab_bar<'a, M: Clone + 'a>(
     let n = tabs.titles.len();
     let active = tabs.active;
     a11y::attach(
-        crate::focus::target_keys(
+        crate::focus::group_keys(
             container(strip)
                 .width(Length::Fill)
                 .style(move |_| style::app_bar(tok))
@@ -8242,7 +8275,7 @@ pub fn accordion_view<'a, M: Clone + 'a>(
     let n = titles.len();
     let open = state.open.unwrap_or(0);
     a11y::attach(
-        crate::focus::target_keys(col.into(), tok, !a11y.disabled && n > 0, move |press| {
+        crate::focus::group_keys(col.into(), tok, !a11y.disabled && n > 0, move |press| {
             use crate::key::Press;
             match press {
                 p if activate_key(&p) => Some(on_toggle(open)),
@@ -8400,11 +8433,11 @@ pub fn expander<'a, M: Clone + 'a>(
         crate::motion::expand(child, t, peek_h, tok, A11y::new(title.clone(), Role::Group))
     };
     a11y::attach(
-        crate::focus::target_keys(
+        crate::focus::group_keys(
             container(column![header, body].spacing(gap(tok)))
                 .padding(inset(tok))
                 .width(Length::Fill)
-                .style(move |_| style::card(tok, false))
+                .style(move |_| style::outlined_card(tok))
                 .into(),
             tok,
             !a11y.disabled,
@@ -8441,7 +8474,7 @@ pub fn pagination<'a, M: Clone + 'a>(
     let range = page_range(len, page, per_page);
     let status = format!("{}–{} / {len}", range.start, range.end);
     a11y::attach(
-        crate::focus::target_keys(
+        crate::focus::group_keys(
             row![
                 button(
                     "Prev",
@@ -8498,6 +8531,10 @@ mod tests {
         if !ok {
             panic!("{msg}");
         }
+    }
+
+    fn vc_scroll_click(_: VisibleWindow) -> ItemClick {
+        ItemClick::primary(99)
     }
 
     fn focusable_after_click<M: Clone>(
@@ -8968,6 +9005,17 @@ mod tests {
             ],
         );
         assert_eq!(got, vec![0, 0, 1, 1, 2]);
+        let mut hug: Element<'_, usize> = button_group(
+            ["Cut", "Copy", "Paste"],
+            |i| i,
+            tok,
+            A11y::new("edit", Role::Group),
+        );
+        let w = layout_size(&mut hug, iced::Size::new(400.0, 48.0)).width;
+        must(
+            w < 320.0 && w > 80.0,
+            format!("button group outline hugs the cells, got {w}"),
+        );
     }
 
     #[test]
@@ -9985,14 +10033,14 @@ mod tests {
     #[test]
     fn virtual_column_primary_click_selects_on_release() {
         let tok = named("dark").tokens;
-        let heights = [40.0_f32, 40.0];
+        let heights = [40.0_f32, 40.0, 40.0, 40.0];
         let win = VisibleWindow::new(80.0);
         let mut el: Element<'_, ItemClick> = virtual_column(
             &heights,
             win,
             1,
             None,
-            |_| ItemClick::primary(99),
+            vc_scroll_click,
             |click| click,
             None,
             tok,
@@ -10005,9 +10053,9 @@ mod tests {
             iced::mouse::Button::Left,
             Size::new(200.0, 80.0),
         );
-        assert!(
+        must(
             down.iter().all(|c| c.id == 99),
-            "primary must not fire on press, got {down:?}"
+            format!("primary must not fire on press, got {down:?}"),
         );
         let got = press_messages(
             &mut el,
@@ -10015,9 +10063,9 @@ mod tests {
             iced::mouse::Button::Left,
             Size::new(200.0, 80.0),
         );
-        assert!(
+        must(
             got.iter().any(|c| c == &ItemClick::primary(0)),
-            "primary release must select the row, got {got:?}"
+            format!("primary release must select the row, got {got:?}"),
         );
         let right = press_only(
             &mut el,
@@ -10025,11 +10073,20 @@ mod tests {
             iced::mouse::Button::Right,
             Size::new(200.0, 80.0),
         );
-        assert!(
+        must(
             right
                 .iter()
-                .any(|c| { c.id == 0 && c.button == ItemButton::Secondary }),
-            "secondary must fire on press, got {right:?}"
+                .any(|c| c.id == 0 && c.button == ItemButton::Secondary),
+            format!("secondary must fire on press, got {right:?}"),
+        );
+        let scrolled = wheel_messages(
+            &mut el,
+            iced::Point::new(12.0, 12.0),
+            Size::new(200.0, 80.0),
+        );
+        must(
+            scrolled.iter().any(|c| c.id == 99),
+            format!("wheel must publish on_scroll, got {scrolled:?}"),
         );
         let src = include_str!("widget.rs")
             .split("pub fn virtual_column")
@@ -10041,12 +10098,14 @@ mod tests {
         assert!(src.contains("item_press"));
         assert!(src.contains("ItemClick"));
         assert!(src.contains("on_click"));
+        assert!(src.contains("focus::group"));
+        assert!(!src.contains("focus::target("));
         let mut dead: Element<'_, ItemClick> = virtual_column(
             &heights,
             win,
             1,
             None,
-            |_| ItemClick::primary(99),
+            vc_scroll_click,
             |click| click,
             None,
             tok,
@@ -10059,9 +10118,9 @@ mod tests {
             iced::mouse::Button::Left,
             Size::new(200.0, 80.0),
         );
-        assert!(
+        must(
             dead_got.iter().all(|c| c.id == 99),
-            "disabled rows must not emit ItemClick, got {dead_got:?}"
+            format!("disabled rows must not emit ItemClick, got {dead_got:?}"),
         );
     }
 
@@ -13565,23 +13624,35 @@ mod tests {
         )
     }
 
-    fn search_row(node: &iced::advanced::layout::Node) -> Option<&iced::advanced::layout::Node> {
+    fn search_row_abs(
+        node: &iced::advanced::layout::Node,
+        origin: iced::Vector,
+    ) -> Option<(&iced::advanced::layout::Node, iced::Vector)> {
+        let here = origin + iced::Vector::new(node.bounds().x, node.bounds().y);
         let kids = node.children();
         if (kids.len() == 2 || kids.len() == 3)
             && kids.iter().any(|k| k.bounds().width <= 32.0)
             && kids.iter().any(|k| k.bounds().width > 80.0)
         {
-            return Some(node);
+            return Some((node, here));
         }
-        kids.iter().find_map(search_row)
+        kids.iter().find_map(|k| search_row_abs(k, here))
     }
 
     fn search_row_marks(node: &iced::advanced::layout::Node) -> Vec<iced::Rectangle> {
-        search_row(node)
-            .map(|row| {
+        search_row_abs(node, iced::Vector::ZERO)
+            .map(|(row, origin)| {
                 row.children()
                     .iter()
-                    .map(|k| k.bounds())
+                    .map(|k| {
+                        let b = k.bounds();
+                        iced::Rectangle {
+                            x: origin.x + b.x,
+                            y: origin.y + b.y,
+                            width: b.width,
+                            height: b.height,
+                        }
+                    })
                     .filter(|b| b.width <= 32.0)
                     .collect()
             })
@@ -13626,6 +13697,12 @@ mod tests {
                     && mark.x + mark.width <= face.x + face.width - 1.0
                     && mark.y + mark.height <= face.y + face.height + 0.5,
                 format!("mark {mark:?} must sit inside the search face {face:?}"),
+            );
+            let mid_mark = mark.y + mark.height / 2.0;
+            let mid_face = face.y + face.height / 2.0;
+            must(
+                (mid_mark - mid_face).abs() <= 2.0,
+                format!("glass midline {mid_mark} must match the bar {mid_face}"),
             );
         }
         let rtl = search_layout("", None, Direction::Rtl);
@@ -15258,6 +15335,171 @@ mod tests {
             src.contains("slider_paint_value"),
             "horizontal RTL slider must paint from start",
         );
+        must(
+            src.contains("group_keys(slider_el"),
+            "slider keys sit on the rail, with no ring",
+        );
+        must(
+            !src.contains("target_keys(slider_el"),
+            "slider must not paint a box around the rail",
+        );
+    }
+
+    fn first_focusable_bounds<M: Clone>(
+        el: &mut Element<'_, M>,
+        size: iced::Size,
+    ) -> Option<iced::Rectangle> {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::operation::{focusable::Focusable, Operation};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Rectangle};
+        struct Find {
+            bounds: Option<Rectangle>,
+        }
+        impl Operation<()> for Find {
+            fn focusable(
+                &mut self,
+                _id: Option<&iced::widget::Id>,
+                bounds: Rectangle,
+                _state: &mut dyn Focusable,
+            ) {
+                if self.bounds.is_none() {
+                    self.bounds = Some(bounds);
+                }
+            }
+            fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<()>)) {
+                operate(self);
+            }
+        }
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let mut tree = Tree::new(el.as_widget());
+        let limits = Limits::new(iced::Size::ZERO, size);
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let mut find = Find { bounds: None };
+        el.as_widget_mut()
+            .operate(&mut tree, layout, &renderer, &mut find);
+        find.bounds
+    }
+
+    fn smallest_descendant_width<M: Clone>(el: &mut Element<'_, M>, size: iced::Size) -> f32 {
+        use iced::advanced::layout::Limits;
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels};
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let mut tree = Tree::new(el.as_widget());
+        let node =
+            el.as_widget_mut()
+                .layout(&mut tree, &renderer, &Limits::new(iced::Size::ZERO, size));
+        fn walk(n: &iced::advanced::layout::Node, best: &mut f32) {
+            let w = n.bounds().width;
+            if w > 4.0 && w < *best {
+                *best = w;
+            }
+            for c in n.children() {
+                walk(c, best);
+            }
+        }
+        let mut best = f32::MAX;
+        walk(&node, &mut best);
+        best
+    }
+
+    #[test]
+    fn focus_ring_hugs_the_control_face() {
+        let tok = named("dark").tokens;
+        let mut slide: Element<'_, f32> = slider(
+            0.0..=1.0,
+            0.4,
+            |v| v,
+            SliderMarks {
+                thumb: "now",
+                min: "0",
+                max: "1",
+                ticks: 0,
+                vertical: false,
+            },
+            tok,
+            A11y::new("level", Role::Slider),
+        );
+        let rail =
+            first_focusable_bounds(&mut slide, iced::Size::new(280.0, 120.0)).expect("slider rail");
+        must(
+            rail.height < 40.0,
+            format!("slider keys wrap the rail, got height {}", rail.height),
+        );
+        let mut pick: Element<'_, u8> = radio(
+            "Flagged",
+            1u8,
+            Some(0),
+            |v| v,
+            tok,
+            A11y::new("Flagged", Role::Radio),
+        );
+        let mark =
+            first_focusable_bounds(&mut pick, iced::Size::new(280.0, 40.0)).expect("radio row");
+        must(
+            mark.width > 80.0,
+            format!("radio row must take the click, got width {}", mark.width),
+        );
+        must(
+            smallest_descendant_width(&mut pick, iced::Size::new(280.0, 40.0)) < 48.0,
+            "radio mark must stay a small start child",
+        );
+        let mut box_el: Element<'_, bool> = checkbox(
+            "Accept",
+            false,
+            |v| v,
+            tok,
+            A11y::new("Accept", Role::Checkbox),
+        );
+        let box_row = first_focusable_bounds(&mut box_el, iced::Size::new(280.0, 40.0))
+            .expect("checkbox row");
+        must(
+            box_row.width > 80.0,
+            format!(
+                "checkbox row must take the click, got width {}",
+                box_row.width
+            ),
+        );
+        must(
+            smallest_descendant_width(&mut box_el, iced::Size::new(280.0, 40.0)) < 48.0,
+            "checkbox mark must stay a small start child",
+        );
+        let mut tog: Element<'_, bool> = switch(
+            "Notify",
+            false,
+            |v| v,
+            tok,
+            A11y::new("Notify", Role::Switch),
+        );
+        let thumb =
+            first_focusable_bounds(&mut tog, iced::Size::new(280.0, 40.0)).expect("switch row");
+        must(
+            thumb.width > 80.0,
+            format!("switch row must take the click, got width {}", thumb.width),
+        );
+        let radio_src = include_str!("widget.rs")
+            .split("pub fn radio<")
+            .nth(1)
+            .unwrap()
+            .split("pub fn slider<'")
+            .next()
+            .unwrap();
+        must(
+            radio_src.contains("labeled_control("),
+            "radio keeps the caption beside the mark",
+        );
+        must(
+            radio_src.contains("target_keys_start"),
+            "radio ring hugs the start mark on a clickable row",
+        );
     }
 
     #[test]
@@ -15467,6 +15709,14 @@ mod tests {
         must(
             !card_src.contains(".width(Length::Fill)\n            .align_x(start)"),
             "Fill+align on list card text drops right-to-left titles",
+        );
+        must(
+            card_src.contains("outlined_card"),
+            "idle list card must keep its own outline, not a parent frame",
+        );
+        must(
+            !card_src.contains("style::card(tok, selected)"),
+            "selected list card is a wash, not a 2 dp primary frame",
         );
         let flush_src = include_str!("widget.rs")
             .split("fn two_line_row")
@@ -18152,6 +18402,15 @@ mod tests {
         assert_eq!(widths.len(), 3);
         assert!((widths[0] - widths[1]).abs() < 1.0);
         assert!((widths[1] - widths[2]).abs() < 1.0);
+        let grid_src = include_str!("widget.rs")
+            .split("pub fn item_grid")
+            .nth(1)
+            .unwrap()
+            .split("pub fn data_table")
+            .next()
+            .unwrap();
+        assert!(grid_src.contains("focus::group"));
+        assert!(!grid_src.contains("focus::target("));
         must(
             (widths[0] * 3.0 + 16.0 - 300.0).abs() < 4.0,
             format!("cells {widths:?} should share the 300px row"),
@@ -19697,6 +19956,44 @@ mod tests {
             el.as_widget_mut().update(
                 &mut tree,
                 &Event::Mouse(iced::mouse::Event::ButtonReleased(button)),
+                layout,
+                iced::mouse::Cursor::Available(at),
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &vp,
+            );
+        }
+        messages
+    }
+
+    fn wheel_messages<M: Clone>(
+        el: &mut Element<'_, M>,
+        at: iced::Point,
+        viewport: iced::Size,
+    ) -> Vec<M> {
+        use iced::advanced::clipboard;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Event, Font, Pixels, Rectangle};
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(iced::Size::ZERO, viewport);
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let vp = Rectangle::new(iced::Point::ORIGIN, viewport);
+        let mut clipboard = clipboard::Null;
+        let mut messages = Vec::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            el.as_widget_mut().update(
+                &mut tree,
+                &Event::Mouse(iced::mouse::Event::WheelScrolled {
+                    delta: iced::mouse::ScrollDelta::Pixels { x: 0.0, y: -400.0 },
+                }),
                 layout,
                 iced::mouse::Cursor::Available(at),
                 &renderer,

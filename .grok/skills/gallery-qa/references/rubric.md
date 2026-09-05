@@ -61,6 +61,21 @@ ok row or a constructor-source substring is not a score for that page.
 
 - Text readable on its surface (body, meta, muted, disabled all distinct)
 - Selection and focus use tokens (`selection`, primary), not a mystery wash
+- A composite (list, `virtual_column`, grid, table, tree) must not
+  paint a Field-radius focus ring around the pane when items have
+  their own face. A stadium wrapping several cards or tiles is
+  **broken** (pane ring + item chrome). Focus indicator is on the
+  item (WCAG 2.4.7, APG roving tabindex, Material list item).
+- A filled parent well (`style::card`, `group_box` Filled, gallery
+  scene card) has no resting outline. A 1 dp frame around children
+  that already have their own outline is **broken**. Selected card
+  is a wash, not a 2 dp primary frame. Outline is `CardFace::Outlined`.
+- The focus ring hugs one control face (button, radio mark). A box
+  around a slider rail or its labels is **broken**. A ring around a
+  caption, min/max pair, or a whole strip is **broken**.
+- Leading icon inside a field (search glass) shares the bar midline
+  with placeholder and value. A high placeholder next to a centered
+  mark is **broken**.
 - Disabled ≠ idle (opacity or muted), but still legible
 - Light beat is light; dark is dark; high-contrast still hierarchical
 - Type: UI for chrome, mono only for code/values that need it — titles/logo never mono by accident

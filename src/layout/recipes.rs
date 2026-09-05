@@ -433,7 +433,7 @@ fn sash_grip<'a, M: Clone + 'a>(
     };
     let stack: Element<'a, M> = Stack::new().width(w).height(h).push(face).push(grip).into();
     let on_sash = std::rc::Rc::new(on_sash);
-    crate::focus::target_keys(stack, tok, true, move |press| {
+    crate::focus::group_keys(stack, tok, true, move |press| {
         use crate::key::Press;
         let step = 8.0;
         let delta = match press {

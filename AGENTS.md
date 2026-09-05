@@ -71,7 +71,9 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   faces (button, card, chip) are Level 1 on that constructor. Search
   is Level 0. Never a hardcoded shadow that disagrees with that
   table. `style::tests::resting_elevation_matches_material_table`
-  is the check.
+  is the check. Filled card and `group_box` Filled are fill only;
+  outline is `CardFace::Outlined`. Selected card is a wash, not a
+  2 dp primary frame.
 - User-facing text uses `typo::UI` (`Font::DEFAULT`, platform sans).
   Code uses `typo::MONO` (`Font::MONOSPACE`). Never bundle a font
   file. Apps that want a named family load it on the iced application
@@ -120,14 +122,26 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   the page looks empty. Form labels: Fixed gutter plus `align_start`.
 - Key order: an open modal consumes (even if a field is focused);
   otherwise focused text owns unmodified typing; otherwise the
-  focused `focus::target` owns arrows, Page, Home, End, Enter, and
-  Space; otherwise `key::handle` matches the action table. Tab /
+  focused `focus::target` or `focus::group` owns arrows, Page, Home,
+  End, Enter, and Space; otherwise `key::handle` matches the action
+  table. Tab /
   Shift+Tab walk targets via `focus::cycle` (wrap the window `view`).
   `run!` / `daemon!` subscribe `key::listen`; the application message
   implements `From<keyboard::Event>`. `ctrl` in a shortcut is the
   host accelerator (Command on macOS, Control elsewhere). `key::press`
   and `Shortcut::parse` cover F1-F24. `KeyContext::capturing_layer`
   reports the same three states `handle` uses.
+- Focus chrome: `focus::target` / `target_keys` paint a 2 dp ring
+  (inset one density grid, Field radius) on **one control face**.
+  A list, `virtual_column`, tree, grid, table, labeled row, slider
+  marks column, or strip is `focus::group` / `group_keys` (or
+  `intercept_keys`). The ring hugs one face (button, radio mark),
+  including when `i18n::order` puts the caption first.
+  A slider has no box: keys sit on the rail. A button group outline
+  hugs the cells. Never a Field-radius ring around a caption, min/max
+  pair, or a stack of cards, and never a Fill outline after the last
+  joined action. WCAG 2.4.7 and APG roving tabindex put
+  the indicator on the focused item, not the ancestor.
 - A widget or pattern is public only when it is themed (all visual
   states), keyboard-complete, tested, documented, listed in
   `catalog::ENTRIES`, and shown on a gallery page. Small related
@@ -168,7 +182,7 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   mixed-size `Rich` — that breaks layout and selection paint. Full
   document copy is `copy_text` on `MarkdownDoc::source`. Contract:
   `select` module rustdoc. Gallery demos only public constructors.
-- Always recapture handbook stills with `just book-stills` in the same change when the painted constructor or chrome in a published still changes. Update `.grok/skills/gallery-qa/references/visual.md` in that change (still path + idle must-show). Never hand-edit those PNGs or generate them.
+- Always recapture handbook stills with `just book-stills` in the same change when the painted constructor or chrome in a published still changes. Update `.grok/skills/gallery-qa/references/visual.md` in that change (still path + idle must-show). Never hand-edit those PNGs or generate them. Always `read_file` that still in the same turn after recapture when pad, icon, height, or alignment changed. A passing layout test is not the visual pass.
 - Always score gallery paint by reading the `visual.md` still then the captured shot. Never treat `SCORE.md`, a constructor-body substring (`include_str`, `contains("i18n::order")`), leftover-English source lists, or a generated image as the visual pass. Never call `image_gen` during gallery QA.
 - Never run `just gallery-qa --backend host` from an agent session. Capture on Xephyr. Host activates the window and moves the pointer on their seat.
 - Never put tour GIFs, handbook stills, or `book/` in the crate `include`. Icons and `assets/themes/catalog.json` are compiled in. `gallery.gif` stays in git for README as the last tagged tour; the guide is GitHub Pages. crates.io cap is 10 MiB.

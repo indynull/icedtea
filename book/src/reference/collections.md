@@ -43,7 +43,8 @@ line. `RowFace::Card` is a surface, wrapped title, and an optional
 is Quiet, or pass a `Variant` for role ink) on the same
 virtualized rows. `ListModel::indent` insets a row from start.
 `on_check` toggles a check slot.
-A focused list moves the primary row with arrows, Page, Home, and
+The list is a `focus::group`: no Field-radius ring around the pane.
+Selected row wash is the item face. A focused list moves the primary row with arrows, Page, Home, and
 End. Primary click fires on release. `on_context` is the secondary
 click.
 
@@ -58,6 +59,7 @@ Constructor: [`widget::virtual_column`](https://docs.rs/icedtea/latest/icedtea/w
 [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
+The column is a `focus::group`: no Field-radius ring around the pane.
 Same windowing as list (overscan, rail, wheel) for app-built faces —
 expand cards, custom bodies. Build heights with
 `collection::expand_card_heights` (closed estimate plus open-row
@@ -93,6 +95,8 @@ Constructor: [`widget::item_grid`](https://docs.rs/icedtea/latest/icedtea/widget
 [icedtea](https://crates.io/crates/icedtea)
 
 Pass titles. Click sends the index. Empty grid is an empty column.
+The grid is a `focus::group`: no Field-radius ring around the tile
+wall. Selected tile is tonal; idle tiles are outlined.
 
 Pass `A11y`.
 

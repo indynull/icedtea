@@ -1,8 +1,10 @@
 //! Focus target, roving tabindex, spatial arrows, landmarks, live regions.
 //!
-//! A [`target`] owns click-to-focus and the 2 dp primary ring. Use
-//! [`rove`] / [`spatial_next`] with [`crate::key::handle`] so arrow
-//! keys move between panels.
+//! A [`target`] owns click-to-focus and the 2 dp primary ring on
+//! **one control face**. A list, tree, grid, or table is a
+//! [`group`]: items own selection wash; the pane does not grow a
+//! second ring. Use [`rove`] / [`spatial_next`] with
+//! [`crate::key::handle`] so arrow keys move between panels.
 
 /// Named landmark region.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -119,6 +121,51 @@ pub fn ring(tok: crate::theme::Tokens, focused: bool) -> iced::widget::container
     }
 }
 
+/// Inset so a 2 dp stroke stays inside. A small face (radio mark)
+/// uses the stroke width; a large face uses one density grid.
+fn ring_inset(bounds: iced::Rectangle, requested: f32) -> f32 {
+    let room = bounds.width.min(bounds.height);
+    let stroke = 2.0;
+    // Radio and checkbox marks are ~16–20 dp. A grid inset
+    // collapses the face; keep the stroke inside.
+    if room <= 24.0 {
+        stroke
+    } else {
+        requested.max(0.0)
+    }
+}
+
+/// Start-edge child of the labeled row (last child in RTL).
+///
+/// Skips single-child wrappers (`attach`, the pad container) so the
+/// ring lands on the mark, not the caption `i18n::order` put first.
+fn start_child_bounds(
+    layout: iced::advanced::Layout<'_>,
+    direction: crate::i18n::Direction,
+) -> Option<iced::Rectangle> {
+    let mut node = layout;
+    loop {
+        let kids: Vec<_> = node.children().collect();
+        match kids.len() {
+            0 => return Some(node.bounds()),
+            1 => node = kids[0],
+            _ => {
+                let mark = if direction == crate::i18n::Direction::Rtl {
+                    *kids.last()?
+                } else {
+                    kids[0]
+                };
+                return Some(
+                    mark.children()
+                        .next()
+                        .map(|c| c.bounds())
+                        .unwrap_or_else(|| mark.bounds()),
+                );
+            }
+        }
+    }
+}
+
 /// Inset `bounds` by `width` so a stroke of that width stays inside.
 fn ring_bounds(bounds: iced::Rectangle, width: f32) -> iced::Rectangle {
     let w = width.max(0.0);
@@ -131,6 +178,14 @@ fn ring_bounds(bounds: iced::Rectangle, width: f32) -> iced::Rectangle {
 }
 
 /// Wrap `child` so a click focuses it and a focused ring paints.
+///
+/// Use this for **one control face** (button, radio mark). The ring
+/// is 2 dp, inset one density grid when the face is large enough,
+/// Field radius. A slider is [`group_keys`]: no box around the rail.
+///
+/// Do **not** wrap a labeled row, a marks column, a strip, or a
+/// list in [`target`]. Those are [`group`] / [`group_keys`]: the
+/// item face or the mark owns chrome.
 ///
 /// `can_focus` is false when the constructor is empty or disabled:
 /// the child is not a [`iced::advanced::widget::operation::focusable::Focusable`]
@@ -157,6 +212,7 @@ pub fn target<'a, M: Clone + 'a>(
         open_on_activate: false,
         keys_first: false,
         paint_ring: true,
+        ring_start: false,
     }
     .into()
 }
@@ -176,6 +232,27 @@ pub fn target_keys<'a, M: Clone + 'a>(
         open_on_activate: false,
         keys_first: false,
         paint_ring: true,
+        ring_start: false,
+    }
+    .into()
+}
+
+/// [`target_keys`] whose ring hugs the start-edge child (radio mark).
+pub fn target_keys_start<'a, M: Clone + 'a>(
+    child: iced::Element<'a, M>,
+    tok: crate::theme::Tokens,
+    can_focus: bool,
+    on_key: impl Fn(crate::key::Press) -> Option<M> + 'a,
+) -> iced::Element<'a, M> {
+    Target {
+        content: child,
+        tok,
+        can_focus,
+        on_key: Some(Box::new(on_key)),
+        open_on_activate: false,
+        keys_first: false,
+        paint_ring: true,
+        ring_start: true,
     }
     .into()
 }
@@ -195,6 +272,80 @@ pub fn target_keys_open<'a, M: Clone + 'a>(
         open_on_activate: true,
         keys_first: false,
         paint_ring: true,
+        ring_start: false,
+    }
+    .into()
+}
+
+/// Click-to-focus a **composite** (list, tree, grid, table). No ring.
+///
+/// Items own selection wash or their own control face. A Field-radius
+/// ring around the pane would sit on top of several cards or tiles.
+/// Click still focuses the group so arrows reach [`group_keys`].
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let body = widget::label("rows", tok, A11y::new("rows", Role::List));
+/// let _: icedtea::Element<'_, ()> = icedtea::focus::group(body, tok, true);
+/// ```
+pub fn group<'a, M: Clone + 'a>(
+    child: iced::Element<'a, M>,
+    tok: crate::theme::Tokens,
+    can_focus: bool,
+) -> iced::Element<'a, M> {
+    Target {
+        content: child,
+        tok,
+        can_focus,
+        on_key: None,
+        open_on_activate: false,
+        keys_first: false,
+        paint_ring: false,
+        ring_start: false,
+    }
+    .into()
+}
+
+/// [`group`] plus keys while focused. Same key contract as
+/// [`target_keys`], without a pane ring.
+pub fn group_keys<'a, M: Clone + 'a>(
+    child: iced::Element<'a, M>,
+    tok: crate::theme::Tokens,
+    can_focus: bool,
+    on_key: impl Fn(crate::key::Press) -> Option<M> + 'a,
+) -> iced::Element<'a, M> {
+    Target {
+        content: child,
+        tok,
+        can_focus,
+        on_key: Some(Box::new(on_key)),
+        open_on_activate: false,
+        keys_first: false,
+        paint_ring: false,
+        ring_start: false,
+    }
+    .into()
+}
+
+/// [`group_keys`] that also clicks the child on Enter or Space.
+pub fn group_keys_open<'a, M: Clone + 'a>(
+    child: iced::Element<'a, M>,
+    tok: crate::theme::Tokens,
+    can_focus: bool,
+    on_key: impl Fn(crate::key::Press) -> Option<M> + 'a,
+) -> iced::Element<'a, M> {
+    Target {
+        content: child,
+        tok,
+        can_focus,
+        on_key: Some(Box::new(on_key)),
+        open_on_activate: true,
+        keys_first: false,
+        paint_ring: false,
+        ring_start: false,
     }
     .into()
 }
@@ -229,6 +380,7 @@ pub fn intercept_keys<'a, M: Clone + 'a>(
         open_on_activate: false,
         keys_first: true,
         paint_ring: false,
+        ring_start: false,
     }
     .into()
 }
@@ -241,6 +393,7 @@ struct Target<'a, Message> {
     open_on_activate: bool,
     keys_first: bool,
     paint_ring: bool,
+    ring_start: bool,
 }
 
 #[derive(Default)]
@@ -419,18 +572,23 @@ impl<'a, Message: Clone> iced::advanced::Widget<Message, iced::Theme, iced::Rend
         if !focused || !self.paint_ring {
             return;
         }
-        let bounds = layout.bounds();
+        let bounds = if self.ring_start {
+            start_child_bounds(layout, self.tok.direction).unwrap_or_else(|| layout.bounds())
+        } else {
+            layout.bounds()
+        };
         let Some(layer) = bounds.intersection(viewport) else {
             return;
         };
         let face = ring(self.tok, true);
         // Later layer than a child's `with_layer` clip so a selected
         // wash on the first or last row cannot cover the stroke.
+        let inset = ring_inset(bounds, crate::m3::density::GRID as f32);
         iced::advanced::Renderer::with_layer(renderer, layer, |renderer| {
             iced::advanced::Renderer::fill_quad(
                 renderer,
                 iced::advanced::renderer::Quad {
-                    bounds: ring_bounds(bounds, crate::m3::density::GRID as f32),
+                    bounds: ring_bounds(bounds, inset),
                     border: face.border,
                     ..iced::advanced::renderer::Quad::default()
                 },
@@ -966,6 +1124,18 @@ mod tests {
     use super::*;
     use crate::key::Press;
 
+    fn must(ok: bool, msg: impl std::fmt::Display) {
+        if !ok {
+            panic!("{msg}");
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "cover-must")]
+    fn must_rejects_a_failed_check() {
+        must(false, "cover-must");
+    }
+
     #[test]
     fn rove_spatial_and_trap() {
         assert_eq!(rove(0, 1, 3), 1);
@@ -1069,12 +1239,24 @@ mod tests {
                 iced::mouse::Cursor::Unavailable,
                 &iced::Rectangle::new(Point::ORIGIN, Size::new(200.0, 80.0)),
             );
+            el.as_widget().draw(
+                &tree,
+                &mut renderer,
+                &Theme::Dark,
+                &Style::default(),
+                layout,
+                iced::mouse::Cursor::Unavailable,
+                &iced::Rectangle::new(Point::new(800.0, 800.0), Size::new(10.0, 10.0)),
+            );
         }
         if can_focus {
-            assert_eq!(op.n, 1, "enabled target is one focusable");
+            must(
+                op.n == 1,
+                format!("enabled target is one focusable, got {}", op.n),
+            );
             op.focused == 1
         } else {
-            assert_eq!(op.n, 0, "empty or disabled target is not focusable");
+            must(op.n == 0, "empty or disabled target is not focusable");
             false
         }
     }
@@ -1095,9 +1277,9 @@ mod tests {
         let layer = body
             .find("with_layer")
             .expect("ring must use with_layer so a clip row cannot cover it");
-        assert!(
+        must(
             layer > child,
-            "ring layer must start after the child so first and last rows stay under the stroke"
+            "ring layer must start after the child so first and last rows stay under the stroke",
         );
     }
 
@@ -1113,6 +1295,236 @@ mod tests {
         let tiny = ring_bounds(Rectangle::new(Point::ORIGIN, Size::new(2.0, 2.0)), 2.0);
         assert_eq!(tiny.width, 0.0);
         assert_eq!(tiny.height, 0.0);
+        let mark = Rectangle::new(Point::ORIGIN, Size::new(20.0, 20.0));
+        must(
+            ring_inset(mark, crate::m3::density::GRID as f32) == 2.0,
+            "a radio mark uses the stroke, not a grid inset",
+        );
+        let face = Rectangle::new(Point::ORIGIN, Size::new(240.0, 36.0));
+        assert_eq!(
+            ring_inset(face, crate::m3::density::GRID as f32),
+            crate::m3::density::GRID as f32
+        );
+    }
+
+    #[test]
+    fn group_skips_the_pane_ring() {
+        let src = include_str!("focus.rs");
+        let group = src
+            .split("pub fn group<")
+            .nth(1)
+            .expect("group")
+            .split("pub fn group_keys")
+            .next()
+            .expect("group body");
+        assert!(group.contains("paint_ring: false"));
+        let keys = src
+            .split("pub fn group_keys<")
+            .nth(1)
+            .expect("group_keys")
+            .split("pub fn group_keys_open")
+            .next()
+            .expect("group_keys body");
+        assert!(keys.contains("paint_ring: false"));
+        let open = src
+            .split("pub fn group_keys_open<")
+            .nth(1)
+            .expect("group_keys_open")
+            .split("pub fn intercept_keys")
+            .next()
+            .expect("group_keys_open body");
+        assert!(open.contains("paint_ring: false"));
+    }
+
+    #[test]
+    fn start_ring_hugs_the_mark_in_rtl() {
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Size};
+        let tok = crate::theme::named("dark")
+            .tokens
+            .with_direction(crate::i18n::Direction::Rtl);
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(280.0, 40.0));
+        let mut radio: iced::Element<'_, u8> = crate::widget::radio(
+            "Flagged",
+            1u8,
+            Some(0),
+            |v| v,
+            tok,
+            crate::a11y::A11y::new("Flagged", crate::a11y::Role::Radio),
+        );
+        let mut tree = Tree::new(radio.as_widget());
+        let node = radio.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let row = layout.bounds();
+        let face = start_child_bounds(layout, tok.direction).expect("radio mark");
+        must(
+            face.width < 48.0,
+            format!("RTL radio ring must hug the mark, got width {}", face.width),
+        );
+        must(
+            face.x + face.width > row.x + row.width * 0.5,
+            format!(
+                "RTL radio mark sits on start (right), mark={} row={}",
+                face.x, row.x
+            ),
+        );
+        let mut box_el: iced::Element<'_, bool> = crate::widget::checkbox(
+            "Accept",
+            false,
+            |v| v,
+            tok,
+            crate::a11y::A11y::new("Accept", crate::a11y::Role::Checkbox),
+        );
+        let mut tree = Tree::new(box_el.as_widget());
+        let node = box_el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let row = layout.bounds();
+        let face = start_child_bounds(layout, tok.direction).expect("checkbox mark");
+        must(
+            face.width < 48.0,
+            format!(
+                "RTL checkbox ring must hug the mark, got width {}",
+                face.width
+            ),
+        );
+        must(
+            face.x + face.width > row.x + row.width * 0.5,
+            format!(
+                "RTL checkbox mark sits on start (right), mark={} row={}",
+                face.x, row.x
+            ),
+        );
+        let mut tog: iced::Element<'_, bool> = crate::widget::switch(
+            "Notify",
+            false,
+            |v| v,
+            tok,
+            crate::a11y::A11y::new("Notify", crate::a11y::Role::Switch),
+        );
+        let mut tree = Tree::new(tog.as_widget());
+        let node = tog.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let row = layout.bounds();
+        let face = start_child_bounds(layout, tok.direction).expect("switch mark");
+        must(
+            face.width < 64.0,
+            format!(
+                "RTL switch ring must hug the thumb, got width {}",
+                face.width
+            ),
+        );
+        must(
+            face.x + face.width > row.x + row.width * 0.5,
+            format!(
+                "RTL switch thumb sits on start (right), mark={} row={}",
+                face.x, row.x
+            ),
+        );
+        let ltr = crate::theme::named("dark").tokens;
+        let mut ltr_radio: iced::Element<'_, u8> = crate::widget::radio(
+            "Flagged",
+            1u8,
+            Some(0),
+            |v| v,
+            ltr,
+            crate::a11y::A11y::new("Flagged", crate::a11y::Role::Radio),
+        );
+        let mut tree = Tree::new(ltr_radio.as_widget());
+        let node = ltr_radio
+            .as_widget_mut()
+            .layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let row = layout.bounds();
+        let face = start_child_bounds(layout, ltr.direction).expect("ltr radio mark");
+        must(
+            face.width < 48.0,
+            format!("LTR radio ring must hug the mark, got width {}", face.width),
+        );
+        must(
+            face.x < row.x + row.width * 0.5,
+            format!(
+                "LTR radio mark sits on start (left), mark={} row={}",
+                face.x, row.x
+            ),
+        );
+    }
+
+    #[test]
+    fn start_ring_draws_on_a_radio_and_open_keys_click() {
+        let tok = crate::theme::named("dark").tokens;
+        let mut radio: iced::Element<'_, u8> = crate::widget::radio(
+            "Flagged",
+            1u8,
+            Some(0),
+            |v| v,
+            tok,
+            crate::a11y::A11y::new("Flagged", crate::a11y::Role::Radio),
+        );
+        assert!(pump_click(&mut radio, true));
+        let blank: iced::Element<'_, ()> = iced::widget::Row::new()
+            .push(iced::widget::Space::new().width(12).height(12))
+            .into();
+        let mut start = target_keys_start(blank, tok, true, |_| None);
+        assert!(pump_click(&mut start, true));
+        let body = crate::widget::label(
+            "go",
+            tok,
+            crate::a11y::A11y::new("go", crate::a11y::Role::Button),
+        );
+        let mut open = target_keys_open(body, tok, true, |_| None);
+        assert!(pump_click(&mut open, true));
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::keyboard;
+        use iced::{Event, Font, Pixels, Point, Rectangle, Size};
+        let mut tree = Tree::new(open.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(200.0, 80.0));
+        let node = open.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let mut messages = Vec::<()>::new();
+        {
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            open.as_widget_mut().update(
+                &mut tree,
+                &Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(keyboard::key::Named::Enter),
+                    modified_key: keyboard::Key::Named(keyboard::key::Named::Enter),
+                    physical_key: keyboard::key::Physical::Code(keyboard::key::Code::Enter),
+                    location: keyboard::Location::Standard,
+                    modifiers: keyboard::Modifiers::empty(),
+                    text: None,
+                    repeat: false,
+                }),
+                layout,
+                iced::mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &Rectangle::new(Point::ORIGIN, Size::new(200.0, 80.0)),
+            );
+            open.as_widget().draw(
+                &tree,
+                &mut iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+                    Font::DEFAULT,
+                    Pixels::from(16u32),
+                )),
+                &iced::Theme::Dark,
+                &iced::advanced::renderer::Style::default(),
+                layout,
+                iced::mouse::Cursor::Unavailable,
+                &Rectangle::new(Point::new(800.0, 800.0), Size::new(10.0, 10.0)),
+            );
+        }
     }
 
     #[test]

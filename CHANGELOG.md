@@ -13,9 +13,20 @@
 - Outline `tree_view` wraps the title in the leftover row width.
   Files stays one clipped line.
 - `RowSlot::Text` takes a `Variant`. `RowSlot::text` is Quiet.
+- A list, `virtual_column`, grid, or table is `focus::group`: no
+  Field-radius ring around the pane. Item wash or tile face is the
+  indicator.
 
 ### Bug fix
 
+- Filled cards and `group_box` Filled drop the resting outline so a
+  parent well does not frame every child. Selected card is a
+  secondary wash. Outline stays on `CardFace::Outlined`.
+- The focus ring sits on the control face (radio mark, button).
+  A slider has no box. A labeled row, marks column, or strip is a
+  `focus::group`. In right-to-left the ring stays on the mark, not
+  the caption `i18n::order` puts first.
+- `button_group` outline hugs the cells.
 - Named catalog colorways use that ink, not the dumped Textual
   foreground.
 - `focus::target` paints the ring on a layer above the child, so a

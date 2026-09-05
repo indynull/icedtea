@@ -241,6 +241,19 @@ impl Corner {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn must(ok: bool, msg: impl std::fmt::Display) {
+        if !ok {
+            panic!("{msg}");
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "cover-must")]
+    fn must_rejects_a_failed_check() {
+        must(false, "cover-must");
+    }
+
     #[test]
     fn shape_scale() {
         for (step, dp) in Shape::STEPS {
@@ -410,10 +423,9 @@ mod tests {
             ShapePolicy::Pill,
             ShapePolicy::Material,
         ] {
-            assert_eq!(
-                Component::Menu.shape_for(policy),
-                Component::Field.shape_for(policy),
-                "menu overlay matches the closed field on {policy:?}"
+            must(
+                Component::Menu.shape_for(policy) == Component::Field.shape_for(policy),
+                format!("menu overlay matches the closed field on {policy:?}"),
             );
         }
         assert_eq!(ShapePolicy::default(), ShapePolicy::Desktop);

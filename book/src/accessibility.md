@@ -26,6 +26,14 @@ Keyboard order is the working desktop path. An open modal consumes
 keys first. A focused field owns unmodified typing. Otherwise the
 focused constructor owns arrows, Enter, and Space. Tab walks
 [`focus::cycle`](https://docs.rs/icedtea/latest/icedtea/focus/fn.cycle.html).
+
+A [`focus::target`](https://docs.rs/icedtea/latest/icedtea/focus/fn.target.html)
+ring is 2 dp, inset one density grid step, on **one control face**.
+A list, virtual column, tree, grid, or table is
+[`focus::group`](https://docs.rs/icedtea/latest/icedtea/focus/fn.group.html):
+the selected row or tile owns chrome. The pane does not paint a
+second ring around several item faces (WCAG 2.4.7; APG roving
+tabindex; Material list focus is on the item).
 Otherwise
 [`key::handle`](https://docs.rs/icedtea/latest/icedtea/key/fn.handle.html)
 matches the action table. See [Architecture](architecture.md#keys).

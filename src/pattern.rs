@@ -1196,7 +1196,7 @@ pub fn nav_rail<'a, M: Clone + 'a>(
     }
     let n = items.len();
     crate::a11y::attach(
-        crate::focus::target_keys(
+        crate::focus::group_keys(
             container(col)
                 .width(if expanded { 220 } else { 72 })
                 .padding(tok.density.gap())
@@ -3292,7 +3292,9 @@ mod tests {
         assert_ne!(row.border.radius.top_left, crate::m3::Shape::Full.dp());
         assert_eq!(
             row.border.radius.top_left,
-            crate::m3::Shape::ExtraSmall.dp()
+            crate::m3::shape::Component::Menu
+                .shape_for(crate::m3::ShapePolicy::Pill)
+                .dp()
         );
         let card = context_card_size(table.iter().count(), vp, tok.density);
         let row_w = menu_row_width(&mut cm);

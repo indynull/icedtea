@@ -1973,10 +1973,8 @@ impl Gallery {
                         "src",
                         vec![
                             TreeNode::leaf(3, "lib.rs").with_trailing(RowSlot::text("rs")),
-                            TreeNode::leaf(4, "catalog.rs")
-                                .with_trailing(RowSlot::text("rs")),
-                            TreeNode::leaf(5, "widget.rs")
-                                .with_trailing(RowSlot::text("rs")),
+                            TreeNode::leaf(4, "catalog.rs").with_trailing(RowSlot::text("rs")),
+                            TreeNode::leaf(5, "widget.rs").with_trailing(RowSlot::text("rs")),
                         ],
                     )
                     .with_trailing(RowSlot::text("3")),
@@ -1984,10 +1982,8 @@ impl Gallery {
                         6,
                         "book",
                         vec![
-                            TreeNode::leaf(7, "install.md")
-                                .with_trailing(RowSlot::text("md")),
-                            TreeNode::leaf(8, "introduction.md")
-                                .with_trailing(RowSlot::text("md")),
+                            TreeNode::leaf(7, "install.md").with_trailing(RowSlot::text("md")),
+                            TreeNode::leaf(8, "introduction.md").with_trailing(RowSlot::text("md")),
                         ],
                     ),
                     TreeNode::folder(9, "assets"),
@@ -6201,7 +6197,13 @@ impl Gallery {
                                 .height(Length::Fill)
                                 .align_x(icedtea::i18n::align_start(tok.direction))
                                 .padding(8)
-                                .style(move |_| icedtea::style::card(tok, selected || open))
+                                .style(move |_| {
+                                    if selected || open {
+                                        icedtea::style::card(tok, true)
+                                    } else {
+                                        icedtea::style::outlined_card(tok)
+                                    }
+                                })
                                 .into()
                         },
                         named("vc", Role::List),

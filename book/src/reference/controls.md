@@ -150,8 +150,9 @@ Constructor: [`widget::button_group`](https://docs.rs/icedtea/latest/icedtea/wid
 [icedtea](https://crates.io/crates/icedtea)
 
 Each cell is a label plus optional icon (`Cell`). Press sends the index.
-Empty cells paint an empty row. Disabled drops every press.
-Arrows move along the strip. Enter and Space press the cell.
+Empty cells paint an empty row. Disabled drops every press. The
+outline hugs the cells. Arrows move along the strip. Enter and Space
+press the cell.
 
 Pass `A11y`.
 

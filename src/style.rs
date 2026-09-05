@@ -38,15 +38,22 @@ pub fn fill(bg: Color, fg: Color) -> container::Style {
     }
 }
 
-/// M3 filled card (Level 0). Outline marks the edge; no drop.
-pub fn card(tok: Tokens, focus: bool) -> container::Style {
+/// M3 filled card (Level 0). Fill marks the face; no resting outline
+/// and no drop. A parent well can nest items without a second frame.
+/// `selected` is a secondary-container wash.
+pub fn card(tok: Tokens, selected: bool) -> container::Style {
     let s = tok.scheme();
+    let (bg, fg) = if selected {
+        (s.secondary_container, s.on_secondary_container)
+    } else {
+        (s.surface_container_low, s.on_surface)
+    };
     container::Style {
-        background: Some(Background::Color(s.surface_container_low)),
-        text_color: Some(s.on_surface),
+        background: Some(Background::Color(bg)),
+        text_color: Some(fg),
         border: Border {
-            color: if focus { s.primary } else { s.outline_variant },
-            width: if focus { 2.0 } else { 1.0 },
+            color: Color::TRANSPARENT,
+            width: 0.0,
             radius: component_radius(tok, Component::Card),
         },
         shadow: tok.shadow(Elevation::Level0),
@@ -1041,6 +1048,18 @@ mod tests {
     use crate::theme::named;
     use crate::toast::ToastKind;
 
+    fn must(ok: bool, msg: impl std::fmt::Display) {
+        if !ok {
+            panic!("{msg}");
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "cover-must")]
+    fn must_rejects_a_failed_check() {
+        must(false, "cover-must");
+    }
+
     #[test]
     fn filled_button_uses_m3_primary_roles() {
         let tok = named("light").tokens;
@@ -1386,7 +1405,7 @@ mod tests {
             if policy == crate::m3::ShapePolicy::Pill {
                 assert_eq!(
                     hit.border.radius.top_left,
-                    crate::m3::Shape::ExtraSmall.dp()
+                    crate::m3::shape::Component::Menu.shape_for(policy).dp()
                 );
                 assert_ne!(
                     hit.border.radius.top_left,
@@ -1406,7 +1425,9 @@ mod tests {
         let menu = menu_item_style(pill)(&ptheme, button::Status::Hovered);
         assert_eq!(
             menu.border.radius.top_left,
-            crate::m3::Shape::ExtraSmall.dp()
+            crate::m3::shape::Component::Menu
+                .shape_for(crate::m3::ShapePolicy::Pill)
+                .dp()
         );
         assert_ne!(menu.border.radius.top_left, crate::m3::Shape::Full.dp());
         let box_st = checkbox_style(pill)(&ptheme, checkbox::Status::Active { is_checked: false });
@@ -1542,6 +1563,27 @@ mod tests {
     }
 
     #[test]
+    fn filled_card_is_fill_only_selected_is_a_wash() {
+        let tok = named("dark").tokens;
+        let s = tok.scheme();
+        let rest = card(tok, false);
+        assert_eq!(rest.border.width, 0.0);
+        assert_eq!(rest.border.color, Color::TRANSPARENT);
+        assert_eq!(
+            rest.background,
+            Some(Background::Color(s.surface_container_low))
+        );
+        let on = card(tok, true);
+        assert_eq!(on.border.width, 0.0);
+        assert_eq!(
+            on.background,
+            Some(Background::Color(s.secondary_container))
+        );
+        assert_eq!(on.text_color, Some(s.on_secondary_container));
+        assert_eq!(outlined_card(tok).border.width, 1.0);
+    }
+
+    #[test]
     fn styles_cover_states_and_variants() {
         let tok = named("dark").tokens;
         let theme = crate::theme::iced_theme("dark", tok);
@@ -1632,18 +1674,20 @@ mod tests {
             crate::m3::ShapePolicy::Material,
         ] {
             let look = tok.with_shape(policy);
-            assert_eq!(
-                overlay_menu_style(look)(&theme).border.radius.top_left,
-                picker_style(look)(&theme, pick_list::Status::Active)
-                    .border
-                    .radius
-                    .top_left,
-                "menu radius matches the closed field on {policy:?}"
+            let menu_r = overlay_menu_style(look)(&theme).border.radius.top_left;
+            let field_r = picker_style(look)(&theme, pick_list::Status::Active)
+                .border
+                .radius
+                .top_left;
+            must(
+                menu_r == field_r,
+                format!("menu radius matches the closed field on {policy:?}"),
             );
-            assert_eq!(
-                search_face(look, false).border.radius.top_left,
-                crate::m3::Component::Search.radius_for(policy).top_left,
-                "search face follows Search on {policy:?}"
+            let search_r = search_face(look, false).border.radius.top_left;
+            let want = crate::m3::Component::Search.radius_for(policy).top_left;
+            must(
+                search_r == want,
+                format!("search face follows Search on {policy:?}"),
             );
             let _ = search_face(look, true);
         }
