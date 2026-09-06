@@ -318,6 +318,9 @@ fn select_family(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    static FONT_DB: Mutex<()> = Mutex::new(());
 
     fn cover(family: &str, mono: bool, weight: u16) -> FaceCover {
         FaceCover {
@@ -372,6 +375,11 @@ mod tests {
         assert_eq!(FontFace::Ui.font(), UI);
         assert_eq!(FontFace::Mono.font(), MONO);
         let _ = UI_ITALIC;
+    }
+
+    #[test]
+    fn bind_sans_family_sets_the_named_face() {
+        let _g = FONT_DB.lock().expect("font db");
         bind_sans_family("");
         assert!(!sans_family().is_empty());
         bind_sans_family("Noto Sans");
@@ -508,6 +516,7 @@ mod tests {
 
     #[test]
     fn install_binds_usable_ui_and_mono_families() {
+        let _g = FONT_DB.lock().expect("font db");
         install_platform_faces();
         let lock = font_system();
         let mut system = lock.write().expect("font system");
