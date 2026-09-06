@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.16.1 — 2026-09-05
+
 ### Feature
 
 - `theme::auto_ink` mixes white or black onto a canvas (Textual
