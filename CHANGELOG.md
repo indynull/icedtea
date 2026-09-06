@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.16.2 — 2026-09-06
+
 ### Feature
 
 - `motion::Job` and `motion::Run` pick duration and enter/exit ease
