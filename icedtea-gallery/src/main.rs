@@ -763,6 +763,8 @@ fn widget_job<'a>(id: &str, cat: &'a Catalog) -> Option<&'a str> {
         "main-window" => cat.t("wjob.main-window"),
         "dialogs" => cat.t("wjob.dialogs"),
         "motion" => cat.t("wjob.motion"),
+        "switch-motion" => cat.t("wjob.switch-motion"),
+        "attention-motion" => cat.t("wjob.attention-motion"),
         "expand-motion" => cat.t("wjob.expand-motion"),
         _ => return None,
     };
@@ -1095,33 +1097,33 @@ fn extras_after(page: &str) -> &'static [TourBeat] {
                 page: "motion",
                 theme: "dark",
                 appearance: Appearance::Dark,
-                caption: "Motion: bounce in",
-                act: "bounce-in\n",
+                caption: "Motion: next event",
+                act: "step-next\n",
                 hold_ms: 180,
             },
             TourBeat {
                 page: "motion",
                 theme: "dark",
                 appearance: Appearance::Dark,
-                caption: "Motion: pulse and shake",
-                act: "pulse true\nshake\n",
+                caption: "Motion: invalid field shake",
+                act: "field-check\n",
                 hold_ms: 160,
             },
+            TourBeat {
+                page: "motion",
+                theme: "dark",
+                appearance: Appearance::Dark,
+                caption: "Motion: expand open",
+                act: "expand true\n",
+                hold_ms: 140,
+            },
         ],
-        "expand-motion" => &[TourBeat {
-            page: "expand-motion",
-            theme: "dark",
-            appearance: Appearance::Dark,
-            caption: "Expand motion: open",
-            act: "expand true\n",
-            hold_ms: 140,
-        }],
         _ => &[],
     }
 }
 
 fn extra_beat_count() -> usize {
-    extras_after("code").len() + extras_after("motion").len() + extras_after("expand-motion").len()
+    extras_after("code").len() + extras_after("motion").len()
 }
 
 fn theme_page_index() -> usize {
@@ -1209,8 +1211,7 @@ fn tour_caption_for(page: &str) -> &'static str {
         "status-page" => "Status page: empty or error",
         "palette" => "Command palette: filter actions",
         "main-window" => "Main window: menu, tools, status",
-        "motion" => "Motion: fade and slide",
-        "expand-motion" => "Expand motion: peek to open",
+        "motion" => "Motion: pick what opens and play",
         _ => catalog::page_title(page),
     }
 }
@@ -1284,6 +1285,19 @@ fn parse_inject_line(line: &str) -> Option<Message> {
         "bounce-in" | "bounce_in" => Some(Message::BounceIn),
         "pulse" => Some(Message::Pulse(parts.next()? == "true")),
         "shake" => Some(Message::ShakePlay),
+        "switch-tab" | "switch_tab" => Some(Message::SwitchTab(parts.next()?.parse().ok()?)),
+        "step-next" | "step_next" => Some(Message::StepNext),
+        "step-prev" | "step_prev" => Some(Message::StepPrev),
+        "field-name" | "field_name" => Some(Message::FieldName(parts.next()?.to_string())),
+        "field-check" | "field_check" => Some(Message::FieldCheck),
+        "enter-kind" | "enter_kind" => Some(Message::EnterKind(parts.next()?.to_string())),
+        "enter-slide" | "enter_slide" => Some(Message::EnterSlide(parts.next()?.to_string())),
+        "switch-face" | "switch_face" => Some(Message::SwitchFacePick(parts.next()?.to_string())),
+        "step-slide" | "step_slide" => Some(Message::StepSlide(parts.next()?.to_string())),
+        "attn-face" | "attn_face" => Some(Message::AttnFace(parts.next()?.to_string())),
+        "disclose-axis" | "disclose_axis" => Some(Message::DiscloseAxis(parts.next()?.to_string())),
+        "enter-ms" | "enter_ms" => Some(Message::EnterMs(parts.next()?.parse().ok()?)),
+        "switch-ms" | "switch_ms" => Some(Message::SwitchMs(parts.next()?.parse().ok()?)),
         "reduce-motion" | "reduce_motion" => Some(Message::ReduceMotion(parts.next()? == "true")),
         "density" => Some(Message::Density(parts.next()?.to_string())),
         "type" | "font-scale" | "font_scale" => Some(Message::FontScale(parts.next()?.to_string())),
@@ -1375,6 +1389,51 @@ fn parse_inject_line(line: &str) -> Option<Message> {
         )),
         _ => None,
     }
+}
+
+fn parse_enter_kind(s: &str, cat: &Catalog) -> icedtea::motion::Enter {
+    let n = s.to_ascii_lowercase();
+    if n == "menu" || s == cat.t("motion.kind-menu") {
+        icedtea::motion::Enter::Menu
+    } else if n == "sheet" || s == cat.t("motion.kind-sheet") {
+        icedtea::motion::Enter::Sheet
+    } else if n == "toast" || s == cat.t("motion.kind-toast") {
+        icedtea::motion::Enter::Toast
+    } else if n == "tooltip" || s == cat.t("motion.kind-tooltip") {
+        icedtea::motion::Enter::Tooltip
+    } else {
+        icedtea::motion::Enter::Dialog
+    }
+}
+
+fn parse_slide(s: &str, cat: &Catalog) -> icedtea::motion::Slide {
+    let n = s.to_ascii_lowercase();
+    if n == "none" || n == "fade" || s == cat.t("motion.slide-none") {
+        icedtea::motion::Slide::None
+    } else if n == "down" || s == cat.t("motion.slide-down") {
+        icedtea::motion::Slide::Down
+    } else if n == "start" || s == cat.t("motion.slide-start") {
+        icedtea::motion::Slide::Start
+    } else if n == "end" || s == cat.t("motion.slide-end") {
+        icedtea::motion::Slide::End
+    } else {
+        icedtea::motion::Slide::Up
+    }
+}
+
+fn parse_switch_fade(s: &str, cat: &Catalog) -> bool {
+    let n = s.to_ascii_lowercase();
+    !(n == "axis" || n == "shared" || s == cat.t("motion.face-axis"))
+}
+
+fn parse_attn_pulse(s: &str, cat: &Catalog) -> bool {
+    let n = s.to_ascii_lowercase();
+    n == "pulse" || s == cat.t("motion.attn-pulse")
+}
+
+fn parse_disclose_inline(s: &str, cat: &Catalog) -> bool {
+    let n = s.to_ascii_lowercase();
+    n == "inline" || n == "width" || s == cat.t("motion.axis-inline")
 }
 
 fn parse_tour_beat(text: &str, len: usize) -> Option<usize> {
@@ -1587,6 +1646,19 @@ enum Message {
     BounceIn,
     Pulse(bool),
     ShakePlay,
+    SwitchTab(usize),
+    StepNext,
+    StepPrev,
+    FieldName(String),
+    FieldCheck,
+    EnterKind(String),
+    EnterSlide(String),
+    SwitchFacePick(String),
+    StepSlide(String),
+    AttnFace(String),
+    DiscloseAxis(String),
+    EnterMs(f32),
+    SwitchMs(f32),
     ReduceMotion(bool),
     Motion,
     OpenDocs(&'static str),
@@ -1826,6 +1898,23 @@ struct Gallery {
     bounce_start: Option<icedtea::iced::time::Instant>,
     pulse_on: bool,
     shake_start: Option<icedtea::iced::time::Instant>,
+    switch_tab: usize,
+    switch_from: usize,
+    switch_run: icedtea::motion::Run,
+    switch_fade: bool,
+    step_idx: usize,
+    step_from: usize,
+    step_slide: icedtea::motion::Slide,
+    step_play: icedtea::motion::Slide,
+    step_run: icedtea::motion::Run,
+    field_name: String,
+    enter_kind: icedtea::motion::Enter,
+    enter_slide: icedtea::motion::Slide,
+    enter_run: icedtea::motion::Run,
+    enter_ms: f32,
+    switch_ms: f32,
+    attn_pulse: bool,
+    disclose_inline: bool,
     window_width: f32,
     window_height: f32,
     pointer: icedtea::iced::Point,
@@ -2160,6 +2249,41 @@ impl Gallery {
             bounce_start: None,
             pulse_on: false,
             shake_start: None,
+            switch_tab: 0,
+            switch_from: 0,
+            switch_run: icedtea::motion::run(
+                icedtea::motion::Job::Switch(icedtea::motion::SwitchFace::FadeThrough),
+                true,
+                false,
+            ),
+            switch_fade: true,
+            step_idx: 0,
+            step_from: 0,
+            step_slide: icedtea::motion::Slide::Up,
+            step_play: icedtea::motion::Slide::Up,
+            step_run: icedtea::motion::run(
+                icedtea::motion::Job::Switch(icedtea::motion::SwitchFace::SharedAxis(
+                    icedtea::motion::Slide::Up,
+                )),
+                true,
+                false,
+            ),
+            field_name: String::new(),
+            enter_kind: icedtea::motion::Enter::Dialog,
+            enter_slide: icedtea::motion::Slide::Up,
+            enter_run: icedtea::motion::run(
+                icedtea::motion::Job::Enter(icedtea::motion::Enter::Dialog),
+                true,
+                false,
+            ),
+            enter_ms: icedtea::motion::Job::Enter(icedtea::motion::Enter::Dialog)
+                .duration(true, false)
+                .as_millis() as f32,
+            switch_ms: icedtea::motion::Job::Switch(icedtea::motion::SwitchFace::FadeThrough)
+                .duration(true, false)
+                .as_millis() as f32,
+            attn_pulse: false,
+            disclose_inline: false,
             window_width: 900.0,
             window_height: 640.0,
             pointer: icedtea::iced::Point::ORIGIN,
@@ -2648,6 +2772,9 @@ impl Gallery {
             || self.shake_moving()
             || self.pulse_on
             || self.fade_anim.is_animating(now)
+            || self.switch_run.is_live(now)
+            || self.step_run.is_live(now)
+            || self.enter_run.is_live(now)
             || self.acc_closing
             || self.context_closing
             || self.cascade_closing
@@ -2719,6 +2846,304 @@ impl Gallery {
         )
     }
 
+    fn hold_ms(ms: f32) -> std::time::Duration {
+        std::time::Duration::from_millis(ms.round().clamp(50.0, 600.0) as u64)
+    }
+
+    fn sync_enter_run(&mut self) {
+        self.enter_run = icedtea::motion::run(
+            icedtea::motion::Job::Enter(self.enter_kind),
+            self.dialog_open,
+            self.reduced_motion,
+        )
+        .lasting(Self::hold_ms(self.enter_ms));
+    }
+
+    fn rebuild_switch_runs(&mut self) {
+        let hold = Self::hold_ms(self.switch_ms);
+        self.switch_run = icedtea::motion::run(
+            icedtea::motion::Job::Switch(self.live_switch_face()),
+            true,
+            self.reduced_motion,
+        )
+        .lasting(hold);
+        self.step_run = icedtea::motion::run(
+            icedtea::motion::Job::Switch(icedtea::motion::SwitchFace::SharedAxis(self.step_slide)),
+            true,
+            self.reduced_motion,
+        )
+        .lasting(hold);
+    }
+
+    fn live_switch_face(&self) -> icedtea::motion::SwitchFace {
+        if self.switch_fade {
+            icedtea::motion::SwitchFace::FadeThrough
+        } else {
+            icedtea::motion::SwitchFace::SharedAxis(self.step_play)
+        }
+    }
+
+    fn enter_kind_label(&self) -> &str {
+        match self.enter_kind {
+            icedtea::motion::Enter::Dialog => self.catalog.t("motion.kind-dialog"),
+            icedtea::motion::Enter::Menu => self.catalog.t("motion.kind-menu"),
+            icedtea::motion::Enter::Sheet => self.catalog.t("motion.kind-sheet"),
+            icedtea::motion::Enter::Toast => self.catalog.t("motion.kind-toast"),
+            icedtea::motion::Enter::Tooltip => self.catalog.t("motion.kind-tooltip"),
+        }
+    }
+
+    fn slide_label(&self, slide: icedtea::motion::Slide) -> &str {
+        match slide {
+            icedtea::motion::Slide::None => self.catalog.t("motion.slide-none"),
+            icedtea::motion::Slide::Up => self.catalog.t("motion.slide-up"),
+            icedtea::motion::Slide::Down => self.catalog.t("motion.slide-down"),
+            icedtea::motion::Slide::Start => self.catalog.t("motion.slide-start"),
+            icedtea::motion::Slide::End => self.catalog.t("motion.slide-end"),
+        }
+    }
+
+    fn slide_dir_hint(&self) -> &str {
+        if self.direction == Direction::Ltr {
+            self.catalog.t("motion.slide-dir-ltr")
+        } else {
+            self.catalog.t("motion.slide-dir-rtl")
+        }
+    }
+
+    fn enter_uses(&self) -> &str {
+        match self.enter_kind {
+            icedtea::motion::Enter::Dialog => self.catalog.t("motion.uses-dialog"),
+            icedtea::motion::Enter::Menu => self.catalog.t("motion.uses-menu"),
+            icedtea::motion::Enter::Sheet => self.catalog.t("motion.uses-sheet"),
+            icedtea::motion::Enter::Toast => self.catalog.t("motion.uses-toast"),
+            icedtea::motion::Enter::Tooltip => self.catalog.t("motion.uses-tooltip"),
+        }
+    }
+
+    fn enter_timing(&self) -> String {
+        let enter_ms = self.enter_run.duration(true).as_millis();
+        let exit_ms = self.enter_run.duration(false).as_millis();
+        let job_ms = icedtea::motion::Job::Enter(self.enter_kind)
+            .duration(true, self.reduced_motion)
+            .as_millis();
+        format!(
+            "{} {enter_ms} ms · {} {exit_ms} ms · {} {job_ms} ms",
+            self.catalog.t("motion.enter"),
+            self.catalog.t("motion.exit"),
+            self.catalog.t("motion.job"),
+        )
+    }
+
+    fn switch_timing(&self) -> String {
+        let play = self.switch_run.duration(true).as_millis();
+        let job_ms = icedtea::motion::Job::Switch(self.live_switch_face())
+            .duration(true, self.reduced_motion)
+            .as_millis();
+        format!(
+            "{} {play} ms · {} {job_ms} ms",
+            self.catalog.t("motion.play"),
+            self.catalog.t("motion.job"),
+        )
+    }
+
+    fn motion_ms_slider(
+        &self,
+        id: &str,
+        value: f32,
+        on: fn(f32) -> Message,
+    ) -> Element<'_, Message> {
+        let tok = self.tokens;
+        let thumb = format!("{} ms", value.round() as u64);
+        let lab: Element<'_, Message> =
+            widget::meta(self.catalog.t("motion.ms"), tok, named(id, Role::Status));
+        let rail: Element<'_, Message> = widget::slider(
+            50.0..=600.0,
+            value,
+            on,
+            widget::SliderMarks {
+                ticks: 0,
+                min: "50",
+                max: "600",
+                thumb: "",
+                vertical: false,
+            },
+            tok,
+            named(&format!("{id}-rail"), Role::Slider).with_value(thumb),
+        );
+        column![lab, rail]
+            .spacing(4)
+            .width(Length::Fill)
+            .align_x(icedtea::i18n::align_start(self.direction))
+            .into()
+    }
+
+    fn motion_pick(
+        &self,
+        id: &str,
+        label: &str,
+        options: Vec<String>,
+        current: &str,
+        on: fn(String) -> Message,
+    ) -> Element<'_, Message> {
+        let tok = self.tokens;
+        let w = look_pick_width(&options, current, tok);
+        let lab: Element<'_, Message> = widget::meta(label, tok, named(id, Role::Status));
+        let list: Element<'_, Message> = container(widget::pick_list(
+            options,
+            Some(current.to_string()),
+            on,
+            tok,
+            widget::ControlSize::Default,
+            named(&format!("{id}-pick"), Role::ComboBox),
+        ))
+        .width(Length::Fixed(w))
+        .into();
+        let mut r = icedtea::iced::widget::Row::new()
+            .spacing(8)
+            .align_y(Alignment::Center);
+        for kid in icedtea::i18n::order(self.direction, [lab, list]) {
+            r = r.push(kid);
+        }
+        r.into()
+    }
+
+    fn enter_sample(&self, t: f32, paint: Tokens) -> Element<'_, Message> {
+        let tok = self.tokens;
+        let cat = &self.catalog;
+        let face: Element<'_, Message> = match self.enter_kind {
+            icedtea::motion::Enter::Dialog => container(pattern::dialog_sheet(
+                cat.t("dialog.save"),
+                cat.t("dialog.overwrite-notes"),
+                (cat.t("dialog.save").into(), Message::ConfirmSave),
+                Some((cat.t("cancel").into(), Message::ConfirmCancel)),
+                None::<(String, Message)>,
+                Some(icedtea::icon::Icon::Warning),
+                paint,
+            ))
+            .width(Length::Fixed(320.0))
+            .into(),
+            icedtea::motion::Enter::Menu => {
+                let acts: Vec<_> = self.actions.iter().take(4).cloned().collect();
+                container(pattern::sectioned_menu(
+                    [pattern::MenuSection::new("", acts)],
+                    paint,
+                    named("enter-menu", Role::Menu),
+                ))
+                .width(Length::Fixed(220.0))
+                .style(move |_| icedtea::style::fade_face(icedtea::style::menu_sheet(tok), t))
+                .into()
+            }
+            icedtea::motion::Enter::Sheet => container(
+                column![
+                    widget::label(
+                        cat.t("ss.title"),
+                        paint,
+                        named("enter-sheet-title", Role::Header),
+                    ),
+                    widget::meta(
+                        cat.t("hint.name"),
+                        paint,
+                        named("enter-sheet-k", Role::Status)
+                    ),
+                    widget::label("notes.txt", paint, named("enter-sheet-v", Role::Status)),
+                ]
+                .spacing(8)
+                .padding(12),
+            )
+            .width(Length::Fixed(220.0))
+            .height(Length::Fixed(160.0))
+            .style(move |_| icedtea::style::fade_face(icedtea::style::side_sheet_face(tok), t))
+            .into(),
+            icedtea::motion::Enter::Toast => container(widget::label(
+                cat.t("dialog.last-saved"),
+                paint,
+                named("enter-toast", Role::Status),
+            ))
+            .width(Length::Fill)
+            .padding(paint.density.inset())
+            .style(move |_| {
+                icedtea::style::fade_face(
+                    icedtea::style::toast_face(tok, icedtea::toast::ToastKind::Success),
+                    t,
+                )
+            })
+            .into(),
+            icedtea::motion::Enter::Tooltip => container(widget::meta(
+                cat.t("tip.write"),
+                paint,
+                named("enter-tip", Role::Tooltip),
+            ))
+            .padding(tok.density.gap())
+            .style(move |_| icedtea::style::fade_face(icedtea::style::tooltip(tok), t))
+            .into(),
+        };
+        let moving =
+            icedtea::motion::overlay(face, t, self.enter_slide, tok, named("motion", Role::Group));
+        match self.enter_kind {
+            icedtea::motion::Enter::Tooltip => column![
+                widget::button(
+                    cat.t("save"),
+                    None,
+                    tok,
+                    Variant::Quiet,
+                    Icons::NONE,
+                    ButtonOpts::SHRINK,
+                    btn("enter-tip-host"),
+                ),
+                moving,
+            ]
+            .spacing(6)
+            .align_x(icedtea::i18n::align_start(tok.direction))
+            .into(),
+            icedtea::motion::Enter::Toast => {
+                column![Space::new().height(Length::Fixed(48.0)), moving,]
+                    .width(Length::Fill)
+                    .into()
+            }
+            _ => moving,
+        }
+    }
+
+    fn go_switch_tab(&mut self, i: usize) {
+        if i == self.switch_tab {
+            return;
+        }
+        self.switch_from = self.switch_tab;
+        self.switch_tab = i;
+        let now = icedtea::iced::time::Instant::now();
+        self.switch_run = icedtea::motion::run(
+            icedtea::motion::Job::Switch(icedtea::motion::SwitchFace::FadeThrough),
+            false,
+            self.reduced_motion,
+        )
+        .lasting(Self::hold_ms(self.switch_ms));
+        self.switch_run.go(true, now);
+    }
+
+    fn go_step(&mut self, next: bool) {
+        let n = 2;
+        self.step_from = self.step_idx;
+        self.step_idx = if next {
+            (self.step_idx + 1) % n
+        } else {
+            (self.step_idx + n - 1) % n
+        };
+        self.step_play = if next {
+            self.step_slide
+        } else {
+            self.step_slide.opposite()
+        };
+        let now = icedtea::iced::time::Instant::now();
+        self.step_run = icedtea::motion::run(
+            icedtea::motion::Job::Switch(icedtea::motion::SwitchFace::SharedAxis(self.step_play)),
+            false,
+            self.reduced_motion,
+        )
+        .lasting(Self::hold_ms(self.switch_ms));
+        self.step_run.go(true, now);
+    }
+
     fn go_bounce(&mut self) {
         let shown = self.shown_bounce();
         self.bounce_from = shown;
@@ -2730,26 +3155,23 @@ impl Gallery {
         let Some(start) = self.shake_start else {
             return false;
         };
-        let dur =
-            icedtea::motion::duration(icedtea::m3::DurationStep::Medium2, self.reduced_motion);
+        let dur = icedtea::motion::duration(icedtea::m3::DurationStep::Short4, self.reduced_motion);
         if dur.is_zero() {
             return false;
         }
         icedtea::iced::time::Instant::now().saturating_duration_since(start) < dur
     }
 
-    fn shown_shake(&self) -> f32 {
+    fn shake_progress(&self) -> f32 {
         let Some(start) = self.shake_start else {
             return 0.0;
         };
-        let dur =
-            icedtea::motion::duration(icedtea::m3::DurationStep::Medium2, self.reduced_motion);
+        let dur = icedtea::motion::duration(icedtea::m3::DurationStep::Short4, self.reduced_motion);
         if dur.is_zero() {
             return 0.0;
         }
         let elapsed = icedtea::iced::time::Instant::now().saturating_duration_since(start);
-        let u = (elapsed.as_secs_f32() / dur.as_secs_f32()).clamp(0.0, 1.0);
-        icedtea::motion::shake(u)
+        (elapsed.as_secs_f32() / dur.as_secs_f32()).clamp(0.0, 1.0)
     }
 
     fn go_progress(&mut self, to: f32) {
@@ -3178,8 +3600,9 @@ impl Gallery {
             }
             Message::DialogOpen(on) => {
                 self.dialog_open = on;
-                self.dialog_anim
-                    .go_mut(on, icedtea::iced::time::Instant::now());
+                let now = icedtea::iced::time::Instant::now();
+                self.dialog_anim.go_mut(on, now);
+                self.enter_run.go(on, now);
             }
             Message::FadeOpen(on) => {
                 self.fade_open = on;
@@ -3196,6 +3619,60 @@ impl Gallery {
             Message::Pulse(on) => self.pulse_on = on,
             Message::ShakePlay => {
                 self.shake_start = Some(icedtea::iced::time::Instant::now());
+            }
+            Message::SwitchTab(i) => self.go_switch_tab(i),
+            Message::StepNext => self.go_step(true),
+            Message::StepPrev => self.go_step(false),
+            Message::FieldName(s) => self.field_name = s,
+            Message::FieldCheck => {
+                if self.attn_pulse {
+                    self.pulse_on = !self.pulse_on;
+                } else if self.field_name.trim().is_empty() {
+                    self.shake_start = Some(icedtea::iced::time::Instant::now());
+                }
+            }
+            Message::EnterKind(s) => {
+                self.enter_kind = parse_enter_kind(&s, &self.catalog);
+                self.enter_slide = match self.enter_kind {
+                    icedtea::motion::Enter::Toast => icedtea::motion::Slide::Down,
+                    icedtea::motion::Enter::Sheet => icedtea::motion::Slide::End,
+                    _ => icedtea::motion::Slide::Up,
+                };
+                self.enter_ms = icedtea::motion::Job::Enter(self.enter_kind)
+                    .duration(true, false)
+                    .as_millis() as f32;
+                self.sync_enter_run();
+            }
+            Message::EnterMs(ms) => {
+                self.enter_ms = ms.clamp(50.0, 600.0);
+                self.enter_run.hold(Self::hold_ms(self.enter_ms));
+            }
+            Message::SwitchMs(ms) => {
+                self.switch_ms = ms.clamp(50.0, 600.0);
+                self.switch_run.hold(Self::hold_ms(self.switch_ms));
+                self.step_run.hold(Self::hold_ms(self.switch_ms));
+            }
+            Message::EnterSlide(s) => self.enter_slide = parse_slide(&s, &self.catalog),
+            Message::SwitchFacePick(s) => {
+                self.switch_fade = parse_switch_fade(&s, &self.catalog);
+                self.switch_ms = icedtea::motion::Job::Switch(self.live_switch_face())
+                    .duration(true, false)
+                    .as_millis() as f32;
+                self.rebuild_switch_runs();
+            }
+            Message::StepSlide(s) => {
+                self.step_slide = parse_slide(&s, &self.catalog);
+                self.step_play = self.step_slide;
+                self.rebuild_switch_runs();
+            }
+            Message::AttnFace(s) => {
+                self.attn_pulse = parse_attn_pulse(&s, &self.catalog);
+                if !self.attn_pulse {
+                    self.pulse_on = false;
+                }
+            }
+            Message::DiscloseAxis(s) => {
+                self.disclose_inline = parse_disclose_inline(&s, &self.catalog);
             }
             Message::ReduceMotion(on) => {
                 self.reduced_motion = on;
@@ -3226,6 +3703,8 @@ impl Gallery {
                 self.bounce_from = self.bounce_to;
                 self.bounce_start = None;
                 self.shake_start = None;
+                self.rebuild_switch_runs();
+                self.sync_enter_run();
             }
             Message::OpenDocs(id) => open_docs_url(id),
             Message::Motion => {
@@ -4066,6 +4545,39 @@ impl Gallery {
                     self.bounce_start = None;
                     self.pulse_on = false;
                     self.shake_start = None;
+                    self.switch_tab = 0;
+                    self.switch_from = 0;
+                    self.switch_run = icedtea::motion::run(
+                        icedtea::motion::Job::Switch(icedtea::motion::SwitchFace::FadeThrough),
+                        true,
+                        self.reduced_motion,
+                    );
+                    self.step_idx = 0;
+                    self.step_from = 0;
+                    self.step_slide = icedtea::motion::Slide::Up;
+                    self.step_play = icedtea::motion::Slide::Up;
+                    self.step_run = icedtea::motion::run(
+                        icedtea::motion::Job::Switch(icedtea::motion::SwitchFace::SharedAxis(
+                            icedtea::motion::Slide::Up,
+                        )),
+                        true,
+                        self.reduced_motion,
+                    );
+                    self.field_name.clear();
+                    self.enter_kind = icedtea::motion::Enter::Dialog;
+                    self.enter_slide = icedtea::motion::Slide::Up;
+                    self.enter_ms = icedtea::motion::Job::Enter(icedtea::motion::Enter::Dialog)
+                        .duration(true, false)
+                        .as_millis() as f32;
+                    self.switch_ms =
+                        icedtea::motion::Job::Switch(icedtea::motion::SwitchFace::FadeThrough)
+                            .duration(true, false)
+                            .as_millis() as f32;
+                    self.sync_enter_run();
+                    self.switch_fade = true;
+                    self.attn_pulse = false;
+                    self.disclose_inline = false;
+                    self.rebuild_switch_runs();
                 }
                 "expand-motion" => {
                     self.expander_open = false;
@@ -7971,21 +8483,25 @@ impl Gallery {
             .align_x(icedtea::i18n::align_start(tok.direction))
             .into(),
             "motion" => {
-                let progress = Self::anim_progress(&self.dialog_anim);
-                let t = icedtea::motion::visual(progress, tok.reduced_motion);
-                let paint = tok.fade(t);
-                let card = widget::group_box(
-                    self.catalog.t("motion.sheet"),
-                    widget::label(
-                        self.catalog.t("motion.fade-slide"),
-                        paint,
-                        named("motion-body", Role::Status),
-                    ),
-                    paint,
-                    CardFace::Elevated,
-                    named("motion-card", Role::Group),
-                    None,
+                let enter_t = icedtea::motion::visual(
+                    self.enter_run.progress(icedtea::iced::time::Instant::now()),
+                    tok.reduced_motion,
                 );
+                let enter_paint = tok.fade(enter_t);
+                let kinds = vec![
+                    self.catalog.t("motion.kind-dialog").to_string(),
+                    self.catalog.t("motion.kind-menu").to_string(),
+                    self.catalog.t("motion.kind-sheet").to_string(),
+                    self.catalog.t("motion.kind-toast").to_string(),
+                    self.catalog.t("motion.kind-tooltip").to_string(),
+                ];
+                let slides = vec![
+                    self.catalog.t("motion.slide-none").to_string(),
+                    self.catalog.t("motion.slide-up").to_string(),
+                    self.catalog.t("motion.slide-down").to_string(),
+                    self.catalog.t("motion.slide-start").to_string(),
+                    self.catalog.t("motion.slide-end").to_string(),
+                ];
                 column![
                     widget::switch(
                         self.catalog.t("motion.reduce"),
@@ -7994,6 +8510,32 @@ impl Gallery {
                         tok,
                         named("reduce-motion", Role::Switch).with_checked(self.reduced_motion),
                     ),
+                    self.motion_pick(
+                        "enter-kind",
+                        self.catalog.t("motion.kind"),
+                        kinds,
+                        self.enter_kind_label(),
+                        Message::EnterKind,
+                    ),
+                    self.motion_pick(
+                        "enter-slide",
+                        self.catalog.t("motion.slide"),
+                        slides,
+                        self.slide_label(self.enter_slide),
+                        Message::EnterSlide,
+                    ),
+                    widget::meta(
+                        self.slide_dir_hint(),
+                        tok,
+                        named("enter-slide-dir", Role::Status),
+                    ),
+                    self.motion_ms_slider("enter-ms", self.enter_ms, Message::EnterMs),
+                    widget::meta(
+                        self.enter_timing(),
+                        tok,
+                        named("enter-timing", Role::Status),
+                    ),
+                    widget::meta(self.enter_uses(), tok, named("when-enter", Role::Status)),
                     widget::button(
                         if self.dialog_open {
                             self.catalog.t("motion.close")
@@ -8007,154 +8549,246 @@ impl Gallery {
                         ButtonOpts::SHRINK,
                         btn("overlay-toggle")
                     ),
-                    icedtea::motion::overlay(
-                        card,
-                        t,
-                        icedtea::motion::Slide::Up,
-                        tok,
-                        named("motion", Role::Group),
-                    ),
-                    {
-                        let fade_t = icedtea::motion::visual(
-                            Self::anim_progress(&self.fade_anim),
-                            tok.reduced_motion,
-                        );
-                        let fade_paint = tok.fade(fade_t);
-                        let bounce_t = self.shown_bounce();
-                        let bounce_paint = tok.fade(bounce_t.max(0.15));
-                        let pulse_t = if self.pulse_on && !tok.reduced_motion {
-                            0.55 + 0.45 * icedtea::motion::pulse(self.spin)
+                    self.enter_sample(enter_t, enter_paint),
+                ]
+                .spacing(10)
+                .width(Length::Fill)
+                .align_x(icedtea::i18n::align_start(tok.direction))
+                .into()
+            }
+            "switch-motion" => {
+                let now = icedtea::iced::time::Instant::now();
+                let face = self.live_switch_face();
+                let (progress, from, to, uses) = if self.switch_fade {
+                    (
+                        self.switch_run.progress(now),
+                        self.switch_from,
+                        self.switch_tab,
+                        self.catalog.t("motion.uses-through"),
+                    )
+                } else {
+                    (
+                        self.step_run.progress(now),
+                        self.step_from,
+                        self.step_idx,
+                        if matches!(
+                            self.step_slide,
+                            icedtea::motion::Slide::Start | icedtea::motion::Slide::End
+                        ) {
+                            self.catalog.t("motion.uses-axis-x")
                         } else {
-                            1.0
-                        };
-                        let pulse_paint = tok.fade(pulse_t);
-                        let dx = self.shown_shake() * 16.0;
-                        let fade_col = column![
+                            self.catalog.t("motion.uses-axis-y")
+                        },
+                    )
+                };
+                let out_paint = tok.fade(face.outgoing_fade(progress));
+                let in_paint = tok.fade(face.incoming_fade(progress));
+                let pane = |i: usize, paint| {
+                    let key = if self.switch_fade {
+                        if i == 0 {
+                            "motion.notes"
+                        } else {
+                            "motion.guide"
+                        }
+                    } else if i == 0 {
+                        "motion.event-a"
+                    } else {
+                        "motion.event-b"
+                    };
+                    widget::group_box(
+                        self.catalog.t(key),
+                        widget::label(uses, paint, named(key, Role::Status)),
+                        paint,
+                        CardFace::Elevated,
+                        named(&format!("{key}-card"), Role::Group),
+                        None,
+                    )
+                };
+                let faces = vec![
+                    self.catalog.t("motion.face-through").to_string(),
+                    self.catalog.t("motion.face-axis").to_string(),
+                ];
+                let face_now = if self.switch_fade {
+                    self.catalog.t("motion.face-through")
+                } else {
+                    self.catalog.t("motion.face-axis")
+                };
+                let slides = vec![
+                    self.catalog.t("motion.slide-up").to_string(),
+                    self.catalog.t("motion.slide-down").to_string(),
+                    self.catalog.t("motion.slide-start").to_string(),
+                    self.catalog.t("motion.slide-end").to_string(),
+                ];
+                let mut col = column![
+                    self.motion_pick(
+                        "switch-face",
+                        self.catalog.t("motion.face"),
+                        faces,
+                        face_now,
+                        Message::SwitchFacePick,
+                    ),
+                    self.motion_ms_slider("switch-ms", self.switch_ms, Message::SwitchMs),
+                    widget::meta(
+                        self.switch_timing(),
+                        tok,
+                        named("switch-timing", Role::Status),
+                    ),
+                    widget::meta(uses, tok, named("switch-uses", Role::Status)),
+                ]
+                .spacing(10)
+                .width(Length::Fill)
+                .align_x(icedtea::i18n::align_start(tok.direction));
+                if self.switch_fade {
+                    col = col.push(widget::segmented_button(
+                        [
+                            self.catalog.t("motion.notes"),
+                            self.catalog.t("motion.guide"),
+                        ],
+                        self.switch_tab,
+                        Message::SwitchTab,
+                        tok,
+                        widget::ControlSize::Default,
+                        named("switch-tabs", Role::Group),
+                    ));
+                } else {
+                    col = col.push(self.motion_pick(
+                        "step-slide",
+                        self.catalog.t("motion.slide"),
+                        slides,
+                        self.slide_label(self.step_slide),
+                        Message::StepSlide,
+                    ));
+                    col = col.push(widget::meta(
+                        self.slide_dir_hint(),
+                        tok,
+                        named("switch-slide-dir", Role::Status),
+                    ));
+                    col = col.push(dir_row(
+                        tok.direction,
+                        8.0,
+                        [
                             widget::button(
-                                if self.fade_open {
-                                    self.catalog.t("motion.fade-out")
-                                } else {
-                                    self.catalog.t("motion.fade-in")
-                                },
-                                Some(Message::FadeOpen(!self.fade_open)),
+                                self.catalog.t("motion.previous"),
+                                Some(Message::StepPrev),
                                 tok,
                                 Variant::Quiet,
                                 Icons::NONE,
                                 ButtonOpts::SHRINK,
-                                btn("fade-toggle")
+                                btn("step-prev"),
                             ),
-                            icedtea::motion::overlay(
-                                widget::group_box(
-                                    self.catalog.t("motion.fade"),
-                                    widget::label(
-                                        self.catalog.t("motion.fade-body"),
-                                        fade_paint,
-                                        named("fade-body", Role::Status),
-                                    ),
-                                    fade_paint,
-                                    CardFace::Elevated,
-                                    named("fade-card", Role::Group),
-                                    None,
-                                ),
-                                fade_t,
-                                icedtea::motion::Slide::None,
-                                tok,
-                                named("fade-only", Role::Group),
-                            ),
-                        ]
-                        .spacing(6);
-                        let bounce_col = column![
                             widget::button(
-                                if bounce_t > 0.5 {
-                                    self.catalog.t("motion.bounce-out")
-                                } else {
-                                    self.catalog.t("motion.bounce-in")
-                                },
-                                Some(Message::BouncePlay),
+                                self.catalog.t("motion.next"),
+                                Some(Message::StepNext),
                                 tok,
                                 Variant::Quiet,
                                 Icons::NONE,
                                 ButtonOpts::SHRINK,
-                                btn("bounce-play")
+                                btn("step-next"),
                             ),
-                            icedtea::motion::overlay(
-                                widget::group_box(
-                                    self.catalog.t("motion.bounce"),
-                                    widget::label(
-                                        self.catalog.t("motion.bounce-body"),
-                                        bounce_paint,
-                                        named("bounce-body", Role::Status),
-                                    ),
-                                    bounce_paint,
-                                    CardFace::Elevated,
-                                    named("bounce-card", Role::Group),
-                                    None,
-                                ),
-                                bounce_t,
-                                icedtea::motion::Slide::Up,
-                                tok,
-                                named("bounce-motion", Role::Group),
-                            ),
-                        ]
-                        .spacing(6);
-                        let pulse_col = column![
-                            widget::switch(
-                                self.catalog.t("motion.pulse"),
-                                self.pulse_on,
-                                Message::Pulse,
-                                tok,
-                                named("pulse-switch", Role::Switch).with_checked(self.pulse_on),
-                            ),
-                            widget::group_box(
-                                self.catalog.t("motion.pulse"),
-                                widget::label(
-                                    self.catalog.t("motion.pulse-body"),
-                                    pulse_paint,
-                                    named("pulse-body", Role::Status),
-                                ),
-                                pulse_paint,
-                                CardFace::Elevated,
-                                named("pulse-card", Role::Group),
-                                None,
-                            ),
-                        ]
-                        .spacing(6);
-                        let shake_col = column![
-                            widget::button(
-                                self.catalog.t("motion.shake"),
-                                Some(Message::ShakePlay),
-                                tok,
-                                Variant::Quiet,
-                                Icons::NONE,
-                                ButtonOpts::SHRINK,
-                                btn("shake-play")
-                            ),
-                            container(widget::group_box(
-                                self.catalog.t("motion.shake"),
-                                widget::label(
-                                    self.catalog.t("motion.shake-body"),
-                                    tok,
-                                    named("shake-body", Role::Status),
-                                ),
-                                tok,
-                                CardFace::Elevated,
-                                named("shake-card", Role::Group),
-                                None,
-                            ))
-                            .padding(Padding {
-                                top: 0.0,
-                                right: (16.0 - dx).max(0.0),
-                                bottom: 0.0,
-                                left: (16.0 + dx).max(0.0),
-                            }),
-                        ]
-                        .spacing(6);
-                        column![
-                            dir_row(tok.direction, 12.0, [fade_col.into(), bounce_col.into()]),
-                            dir_row(tok.direction, 12.0, [pulse_col.into(), shake_col.into()]),
-                        ]
-                        .spacing(10)
-                    },
+                        ],
+                    ));
+                }
+                col.push(icedtea::motion::switch(
+                    pane(from, out_paint),
+                    pane(to, in_paint),
+                    progress,
+                    face,
+                    tok,
+                    named("switch-motion", Role::Group),
+                ))
+                .into()
+            }
+            "attention-motion" => {
+                let faces = vec![
+                    self.catalog.t("motion.attn-shake").to_string(),
+                    self.catalog.t("motion.attn-pulse").to_string(),
+                ];
+                let face_now = if self.attn_pulse {
+                    self.catalog.t("motion.attn-pulse")
+                } else {
+                    self.catalog.t("motion.attn-shake")
+                };
+                let uses = if self.attn_pulse {
+                    self.catalog.t("motion.uses-pulse")
+                } else {
+                    self.catalog.t("motion.uses-shake")
+                };
+                let progress = if self.attn_pulse {
+                    if self.pulse_on && !tok.reduced_motion {
+                        self.spin
+                    } else {
+                        0.0
+                    }
+                } else {
+                    self.shake_progress()
+                };
+                let face = if self.attn_pulse {
+                    icedtea::motion::AttentionFace::Pulse
+                } else {
+                    icedtea::motion::AttentionFace::Shake
+                };
+                let child: Element<'_, Message> = if self.attn_pulse {
+                    widget::group_box(
+                        self.catalog.t("motion.attn-pulse"),
+                        widget::label(uses, tok, named("pulse-body", Role::Status)),
+                        tok,
+                        CardFace::Elevated,
+                        named("pulse-card", Role::Group),
+                        None,
+                    )
+                } else {
+                    widget::text_input(
+                        self.catalog.t("motion.field"),
+                        &self.field_name,
+                        Message::FieldName,
+                        None,
+                        widget::FieldOpts::NONE,
+                        tok,
+                        named("motion-field", Role::TextBox),
+                        None,
+                    )
+                };
+                let hint = if self.attn_pulse {
+                    uses
+                } else if self.shake_start.is_some() && self.field_name.trim().is_empty() {
+                    self.catalog.t("motion.field-bad")
+                } else {
+                    self.catalog.t("motion.field-ok")
+                };
+                column![
+                    self.motion_pick(
+                        "attn-face",
+                        self.catalog.t("motion.face"),
+                        faces,
+                        face_now,
+                        Message::AttnFace,
+                    ),
+                    widget::meta(uses, tok, named("attn-uses", Role::Status)),
+                    icedtea::motion::attention(
+                        child,
+                        progress,
+                        face,
+                        tok,
+                        named("attention-motion", Role::Group),
+                    ),
+                    widget::button(
+                        if self.attn_pulse {
+                            self.catalog.t("motion.pulse")
+                        } else {
+                            self.catalog.t("motion.check")
+                        },
+                        Some(if self.attn_pulse {
+                            Message::Pulse(!self.pulse_on)
+                        } else {
+                            Message::FieldCheck
+                        }),
+                        tok,
+                        Variant::Quiet,
+                        Icons::NONE,
+                        ButtonOpts::SHRINK,
+                        btn("attn-play"),
+                    ),
+                    widget::meta(hint, tok, named("field-hint", Role::Status)),
                 ]
                 .spacing(10)
                 .width(Length::Fill)
@@ -8163,7 +8797,46 @@ impl Gallery {
             }
             "expand-motion" => {
                 let progress = Self::anim_progress(&self.expand_anim);
+                let axis = if self.disclose_inline {
+                    icedtea::motion::Axis::Inline
+                } else {
+                    icedtea::motion::Axis::Block
+                };
+                let axes = vec![
+                    self.catalog.t("motion.axis-block").to_string(),
+                    self.catalog.t("motion.axis-inline").to_string(),
+                ];
+                let axis_now = if self.disclose_inline {
+                    self.catalog.t("motion.axis-inline")
+                } else {
+                    self.catalog.t("motion.axis-block")
+                };
+                let uses = if self.disclose_inline {
+                    self.catalog.t("motion.uses-inline")
+                } else {
+                    self.catalog.t("motion.uses-block")
+                };
+                let body = if self.disclose_inline {
+                    widget::group_box(
+                        self.catalog.t("motion.axis-inline"),
+                        widget::label(uses, tok, named("rail-body", Role::Status)),
+                        tok,
+                        CardFace::Elevated,
+                        named("rail-card", Role::Group),
+                        None,
+                    )
+                } else {
+                    expand_notes_body(tok, &self.catalog)
+                };
                 column![
+                    self.motion_pick(
+                        "disclose-axis",
+                        self.catalog.t("motion.axis"),
+                        axes,
+                        axis_now,
+                        Message::DiscloseAxis,
+                    ),
+                    widget::meta(uses, tok, named("disclose-uses", Role::Status)),
                     widget::button(
                         if self.expander_open {
                             self.catalog.t("expand.collapse")
@@ -8178,9 +8851,14 @@ impl Gallery {
                         btn("expand-toggle")
                     ),
                     icedtea::motion::expand(
-                        expand_notes_body(tok, &self.catalog),
+                        body,
                         progress,
-                        widget::Peek::Lines(2).height(),
+                        if self.disclose_inline {
+                            0.0
+                        } else {
+                            widget::Peek::Lines(2).height()
+                        },
+                        axis,
                         tok,
                         named("expand-motion", Role::Group),
                     ),
@@ -8312,6 +8990,8 @@ fn handled_ids() -> &'static [&'static str] {
         "palette",
         "main-window",
         "motion",
+        "switch-motion",
+        "attention-motion",
         "expand-motion",
     ]
 }
@@ -8734,15 +9414,14 @@ mod tests {
         let _ = g.update(super::Message::Tour);
         assert_eq!(g.theme, "dark");
         assert_ne!(g.page, "theme");
-        let bounce = (0..super::tour_len())
+        let step = (0..super::tour_len())
             .map(super::tour_beat)
-            .find(|b| b.caption == "Motion: bounce in")
-            .expect("bounce tour beat");
-        assert!(bounce.act.contains("bounce-in"));
-        g.apply_tour_beat(&bounce);
+            .find(|b| b.caption == "Motion: next event")
+            .expect("step tour beat");
+        assert!(step.act.contains("step-next"));
+        g.apply_tour_beat(&step);
         assert_eq!(g.page, "motion");
-        assert!(g.bounce_start.is_some());
-        assert!(g.bounce_to > 0.5);
+        assert_eq!(g.step_idx, 1);
     }
 
     #[test]
@@ -9448,6 +10127,39 @@ mod tests {
         let _ = g.update(super::Message::ContextDismiss);
         assert!(g.context.is_some());
         assert!(g.context_closing);
+    }
+
+    #[test]
+    fn fade_through_tab_uses_duration_slider() {
+        let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
+        let _ = g.update(super::Message::SwitchMs(600.0));
+        let _ = g.update(super::Message::SwitchTab(1));
+        assert_eq!(g.switch_run.duration(true).as_millis(), 600);
+        assert_eq!(g.switch_tab, 1);
+        let later = icedtea::iced::time::Instant::now() + std::time::Duration::from_millis(100);
+        let p = g.switch_run.progress(later);
+        assert!(
+            p < 0.4,
+            "600 ms fade-through should still be early at 100 ms, got {p}"
+        );
+    }
+
+    #[test]
+    fn shared_axis_next_keeps_start_slide() {
+        let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
+        let _ = g.update(super::Message::SwitchFacePick(
+            g.catalog.t("motion.face-axis").to_string(),
+        ));
+        let _ = g.update(super::Message::StepSlide(
+            g.catalog.t("motion.slide-start").to_string(),
+        ));
+        assert_eq!(g.step_slide, icedtea::motion::Slide::Start);
+        let _ = g.update(super::Message::StepNext);
+        assert_eq!(g.step_slide, icedtea::motion::Slide::Start);
+        assert_eq!(g.step_play, icedtea::motion::Slide::Start);
+        let _ = g.update(super::Message::StepPrev);
+        assert_eq!(g.step_slide, icedtea::motion::Slide::Start);
+        assert_eq!(g.step_play, icedtea::motion::Slide::End);
     }
 
     #[test]

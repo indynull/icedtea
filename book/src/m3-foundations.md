@@ -82,11 +82,11 @@ host Map and Desktop rows.
 `m3::DurationStep` and `m3::Ease` are the M3 duration and easing
 tokens. Desktop chrome uses the short and medium steps (50–250 ms).
 `Tokens::with_reduced_motion(true)` collapses every duration to 0 ms.
-Constructors take a 0–1 progress; the application owns
-`iced::Animation`. Overlay chrome uses `motion::overlay`
-(`Slide::None` is fade only). `bounce_out`, `pulse`, and `shake`
-sample like `Ease`. Determinate progress uses
-`motion::value_animation`; the linear busy bar uses
+Constructors take a 0–1 progress; the application owns a
+`motion::Run` for a `Job` (enter, switch, disclose, attention,
+value). Overlay chrome uses `motion::overlay`. Next/previous
+peers use `motion::switch` (`SwitchFace::SharedAxis`). Determinate
+progress uses `motion::value_animation`; the linear busy bar uses
 `motion::progress_run`. See [Motion](motion.md).
 
 ## Control states

@@ -303,27 +303,58 @@ Constructor: [`motion::overlay`](https://docs.rs/icedtea/latest/icedtea/motion/f
 [source](https://github.com/indynull/icedtea/blob/main/src/motion.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-`progress` is 0 (gone) to 1 (rest). The application owns
-`iced::Animation` and passes `interpolate(0.0, 1.0, now)`.
-`Slide::None` is fade only: build the child with `Tokens::fade`.
-Reduced-motion tokens snap to 0 or 1. Duration and easing live in
-`m3::motion`. `bounce_out`, `pulse`, and `shake` are curves you
-sample like `Ease`; see [Motion](../motion.md).
+`progress` is 0 (gone) to 1 (rest). Hold a [`motion::Run`](https://docs.rs/icedtea/latest/icedtea/motion/struct.Run.html)
+for [`Job::Enter`](https://docs.rs/icedtea/latest/icedtea/motion/enum.Job.html)
+(dialog, menu, sheet, toast, tooltip). `Slide::None` is fade only:
+build the child with `Tokens::fade`. Reduced-motion tokens snap to
+0 or 1. See [Motion](../motion.md).
+
+Pass `A11y`.
+
+### Switch motion
+
+**`switch-motion`** — Replace one child with another.
+
+Constructor: [`motion::switch`](https://docs.rs/icedtea/latest/icedtea/motion/fn.switch.html)
+
+[source](https://github.com/indynull/icedtea/blob/main/src/motion.rs) ·
+[icedtea](https://crates.io/crates/icedtea)
+
+`SwitchFace::SharedAxis` is next/previous peers (timeline j/k):
+incoming uses `progress` on that slide, leaving uses `1 - progress`
+on the opposite slide, travel is 12 dp. `SwitchFace::FadeThrough` is
+tab bodies and other unrelated destinations. Build each child with
+`Tokens::fade` from `incoming_fade` / `outgoing_fade`. Child overlays
+(pick lists) still open.
+
+Pass `A11y`.
+
+### Attention motion
+
+**`attention-motion`** — Shake or pulse a child.
+
+Constructor: [`motion::attention`](https://docs.rs/icedtea/latest/icedtea/motion/fn.attention.html)
+
+[source](https://github.com/indynull/icedtea/blob/main/src/motion.rs) ·
+[icedtea](https://crates.io/crates/icedtea)
+
+`AttentionFace::Shake` is an invalid field. `AttentionFace::Pulse`
+is a live mark. Reduced-motion tokens hold rest.
 
 Pass `A11y`.
 
 ### Expand motion
 
-**`expand-motion`** — Clip a child between a peek height and its open
-height.
+**`expand-motion`** — Clip a child between a peek size and its open
+size on one axis.
 
 Constructor: [`motion::expand`](https://docs.rs/icedtea/latest/icedtea/motion/fn.expand.html)
 
 [source](https://github.com/indynull/icedtea/blob/main/src/motion.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Expander and accordion paint through this. `progress` 0 is the peek;
-1 is the laid-out height.
+`Axis::Block` is height (expander, accordion, tree). `Axis::Inline`
+is width (drawer). `progress` 0 is the peek; 1 is the laid-out size.
 
 Pass `A11y`.
 

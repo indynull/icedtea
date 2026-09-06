@@ -1747,9 +1747,8 @@ _TOUR_PAGES = (
     "palette",
     "main-window",
     "motion",
-    "expand-motion",
 )
-_TOUR_EXTRAS = {"code": 1, "motion": 3, "expand-motion": 1}
+_TOUR_EXTRAS = {"code": 1, "motion": 4}
 
 # Gallery catalog fill languages (`copy.rs` every_locale).
 GALLERY_LOCALES = ("en", "vi", "ja", "zh", "ar", "ur", "he")

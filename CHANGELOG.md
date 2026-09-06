@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Feature
+
+- `motion::Job` and `motion::Run` pick duration and enter/exit ease
+  for overlay, switch, disclose, attention, and value.
+- `motion::switch` replaces one child with another
+  (`SwitchFace::FadeThrough` or `SwitchFace::SharedAxis`).
+- `motion::attention` shakes an invalid field or pulses a live mark.
+- `motion::expand` clips on `Axis::Block` or `Axis::Inline`.
+- `motion::Run::lasting` holds an enter duration; exit keeps the job
+  ratio. Reduced motion still snaps.
+
 ## 0.16.1 — 2026-09-05
 
 ### Feature

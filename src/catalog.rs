@@ -129,7 +129,9 @@ pub const ENTRIES: &[Entry] = &[
     Entry { id: "palette", title: "Command palette", group: "Patterns", page: "palette" },
     Entry { id: "main-window", title: "Main window", group: "Patterns", page: "main-window" },
     Entry { id: "motion", title: "Motion", group: "Chrome", page: "motion" },
-    Entry { id: "expand-motion", title: "Expand motion", group: "Chrome", page: "expand-motion" },
+    Entry { id: "switch-motion", title: "Switch motion", group: "Chrome", page: "motion" },
+    Entry { id: "attention-motion", title: "Attention motion", group: "Chrome", page: "motion" },
+    Entry { id: "expand-motion", title: "Expand motion", group: "Chrome", page: "motion" },
 ];
 
 pub fn get(id: &str) -> Option<&'static Entry> {
@@ -277,6 +279,8 @@ pub fn constructor(id: &str) -> Option<(&'static str, &'static str)> {
         "palette" => ("pattern", "command_palette_view"),
         "main-window" => ("pattern", "main_window"),
         "motion" => ("motion", "overlay"),
+        "switch-motion" => ("motion", "switch"),
+        "attention-motion" => ("motion", "attention"),
         "expand-motion" => ("motion", "expand"),
         _ => return None,
     })
@@ -744,6 +748,8 @@ mod tests {
             ("palette", "command_palette_view", pattern),
             ("main-window", "main_window", pattern),
             ("motion", "overlay", motion),
+            ("switch-motion", "switch", motion),
+            ("attention-motion", "attention", motion),
             ("expand-motion", "expand", motion),
         ];
         assert_eq!(map.len(), ENTRIES.len());

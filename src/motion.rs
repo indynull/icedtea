@@ -1,18 +1,19 @@
-//! Overlay and disclosure paint from a 0..=1 progress.
+//! Overlay, disclose, switch, and attention paint from a 0..=1 progress.
 //!
-//! The application owns [`iced::Animation`] and the clock. Pass
-//! `animation.interpolate(0.0, 1.0, now)` as `progress`. Reduced-motion
-//! tokens snap that value to 0 or 1. [`bounce_out`], [`pulse`], and
-//! [`shake`] are extra curves for the same hook.
+//! Pick a [`Job`], hold a [`Run`], and pass `progress` into the matching
+//! constructor. The application owns the clock. Reduced-motion tokens
+//! snap that value to 0 or 1. [`bounce_out`], [`pulse`], and [`shake`]
+//! are extra curves for the same hook.
 
 use iced::advanced::layout::{self, Layout};
+use iced::advanced::overlay;
 use iced::advanced::renderer;
 use iced::advanced::widget::tree::Tree;
 use iced::advanced::widget::Widget;
 use iced::advanced::{Clipboard, Shell};
 use iced::mouse;
-use iced::time::Duration;
-use iced::{Element, Event, Length, Rectangle, Size, Vector};
+use iced::time::{Duration, Instant};
+use iced::{Element, Event, Length, Rectangle, Size, Transformation, Vector};
 
 use crate::a11y::{self, A11y};
 use crate::m3::motion::{self as m3motion, DurationStep, Ease};
@@ -39,15 +40,249 @@ impl Slide {
     }
 
     fn delta(self, remain: f32) -> Vector {
-        let d = self.pixels() * remain;
+        offset_delta(self, self.pixels() * remain)
+    }
+
+    /// Incoming `Up` leaves toward `Down`; `Start` leaves toward `End`.
+    pub fn opposite(self) -> Self {
         match self {
-            Self::None => Vector::ZERO,
-            Self::Up => Vector::new(0.0, d),
-            Self::Down => Vector::new(0.0, -d),
-            Self::Start => Vector::new(-d, 0.0),
-            Self::End => Vector::new(d, 0.0),
+            Self::None => Self::None,
+            Self::Up => Self::Down,
+            Self::Down => Self::Up,
+            Self::Start => Self::End,
+            Self::End => Self::Start,
         }
     }
+}
+
+fn offset_delta(slide: Slide, d: f32) -> Vector {
+    match slide {
+        Slide::None => Vector::ZERO,
+        Slide::Up => Vector::new(0.0, d),
+        Slide::Down => Vector::new(0.0, -d),
+        Slide::Start => Vector::new(-d, 0.0),
+        Slide::End => Vector::new(d, 0.0),
+    }
+}
+
+/// Disclose axis: block is height, inline is width.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Axis {
+    Block,
+    Inline,
+}
+
+/// Overlay chrome that enters and exits.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Enter {
+    Dialog,
+    Menu,
+    Sheet,
+    Toast,
+    Tooltip,
+}
+
+/// How [`switch`] replaces one child with another.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum SwitchFace {
+    /// Unrelated destinations: fade the leaving child out, then fade
+    /// the incoming child in. Tab bodies and settings groups.
+    FadeThrough,
+    /// Spatial siblings. `Slide` is the incoming direction. Next on Y
+    /// is [`Slide::Up`]; previous is [`Slide::Down`].
+    SharedAxis(Slide),
+}
+
+impl SwitchFace {
+    /// Opacity for the leaving child. Shared axis is `1 - progress`.
+    pub fn outgoing_fade(self, progress: f32) -> f32 {
+        let p = progress.clamp(0.0, 1.0);
+        match self {
+            Self::FadeThrough => (1.0 - p / 0.35).clamp(0.0, 1.0),
+            Self::SharedAxis(_) => 1.0 - p,
+        }
+    }
+
+    /// Opacity for the incoming child. Shared axis is `progress`.
+    pub fn incoming_fade(self, progress: f32) -> f32 {
+        let p = progress.clamp(0.0, 1.0);
+        match self {
+            Self::FadeThrough => ((p - 0.35) / 0.65).clamp(0.0, 1.0),
+            Self::SharedAxis(_) => p,
+        }
+    }
+
+    fn incoming_slide(self) -> Slide {
+        match self {
+            Self::FadeThrough => Slide::None,
+            Self::SharedAxis(slide) => slide,
+        }
+    }
+
+    fn outgoing_slide(self) -> Slide {
+        self.incoming_slide().opposite()
+    }
+}
+
+/// How [`attention`] marks a child.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum AttentionFace {
+    /// Decaying wiggle. Invalid field after a failed check.
+    Shake,
+    /// Scale pulse. Live or recording mark.
+    Pulse,
+}
+
+/// Named motion job: duration, enter/exit ease, and which constructor.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Job {
+    Enter(Enter),
+    Switch(SwitchFace),
+    Disclose(Axis),
+    Attention(AttentionFace),
+    Value,
+}
+
+impl Job {
+    /// Duration for this direction. Exit is shorter on overlay chrome.
+    pub fn duration(self, entering: bool, reduced: bool) -> Duration {
+        if reduced {
+            return Duration::ZERO;
+        }
+        let step = match self {
+            Self::Enter(Enter::Dialog | Enter::Sheet) => {
+                if entering {
+                    DurationStep::Short4
+                } else {
+                    DurationStep::Short3
+                }
+            }
+            Self::Enter(Enter::Menu) => {
+                if entering {
+                    DurationStep::Short3
+                } else {
+                    DurationStep::Short2
+                }
+            }
+            Self::Enter(Enter::Toast) => DurationStep::Short3,
+            Self::Enter(Enter::Tooltip) => {
+                if entering {
+                    DurationStep::Short2
+                } else {
+                    DurationStep::Short1
+                }
+            }
+            Self::Switch(SwitchFace::FadeThrough) => DurationStep::Medium1,
+            Self::Switch(SwitchFace::SharedAxis(_)) => DurationStep::Medium2,
+            Self::Disclose(_) => DurationStep::Medium1,
+            Self::Attention(AttentionFace::Shake) => DurationStep::Short4,
+            Self::Attention(AttentionFace::Pulse) => DurationStep::Medium2,
+            Self::Value => DurationStep::Medium2,
+        };
+        step.duration(false)
+    }
+
+    /// Ease for this direction. Enter decelerates; exit accelerates.
+    pub fn ease(self, entering: bool) -> Ease {
+        match self {
+            Self::Switch(SwitchFace::FadeThrough) => Ease::Standard,
+            Self::Enter(_) | Self::Switch(_) if entering => Ease::EmphasizedDecelerate,
+            Self::Enter(_) | Self::Switch(_) => Ease::EmphasizedAccelerate,
+            Self::Disclose(_) => Ease::EmphasizedDecelerate,
+            Self::Attention(_) | Self::Value => Ease::Standard,
+        }
+    }
+}
+
+/// One 0..=1 clock for a [`Job`]. Rebuilds duration and ease on [`Run::go`].
+#[derive(Debug, Clone)]
+pub struct Run {
+    anim: iced::Animation<bool>,
+    job: Job,
+    reduced: bool,
+    enter_hold: Option<Duration>,
+}
+
+impl Run {
+    /// Rest at `open` (1) or closed (0).
+    pub fn new(job: Job, open: bool, reduced: bool) -> Self {
+        let mut run = Self {
+            anim: iced::Animation::new(open),
+            job,
+            reduced,
+            enter_hold: None,
+        };
+        run.anim = iced::Animation::new(open)
+            .duration(run.span(open))
+            .easing(job.ease(open).lilt());
+        run
+    }
+
+    /// Hold this enter duration. Exit keeps the job's shorter ratio.
+    ///
+    /// Reduced motion still snaps to 0 ms. Use this from a gallery
+    /// or when an application has felt a length; the default path is
+    /// the job step.
+    pub fn lasting(mut self, enter: Duration) -> Self {
+        self.enter_hold = Some(enter);
+        let open = self.anim.value();
+        self.anim = iced::Animation::new(open)
+            .duration(self.span(open))
+            .easing(self.job.ease(open).lilt());
+        self
+    }
+
+    /// Remember an enter length without snapping the current play.
+    pub fn hold(&mut self, enter: Duration) {
+        self.enter_hold = Some(enter);
+    }
+
+    fn span(&self, entering: bool) -> Duration {
+        if self.reduced {
+            return Duration::ZERO;
+        }
+        match self.enter_hold {
+            None => self.job.duration(entering, false),
+            Some(enter) => {
+                if entering {
+                    enter
+                } else {
+                    let je = self.job.duration(true, false).as_secs_f32().max(0.001);
+                    let jx = self.job.duration(false, false).as_secs_f32();
+                    Duration::from_secs_f32(enter.as_secs_f32() * (jx / je))
+                }
+            }
+        }
+    }
+
+    /// Drive toward open or closed. Exit uses the job's shorter step.
+    pub fn go(&mut self, open: bool, now: Instant) {
+        let from = self.anim.value();
+        self.anim = iced::Animation::new(from)
+            .duration(self.span(open))
+            .easing(self.job.ease(open).lilt());
+        self.anim.go_mut(open, now);
+    }
+
+    /// Enter or exit length this run will use.
+    pub fn duration(&self, entering: bool) -> Duration {
+        self.span(entering)
+    }
+
+    /// Interpolated 0..=1 at `now`.
+    pub fn progress(&self, now: Instant) -> f32 {
+        self.anim.interpolate(0.0, 1.0, now)
+    }
+
+    /// True while the value is still moving.
+    pub fn is_live(&self, now: Instant) -> bool {
+        self.anim.is_animating(now)
+    }
+}
+
+/// Configure a [`Run`] at rest.
+pub fn run(job: Job, open: bool, reduced: bool) -> Run {
+    Run::new(job, open, reduced)
 }
 
 /// Snap progress when reduced motion is on.
@@ -232,14 +467,15 @@ pub fn overlay<'a, M: 'a>(
     )
 }
 
-/// Clip a child between a peek height and its open height.
+/// Clip a child between a peek size and its open size on one [`Axis`].
 ///
 /// `progress` 0 is `peek` pixels (0 hides). 1 is the child's laid-out
-/// height. Reduced-motion tokens snap.
+/// size on that axis. [`Axis::Block`] is height; [`Axis::Inline`] is
+/// width (drawer, folder rail). Reduced-motion tokens snap.
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
-/// use icedtea::motion;
+/// use icedtea::motion::{self, Axis};
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
@@ -248,6 +484,7 @@ pub fn overlay<'a, M: 'a>(
 ///     body,
 ///     1.0,
 ///     0.0,
+///     Axis::Block,
 ///     tok,
 ///     A11y::new("expand", Role::Group),
 /// );
@@ -256,6 +493,7 @@ pub fn expand<'a, M: 'a>(
     child: Element<'a, M>,
     progress: f32,
     peek: f32,
+    axis: Axis,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
@@ -264,6 +502,96 @@ pub fn expand<'a, M: 'a>(
             content: child,
             progress,
             peek: peek.max(0.0),
+            axis,
+            reduced: tok.reduced_motion,
+        }
+        .into(),
+        &a11y,
+    )
+}
+
+/// Replace `outgoing` with `incoming` from a 0..=1 progress.
+///
+/// [`SwitchFace::SharedAxis`] is next/previous peers: incoming uses
+/// `progress` on `slide`, leaving uses `1 - progress` on the opposite
+/// slide, travel is [`m3::motion::OVERLAY_SLIDE`](crate::m3::motion::OVERLAY_SLIDE)
+/// (12 dp). Build each child with [`Tokens::fade`](`crate::theme::Tokens::fade`)
+/// from [`SwitchFace::incoming_fade`] / [`SwitchFace::outgoing_fade`].
+/// [`SwitchFace::FadeThrough`] is tab bodies and other unrelated
+/// destinations. Reduced-motion tokens snap. Child overlays (pick
+/// lists) still open.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::motion::{self, Slide, SwitchFace};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let leaving = widget::label("one", tok, A11y::new("one", Role::Status));
+/// let incoming = widget::label("two", tok, A11y::new("two", Role::Status));
+/// let _: icedtea::Element<'_, ()> = motion::switch(
+///     leaving,
+///     incoming,
+///     1.0,
+///     SwitchFace::SharedAxis(Slide::Up),
+///     tok,
+///     A11y::new("step", Role::Group),
+/// );
+/// ```
+pub fn switch<'a, M: 'a>(
+    outgoing: Element<'a, M>,
+    incoming: Element<'a, M>,
+    progress: f32,
+    face: SwitchFace,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    a11y::attach(
+        SwitchLayer {
+            outgoing,
+            incoming,
+            progress,
+            face,
+            reduced: tok.reduced_motion,
+        }
+        .into(),
+        &a11y,
+    )
+}
+
+/// Shake or pulse a child from a 0..=1 progress.
+///
+/// [`AttentionFace::Shake`] is a decaying wiggle that starts and ends
+/// at rest (invalid field). [`AttentionFace::Pulse`] scales about the
+/// center (live mark). Reduced-motion tokens hold rest.
+///
+/// ```
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::motion::{self, AttentionFace};
+/// use icedtea::theme;
+/// use icedtea::widget;
+/// let tok = theme::named("dark").tokens;
+/// let field = widget::label("Name", tok, A11y::new("Name", Role::Status));
+/// let _: icedtea::Element<'_, ()> = motion::attention(
+///     field,
+///     0.0,
+///     AttentionFace::Shake,
+///     tok,
+///     A11y::new("invalid", Role::Group),
+/// );
+/// ```
+pub fn attention<'a, M: 'a>(
+    child: Element<'a, M>,
+    progress: f32,
+    face: AttentionFace,
+    tok: Tokens,
+    a11y: A11y,
+) -> Element<'a, M> {
+    a11y::attach(
+        AttentionLayer {
+            content: child,
+            progress,
+            face,
             reduced: tok.reduced_motion,
         }
         .into(),
@@ -413,6 +741,27 @@ impl<'a, Message> Widget<Message, iced::Theme, iced::Renderer> for OverlayLayer<
             operation,
         );
     }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &iced::Renderer,
+        viewport: &Rectangle,
+        translation: Vector,
+    ) -> Option<overlay::Element<'b, Message, iced::Theme, iced::Renderer>> {
+        if visual(self.progress, self.reduced) <= 0.0 {
+            return None;
+        }
+        let delta = self.slide_delta();
+        self.content.as_widget_mut().overlay(
+            &mut tree.children[0],
+            layout.children().next().unwrap(),
+            renderer,
+            viewport,
+            translation + delta,
+        )
+    }
 }
 
 impl<'a, Message: 'a> From<OverlayLayer<'a, Message>> for Element<'a, Message> {
@@ -425,6 +774,7 @@ struct ExpandLayer<'a, Message> {
     content: Element<'a, Message>,
     progress: f32,
     peek: f32,
+    axis: Axis,
     reduced: bool,
 }
 
@@ -438,7 +788,10 @@ impl<'a, Message> Widget<Message, iced::Theme, iced::Renderer> for ExpandLayer<'
     }
 
     fn size(&self) -> Size<Length> {
-        Size::new(Length::Fill, Length::Shrink)
+        match self.axis {
+            Axis::Block => Size::new(Length::Fill, Length::Shrink),
+            Axis::Inline => Size::new(Length::Shrink, Length::Fill),
+        }
     }
 
     fn layout(
@@ -447,15 +800,26 @@ impl<'a, Message> Widget<Message, iced::Theme, iced::Renderer> for ExpandLayer<'
         renderer: &iced::Renderer,
         limits: &layout::Limits,
     ) -> layout::Node {
-        let child_limits =
-            layout::Limits::new(Size::ZERO, Size::new(limits.max().width, f32::INFINITY));
+        let max = limits.max();
+        let child_limits = match self.axis {
+            Axis::Block => layout::Limits::new(Size::ZERO, Size::new(max.width, f32::INFINITY)),
+            Axis::Inline => layout::Limits::new(Size::ZERO, Size::new(f32::INFINITY, max.height)),
+        };
         let child =
             self.content
                 .as_widget_mut()
                 .layout(&mut tree.children[0], renderer, &child_limits);
         let t = visual(self.progress, self.reduced);
-        let h = height(t, self.peek, child.size().height);
-        let size = Size::new(child.size().width, h.max(0.0));
+        let size = match self.axis {
+            Axis::Block => Size::new(
+                child.size().width,
+                height(t, self.peek, child.size().height).max(0.0),
+            ),
+            Axis::Inline => Size::new(
+                height(t, self.peek, child.size().width).max(0.0),
+                child.size().height,
+            ),
+        };
         layout::Node::with_children(size, vec![child])
     }
 
@@ -544,10 +908,466 @@ impl<'a, Message> Widget<Message, iced::Theme, iced::Renderer> for ExpandLayer<'
             operation,
         );
     }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &iced::Renderer,
+        viewport: &Rectangle,
+        translation: Vector,
+    ) -> Option<overlay::Element<'b, Message, iced::Theme, iced::Renderer>> {
+        if visual(self.progress, self.reduced) <= 0.0 && self.peek <= 0.0 {
+            return None;
+        }
+        self.content.as_widget_mut().overlay(
+            &mut tree.children[0],
+            layout.children().next().unwrap(),
+            renderer,
+            viewport,
+            translation,
+        )
+    }
 }
 
 impl<'a, Message: 'a> From<ExpandLayer<'a, Message>> for Element<'a, Message> {
     fn from(value: ExpandLayer<'a, Message>) -> Self {
+        Self::new(value)
+    }
+}
+
+struct SwitchLayer<'a, Message> {
+    outgoing: Element<'a, Message>,
+    incoming: Element<'a, Message>,
+    progress: f32,
+    face: SwitchFace,
+    reduced: bool,
+}
+
+impl<Message> SwitchLayer<'_, Message> {
+    fn t(&self) -> f32 {
+        visual(self.progress, self.reduced)
+    }
+
+    fn incoming_delta(&self) -> Vector {
+        let remain = 1.0 - self.t();
+        offset_delta(self.face.incoming_slide(), m3motion::OVERLAY_SLIDE * remain)
+    }
+
+    fn outgoing_delta(&self) -> Vector {
+        offset_delta(
+            self.face.outgoing_slide(),
+            m3motion::OVERLAY_SLIDE * self.t(),
+        )
+    }
+}
+
+impl<'a, Message> Widget<Message, iced::Theme, iced::Renderer> for SwitchLayer<'a, Message> {
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.outgoing), Tree::new(&self.incoming)]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(&[&self.outgoing, &self.incoming]);
+    }
+
+    fn size(&self) -> Size<Length> {
+        Size::new(Length::Fill, Length::Fill)
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        let out = self
+            .outgoing
+            .as_widget_mut()
+            .layout(&mut tree.children[0], renderer, limits);
+        let incoming =
+            self.incoming
+                .as_widget_mut()
+                .layout(&mut tree.children[1], renderer, limits);
+        let size = Size::new(
+            out.size().width.max(incoming.size().width),
+            out.size().height.max(incoming.size().height),
+        );
+        layout::Node::with_children(size, vec![out, incoming])
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &iced::Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &Rectangle,
+    ) {
+        let t = self.t();
+        let out_delta = self.outgoing_delta();
+        let in_delta = self.incoming_delta();
+        let mut kids = layout.children();
+        let out_layout = kids.next().unwrap();
+        let in_layout = kids.next().unwrap();
+        if t < 1.0 {
+            self.outgoing.as_widget_mut().update(
+                &mut tree.children[0],
+                event,
+                out_layout,
+                cursor - out_delta,
+                renderer,
+                clipboard,
+                shell,
+                viewport,
+            );
+        }
+        if t > 0.0 {
+            self.incoming.as_widget_mut().update(
+                &mut tree.children[1],
+                event,
+                in_layout,
+                cursor - in_delta,
+                renderer,
+                clipboard,
+                shell,
+                viewport,
+            );
+        }
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+        renderer: &iced::Renderer,
+    ) -> mouse::Interaction {
+        let t = self.t();
+        let mut kids = layout.children();
+        let out_layout = kids.next().unwrap();
+        let in_layout = kids.next().unwrap();
+        let incoming = if t > 0.0 {
+            self.incoming.as_widget().mouse_interaction(
+                &tree.children[1],
+                in_layout,
+                cursor - self.incoming_delta(),
+                viewport,
+                renderer,
+            )
+        } else {
+            mouse::Interaction::None
+        };
+        if incoming != mouse::Interaction::None {
+            return incoming;
+        }
+        if t < 1.0 {
+            self.outgoing.as_widget().mouse_interaction(
+                &tree.children[0],
+                out_layout,
+                cursor - self.outgoing_delta(),
+                viewport,
+                renderer,
+            )
+        } else {
+            mouse::Interaction::None
+        }
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut iced::Renderer,
+        theme: &iced::Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+    ) {
+        use iced::advanced::Renderer as _;
+        let t = self.t();
+        let mut kids = layout.children();
+        let out_layout = kids.next().unwrap();
+        let in_layout = kids.next().unwrap();
+        if self.face.outgoing_fade(t) > 0.0 {
+            renderer.with_translation(self.outgoing_delta(), |renderer| {
+                self.outgoing.as_widget().draw(
+                    &tree.children[0],
+                    renderer,
+                    theme,
+                    style,
+                    out_layout,
+                    cursor,
+                    viewport,
+                );
+            });
+        }
+        if self.face.incoming_fade(t) > 0.0 {
+            renderer.with_translation(self.incoming_delta(), |renderer| {
+                self.incoming.as_widget().draw(
+                    &tree.children[1],
+                    renderer,
+                    theme,
+                    style,
+                    in_layout,
+                    cursor,
+                    viewport,
+                );
+            });
+        }
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &iced::Renderer,
+        operation: &mut dyn iced::advanced::widget::Operation,
+    ) {
+        let mut kids = layout.children();
+        let out_layout = kids.next().unwrap();
+        let in_layout = kids.next().unwrap();
+        self.outgoing.as_widget_mut().operate(
+            &mut tree.children[0],
+            out_layout,
+            renderer,
+            operation,
+        );
+        self.incoming.as_widget_mut().operate(
+            &mut tree.children[1],
+            in_layout,
+            renderer,
+            operation,
+        );
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &iced::Renderer,
+        viewport: &Rectangle,
+        translation: Vector,
+    ) -> Option<overlay::Element<'b, Message, iced::Theme, iced::Renderer>> {
+        let t = self.t();
+        let out_delta = self.outgoing_delta();
+        let in_delta = self.incoming_delta();
+        let mut kids = layout.children();
+        let out_layout = kids.next()?;
+        let in_layout = kids.next()?;
+        let (out_tree, rest) = tree.children.split_at_mut(1);
+        let out = if t < 1.0 {
+            self.outgoing.as_widget_mut().overlay(
+                &mut out_tree[0],
+                out_layout,
+                renderer,
+                viewport,
+                translation + out_delta,
+            )
+        } else {
+            None
+        };
+        let incoming = if t > 0.0 {
+            self.incoming.as_widget_mut().overlay(
+                &mut rest[0],
+                in_layout,
+                renderer,
+                viewport,
+                translation + in_delta,
+            )
+        } else {
+            None
+        };
+        match (out, incoming) {
+            (Some(a), Some(b)) => Some(overlay::Group::with_children(vec![a, b]).overlay()),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        }
+    }
+}
+
+impl<'a, Message: 'a> From<SwitchLayer<'a, Message>> for Element<'a, Message> {
+    fn from(value: SwitchLayer<'a, Message>) -> Self {
+        Self::new(value)
+    }
+}
+
+const ATTENTION_SHAKE: f32 = 8.0;
+const ATTENTION_PULSE: f32 = 0.06;
+
+struct AttentionLayer<'a, Message> {
+    content: Element<'a, Message>,
+    progress: f32,
+    face: AttentionFace,
+    reduced: bool,
+}
+
+impl<Message> AttentionLayer<'_, Message> {
+    fn t(&self) -> f32 {
+        visual(self.progress, self.reduced)
+    }
+
+    fn delta(&self) -> Vector {
+        match self.face {
+            AttentionFace::Shake if !self.reduced => {
+                Vector::new(shake(self.t()) * ATTENTION_SHAKE, 0.0)
+            }
+            _ => Vector::ZERO,
+        }
+    }
+
+    fn transform(&self, bounds: Rectangle) -> Transformation {
+        match self.face {
+            AttentionFace::Pulse if !self.reduced => {
+                let s = 1.0 + ATTENTION_PULSE * pulse(self.t());
+                let c = bounds.center();
+                Transformation::translate(c.x, c.y)
+                    * Transformation::scale(s)
+                    * Transformation::translate(-c.x, -c.y)
+            }
+            _ => Transformation::translate(self.delta().x, self.delta().y),
+        }
+    }
+}
+
+impl<'a, Message> Widget<Message, iced::Theme, iced::Renderer> for AttentionLayer<'a, Message> {
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.content)]
+    }
+
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(std::slice::from_ref(&self.content));
+    }
+
+    fn size(&self) -> Size<Length> {
+        self.content.as_widget().size()
+    }
+
+    fn size_hint(&self) -> Size<Length> {
+        self.content.as_widget().size_hint()
+    }
+
+    fn layout(
+        &mut self,
+        tree: &mut Tree,
+        renderer: &iced::Renderer,
+        limits: &layout::Limits,
+    ) -> layout::Node {
+        let child = self
+            .content
+            .as_widget_mut()
+            .layout(&mut tree.children[0], renderer, limits);
+        let size = child.size();
+        layout::Node::with_children(size, vec![child])
+    }
+
+    fn update(
+        &mut self,
+        tree: &mut Tree,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &iced::Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+        viewport: &Rectangle,
+    ) {
+        let delta = self.delta();
+        self.content.as_widget_mut().update(
+            &mut tree.children[0],
+            event,
+            layout.children().next().unwrap(),
+            cursor - delta,
+            renderer,
+            clipboard,
+            shell,
+            viewport,
+        );
+    }
+
+    fn mouse_interaction(
+        &self,
+        tree: &Tree,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+        renderer: &iced::Renderer,
+    ) -> mouse::Interaction {
+        self.content.as_widget().mouse_interaction(
+            &tree.children[0],
+            layout.children().next().unwrap(),
+            cursor - self.delta(),
+            viewport,
+            renderer,
+        )
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut iced::Renderer,
+        theme: &iced::Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        viewport: &Rectangle,
+    ) {
+        use iced::advanced::Renderer as _;
+        let child_layout = layout.children().next().unwrap();
+        renderer.with_transformation(self.transform(layout.bounds()), |renderer| {
+            self.content.as_widget().draw(
+                &tree.children[0],
+                renderer,
+                theme,
+                style,
+                child_layout,
+                cursor,
+                viewport,
+            );
+        });
+    }
+
+    fn operate(
+        &mut self,
+        tree: &mut Tree,
+        layout: Layout<'_>,
+        renderer: &iced::Renderer,
+        operation: &mut dyn iced::advanced::widget::Operation,
+    ) {
+        self.content.as_widget_mut().operate(
+            &mut tree.children[0],
+            layout.children().next().unwrap(),
+            renderer,
+            operation,
+        );
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        tree: &'b mut Tree,
+        layout: Layout<'b>,
+        renderer: &iced::Renderer,
+        viewport: &Rectangle,
+        translation: Vector,
+    ) -> Option<overlay::Element<'b, Message, iced::Theme, iced::Renderer>> {
+        let delta = self.delta();
+        self.content.as_widget_mut().overlay(
+            &mut tree.children[0],
+            layout.children().next().unwrap(),
+            renderer,
+            viewport,
+            translation + delta,
+        )
+    }
+}
+
+impl<'a, Message: 'a> From<AttentionLayer<'a, Message>> for Element<'a, Message> {
+    fn from(value: AttentionLayer<'a, Message>) -> Self {
         Self::new(value)
     }
 }
@@ -651,7 +1471,14 @@ mod tests {
             overlay(body, 0.5, Slide::Up, tok, A11y::new("motion", Role::Group));
         let reduced = tok.with_reduced_motion(true);
         let body = widget::label("more", reduced, A11y::new("more", Role::Status));
-        let _: Element<'_, ()> = expand(body, 0.3, 8.0, reduced, A11y::new("expand", Role::Group));
+        let _: Element<'_, ()> = expand(
+            body,
+            0.3,
+            8.0,
+            Axis::Block,
+            reduced,
+            A11y::new("expand", Role::Group),
+        );
         assert_eq!(visual(0.3, true), 0.0);
     }
 
@@ -757,6 +1584,9 @@ mod tests {
         let mut op = focusable::unfocus::<()>();
         el.as_widget_mut()
             .operate(&mut tree, layout, &renderer, &mut op);
+        let _ = el
+            .as_widget_mut()
+            .overlay(&mut tree, layout, &renderer, &viewport, Vector::ZERO);
         let _ = messages;
     }
 
@@ -794,17 +1624,35 @@ mod tests {
             (1.0, 0.0, tok),
             (0.3, 8.0, reduced),
         ] {
-            let mut el: Element<'_, ()> =
-                expand(body(), p, peek, t, A11y::new("expand", Role::Group));
+            let mut el: Element<'_, ()> = expand(
+                body(),
+                p,
+                peek,
+                Axis::Block,
+                t,
+                A11y::new("expand", Role::Group),
+            );
             drive(&mut el, vp);
             drive(&mut el, miss);
         }
         let far = iced::Rectangle::new(iced::Point::new(4000.0, 4000.0), iced::Size::new(4.0, 4.0));
-        let mut hidden: Element<'_, ()> =
-            expand(body(), 0.0, 0.0, tok, A11y::new("gone", Role::Group));
+        let mut hidden: Element<'_, ()> = expand(
+            body(),
+            0.0,
+            0.0,
+            Axis::Block,
+            tok,
+            A11y::new("gone", Role::Group),
+        );
         drive(&mut hidden, far);
-        let mut clipped: Element<'_, ()> =
-            expand(body(), 1.0, 0.0, tok, A11y::new("full", Role::Group));
+        let mut clipped: Element<'_, ()> = expand(
+            body(),
+            1.0,
+            0.0,
+            Axis::Block,
+            tok,
+            A11y::new("full", Role::Group),
+        );
         drive(&mut clipped, far);
     }
 
@@ -936,6 +1784,127 @@ mod tests {
     }
 
     #[test]
+    fn lasting_scales_exit_with_the_job_ratio() {
+        let job = Job::Enter(Enter::Dialog);
+        let enter = job.duration(true, false);
+        let exit = job.duration(false, false);
+        assert!(exit < enter);
+        let hold = Duration::from_millis(400);
+        let mut clock = run(job, true, false).lasting(hold);
+        let now = Instant::now();
+        clock.go(false, now);
+        let ratio = exit.as_secs_f32() / enter.as_secs_f32();
+        let want = hold.as_secs_f32() * ratio;
+        assert!((clock.duration(false).as_secs_f32() - want).abs() < 0.001);
+        assert_eq!(clock.duration(true), hold);
+        let snap = run(job, true, true).lasting(hold);
+        assert_eq!(snap.span(true), Duration::ZERO);
+    }
+
+    #[test]
+    fn lasting_fade_through_is_early_at_one_fifth() {
+        let hold = Duration::from_millis(500);
+        let mut clock = run(Job::Switch(SwitchFace::FadeThrough), false, false).lasting(hold);
+        let now = Instant::now();
+        clock.go(true, now);
+        assert!(clock.is_live(now));
+        let p = clock.progress(now + Duration::from_millis(100));
+        assert!(
+            p > 0.02 && p < 0.35,
+            "500 ms fade-through should still be early at 100 ms, got {p}"
+        );
+    }
+
+    #[test]
+    fn enter_exit_uses_shorter_exit() {
+        let enter = Job::Enter(Enter::Dialog).duration(true, false);
+        let exit = Job::Enter(Enter::Dialog).duration(false, false);
+        assert!(exit < enter);
+        assert_eq!(
+            Job::Enter(Enter::Dialog).duration(true, true),
+            Duration::ZERO
+        );
+        assert_eq!(
+            Job::Switch(SwitchFace::SharedAxis(Slide::Up)).duration(true, false),
+            DurationStep::Medium2.duration(false)
+        );
+        assert_eq!(
+            Job::Enter(Enter::Dialog).ease(true),
+            Ease::EmphasizedDecelerate
+        );
+        assert_eq!(
+            Job::Enter(Enter::Dialog).ease(false),
+            Ease::EmphasizedAccelerate
+        );
+    }
+
+    #[test]
+    fn run_progress_snaps_when_reduced() {
+        let now = Instant::now();
+        let rest = run(Job::Enter(Enter::Dialog), true, true);
+        assert!((rest.progress(now) - 1.0).abs() < 1e-5);
+        assert!(!rest.is_live(now));
+        let mut closing = run(Job::Enter(Enter::Dialog), true, true);
+        closing.go(false, now);
+        assert!((closing.progress(now) - 0.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn shared_axis_fades_cross_and_slides_opposite() {
+        let face = SwitchFace::SharedAxis(Slide::Up);
+        assert!((face.incoming_fade(0.0) - 0.0).abs() < 1e-5);
+        assert!((face.incoming_fade(1.0) - 1.0).abs() < 1e-5);
+        assert!((face.outgoing_fade(0.0) - 1.0).abs() < 1e-5);
+        assert!((face.outgoing_fade(1.0) - 0.0).abs() < 1e-5);
+        assert_eq!(face.incoming_slide(), Slide::Up);
+        assert_eq!(face.outgoing_slide(), Slide::Down);
+        let fade = SwitchFace::FadeThrough;
+        assert!(fade.outgoing_fade(0.2) > 0.3);
+        assert_eq!(fade.incoming_fade(0.2), 0.0);
+        assert_eq!(fade.outgoing_fade(0.8), 0.0);
+        assert!(fade.incoming_fade(0.8) > 0.5);
+        assert_eq!(Slide::Start.opposite(), Slide::End);
+        assert_eq!(Slide::None.opposite(), Slide::None);
+    }
+
+    #[test]
+    fn switch_and_attention_constructors_build() {
+        let tok = named("dark").tokens;
+        let a = || widget::label("one", tok, A11y::new("one", Role::Status));
+        let b = || widget::label("two", tok, A11y::new("two", Role::Status));
+        let vp = iced::Rectangle::new(iced::Point::ORIGIN, iced::Size::new(320.0, 240.0));
+        for face in [
+            SwitchFace::FadeThrough,
+            SwitchFace::SharedAxis(Slide::Up),
+            SwitchFace::SharedAxis(Slide::Down),
+            SwitchFace::SharedAxis(Slide::Start),
+            SwitchFace::SharedAxis(Slide::End),
+        ] {
+            for p in [0.0, 0.5, 1.0] {
+                let mut el: Element<'_, ()> =
+                    switch(a(), b(), p, face, tok, A11y::new("step", Role::Group));
+                drive(&mut el, vp);
+            }
+        }
+        for face in [AttentionFace::Shake, AttentionFace::Pulse] {
+            for p in [0.0, 0.3, 1.0] {
+                let mut el: Element<'_, ()> =
+                    attention(a(), p, face, tok, A11y::new("attn", Role::Group));
+                drive(&mut el, vp);
+            }
+        }
+        let mut wide: Element<'_, ()> = expand(
+            a(),
+            0.5,
+            0.0,
+            Axis::Inline,
+            tok,
+            A11y::new("rail", Role::Group),
+        );
+        drive(&mut wide, vp);
+    }
+
+    #[test]
     fn expand_draw_returns_when_viewport_misses() {
         use iced::advanced::layout::{Layout, Limits};
         use iced::advanced::renderer::Style;
@@ -948,6 +1917,7 @@ mod tests {
             content: body,
             progress: 1.0,
             peek: 0.0,
+            axis: Axis::Block,
             reduced: false,
         };
         let mut tree = Tree::new(&layer as &dyn Widget<(), Theme, iced::Renderer>);

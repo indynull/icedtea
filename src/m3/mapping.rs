@@ -468,6 +468,16 @@ pub const MAP: &[MapRow] = &[
         fate: Fate::Map,
     },
     MapRow {
+        id: "switch-motion",
+        m3: "Motion (shared axis / fade through)",
+        fate: Fate::Map,
+    },
+    MapRow {
+        id: "attention-motion",
+        m3: "Motion (attention)",
+        fate: Fate::Map,
+    },
+    MapRow {
         id: "expand-motion",
         m3: "Motion (expand)",
         fate: Fate::Map,

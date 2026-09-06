@@ -7940,6 +7940,7 @@ fn tree_push_branch<'a, M: Clone + 'a>(
             body,
             t,
             0.0,
+            crate::motion::Axis::Block,
             tok,
             A11y::new("tree-branch", Role::Group),
         ))
@@ -8267,6 +8268,7 @@ pub fn accordion_view<'a, M: Clone + 'a>(
                 pane.into(),
                 t,
                 0.0,
+                crate::motion::Axis::Block,
                 tok,
                 A11y::new(title.clone(), Role::Group),
             ));
@@ -8430,7 +8432,14 @@ pub fn expander<'a, M: Clone + 'a>(
     } else if t <= 0.0 {
         peek_clip(child, peek_h, tok)
     } else {
-        crate::motion::expand(child, t, peek_h, tok, A11y::new(title.clone(), Role::Group))
+        crate::motion::expand(
+            child,
+            t,
+            peek_h,
+            crate::motion::Axis::Block,
+            tok,
+            A11y::new(title.clone(), Role::Group),
+        )
     };
     a11y::attach(
         crate::focus::group_keys(

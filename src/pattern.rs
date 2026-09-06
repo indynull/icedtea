@@ -2246,14 +2246,16 @@ pub fn drawer<'a, M: Clone + 'a>(
         let _ = on_close;
         content
     } else {
+        let pane = crate::motion::expand(
+            container(pane).width(220.0).into(),
+            t,
+            0.0,
+            crate::motion::Axis::Inline,
+            tok,
+            A11y::new("drawer-pane", Role::Group),
+        );
         crate::focus::dismiss_on_escape(
-            list_detail(
-                pane,
-                content,
-                layout::fixed((220.0 * t).max(1.0)),
-                tok,
-                tok.direction,
-            ),
+            list_detail(pane, content, Length::Shrink, tok, tok.direction),
             on_close,
         )
     }
