@@ -317,7 +317,7 @@ pub fn height(progress: f32, peek: f32, open: f32) -> f32 {
 
 /// Ease-out bounce. 0 and 1 are at rest; the approach hops.
 ///
-/// Pass the result into [`overlay`] or [`expand`] the same way as
+/// Pass the result into [`overlay()`] or [`expand()`] the same way as
 /// [`Ease::sample`](crate::m3::Ease::sample).
 pub fn bounce_out(t: f32) -> f32 {
     let t = t.clamp(0.0, 1.0);
@@ -1809,10 +1809,7 @@ mod tests {
         clock.go(true, now);
         assert!(clock.is_live(now));
         let p = clock.progress(now + Duration::from_millis(100));
-        assert!(
-            p > 0.02 && p < 0.35,
-            "500 ms fade-through should still be early at 100 ms, got {p}"
-        );
+        assert!((0.02..0.35).contains(&p));
     }
 
     #[test]
@@ -1836,6 +1833,175 @@ mod tests {
             Job::Enter(Enter::Dialog).ease(false),
             Ease::EmphasizedAccelerate
         );
+        for (job, enter, exit) in [
+            (
+                Job::Enter(Enter::Menu),
+                DurationStep::Short3,
+                DurationStep::Short2,
+            ),
+            (
+                Job::Enter(Enter::Toast),
+                DurationStep::Short3,
+                DurationStep::Short3,
+            ),
+            (
+                Job::Enter(Enter::Tooltip),
+                DurationStep::Short2,
+                DurationStep::Short1,
+            ),
+            (
+                Job::Disclose(Axis::Block),
+                DurationStep::Medium1,
+                DurationStep::Medium1,
+            ),
+            (
+                Job::Attention(AttentionFace::Shake),
+                DurationStep::Short4,
+                DurationStep::Short4,
+            ),
+            (
+                Job::Attention(AttentionFace::Pulse),
+                DurationStep::Medium2,
+                DurationStep::Medium2,
+            ),
+            (Job::Value, DurationStep::Medium2, DurationStep::Medium2),
+        ] {
+            assert_eq!(job.duration(true, false), enter.duration(false));
+            assert_eq!(job.duration(false, false), exit.duration(false));
+        }
+        assert_eq!(
+            Job::Disclose(Axis::Inline).ease(true),
+            Ease::EmphasizedDecelerate
+        );
+        assert_eq!(
+            Job::Attention(AttentionFace::Shake).ease(true),
+            Ease::Standard
+        );
+        assert_eq!(Job::Value.ease(false), Ease::Standard);
+    }
+
+    #[test]
+    fn switch_forwards_incoming_pointer_and_child_overlays() {
+        use crate::variant::Variant;
+        use iced::advanced::layout::{Layout, Limits};
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels, Point, Size};
+        let tok = named("dark").tokens;
+        let face = || {
+            widget::tooltip_wrap(
+                widget::button(
+                    "Go",
+                    Some(()),
+                    tok,
+                    Variant::Primary,
+                    crate::icon::Icons::NONE,
+                    crate::widget::ButtonOpts::SHRINK,
+                    A11y::button("Go"),
+                ),
+                "tip",
+                crate::widget::TooltipAnchor::Follow,
+                tok,
+                A11y::new("tip", Role::Tooltip),
+            )
+        };
+        let mut el: Element<'_, ()> = switch(
+            face(),
+            face(),
+            0.5,
+            SwitchFace::FadeThrough,
+            tok,
+            A11y::new("sw", Role::Group),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let limits = Limits::new(Size::ZERO, Size::new(320.0, 240.0));
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let viewport = iced::Rectangle::new(Point::ORIGIN, Size::new(320.0, 240.0));
+        let at = mouse::Cursor::Available(Point::new(16.0, 16.0));
+        let hit = el
+            .as_widget()
+            .mouse_interaction(&tree, layout, at, &viewport, &renderer);
+        assert_ne!(hit, mouse::Interaction::None);
+        let _ = el
+            .as_widget_mut()
+            .overlay(&mut tree, layout, &renderer, &viewport, Vector::ZERO);
+        let mut only_in: Element<'_, ()> = switch(
+            face(),
+            face(),
+            1.0,
+            SwitchFace::FadeThrough,
+            tok,
+            A11y::new("in", Role::Group),
+        );
+        drive(
+            &mut only_in,
+            iced::Rectangle::new(Point::ORIGIN, Size::new(320.0, 240.0)),
+        );
+        let mut only_out: Element<'_, ()> = switch(
+            face(),
+            face(),
+            0.0,
+            SwitchFace::FadeThrough,
+            tok,
+            A11y::new("out", Role::Group),
+        );
+        drive(
+            &mut only_out,
+            iced::Rectangle::new(Point::ORIGIN, Size::new(320.0, 240.0)),
+        );
+
+        struct OverlayChild;
+        impl iced::advanced::widget::Widget<(), iced::Theme, iced::Renderer> for OverlayChild {
+            fn size(&self) -> Size<Length> {
+                Size::new(Length::Fill, Length::Shrink)
+            }
+            fn layout(
+                &mut self,
+                _tree: &mut Tree,
+                _renderer: &iced::Renderer,
+                limits: &Limits,
+            ) -> iced::advanced::layout::Node {
+                iced::advanced::layout::Node::new(Size::new(limits.max().width.min(80.0), 24.0))
+            }
+            fn draw(
+                &self,
+                _tree: &Tree,
+                _renderer: &mut iced::Renderer,
+                _theme: &iced::Theme,
+                _style: &iced::advanced::renderer::Style,
+                _layout: Layout<'_>,
+                _cursor: mouse::Cursor,
+                _viewport: &iced::Rectangle,
+            ) {
+            }
+            fn overlay<'b>(
+                &'b mut self,
+                _tree: &'b mut Tree,
+                _layout: Layout<'b>,
+                _renderer: &iced::Renderer,
+                _viewport: &iced::Rectangle,
+                _translation: Vector,
+            ) -> Option<iced::advanced::overlay::Element<'b, (), iced::Theme, iced::Renderer>>
+            {
+                Some(iced::advanced::overlay::Group::with_children(Vec::new()).overlay())
+            }
+        }
+        let _ =
+            iced::advanced::widget::Widget::<(), iced::Theme, iced::Renderer>::size(&OverlayChild);
+        let kid = || Element::<()>::new(OverlayChild);
+        let mut both: Element<'_, ()> = switch(
+            kid(),
+            kid(),
+            0.5,
+            SwitchFace::FadeThrough,
+            tok,
+            A11y::new("both", Role::Group),
+        );
+        drive(&mut both, viewport);
     }
 
     #[test]

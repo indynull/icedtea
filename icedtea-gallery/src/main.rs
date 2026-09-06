@@ -1089,8 +1089,8 @@ fn extras_after(page: &str) -> &'static [TourBeat] {
                 page: "motion",
                 theme: "dark",
                 appearance: Appearance::Dark,
-                caption: "Motion: overlay close",
-                act: "dialog false\n",
+                caption: "Motion: overlay open",
+                act: "dialog true\n",
                 hold_ms: 120,
             },
             TourBeat {
@@ -1098,7 +1098,7 @@ fn extras_after(page: &str) -> &'static [TourBeat] {
                 theme: "dark",
                 appearance: Appearance::Dark,
                 caption: "Motion: next event",
-                act: "step-next\n",
+                act: "dialog false\nswitch-face axis\nstep-next\n",
                 hold_ms: 180,
             },
             TourBeat {
@@ -1106,7 +1106,7 @@ fn extras_after(page: &str) -> &'static [TourBeat] {
                 theme: "dark",
                 appearance: Appearance::Dark,
                 caption: "Motion: invalid field shake",
-                act: "field-check\n",
+                act: "dialog false\nfield-check\n",
                 hold_ms: 160,
             },
             TourBeat {
@@ -1114,7 +1114,7 @@ fn extras_after(page: &str) -> &'static [TourBeat] {
                 theme: "dark",
                 appearance: Appearance::Dark,
                 caption: "Motion: expand open",
-                act: "expand true\n",
+                act: "dialog false\nexpand true\n",
                 hold_ms: 140,
             },
         ],
@@ -2228,8 +2228,8 @@ impl Gallery {
             pal_omit: false,
             pal_highlight: true,
             reduced_motion: false,
-            dialog_open: true,
-            dialog_anim: icedtea::motion::overlay_animation(true, false),
+            dialog_open: false,
+            dialog_anim: icedtea::motion::overlay_animation(false, false),
             sheet_anim: icedtea::motion::overlay_animation(false, false),
             palette_anim: icedtea::motion::overlay_animation(true, false),
             expand_anim: icedtea::motion::expand_animation(false, false),
@@ -2908,16 +2908,6 @@ impl Gallery {
             self.catalog.t("motion.slide-dir-ltr")
         } else {
             self.catalog.t("motion.slide-dir-rtl")
-        }
-    }
-
-    fn enter_uses(&self) -> &str {
-        match self.enter_kind {
-            icedtea::motion::Enter::Dialog => self.catalog.t("motion.uses-dialog"),
-            icedtea::motion::Enter::Menu => self.catalog.t("motion.uses-menu"),
-            icedtea::motion::Enter::Sheet => self.catalog.t("motion.uses-sheet"),
-            icedtea::motion::Enter::Toast => self.catalog.t("motion.uses-toast"),
-            icedtea::motion::Enter::Tooltip => self.catalog.t("motion.uses-tooltip"),
         }
     }
 
@@ -4535,9 +4525,9 @@ impl Gallery {
         if beat.act.is_empty() {
             match beat.page {
                 "motion" => {
-                    self.dialog_open = true;
+                    self.dialog_open = false;
                     self.dialog_anim =
-                        icedtea::motion::overlay_animation(true, self.reduced_motion);
+                        icedtea::motion::overlay_animation(false, self.reduced_motion);
                     self.fade_open = true;
                     self.fade_anim = icedtea::motion::overlay_animation(true, self.reduced_motion);
                     self.bounce_from = 1.0;
@@ -4907,28 +4897,53 @@ impl Gallery {
             "fields" => Some("field-support"),
             _ => None,
         };
+        // 480: two tiles need ~984 plus the nav rail. At the
+        // 1100 window they stack; at 1280 and 1600 they sit
+        // beside and share leftover.
+        const COL_MIN: f32 = 480.0;
+        let col = |hosts: &[&icedtea::catalog::Entry]| {
+            layout::Slot::sized(
+                stack(hosts),
+                icedtea::layout::SizePolicy::between(COL_MIN, COL_MIN, f32::INFINITY, 1.0),
+            )
+        };
+        let wrap_opts = layout::BoxOpts {
+            gap: 24.0,
+            line_gap: 20.0,
+            cross: layout::Cross::Start,
+            width: layout::FILL,
+            height: layout::SHRINK,
+            ..layout::BoxOpts::new()
+        };
+        if page == "motion" && hosted.len() >= 3 {
+            // 300: three tiles fit at 1600 (Opens, Switch, Attention+Expand).
+            const MOTION_MIN: f32 = 300.0;
+            let tile = |hosts: &[&icedtea::catalog::Entry]| {
+                layout::Slot::sized(
+                    stack(hosts),
+                    icedtea::layout::SizePolicy::between(
+                        MOTION_MIN,
+                        MOTION_MIN,
+                        f32::INFINITY,
+                        1.0,
+                    ),
+                )
+            };
+            return layout::wrap(
+                [tile(&hosted[0..1]), tile(&hosted[1..2]), tile(&hosted[2..])],
+                layout::BoxOpts {
+                    gap: 16.0,
+                    line_gap: 16.0,
+                    ..wrap_opts
+                },
+                self.direction,
+            );
+        }
         if let Some(id) = pack_at {
             if let Some(mid) = hosted.iter().position(|e| e.id == id) {
-                // 480: two tiles need ~984 plus the nav rail. At the
-                // 1100 window they stack; at 1280 and 1600 they sit
-                // beside and share leftover.
-                const COL_MIN: f32 = 480.0;
-                let col = |hosts: &[&icedtea::catalog::Entry]| {
-                    layout::Slot::sized(
-                        stack(hosts),
-                        icedtea::layout::SizePolicy::between(COL_MIN, COL_MIN, f32::INFINITY, 1.0),
-                    )
-                };
                 return layout::wrap(
                     [col(&hosted[..mid]), col(&hosted[mid..])],
-                    layout::BoxOpts {
-                        gap: 24.0,
-                        line_gap: 20.0,
-                        cross: layout::Cross::Start,
-                        width: layout::FILL,
-                        height: layout::SHRINK,
-                        ..layout::BoxOpts::new()
-                    },
+                    wrap_opts,
                     self.direction,
                 );
             }
@@ -8510,24 +8525,25 @@ impl Gallery {
                         tok,
                         named("reduce-motion", Role::Switch).with_checked(self.reduced_motion),
                     ),
-                    self.motion_pick(
-                        "enter-kind",
-                        self.catalog.t("motion.kind"),
-                        kinds,
-                        self.enter_kind_label(),
-                        Message::EnterKind,
-                    ),
-                    self.motion_pick(
-                        "enter-slide",
-                        self.catalog.t("motion.slide"),
-                        slides,
-                        self.slide_label(self.enter_slide),
-                        Message::EnterSlide,
-                    ),
-                    widget::meta(
-                        self.slide_dir_hint(),
-                        tok,
-                        named("enter-slide-dir", Role::Status),
+                    dir_row(
+                        tok.direction,
+                        12.0,
+                        [
+                            self.motion_pick(
+                                "enter-kind",
+                                self.catalog.t("motion.kind"),
+                                kinds,
+                                self.enter_kind_label(),
+                                Message::EnterKind,
+                            ),
+                            self.motion_pick(
+                                "enter-slide",
+                                self.catalog.t("motion.slide"),
+                                slides,
+                                self.slide_label(self.enter_slide),
+                                Message::EnterSlide,
+                            ),
+                        ],
                     ),
                     self.motion_ms_slider("enter-ms", self.enter_ms, Message::EnterMs),
                     widget::meta(
@@ -8535,7 +8551,6 @@ impl Gallery {
                         tok,
                         named("enter-timing", Role::Status),
                     ),
-                    widget::meta(self.enter_uses(), tok, named("when-enter", Role::Status)),
                     widget::button(
                         if self.dialog_open {
                             self.catalog.t("motion.close")
@@ -8551,7 +8566,7 @@ impl Gallery {
                     ),
                     self.enter_sample(enter_t, enter_paint),
                 ]
-                .spacing(10)
+                .spacing(8)
                 .width(Length::Fill)
                 .align_x(icedtea::i18n::align_start(tok.direction))
                 .into()
@@ -8633,9 +8648,8 @@ impl Gallery {
                         tok,
                         named("switch-timing", Role::Status),
                     ),
-                    widget::meta(uses, tok, named("switch-uses", Role::Status)),
                 ]
-                .spacing(10)
+                .spacing(8)
                 .width(Length::Fill)
                 .align_x(icedtea::i18n::align_start(tok.direction));
                 if self.switch_fade {

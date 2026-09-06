@@ -251,12 +251,11 @@ across idle *and* after (`00` idle controls, `01` after-toggles,
 on `07-selectable` in an idle-only cut is looking at Image; in
 `--interact` that prefix is a later beat.
 
-Motion extras: beat 33 idle is the must-show (overlay open, Close on
-start, fade body is catalog fill). Beats 34–35 apply `dialog false`
-and `bounce-in`. A 450–700 ms settle makes those two rest-frame
-twins of the closed overlay. To score Close-in-flight or bounce,
-recapture `--beats 34,35 --settle-ms 80`. Do not treat the settled
-twin as a miss of the motion constructor — 33 already holds it.
+Motion extras: idle `Motion: pick what opens and play` is the
+must-show (Opens / Switch / Attention / Expand two-up, overlay
+closed). The four extras apply `dialog true`, `switch-face axis`
+plus `step-next`, `field-check`, and `expand true`. Score the
+open overlay on the first extra, not on idle.
 
 Jumping `--beats N` from a cold gallery can grab the previous page.
 Walk in from the neighbor (`--beats N-1,N --settle-ms 700`) and

@@ -460,6 +460,7 @@ BOOK_STILLS: dict[str, str] = {
     "chrome": "chrome.png",
     "layout": "layout.png",
     "list-and-detail": "patterns.png",
+    "motion": "motion.png",
 }
 BOOK_HELLO_STILL = "first-window.png"
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
@@ -645,13 +646,13 @@ DEFAULT_INTERACT: list[dict[str, str]] = [
         "expect": "side sheet open over dim scene",
     },
     {
-        "match": "Motion: fade and slide",
+        "match": "Motion: pick what opens and play",
         "name": "motion-play",
-        "script": "dialog false\nbounce-in\npulse true\nshake\n",
-        "expect": "overlay closed; bounce card visible; pulse on",
+        "script": "dialog true\n",
+        "expect": "Save confirm overlay open on the Opens tile",
     },
     {
-        "match": "Expand motion",
+        "match": "Motion: expand open",
         "name": "expand-open",
         "script": "expand true\n",
         "expect": "expand notes body open",
@@ -1169,7 +1170,7 @@ def gallery_readout_hits(root: Path) -> list[str]:
     return hits
 
 
-def visual_map_hits(root: Path) -> list[str]:
+def visual_map_hits(root: Path, *, require_png: bool = True) -> list[str]:
     """Every tour page has a visual.md row and a still PNG (or a page-still note)."""
     path = root / ".grok" / "skills" / "gallery-qa" / "references" / "visual.md"
     if not path.is_file():
@@ -1193,7 +1194,7 @@ def visual_map_hits(root: Path) -> list[str]:
         still = rows[page]
         if still.startswith("`") and still.endswith("`"):
             still_path = root / still.strip("`")
-            if not still_path.is_file():
+            if require_png and not still_path.is_file():
                 hits.append(f"missing still {still} for {page}")
         elif "page still" not in still.casefold():
             hits.append(f"visual.md {page} still is not a path or page-still note")
@@ -2488,7 +2489,7 @@ def main() -> int:
                 if s.get("kind") != "idle" or s.get("shot") is None:
                     continue
                 dest_name = BOOK_STILLS.get(s.get("page", ""))
-                if dest_name is None:
+                if dest_name is None or dest_name in written:
                     continue
                 publish_book_still(out / s["shot"], images / dest_name)
                 written.add(dest_name)
@@ -2678,7 +2679,7 @@ def _self_check() -> None:
     controls = gallery_controls_hits(root)
     if controls:
         raise SystemExit(f"gallery controls: {controls}")
-    visual = visual_map_hits(root)
+    visual = visual_map_hits(root, require_png="--book" not in sys.argv)
     if visual:
         raise SystemExit(f"visual map: {visual}")
     if parse_locales(None) is not None:

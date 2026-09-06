@@ -69,7 +69,7 @@ In the same change:
 | status-page | `book/src/images/patterns.png` | Empty or error copy. RTL: that copy sits on the start of a centered block |
 | palette | `book/src/images/patterns.png` | Field plus hits from the Action table. Locale: the filter hint is catalog fill, not leftover `Theme` / `Ask`. An empty filename, a status-page grab, or a previous-page twin is a recapture fail — walk in from beat 30 (`--beats 30,31`) |
 | main-window | `book/src/images/first-window.png` | Save and Quit on the toolbar, filling Notes editor, status Ready with `ctrl+s save` and `ctrl+q quit`. Locale gallery main-window: the inner status is catalog `ok` (حسناً / ٹھیک ہے / אישור / 确定 / ja `OK`), never the raw key `ok`. ja `OK` is catalog fill, same class as vi `Accordion` |
-| motion | `book/src/images/chrome.png` | Opens, switch, attention, and expand tiles on one page. Duration slider, Open, real overlay, Next/Previous, field shake, peek/open. RTL: Open / Next on the start. Locale: pick labels and Start/End hint are catalog fill |
+| motion | `book/src/images/motion.png` | Three tiles: Opens, Switch, then Attention stacked with Expand. Opens shows the duration slider and Open (overlay closed on idle). RTL: Opens on the start (right). Locale: pick labels and Start/End hint are catalog fill |
 
 Look strip: theme pick and dark/light meta are one group; Language
 and Face (Noto Sans / System) are separate groups with a wider gap

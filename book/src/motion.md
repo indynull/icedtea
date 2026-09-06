@@ -1,5 +1,7 @@
 # Motion
 
+![Opens, switch, attention, and expand on one page](images/motion.png)
+
 Pick a [`Job`](https://docs.rs/icedtea/latest/icedtea/motion/enum.Job.html).
 Hold a [`Run`](https://docs.rs/icedtea/latest/icedtea/motion/struct.Run.html).
 Pass `progress` into the constructor. The application owns the clock.
