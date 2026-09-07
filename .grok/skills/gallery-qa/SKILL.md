@@ -75,9 +75,11 @@ Shots land under `tmp/gallery-qa/<timestamp>/` (or `--out DIR`).
    (not for UI, not for animals, not for anything). Score only the
    book still in `visual.md` and the captured `shots/*.png`. No
    hand-edited PNGs.
-7. **Drive the shipped constructor.** Tests call `themed_pick_list`
-   (or the public fn under review) from a real start state. Do not
-   assert only a private helper, and do not start past the widget.
+7. **Drive the shipped constructor.** Tests call `pick_list`,
+   `widget::scroll`, or the public fn under review from a real start
+   state. Do not assert only a private helper, and do not start past
+   the widget. `widget::scroll` is `ThemedScroll` (24 px rail). Iced's
+   2 px scroller is not the catalog scrollbar.
 8. **Score the local tour** after a paint change (`just gallery-gif`
    writes `tmp/gallery.gif`; handbook stills stay in-tree). A source
    fix whose recaptured GIF still shows the old mark is **broken**.
@@ -239,10 +241,12 @@ page painted. Recapture those beats (`--settle-ms` if paint is slow).
 Only if a second grab is still the previous page is the gallery stuck.
 
 Do not invent beat numbers from the page name. Tour beats follow
-`catalog::pages()` plus extras (`code`, `motion`, `expand-motion`).
-Layout sits after Keys: idle first screen is pack (Find, filling
-search, Go) then wrap chips and min-width tiles. Score start/end
-on RTL; two parent widths are the library tests, not one still.
+gallery pages: every catalog page, extra Theme and Colors pages
+(not catalog ids) before Keys, a Light flip on Theme, plus extras
+on Code and Motion. Layout sits after Keys: idle first screen is
+pack (Find, filling search, Go) then wrap chips and min-width
+tiles. Score start/end on RTL; two parent widths are the library
+tests, not one still.
 An idle-only cut writes
 one file per beat (`00-beat00-idle-…`). An `--interact` cut
 interleaves after-inject frames, so file prefixes are sequential

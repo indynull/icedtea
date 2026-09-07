@@ -25,7 +25,7 @@ button groups, tabs, dialogs, and chrome rows share it. Set it from
 - Start/end for chrome: `i18n::order`, `align_start`, `align_end`,
   `inline_pad`. iced `Alignment::Start` is physical left. Empty-field
   placeholder, value, and caret origin follow start (`align_x_start`
-  on `themed_text_input`, `search_input`, `number_input`,
+  on `text_input`, `search_input`, `number_input`,
   `password_input`). Search clear is ordered with the mark and field,
   not appended on physical right. Textarea is a stable Fill field.
   iced 0.14 has no editor writing direction — do not shrink-wrap a
@@ -84,7 +84,7 @@ on the dim wash is the modal, not a start-align miss.
 
 Linear progress and other time motion fill from the **start** edge
 (right in RTL). `progress` orders fill portions with `i18n::order`.
-`themed_slider` fills from start the same way (min on start, max on
+`slider` fills from start the same way (min on start, max on
 end). A physical-left fill or `0`/`1` pinned left/right is **broken**.
 
 Status and job notes after a control press use the locale fill and

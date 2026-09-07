@@ -113,7 +113,8 @@ the shot (not a zero-width bar).
 - Virtualized rows do not paint **over** filters, headers, or siblings
 - Soft container clip is not enough when backgrounds fill layout boxes —
   library needs a real scissor/layer for overscan
-- `themed_scroll` and any sibling scroller clip **below** sticky chrome.
+- `widget::scroll` (`ThemedScroll`, 24 px rail) and any sibling
+  scroller clip **below** sticky chrome.
   Section titles and rows must not paint through a Search field or other
   header that sits above the list (opaque header + scissor, not hope)
 - First useful frame shows content (empty list until scroll message = broken)

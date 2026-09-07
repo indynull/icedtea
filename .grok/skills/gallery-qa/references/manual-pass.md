@@ -97,7 +97,8 @@ page — nothing else should have changed unless the demo says so.
 
 ## Scroll and clip protocol
 
-On every scroller (virtual list **or** `themed_scroll` nav/page):
+On every scroller (virtual list **or** `widget::scroll` / `ThemedScroll`
+nav/page, 24 px rail):
 
 1. Note first row title at rest.
 2. Scroll down several pages; first rows must disappear **into** the clip,
