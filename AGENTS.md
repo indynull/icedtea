@@ -82,8 +82,10 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   so those generics bind to installed faces (normal + bold for UI).
   Apps that start iced without those macros must call it before the
   first frame.
-- Every public widget constructor takes `a11y::A11y` and calls
-  `a11y::attach` (name, role, value, disabled, checked). iced 0.14 has
+- Every public drawing constructor takes `a11y::A11y` and calls
+  `a11y::attach` (name, role, value, disabled, checked). Chrome rows
+  (`toolbar`, `menu_bar`, `status_bar`, `command_bar`) take an
+  `ActionTable`. Layout `pack` / `wrap` take neither. iced 0.14 has
   no accesskit slot; the widget id carries the node id.
 - Always size `pick_list` trailing marks from
   `m3::density::TRAILING_ICON` (24 dp, 20 dp Compact) and
@@ -93,7 +95,8 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
 - Lists and tables virtualize when row counts leave the hundreds
   (`collection::visible_range` + scroll offset). Their rail uses
   `collection::scroller_span` with a 24px minimum handle. `scroll`
-  still uses iced's scroller (2px floor). Free-form expand cards use
+  is `ThemedScroll` (24 px minimum handle, not iced's 2 px scroller).
+  Free-form expand cards use
   `virtual_column` + `expand_card_heights` (extend list windowing; do
   not add a second list model).
 - Split sash: grip emits `SashEvent::Press` only. Move and release come

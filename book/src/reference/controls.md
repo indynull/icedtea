@@ -62,7 +62,7 @@ Pass `A11y`.
 
 ### Checkbox
 
-**`checkbox`** — Check or clear a boolean.
+**`checkbox`** — Check, clear, or mark a partial selection.
 
 Constructor: [`widget::checkbox`](https://docs.rs/icedtea/latest/icedtea/widget/fn.checkbox.html)
 
@@ -70,9 +70,9 @@ Constructor: [`widget::checkbox`](https://docs.rs/icedtea/latest/icedtea/widget/
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
-The application owns the bool. The message carries the next value.
-Disabled keeps the box visible and ignores clicks.
-Space and Enter toggle when the box is focused.
+The application owns [`CheckState`](https://docs.rs/icedtea/latest/icedtea/widget/enum.CheckState.html).
+Press follows `CheckState::toggle`. Disabled keeps the box visible
+and ignores clicks. Space and Enter toggle when the box is focused.
 
 Pass `A11y`.
 
@@ -196,21 +196,6 @@ Constructor: [`widget::range_slider`](https://docs.rs/icedtea/latest/icedtea/wid
 
 Messages are the clamped pair with `low <= high`. Disabled freezes both thumbs.
 Each thumb is a slider: arrows nudge the focused end.
-
-Pass `A11y`.
-
-### Indeterminate checkbox
-
-**`checkbox-indeterminate`** — Three-state checkbox including partial selection.
-
-Constructor: [`widget::checkbox_indeterminate`](https://docs.rs/icedtea/latest/icedtea/widget/fn.checkbox_indeterminate.html)
-
-[source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
-[icedtea](https://crates.io/crates/icedtea) ·
-[iced](https://crates.io/crates/iced)
-
-Uses [`CheckState`](https://docs.rs/icedtea/latest/icedtea/widget/enum.CheckState.html). Press follows `CheckState::toggle`.
-Checked and unchecked states use the checkbox keys.
 
 Pass `A11y`.
 

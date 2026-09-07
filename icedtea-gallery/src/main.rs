@@ -179,10 +179,30 @@ fn ctor_heading<'a>(
 /// Tall notes body for expander and expand-motion. Peek is two lines.
 fn expand_notes_body<'a>(tok: Tokens, cat: &'a Catalog) -> Element<'a, Message> {
     column![
-        widget::label(cat.t("expand.1"), tok, named("exp-1", Role::Status),),
-        widget::label(cat.t("expand.2"), tok, named("exp-2", Role::Status),),
-        widget::label(cat.t("expand.3"), tok, named("exp-3", Role::Status),),
-        widget::label(cat.t("expand.4"), tok, named("exp-4", Role::Status),),
+        widget::label(
+            cat.t("expand.1"),
+            widget::LabelFace::Body,
+            tok,
+            named("exp-1", Role::Status),
+        ),
+        widget::label(
+            cat.t("expand.2"),
+            widget::LabelFace::Body,
+            tok,
+            named("exp-2", Role::Status),
+        ),
+        widget::label(
+            cat.t("expand.3"),
+            widget::LabelFace::Body,
+            tok,
+            named("exp-3", Role::Status),
+        ),
+        widget::label(
+            cat.t("expand.4"),
+            widget::LabelFace::Body,
+            tok,
+            named("exp-4", Role::Status),
+        ),
         widget::image_slot(
             widget::ImageSlot::Ready {
                 handle: samples::banner_handle(),
@@ -193,14 +213,30 @@ fn expand_notes_body<'a>(tok: Tokens, cat: &'a Catalog) -> Element<'a, Message> 
             tok,
             named("exp-shot", Role::Image),
         ),
-        widget::meta(
+        widget::label(
             cat.t("expand.cap"),
+            widget::LabelFace::Meta,
             tok,
             named("exp-shot-cap", Role::Status),
         ),
-        widget::label(cat.t("expand.5"), tok, named("exp-5", Role::Status),),
-        widget::label(cat.t("expand.6"), tok, named("exp-6", Role::Status),),
-        widget::label(cat.t("expand.7"), tok, named("exp-7", Role::Status),),
+        widget::label(
+            cat.t("expand.5"),
+            widget::LabelFace::Body,
+            tok,
+            named("exp-5", Role::Status),
+        ),
+        widget::label(
+            cat.t("expand.6"),
+            widget::LabelFace::Body,
+            tok,
+            named("exp-6", Role::Status),
+        ),
+        widget::label(
+            cat.t("expand.7"),
+            widget::LabelFace::Body,
+            tok,
+            named("exp-7", Role::Status),
+        ),
     ]
     .spacing(8)
     .align_x(icedtea::i18n::align_start(tok.direction))
@@ -277,28 +313,66 @@ fn nav_group_h(first: bool) -> f32 {
     }
 }
 
+/// Extra gallery pages that are not catalog constructors.
+fn extra_gallery_pages(group: &str) -> &'static [&'static str] {
+    match group {
+        "Chrome" => &["theme", "colors"],
+        _ => &[],
+    }
+}
+
+fn group_page_ids(group: &str, query: &str, cat: &Catalog) -> Vec<&'static str> {
+    let q = query.to_ascii_lowercase();
+    let mut page_ids: Vec<&'static str> = Vec::new();
+    for p in extra_gallery_pages(group) {
+        if q.is_empty()
+            || page_label(p, cat).to_ascii_lowercase().contains(&q)
+            || p.contains(q.as_str())
+        {
+            page_ids.push(p);
+        }
+    }
+    for e in catalog::ENTRIES {
+        if e.group != group {
+            continue;
+        }
+        if !q.is_empty()
+            && !e.title.to_ascii_lowercase().contains(&q)
+            && !page_label(e.page, cat).to_ascii_lowercase().contains(&q)
+            && !e.id.contains(q.as_str())
+        {
+            continue;
+        }
+        if !page_ids.contains(&e.page) {
+            page_ids.push(e.page);
+        }
+    }
+    page_ids
+}
+
+/// Catalog pages plus theme and colors (helpers, not catalog ids).
+fn gallery_pages() -> Vec<&'static str> {
+    let mut pages = catalog::pages();
+    if let Some(i) = pages.iter().position(|p| *p == "keys") {
+        if !pages.contains(&"theme") {
+            pages.insert(i, "theme");
+        }
+        if let Some(i) = pages.iter().position(|p| *p == "keys") {
+            if !pages.contains(&"colors") {
+                pages.insert(i, "colors");
+            }
+        }
+    }
+    pages
+}
+
 /// Pixel offset of `page` inside the nav scroller. Matches `view` order.
 fn nav_offset(page: &str, query: &str, collapsed: &HashSet<&'static str>, cat: &Catalog) -> f32 {
     let q = query.to_ascii_lowercase();
     let mut y = 0.0;
     let mut first = true;
     for g in catalog::groups() {
-        let mut page_ids: Vec<&'static str> = Vec::new();
-        for e in catalog::ENTRIES {
-            if e.group != g {
-                continue;
-            }
-            if !q.is_empty()
-                && !e.title.to_ascii_lowercase().contains(&q)
-                && !page_label(e.page, cat).to_ascii_lowercase().contains(&q)
-                && !e.id.contains(q.as_str())
-            {
-                continue;
-            }
-            if !page_ids.contains(&e.page) {
-                page_ids.push(e.page);
-            }
-        }
+        let page_ids = group_page_ids(g, query, cat);
         if page_ids.is_empty() {
             continue;
         }
@@ -343,22 +417,7 @@ fn catalog_nav<'a>(
     let mut started = false;
     let mut rows: Vec<Element<'a, Message>> = Vec::new();
     for g in catalog::groups() {
-        let mut page_ids: Vec<&'static str> = Vec::new();
-        for e in catalog::ENTRIES {
-            if e.group != g {
-                continue;
-            }
-            if !q.is_empty()
-                && !e.title.to_ascii_lowercase().contains(&q)
-                && !page_label(e.page, cat).to_ascii_lowercase().contains(&q)
-                && !e.id.contains(q.as_str())
-            {
-                continue;
-            }
-            if !page_ids.contains(&e.page) {
-                page_ids.push(e.page);
-            }
-        }
+        let page_ids = group_page_ids(g, query, cat);
         if page_ids.is_empty() {
             continue;
         }
@@ -658,7 +717,12 @@ fn group_header<'a>(
 }
 
 fn state_caption<'a>(label: &str, tok: Tokens) -> Element<'a, Message> {
-    widget::meta(label, tok, named(label, Role::Status))
+    widget::label(
+        label,
+        widget::LabelFace::Meta,
+        tok,
+        named(label, Role::Status),
+    )
 }
 
 fn scene_card<'a>(child: Element<'a, Message>, tok: Tokens) -> Element<'a, Message> {
@@ -1056,8 +1120,8 @@ fn list_row_heights(list: &VecList, card: bool) -> Vec<f32> {
         .collect()
 }
 
-/// One README beat. The walk is every `catalog::ENTRIES` page, plus
-/// one Light flip on the Theme page, plus motion clicks after Motion.
+/// One README beat. The walk is every gallery page (catalog plus
+/// theme and colors), plus one Light flip on Theme, plus motion clicks.
 #[derive(Clone, Copy)]
 struct TourBeat {
     page: &'static str,
@@ -1071,7 +1135,7 @@ struct TourBeat {
 }
 
 fn tour_len() -> usize {
-    catalog::pages().len() + 1 + extra_beat_count()
+    gallery_pages().len() + 1 + extra_beat_count()
 }
 
 fn extras_after(page: &str) -> &'static [TourBeat] {
@@ -1127,7 +1191,7 @@ fn extra_beat_count() -> usize {
 }
 
 fn theme_page_index() -> usize {
-    catalog::pages()
+    gallery_pages()
         .iter()
         .position(|p| *p == "theme")
         .expect("theme is a gallery page")
@@ -1145,7 +1209,7 @@ fn base_page_beat(page: &'static str) -> TourBeat {
 }
 
 fn tour_beat(index: usize) -> TourBeat {
-    let pages = catalog::pages();
+    let pages = gallery_pages();
     let light_at = theme_page_index() + 1;
     let mut n = 0usize;
     let seq = pages.len() + 1;
@@ -1635,6 +1699,7 @@ enum Message {
     CodeWrap(bool),
     SearchGo,
     FileOpen,
+    DialogNote(String),
     FileSave,
     Folder,
     ConfirmSave,
@@ -2208,7 +2273,7 @@ impl Gallery {
             system_sans: icedtea::typo::sans_family(),
             spin: 0.0,
             appearance: Appearance::Dark,
-            os_chrome: theme::os_chrome(),
+            os_chrome: /* first-frame via Task */ icedtea::theme::OsChrome::empty(),
             tick: 0,
             direction,
             lang: "en".into(),
@@ -2321,7 +2386,10 @@ impl Gallery {
             gallery.apply_tour_beat(&tour_beat(0));
             write_tour_ack(0);
         }
-        let mut tasks = vec![icedtea::iced::system::theme().map(Message::OsMode)];
+        let mut tasks = vec![
+            icedtea::iced::system::theme().map(Message::OsMode),
+            theme::os_chrome(Message::OsChrome),
+        ];
         if tour_wanted() {
             tasks.push(tour_window());
         }
@@ -2583,7 +2651,12 @@ impl Gallery {
         };
         let pick = |label: &str, options: Vec<String>, current: &str, on: fn(String) -> Message| {
             let w = look_pick_width(&options, current, tok);
-            let lab: Element<'_, Message> = widget::meta(label, tok, named(label, Role::Status));
+            let lab: Element<'_, Message> = widget::label(
+                label,
+                widget::LabelFace::Meta,
+                tok,
+                named(label, Role::Status),
+            );
             let list: Element<'_, Message> = container(widget::pick_list(
                 options,
                 Some(current.to_string()),
@@ -2610,8 +2683,9 @@ impl Gallery {
         for kid in icedtea::i18n::order(
             self.direction,
             [
-                widget::meta(
+                widget::label(
                     self.catalog.t("look.theme"),
+                    widget::LabelFace::Meta,
                     tok,
                     named("theme", Role::Status),
                 ),
@@ -2629,12 +2703,13 @@ impl Gallery {
                     tok,
                 )))
                 .into(),
-                widget::meta(
+                widget::label(
                     if icedtea::theme::named(&self.theme).dark {
                         self.catalog.t("look.dark")
                     } else {
                         self.catalog.t("look.light")
                     },
+                    widget::LabelFace::Meta,
                     tok,
                     named("theme-kind", Role::Status),
                 ),
@@ -2945,8 +3020,12 @@ impl Gallery {
     ) -> Element<'_, Message> {
         let tok = self.tokens;
         let thumb = format!("{} ms", value.round() as u64);
-        let lab: Element<'_, Message> =
-            widget::meta(self.catalog.t("motion.ms"), tok, named(id, Role::Status));
+        let lab: Element<'_, Message> = widget::label(
+            self.catalog.t("motion.ms"),
+            widget::LabelFace::Meta,
+            tok,
+            named(id, Role::Status),
+        );
         let rail: Element<'_, Message> = widget::slider(
             50.0..=600.0,
             value,
@@ -2978,7 +3057,8 @@ impl Gallery {
     ) -> Element<'_, Message> {
         let tok = self.tokens;
         let w = look_pick_width(&options, current, tok);
-        let lab: Element<'_, Message> = widget::meta(label, tok, named(id, Role::Status));
+        let lab: Element<'_, Message> =
+            widget::label(label, widget::LabelFace::Meta, tok, named(id, Role::Status));
         let list: Element<'_, Message> = container(widget::pick_list(
             options,
             Some(current.to_string()),
@@ -3006,10 +3086,13 @@ impl Gallery {
                 cat.t("dialog.save"),
                 cat.t("dialog.overwrite-notes"),
                 (cat.t("dialog.save").into(), Message::ConfirmSave),
-                Some((cat.t("cancel").into(), Message::ConfirmCancel)),
-                None::<(String, Message)>,
-                Some(icedtea::icon::Icon::Warning),
                 paint,
+                named("enter-dlg", Role::Dialog),
+                pattern::DialogOpts {
+                    cancel: Some((cat.t("cancel").into(), Message::ConfirmCancel)),
+                    icon: Some(icedtea::icon::Icon::Warning),
+                    ..pattern::DialogOpts::default()
+                },
             ))
             .width(Length::Fixed(320.0))
             .into(),
@@ -3028,15 +3111,22 @@ impl Gallery {
                 column![
                     widget::label(
                         cat.t("ss.title"),
+                        widget::LabelFace::Body,
                         paint,
                         named("enter-sheet-title", Role::Header),
                     ),
-                    widget::meta(
+                    widget::label(
                         cat.t("hint.name"),
+                        widget::LabelFace::Meta,
                         paint,
                         named("enter-sheet-k", Role::Status)
                     ),
-                    widget::label("notes.txt", paint, named("enter-sheet-v", Role::Status)),
+                    widget::label(
+                        "notes.txt",
+                        widget::LabelFace::Body,
+                        paint,
+                        named("enter-sheet-v", Role::Status)
+                    ),
                 ]
                 .spacing(8)
                 .padding(12),
@@ -3047,6 +3137,7 @@ impl Gallery {
             .into(),
             icedtea::motion::Enter::Toast => container(widget::label(
                 cat.t("dialog.last-saved"),
+                widget::LabelFace::Body,
                 paint,
                 named("enter-toast", Role::Status),
             ))
@@ -3059,8 +3150,9 @@ impl Gallery {
                 )
             })
             .into(),
-            icedtea::motion::Enter::Tooltip => container(widget::meta(
+            icedtea::motion::Enter::Tooltip => container(widget::label(
                 cat.t("tip.write"),
+                widget::LabelFace::Meta,
                 paint,
                 named("enter-tip", Role::Tooltip),
             ))
@@ -4081,10 +4173,11 @@ impl Gallery {
             Message::OsMode(mode) => {
                 self.appearance = Appearance::from_mode(mode);
                 // Surfaces track light/dark; re-read when appearance changes.
-                self.os_chrome = theme::os_chrome();
+                self.os_chrome = icedtea::theme::OsChrome::empty();
                 if self.follow_os {
                     self.apply_theme_pref();
                 }
+                return theme::os_chrome(Message::OsChrome);
             }
             Message::OsChrome(chrome) => {
                 self.os_chrome = chrome;
@@ -4210,22 +4303,27 @@ impl Gallery {
                 }
             }
             Message::FileOpen => {
-                let r =
-                    icedtea::native_dialog(&icedtea::dialog::DialogSpec::file_open().title("Open"));
-                self.dialog_note = format!("{r:?}");
+                return icedtea::native_dialog(
+                    icedtea::dialog::DialogSpec::file_open().title("Open"),
+                    |r| Message::DialogNote(format!("{r:?}")),
+                );
             }
             Message::FileSave => {
-                let r = icedtea::native_dialog(
-                    &icedtea::dialog::DialogSpec::file_save()
+                return icedtea::native_dialog(
+                    icedtea::dialog::DialogSpec::file_save()
                         .title("Save")
                         .default_file_name("notes.txt"),
+                    |r| Message::DialogNote(format!("{r:?}")),
                 );
-                self.dialog_note = format!("{r:?}");
             }
             Message::Folder => {
-                let r =
-                    icedtea::native_dialog(&icedtea::dialog::DialogSpec::folder().title("Folder"));
-                self.dialog_note = format!("{r:?}");
+                return icedtea::native_dialog(
+                    icedtea::dialog::DialogSpec::folder().title("Folder"),
+                    |r| Message::DialogNote(format!("{r:?}")),
+                );
+            }
+            Message::DialogNote(s) => {
+                self.dialog_note = s;
             }
             Message::ConfirmSave => {
                 self.dialog_note = self.catalog.t("toast.saved").to_string();
@@ -4719,7 +4817,9 @@ impl Gallery {
         let shell = container(layout::dock(
             Some({
                 column![
-                    pattern::menu_bar(&self.actions, tok, self.direction, &self.catalog),
+                    pattern::menu_bar(&self.actions, tok, self.direction, &self.catalog, |_| {
+                        Message::Nop
+                    }),
                     themes,
                 ]
                 .into()
@@ -4751,6 +4851,7 @@ impl Gallery {
                 Message::ContextDismiss,
                 Self::anim_progress(&self.context_anim),
                 tok,
+                A11y::new("pat", Role::Group),
             )
         } else {
             Space::new().width(0).height(0).into()
@@ -4793,7 +4894,12 @@ impl Gallery {
         };
         let job_el: Element<'_, Message> = start_line(
             self.direction,
-            widget::meta(job, tok, named("page-job", Role::Status)),
+            widget::label(
+                job,
+                widget::LabelFace::Meta,
+                tok,
+                named("page-job", Role::Status),
+            ),
         );
         let mut col = column![title_el, job_el, card]
             .spacing(12)
@@ -4813,6 +4919,16 @@ impl Gallery {
     }
 
     fn demo(&self, page: &str) -> Element<'_, Message> {
+        if matches!(page, "theme" | "colors") {
+            return self.demo_widget(page);
+        }
+        if page == "keys" {
+            return column![self.demo_widget("keys"), self.demo_widget("cheatsheet"),]
+                .spacing(20)
+                .width(Length::Fill)
+                .align_x(icedtea::i18n::align_start(self.direction))
+                .into();
+        }
         let mut hosted: Vec<_> = catalog::page_entries(page).collect();
         if page == "controls" {
             if let Some(i) = hosted.iter().position(|e| e.id == "range-slider") {
@@ -4872,8 +4988,9 @@ impl Gallery {
                     &self.catalog,
                 ));
                 if let Some(job) = widget_job(e.id, &self.catalog) {
-                    col = col.push(widget::meta(
+                    col = col.push(widget::label(
                         job,
+                        widget::LabelFace::Meta,
                         tok,
                         named(&format!("{}-job", e.id), Role::Status),
                     ));
@@ -4958,8 +5075,9 @@ impl Gallery {
                 let mut col = column![]
                     .spacing(8)
                     .align_x(icedtea::i18n::align_start(tok.direction));
-                col = col.push(widget::meta(
+                col = col.push(widget::label(
                     self.catalog.t("hint.button"),
+                    widget::LabelFace::Meta,
                     tok,
                     named("hint", Role::Status),
                 ));
@@ -5027,8 +5145,9 @@ impl Gallery {
                 col.into()
             }
             "split-button" => column![
-                widget::meta(
+                widget::label(
                     self.catalog.t("hint.split"),
+                    widget::LabelFace::Meta,
                     tok,
                     named("split-hint", Role::Status),
                 ),
@@ -5078,8 +5197,9 @@ impl Gallery {
             .align_x(icedtea::i18n::align_start(tok.direction))
             .into(),
             "toggle-button" => column![
-                widget::meta(
+                widget::label(
                     self.catalog.t("hint.toggle"),
+                    widget::LabelFace::Meta,
                     tok,
                     named("toggle-hint", Role::Status),
                 ),
@@ -5121,29 +5241,37 @@ impl Gallery {
             .align_x(icedtea::i18n::align_start(tok.direction))
             .into(),
             "checkbox" => column![
-                widget::meta(
+                widget::label(
                     self.catalog.t("hint.check"),
+                    widget::LabelFace::Meta,
                     tok,
                     named("check-hint", Role::Status),
                 ),
                 widget::checkbox(
                     self.catalog.t("check.accept"),
-                    self.checked,
-                    Message::Check,
+                    widget::CheckState::from(self.checked),
+                    |s| Message::Check(matches!(s, widget::CheckState::Checked)),
                     tok,
                     named("Accept", Role::Checkbox).with_checked(self.checked),
                 ),
                 widget::checkbox(
+                    self.catalog.t("select-all"),
+                    self.check_tri,
+                    Message::CheckTri,
+                    tok,
+                    named("tri", Role::Checkbox),
+                ),
+                widget::checkbox(
                     self.catalog.t("check.optional"),
-                    self.optional,
-                    Message::Optional,
+                    widget::CheckState::from(self.optional),
+                    |s| Message::Optional(matches!(s, widget::CheckState::Checked)),
                     tok,
                     named("Optional", Role::Checkbox).with_checked(self.optional),
                 ),
                 widget::checkbox(
                     self.catalog.t("check.locked"),
-                    true,
-                    Message::Check,
+                    widget::CheckState::Checked,
+                    |s| Message::Check(matches!(s, widget::CheckState::Checked)),
                     tok,
                     named("Locked", Role::Checkbox)
                         .with_checked(true)
@@ -5155,8 +5283,9 @@ impl Gallery {
             .align_x(icedtea::i18n::align_start(tok.direction))
             .into(),
             "radio" => column![
-                widget::meta(
+                widget::label(
                     self.catalog.t("hint.radio"),
+                    widget::LabelFace::Meta,
                     tok,
                     named("radio-hint", Role::Status),
                 ),
@@ -5190,8 +5319,9 @@ impl Gallery {
             .align_x(icedtea::i18n::align_start(tok.direction))
             .into(),
             "switch" => column![
-                widget::meta(
+                widget::label(
                     self.catalog.t("hint.switch"),
+                    widget::LabelFace::Meta,
                     tok,
                     named("switch-hint", Role::Status),
                 ),
@@ -5248,8 +5378,9 @@ impl Gallery {
                                 tok,
                                 named("value", Role::Slider).with_value(self.value.to_string()),
                             ),
-                            widget::meta(
+                            widget::label(
                                 widget::progress_label(self.value, None, digits),
+                                widget::LabelFace::Meta,
                                 tok,
                                 named("slider-value", Role::Status),
                             ),
@@ -5377,13 +5508,6 @@ impl Gallery {
                 ],
             )
             .into(),
-            "checkbox-indeterminate" => widget::checkbox_indeterminate(
-                self.catalog.t("select-all"),
-                self.check_tri,
-                Message::CheckTri,
-                tok,
-                named("tri", Role::Checkbox),
-            ),
             "progress" => {
                 let shown = self.shown_progress();
                 let digits = tok.clock_digits;
@@ -5484,12 +5608,13 @@ impl Gallery {
                     ButtonOpts::SHRINK,
                     btn("Focus field")
                 ),
-                widget::meta(
+                widget::label(
                     if self.dialog_note.is_empty() {
                         self.catalog.t("field.focus-hint").to_string()
                     } else {
                         self.dialog_note.clone()
                     },
+                    widget::LabelFace::Meta,
                     tok,
                     named("submit-note", Role::Status),
                 ),
@@ -5507,8 +5632,9 @@ impl Gallery {
                 true,
             ),
             "secret" => column![
-                widget::meta(
+                widget::label(
                     self.catalog.t("field.secret-hint"),
+                    widget::LabelFace::Meta,
                     tok,
                     named("secret-hint", Role::Status),
                 ),
@@ -5525,12 +5651,13 @@ impl Gallery {
                     self.direction,
                     named("secret", Role::Group),
                 ),
-                widget::meta(
+                widget::label(
                     if self.dialog_note.is_empty() {
                         self.catalog.t("field.secret-note").to_string()
                     } else {
                         self.dialog_note.clone()
                     },
+                    widget::LabelFace::Meta,
                     tok,
                     named("secret-note", Role::Status),
                 ),
@@ -5542,8 +5669,9 @@ impl Gallery {
             "value-field" => {
                 let copy = Action::new("value.copy", self.catalog.t("copy"), Message::CopyFields);
                 column![
-                    widget::meta(
+                    widget::label(
                         self.catalog.t("field.value-hint"),
+                        widget::LabelFace::Meta,
                         tok,
                         named("value-hint", Role::Status),
                     ),
@@ -5602,9 +5730,15 @@ impl Gallery {
                         Some(icedtea::iced::widget::Id::new("gallery-search")),
                         &runs,
                     ),
-                    widget::meta(sent, tok, named("search-sent", Role::Status)),
-                    widget::meta(
+                    widget::label(
+                        sent,
+                        widget::LabelFace::Meta,
+                        tok,
+                        named("search-sent", Role::Status)
+                    ),
+                    widget::label(
                         self.catalog.t("search.tokens"),
+                        widget::LabelFace::Meta,
                         tok,
                         named("search-tokens", Role::Status),
                     ),
@@ -5639,8 +5773,9 @@ impl Gallery {
                 )
             }
             "field-support" => column![
-                widget::meta(
+                widget::label(
                     self.catalog.t("field.support-hint"),
+                    widget::LabelFace::Meta,
                     tok,
                     named("fs-hint", Role::Status),
                 ),
@@ -5670,8 +5805,9 @@ impl Gallery {
             .align_x(icedtea::i18n::align_start(tok.direction))
             .into(),
             "suggest" => column![
-                widget::meta(
+                widget::label(
                     self.catalog.t("field.suggest-hint"),
+                    widget::LabelFace::Meta,
                     tok,
                     named("suggest-hint", Role::Status),
                 ),
@@ -5697,8 +5833,9 @@ impl Gallery {
                     self.catalog.t("list.flagged").to_string(),
                 ];
                 column![
-                    widget::meta(
+                    widget::label(
                         self.catalog.t("field.form-hint"),
+                        widget::LabelFace::Meta,
                         tok,
                         named("form-hint", Role::Status),
                     ),
@@ -5743,8 +5880,8 @@ impl Gallery {
                                 String::new(),
                                 widget::checkbox(
                                     self.catalog.t("field.form-ok"),
-                                    self.checked,
-                                    Message::Check,
+                                    widget::CheckState::from(self.checked),
+                                    |s| Message::Check(matches!(s, widget::CheckState::Checked)),
                                     tok,
                                     named("form-ok", Role::Checkbox).with_checked(self.checked),
                                 ),
@@ -5770,13 +5907,14 @@ impl Gallery {
                         self.direction,
                         named("compose", Role::Group),
                     ),
-                    widget::meta(
+                    widget::label(
                         format!(
                             "{} {}",
                             self.catalog.t("field.form-row"),
                             tok.clock_digits
                                 .map_str(&(self.form_active + 1).to_string()),
                         ),
+                        widget::LabelFace::Meta,
                         tok,
                         named("form-row", Role::Status),
                     ),
@@ -5789,8 +5927,9 @@ impl Gallery {
             "select" => {
                 let opts = ["nord".into(), "dark".into(), "light".into()];
                 column![
-                    widget::meta(
+                    widget::label(
                         self.catalog.t("density.default"),
+                        widget::LabelFace::Meta,
                         tok,
                         named("pick-default-cap", Role::Status),
                     ),
@@ -5802,8 +5941,9 @@ impl Gallery {
                         widget::ControlSize::Default,
                         named(&self.pick, Role::ComboBox),
                     ),
-                    widget::meta(
+                    widget::label(
                         self.catalog.t("density.compact"),
+                        widget::LabelFace::Meta,
                         tok,
                         named("pick-compact-cap", Role::Status),
                     ),
@@ -5873,8 +6013,9 @@ impl Gallery {
                         tok,
                         named("time-12", Role::SpinButton),
                     ),
-                    widget::meta(
+                    widget::label(
                         self.catalog.t("time.step-hint"),
+                        widget::LabelFace::Meta,
                         tok,
                         named("time-hint", Role::Status),
                     ),
@@ -5897,8 +6038,9 @@ impl Gallery {
             "selectable" => {
                 let copy = Action::new("edit.copy", self.catalog.t("copy"), Message::CopyFields);
                 column![
-                    widget::meta(
+                    widget::label(
                         self.catalog.t("select.hint"),
+                        widget::LabelFace::Meta,
                         tok,
                         named("select-hint", Role::Status),
                     ),
@@ -5963,18 +6105,24 @@ impl Gallery {
             "label" => column![
                 widget::label(
                     self.catalog.t("hint.type"),
+                    widget::LabelFace::Body,
                     tok,
                     named("page", Role::Header)
                 ),
-                widget::meta(
+                widget::label(
                     self.catalog.t("hint.meta"),
+                    widget::LabelFace::Meta,
                     tok,
                     named("meta", Role::Status)
                 ),
-                widget::code_block(
+                widget::highlighted_code(
                     self.field("snippet"),
+                    None,
                     |a| Message::Field("snippet", a),
                     tok,
+                    "dark",
+                    icedtea::layout::SHRINK,
+                    true,
                     named("plain", Role::TextBox),
                 ),
             ]
@@ -5991,7 +6139,12 @@ impl Gallery {
                 let mut copy = Action::new("edit.copy", self.catalog.t("copy"), Message::EditCopy);
                 copy.enabled = !self.md_sel.span.is_empty();
                 column![
-                    widget::meta(showing, tok, named("md-hash", Role::Status)),
+                    widget::label(
+                        showing,
+                        widget::LabelFace::Meta,
+                        tok,
+                        named("md-hash", Role::Status)
+                    ),
                     pattern::command_bar(
                         [
                             copy,
@@ -6009,12 +6162,18 @@ impl Gallery {
                         12.0,
                         [
                             container(widget::scroll(
-                                widget::markdown_outline(
-                                    &self.md_heads,
-                                    self.md_jump,
-                                    Message::MdJump,
+                                widget::markdown_view(
+                                    &[],
+                                    None,
+                                    Message::MdPointer,
                                     tok,
+                                    Message::MdLink,
                                     named("md-outline", Role::List),
+                                    widget::MarkdownOpts {
+                                        headings: Some(&self.md_heads),
+                                        selected: self.md_jump,
+                                        on_jump: Some(std::rc::Rc::new(Message::MdJump)),
+                                    },
                                 ),
                                 tok,
                                 named("md-outline-scroll", Role::Group),
@@ -6031,7 +6190,8 @@ impl Gallery {
                                     Message::MdPointer,
                                     tok,
                                     Message::MdLink,
-                                    named("md", Role::Group)
+                                    named("md", Role::Group),
+                                    widget::MarkdownOpts::default(),
                                 ),
                                 tok,
                                 named("md-scroll", Role::Group),
@@ -6058,7 +6218,12 @@ impl Gallery {
                     .replace("{theme}", &self.theme)
                     .replace("{hl}", &format!("{hl:?}"));
                 column![
-                    widget::meta(hint, tok, named("code-hint", Role::Status)),
+                    widget::label(
+                        hint,
+                        widget::LabelFace::Meta,
+                        tok,
+                        named("code-hint", Role::Status)
+                    ),
                     widget::pick_list(
                         CodeLang::names(),
                         Some(self.code_lang.clone()),
@@ -6069,14 +6234,14 @@ impl Gallery {
                     ),
                     widget::checkbox(
                         self.catalog.t("code.wrap"),
-                        self.code_wrap,
-                        Message::CodeWrap,
+                        widget::CheckState::from(self.code_wrap),
+                        |s| Message::CodeWrap(matches!(s, widget::CheckState::Checked)),
                         tok,
                         named("code-wrap", Role::Checkbox),
                     ),
                     widget::highlighted_code(
                         &self.code_editor,
-                        lang.syntax,
+                        Some(lang.syntax),
                         Message::CodeEdit,
                         tok,
                         &self.theme,
@@ -6125,8 +6290,9 @@ impl Gallery {
                                     ButtonOpts::SHRINK,
                                     btn(&name)
                                 ),
-                                widget::meta(
+                                widget::label(
                                     format!("{hl}"),
+                                    widget::LabelFace::Meta,
                                     t,
                                     A11y::new(format!("{name}-hl"), Role::Status),
                                 ),
@@ -6153,8 +6319,9 @@ impl Gallery {
                 let families: Vec<String> =
                     theme::FAMILIES.iter().map(|f| f.id.to_string()).collect();
                 column![
-                    widget::meta(
+                    widget::label(
                         self.catalog.t("theme.hint"),
+                        widget::LabelFace::Meta,
                         tok,
                         named("theme-hint", Role::Status),
                     ),
@@ -6185,8 +6352,8 @@ impl Gallery {
                             ),
                             widget::checkbox(
                                 self.catalog.t("pref.follow-os"),
-                                self.follow_os,
-                                Message::Follow,
+                                widget::CheckState::from(self.follow_os),
+                                |s| Message::Follow(matches!(s, widget::CheckState::Checked)),
                                 tok,
                                 named("follow", Role::Checkbox).with_checked(self.follow_os),
                             ),
@@ -6232,8 +6399,9 @@ impl Gallery {
                         row![
                             container(Space::new().width(28).height(20))
                                 .style(move |_| icedtea::style::fill(color, tok.text)),
-                            widget::meta(
+                            widget::label(
                                 title.clone(),
+                                widget::LabelFace::Meta,
                                 tok,
                                 A11y::new(title.clone(), Role::Status),
                             ),
@@ -6282,8 +6450,9 @@ impl Gallery {
                     ),
                 ];
                 column![
-                    widget::meta(
+                    widget::label(
                         self.catalog.t("colors.hint"),
+                        widget::LabelFace::Meta,
                         tok,
                         named("colors-hint", Role::Status),
                     ),
@@ -6301,16 +6470,22 @@ impl Gallery {
                     .unwrap_or_else(|| self.catalog.t("keys.type"));
                 let muted = tok.muted;
                 column![
-                    widget::label(last, tok, named("last-key", Role::Status)),
-                    widget::meta(
+                    widget::label(
+                        last,
+                        widget::LabelFace::Body,
+                        tok,
+                        named("last-key", Role::Status)
+                    ),
+                    widget::label(
                         self.catalog.t("keys.hint"),
+                        widget::LabelFace::Meta,
                         tok,
                         named("keys-hint", Role::Status),
                     ),
                     widget::checkbox(
                         self.catalog.t("check.accept"),
-                        self.checked,
-                        Message::Check,
+                        widget::CheckState::from(self.checked),
+                        |s| Message::Check(matches!(s, widget::CheckState::Checked)),
                         tok,
                         named("keys-check", Role::Checkbox).with_checked(self.checked),
                     ),
@@ -6363,7 +6538,12 @@ impl Gallery {
                     let note = name.clone();
                     let face = column![
                         widget::icon_svg(glyph, tok, named(&name, Role::Image)),
-                        widget::meta(name.clone(), tok, named(&name, Role::Status)),
+                        widget::label(
+                            name.clone(),
+                            widget::LabelFace::Meta,
+                            tok,
+                            named(&name, Role::Status)
+                        ),
                     ]
                     .spacing(gap / 2.0)
                     .width(Length::Fill)
@@ -6389,8 +6569,9 @@ impl Gallery {
                     cells.push(cell("app".into(), icedtea::icon::Glyph::Bytes(APP_MARK)));
                 }
                 let grid: Element<'_, Message> = if cells.is_empty() {
-                    widget::meta(
+                    widget::label(
                         self.catalog.t("icon.empty"),
+                        widget::LabelFace::Meta,
                         tok,
                         named("icon-empty", Role::Status),
                     )
@@ -6399,8 +6580,9 @@ impl Gallery {
                 };
                 let pane_el: Element<'_, Message> = container(
                     column![
-                        widget::meta(
+                        widget::label(
                             self.catalog.t("hint.icon"),
+                            widget::LabelFace::Meta,
                             tok,
                             named("icon-hint", Role::Status),
                         ),
@@ -6460,8 +6642,9 @@ impl Gallery {
                     fit,
                 };
                 column![
-                    widget::meta(
+                    widget::label(
                         self.catalog.t("img.hint"),
+                        widget::LabelFace::Meta,
                         tok,
                         named("img-hint", Role::Status),
                     ),
@@ -6505,6 +6688,7 @@ impl Gallery {
             "tooltip" => widget::tooltip_wrap(
                 widget::label(
                     self.catalog.t("hint.hover"),
+                    widget::LabelFace::Body,
                     tok,
                     named("Hover", Role::Header),
                 ),
@@ -6516,6 +6700,7 @@ impl Gallery {
             "rich-tooltip" => widget::tooltip_rich(
                 widget::label(
                     self.catalog.t("hint.save"),
+                    widget::LabelFace::Body,
                     tok,
                     named("Save", Role::Header),
                 ),
@@ -6620,8 +6805,12 @@ impl Gallery {
                             ]
                             .spacing(12)
                             .into();
-                            let count_el: Element<'_, Message> =
-                                widget::meta(count, tok, named("list-count", Role::Status));
+                            let count_el: Element<'_, Message> = widget::label(
+                                count,
+                                widget::LabelFace::Meta,
+                                tok,
+                                named("list-count", Role::Status),
+                            );
                             let spacer: Element<'_, Message> =
                                 Space::new().width(Length::Fill).into();
                             let mut filter_row = row![].spacing(12).align_y(Alignment::Center);
@@ -6682,8 +6871,9 @@ impl Gallery {
                 let sel_at = self.vc_sel;
                 let vc_open = self.catalog.t("vc.open").to_string();
                 column![
-                    widget::meta(
+                    widget::label(
                         self.catalog.t("vc.hint"),
+                        widget::LabelFace::Meta,
                         tok,
                         named("vc-hint", Role::Status),
                     ),
@@ -6705,11 +6895,13 @@ impl Gallery {
                                 column![
                                     widget::label(
                                         title.clone(),
+                                        widget::LabelFace::Body,
                                         tok,
                                         named(&format!("vc-{i}"), Role::ListItem),
                                     ),
-                                    widget::meta(
+                                    widget::label(
                                         vc_open.clone(),
+                                        widget::LabelFace::Meta,
                                         tok,
                                         named(&format!("vc-body-{i}"), Role::Status),
                                     ),
@@ -6717,7 +6909,12 @@ impl Gallery {
                                 .spacing(4)
                                 .into()
                             } else {
-                                widget::label(title, tok, named(&format!("vc-{i}"), Role::ListItem))
+                                widget::label(
+                                    title,
+                                    widget::LabelFace::Body,
+                                    tok,
+                                    named(&format!("vc-{i}"), Role::ListItem),
+                                )
                             };
                             container(face)
                                 .width(Length::Fill)
@@ -6763,7 +6960,12 @@ impl Gallery {
                     .map(|s| self.catalog.t("grid.opened").replace("{name}", &s))
                     .unwrap_or_else(|| self.catalog.t("grid.pick").to_string());
                 column![
-                    widget::meta(picked, tok, named("grid-sel", Role::Status)),
+                    widget::label(
+                        picked,
+                        widget::LabelFace::Meta,
+                        tok,
+                        named("grid-sel", Role::Status)
+                    ),
                     widget::item_grid(
                         &labels,
                         Message::Grid,
@@ -6779,8 +6981,9 @@ impl Gallery {
                 .into()
             }
             "table" => column![
-                widget::meta(
+                widget::label(
                     self.catalog.t("table.pin-hint"),
+                    widget::LabelFace::Meta,
                     tok,
                     named("table-pin", Role::Status),
                 ),
@@ -6842,7 +7045,12 @@ impl Gallery {
                 let faces: Element<'_, Message> = faces.into();
                 column![
                     faces,
-                    widget::meta(picked, tok, named("tree-sel", Role::Status)),
+                    widget::label(
+                        picked,
+                        widget::LabelFace::Meta,
+                        tok,
+                        named("tree-sel", Role::Status)
+                    ),
                     widget::tree_view(
                         &self.tree,
                         self.tree_sel,
@@ -6859,8 +7067,9 @@ impl Gallery {
                 .into()
             }
             "tabs" => column![
-                widget::meta(
+                widget::label(
                     self.catalog.t("hint.pinned"),
+                    widget::LabelFace::Meta,
                     tok,
                     named("tabs-pinned-hint", Role::Status),
                 ),
@@ -6873,8 +7082,9 @@ impl Gallery {
                     tok,
                     named("tabs-pinned", Role::Tab),
                 ),
-                widget::meta(
+                widget::label(
                     self.catalog.t("hint.closable"),
+                    widget::LabelFace::Meta,
                     tok,
                     named("tabs-close-hint", Role::Status),
                 ),
@@ -6901,16 +7111,19 @@ impl Gallery {
                 vec![
                     widget::label(
                         self.catalog.t("acc.body.files"),
+                        widget::LabelFace::Body,
                         tok,
                         named("acc-files", Role::Status),
                     ),
                     widget::label(
                         self.catalog.t("acc.body.appear"),
+                        widget::LabelFace::Body,
                         tok,
                         named("acc-appear", Role::Status),
                     ),
                     widget::label(
                         self.catalog.t("acc.body.adv"),
+                        widget::LabelFace::Body,
                         tok,
                         named("acc-adv", Role::Status),
                     ),
@@ -6934,16 +7147,19 @@ impl Gallery {
                 column![
                     widget::label(
                         self.catalog.t("expand.1"),
+                        widget::LabelFace::Body,
                         tok,
                         named("exp-1", Role::Status),
                     ),
                     widget::label(
                         self.catalog.t("expand.2"),
+                        widget::LabelFace::Body,
                         tok,
                         named("exp-2", Role::Status),
                     ),
                     widget::label(
                         self.catalog.t("expand.3"),
+                        widget::LabelFace::Body,
                         tok,
                         named("exp-3", Role::Status),
                     ),
@@ -6971,9 +7187,15 @@ impl Gallery {
                     icedtea::iced::widget::container(icedtea::widget::group_box(
                         self.catalog.t("hint.document"),
                         column![
-                            widget::label("notes.txt", tok, named("card-title", Role::Header)),
-                            widget::meta(
+                            widget::label(
+                                "notes.txt",
+                                widget::LabelFace::Body,
+                                tok,
+                                named("card-title", Role::Header)
+                            ),
+                            widget::label(
                                 self.catalog.t("card.last-saved"),
+                                widget::LabelFace::Meta,
                                 tok,
                                 named("card-body", Role::Status),
                             ),
@@ -7032,8 +7254,9 @@ impl Gallery {
                 let empty: Element<'_, Message> =
                     icedtea::iced::widget::container(icedtea::widget::group_box(
                         self.catalog.t("card.empty"),
-                        widget::meta(
+                        widget::label(
                             self.catalog.t("hint.no-items"),
+                            widget::LabelFace::Meta,
                             tok,
                             named("empty-card", Role::Status),
                         ),
@@ -7051,8 +7274,9 @@ impl Gallery {
                     pair = pair.push(kid);
                 }
                 column![
-                    widget::meta(
+                    widget::label(
                         self.catalog.t("hint.card"),
+                        widget::LabelFace::Meta,
                         tok,
                         named("card-hint", Role::Status),
                     ),
@@ -7065,8 +7289,9 @@ impl Gallery {
             }
             "rule" => widget::rule_h(tok, named("rule", Role::Separator)),
             "chip" => column![
-                widget::meta(
+                widget::label(
                     self.catalog.t("hint.chip"),
+                    widget::LabelFace::Meta,
                     tok,
                     named("chip-hint", Role::Status),
                 ),
@@ -7201,6 +7426,7 @@ impl Gallery {
             "pack" => {
                 let find = widget::label(
                     self.catalog.t("pack.find"),
+                    widget::LabelFace::Body,
                     tok,
                     named("pack-find", Role::Header),
                 );
@@ -7224,8 +7450,9 @@ impl Gallery {
                     btn(self.catalog.t("pack.go")),
                 );
                 column![
-                    widget::meta(
+                    widget::label(
                         self.catalog.t("hint.pack"),
+                        widget::LabelFace::Meta,
                         tok,
                         named("pack-hint", Role::Status),
                     ),
@@ -7281,17 +7508,23 @@ impl Gallery {
                 let tiles = tile_keys.iter().map(|key| {
                     let title = self.catalog.t(key);
                     layout::Slot::sized(
-                        container(widget::label(title, tok, named(title, Role::Button)))
-                            .width(Length::Fill)
-                            .height(Length::Fixed(72.0))
-                            .padding(tok.density.inset())
-                            .style(move |_| icedtea::style::card(tok, false)),
+                        container(widget::label(
+                            title,
+                            widget::LabelFace::Body,
+                            tok,
+                            named(title, Role::Button),
+                        ))
+                        .width(Length::Fill)
+                        .height(Length::Fixed(72.0))
+                        .padding(tok.density.inset())
+                        .style(move |_| icedtea::style::card(tok, false)),
                         icedtea::layout::SizePolicy::between(200.0, 200.0, f32::INFINITY, 1.0),
                     )
                 });
                 column![
-                    widget::meta(
+                    widget::label(
                         self.catalog.t("hint.wrap"),
+                        widget::LabelFace::Meta,
                         tok,
                         named("wrap-hint", Role::Status),
                     ),
@@ -7336,6 +7569,7 @@ impl Gallery {
                         } else {
                             self.pad.as_str()
                         },
+                        widget::LabelFace::Body,
                         tok,
                         named("pad-value", Role::Status),
                     ),
@@ -7379,8 +7613,9 @@ impl Gallery {
                     Action::new("edit.paste", self.catalog.t("paste"), Message::EditPaste),
                 ];
                 column![
-                    widget::meta(
+                    widget::label(
                         self.catalog.t("ctx.hint"),
+                        widget::LabelFace::Meta,
                         tok,
                         named("ctx-hint", Role::Status),
                     ),
@@ -7392,6 +7627,7 @@ impl Gallery {
                             Message::Nop,
                             1.0,
                             tok,
+                            A11y::new("pat", Role::Group),
                         ))
                         .width(Length::Fixed(220.0))
                         .height(Length::Fixed(240.0)),
@@ -7426,6 +7662,7 @@ impl Gallery {
                     let label = (*copy).to_string();
                     lines = lines.push(widget::label(
                         label.clone(),
+                        widget::LabelFace::Body,
                         tok,
                         named(&format!("scroll-{i}"), Role::Header),
                     ));
@@ -7442,9 +7679,10 @@ impl Gallery {
                 .height(Length::Fixed(160.0))
                 .into()
             }
-            "callout" => widget::info_bar(
-                ToastKind::Warning,
+            "callout" => widget::banner(
                 self.catalog.t("callout.watch"),
+                None,
+                Some(ToastKind::Warning),
                 tok,
                 named("callout-watch", Role::Status),
             ),
@@ -7453,12 +7691,14 @@ impl Gallery {
                     widget::banner(
                         self.catalog.t("banner.update"),
                         Some((self.catalog.t("banner.install").into(), Message::BannerGo)),
+                        None,
                         tok,
                         named(self.catalog.t("banner.update"), Role::Status),
                     )
                 } else {
-                    widget::meta(
+                    widget::label(
                         self.catalog.t("hint.install"),
+                        widget::LabelFace::Meta,
                         tok,
                         named("banner-done", Role::Status),
                     )
@@ -7480,8 +7720,8 @@ impl Gallery {
                         ),
                         widget::checkbox(
                             self.catalog.t("group.remember"),
-                            self.checked,
-                            Message::Toggle,
+                            widget::CheckState::from(self.checked),
+                            |s| Message::Toggle(matches!(s, widget::CheckState::Checked)),
                             tok,
                             named("Remember", Role::Checkbox).with_checked(self.checked),
                         ),
@@ -7495,8 +7735,9 @@ impl Gallery {
                 ),
                 widget::group_box(
                     self.catalog.t("group.disabled"),
-                    widget::meta(
+                    widget::label(
                         self.catalog.t("group.readonly"),
+                        widget::LabelFace::Meta,
                         tok,
                         named("group-off", Role::Status),
                     ),
@@ -7522,7 +7763,9 @@ impl Gallery {
                 self.direction,
                 named("breadcrumb", Role::Group),
             ),
-            "menu" => pattern::menu_bar(&self.actions, tok, self.direction, &self.catalog),
+            "menu" => pattern::menu_bar(&self.actions, tok, self.direction, &self.catalog, |_| {
+                Message::Nop
+            }),
             "toolbar" => pattern::toolbar(self.actions.iter(), tok, self.direction),
             "status-bar" => column![
                 pattern::status_bar(
@@ -7588,8 +7831,9 @@ impl Gallery {
                 container(widget::busy_overlay(
                     widget::group_box(
                         "notes.txt",
-                        widget::meta(
+                        widget::label(
                             self.catalog.t("busy.body"),
+                            widget::LabelFace::Meta,
                             tok,
                             named("busy-body", Role::Status),
                         ),
@@ -7658,13 +7902,19 @@ impl Gallery {
                 }
                 let backdrop = container(
                     column![
-                        widget::label("notes.txt", tok, named("dlg-doc", Role::Header)),
-                        widget::meta(
+                        widget::label(
+                            "notes.txt",
+                            widget::LabelFace::Body,
+                            tok,
+                            named("dlg-doc", Role::Header)
+                        ),
+                        widget::label(
                             if self.dialog_note.is_empty() {
                                 self.catalog.t("dialog.last-saved").to_string()
                             } else {
                                 self.dialog_note.clone()
                             },
+                            widget::LabelFace::Meta,
                             tok,
                             named("dlg-result", Role::Status),
                         ),
@@ -7680,24 +7930,22 @@ impl Gallery {
                 .style(move |_| icedtea::style::panel(tok));
                 if self.dialog_open || progress > 0.01 {
                     let t = icedtea::motion::visual(progress, tok.reduced_motion);
-                    pattern::modal_card(
-                        backdrop.into(),
-                        container(pattern::dialog_sheet(
-                            self.catalog.t("dialog.save"),
-                            self.catalog.t("dialog.overwrite-notes"),
-                            (self.catalog.t("dialog.save").into(), Message::ConfirmSave),
-                            Some((self.catalog.t("cancel").into(), Message::ConfirmCancel)),
-                            [(
+                    pattern::dialog_sheet(
+                        self.catalog.t("dialog.save"),
+                        self.catalog.t("dialog.overwrite-notes"),
+                        (self.catalog.t("dialog.save").into(), Message::ConfirmSave),
+                        tok.fade(t),
+                        named("dlg", Role::Dialog),
+                        pattern::DialogOpts {
+                            cancel: Some((self.catalog.t("cancel").into(), Message::ConfirmCancel)),
+                            extra: vec![(
                                 self.catalog.t("dialog.dont-save").into(),
                                 Message::ConfirmDiscard,
                             )],
-                            Some(icedtea::icon::Icon::Warning),
-                            tok.fade(t),
-                        ))
-                        .width(Length::Fixed(420.0))
-                        .into(),
-                        progress,
-                        tok,
+                            icon: Some(icedtea::icon::Icon::Warning),
+                            backdrop: Some(backdrop.into()),
+                            progress,
+                        },
                     )
                 } else {
                     backdrop.into()
@@ -7708,11 +7956,13 @@ impl Gallery {
                     column![
                         widget::label(
                             self.catalog.t("hint.document"),
+                            widget::LabelFace::Body,
                             tok,
                             named("ss-doc", Role::Header),
                         ),
-                        widget::meta(
+                        widget::label(
                             self.catalog.t("sheet.hint"),
+                            widget::LabelFace::Meta,
                             tok,
                             named("ss-hint", Role::Status),
                         ),
@@ -7744,12 +7994,18 @@ impl Gallery {
                         scene.into(),
                         self.catalog.t("ss.title"),
                         column![
-                            widget::meta(
+                            widget::label(
                                 self.catalog.t("hint.name"),
+                                widget::LabelFace::Meta,
                                 tok,
                                 named("ss-k", Role::Status),
                             ),
-                            widget::label("notes.txt", tok, named("ss-v", Role::Status)),
+                            widget::label(
+                                "notes.txt",
+                                widget::LabelFace::Body,
+                                tok,
+                                named("ss-v", Role::Status)
+                            ),
                         ]
                         .spacing(8)
                         .into(),
@@ -7758,14 +8014,16 @@ impl Gallery {
                         280.0,
                         progress,
                         tok,
+                        A11y::new("pat", Role::Group),
                     )
                 } else {
                     scene.into()
                 }
             }
             "sectioned-menu" => column![
-                widget::meta(
+                widget::label(
                     self.catalog.t("sm.hint"),
+                    widget::LabelFace::Meta,
                     tok,
                     named("sm-hint", Role::Status),
                 ),
@@ -7804,8 +8062,9 @@ impl Gallery {
             .align_x(icedtea::i18n::align_start(tok.direction))
             .into(),
             "cascade-menu" => column![
-                widget::meta(
+                widget::label(
                     self.catalog.t("cascade.hint"),
+                    widget::LabelFace::Meta,
                     tok,
                     named("cm-hint", Role::Status),
                 ),
@@ -7874,14 +8133,21 @@ impl Gallery {
                         .map(|row| row.title.as_str())
                         .unwrap_or_else(|| self.catalog.t("detail.pick"));
                     column![
-                        widget::label(title, tok, named("Detail", Role::Header)),
-                        widget::meta(
+                        widget::label(
+                            title,
+                            widget::LabelFace::Body,
+                            tok,
+                            named("Detail", Role::Header)
+                        ),
+                        widget::label(
                             self.catalog.t("detail.when"),
+                            widget::LabelFace::Meta,
                             tok,
                             named("detail-when", Role::Status),
                         ),
-                        widget::meta(
+                        widget::label(
                             self.catalog.t("detail.body"),
+                            widget::LabelFace::Meta,
                             tok,
                             named("detail-body", Role::Status),
                         ),
@@ -7894,6 +8160,7 @@ impl Gallery {
                 layout::fixed(layout::LIST_PANE),
                 tok,
                 self.direction,
+                A11y::new("pat", Role::Group),
             ),
             "nav-rail" => pattern::nav_rail(
                 [
@@ -7952,6 +8219,7 @@ impl Gallery {
                     column![
                         widget::label(
                             self.catalog.t("hint.places"),
+                            widget::LabelFace::Body,
                             tok,
                             named("Places", Role::Header)
                         ),
@@ -7977,9 +8245,24 @@ impl Gallery {
                     .align_x(icedtea::i18n::align_start(tok.direction))
                     .into(),
                     column![
-                        widget::label(title, tok, named(title, Role::Header)),
-                        widget::meta(blurb, tok, named("nav-places", Role::Status),),
-                        widget::meta(body, tok, named("nav-body", Role::Status),),
+                        widget::label(
+                            title,
+                            widget::LabelFace::Body,
+                            tok,
+                            named(title, Role::Header)
+                        ),
+                        widget::label(
+                            blurb,
+                            widget::LabelFace::Meta,
+                            tok,
+                            named("nav-places", Role::Status),
+                        ),
+                        widget::label(
+                            body,
+                            widget::LabelFace::Meta,
+                            tok,
+                            named("nav-body", Role::Status),
+                        ),
                     ]
                     .spacing(8)
                     .padding(16)
@@ -7993,6 +8276,7 @@ impl Gallery {
                     tok,
                     &self.catalog,
                     self.direction,
+                    A11y::new("pat", Role::Group),
                 )
             }
             "tab-view" => {
@@ -8014,10 +8298,21 @@ impl Gallery {
                     &self.tabs,
                     container(
                         column![
-                            widget::label(title, tok, named(title, Role::Header)),
-                            widget::meta(body, tok, named("tab-body", Role::Status)),
-                            widget::meta(
+                            widget::label(
+                                title,
+                                widget::LabelFace::Body,
+                                tok,
+                                named(title, Role::Header)
+                            ),
+                            widget::label(
+                                body,
+                                widget::LabelFace::Meta,
+                                tok,
+                                named("tab-body", Role::Status)
+                            ),
+                            widget::label(
                                 self.catalog.t("tab.close-hint"),
+                                widget::LabelFace::Meta,
                                 tok,
                                 named("tab-how", Role::Status),
                             ),
@@ -8034,6 +8329,7 @@ impl Gallery {
                     Message::Tab,
                     Message::CloseTab,
                     tok,
+                    A11y::new("pat", Role::Group),
                 )
             }
             "preferences" => pattern::preferences_page(
@@ -8042,6 +8338,7 @@ impl Gallery {
                 Message::PrefsQuery,
                 tok,
                 &self.catalog,
+                A11y::new("pat", Role::Group),
             ),
             "about" => container(
                 container(pattern::about_page(
@@ -8051,6 +8348,7 @@ impl Gallery {
                     self.catalog.t("about.blurb"),
                     tok,
                     &self.catalog,
+                    A11y::new("pat", Role::Group),
                 ))
                 .width(Length::Fixed(420.0)),
             )
@@ -8067,6 +8365,7 @@ impl Gallery {
                             Message::StatusNew,
                         )),
                         tok,
+                        A11y::new("pat", Role::Group),
                     )
                 } else {
                     pattern::status_page(
@@ -8077,6 +8376,7 @@ impl Gallery {
                             Message::StatusNew,
                         )),
                         tok,
+                        A11y::new("pat", Role::Group),
                     )
                 }
             }
@@ -8173,15 +8473,15 @@ impl Gallery {
                     [
                         widget::checkbox(
                             self.catalog.t("pal.omit"),
-                            self.pal_omit,
-                            Message::PaletteOmit,
+                            widget::CheckState::from(self.pal_omit),
+                            |s| Message::PaletteOmit(matches!(s, widget::CheckState::Checked)),
                             tok,
                             named("pal-omit", Role::Checkbox).with_checked(self.pal_omit),
                         ),
                         widget::checkbox(
                             self.catalog.t("pal.highlight"),
-                            self.pal_highlight,
-                            Message::PaletteHighlight,
+                            widget::CheckState::from(self.pal_highlight),
+                            |s| Message::PaletteHighlight(matches!(s, widget::CheckState::Checked)),
                             tok,
                             named("pal-highlight", Role::Checkbox).with_checked(self.pal_highlight),
                         ),
@@ -8202,8 +8502,9 @@ impl Gallery {
                         named("pal-back", Role::Button),
                     ));
                 }
-                let mut page = column![widget::meta(
+                let mut page = column![widget::label(
                     self.catalog.t("pal.hint"),
+                    widget::LabelFace::Meta,
                     tok,
                     named("pal-job", Role::Status),
                 ),]
@@ -8211,8 +8512,9 @@ impl Gallery {
                 .width(Length::Fill)
                 .align_x(icedtea::i18n::align_start(dir));
                 if !self.pal_ran.is_empty() {
-                    page = page.push(widget::meta(
+                    page = page.push(widget::label(
                         &self.pal_ran,
+                        widget::LabelFace::Meta,
                         tok,
                         named("pal-ran", Role::Status),
                     ));
@@ -8232,6 +8534,7 @@ impl Gallery {
                         Self::anim_progress(&self.palette_anim),
                         opts,
                         tok,
+                        A11y::new("pat", Role::Group),
                     ))
                     .width(Length::Fill)
                     .center_x(Length::Fill),
@@ -8303,8 +8606,18 @@ impl Gallery {
                         named("insp-tree", Role::Tree),
                     ),
                     column![
-                        widget::label(name, tok, named("insp-body", Role::Header)),
-                        widget::meta(body, tok, named("insp-text", Role::Status)),
+                        widget::label(
+                            name,
+                            widget::LabelFace::Body,
+                            tok,
+                            named("insp-body", Role::Header)
+                        ),
+                        widget::label(
+                            body,
+                            widget::LabelFace::Meta,
+                            tok,
+                            named("insp-text", Role::Status)
+                        ),
                     ]
                     .spacing(8)
                     .padding(8)
@@ -8313,21 +8626,25 @@ impl Gallery {
                     column![
                         widget::label(
                             self.catalog.t("hint.properties"),
+                            widget::LabelFace::Body,
                             tok,
                             named("insp-props", Role::Header)
                         ),
-                        widget::meta(
+                        widget::label(
                             format!("{}  {name}", self.catalog.t("table.name")),
+                            widget::LabelFace::Meta,
                             tok,
                             named("insp-name", Role::Status)
                         ),
-                        widget::meta(
+                        widget::label(
                             format!("{}  {kind}", self.catalog.t("insp.kind")),
+                            widget::LabelFace::Meta,
                             tok,
                             named("insp-kind", Role::Status)
                         ),
-                        widget::meta(
+                        widget::label(
                             format!("{}  {path}", self.catalog.t("table.path")),
+                            widget::LabelFace::Meta,
                             tok,
                             named("insp-path", Role::Status)
                         ),
@@ -8337,6 +8654,7 @@ impl Gallery {
                     .align_x(icedtea::i18n::align_start(self.direction))
                     .into(),
                     tok,
+                    A11y::new("pat", Role::Group),
                 )
             }
             "workspace" => {
@@ -8345,13 +8663,15 @@ impl Gallery {
                 container(pattern::workspace(
                     &self.ws,
                     move |id| match id {
-                        "explorer" => widget::meta(
+                        "explorer" => widget::label(
                             "src/\n  lib.rs\n  catalog.rs",
+                            widget::LabelFace::Meta,
                             tok,
                             named("ws-explorer", Role::List),
                         ),
-                        "term" => widget::meta(
+                        "term" => widget::label(
                             "$ cargo test -p icedtea",
+                            widget::LabelFace::Meta,
                             tok,
                             named("ws-term", Role::Status),
                         ),
@@ -8366,8 +8686,9 @@ impl Gallery {
                             named("ws-outline", Role::Tree),
                         ),
                         _ => column![
-                            widget::meta(
+                            widget::label(
                                 self.catalog.t("ws.hint"),
+                                widget::LabelFace::Meta,
                                 tok,
                                 named("ws-center", Role::Status),
                             ),
@@ -8467,12 +8788,14 @@ impl Gallery {
                     ),
                     widget::label(
                         self.catalog.t("drawer.hint"),
+                        widget::LabelFace::Body,
                         tok,
                         named("drawer-main", Role::Status),
                     ),
                     Self::anim_progress(&self.drawer_anim),
                     Message::DrawerToggle,
                     tok,
+                    A11y::new("pat", Role::Group),
                 ),
             ]
             .spacing(8)
@@ -8490,7 +8813,12 @@ impl Gallery {
                     named("cheat-q", Role::TextBox),
                     None,
                 ),
-                pattern::cheatsheet(&self.actions, &self.cheat_q, tok),
+                pattern::cheatsheet(
+                    &self.actions,
+                    &self.cheat_q,
+                    tok,
+                    A11y::new("pat", Role::Group)
+                ),
             ]
             .spacing(8)
             .width(Length::Fill)
@@ -8546,8 +8874,9 @@ impl Gallery {
                         ],
                     ),
                     self.motion_ms_slider("enter-ms", self.enter_ms, Message::EnterMs),
-                    widget::meta(
+                    widget::label(
                         self.enter_timing(),
+                        widget::LabelFace::Meta,
                         tok,
                         named("enter-timing", Role::Status),
                     ),
@@ -8612,7 +8941,12 @@ impl Gallery {
                     };
                     widget::group_box(
                         self.catalog.t(key),
-                        widget::label(uses, paint, named(key, Role::Status)),
+                        widget::label(
+                            uses,
+                            widget::LabelFace::Body,
+                            paint,
+                            named(key, Role::Status),
+                        ),
                         paint,
                         CardFace::Elevated,
                         named(&format!("{key}-card"), Role::Group),
@@ -8643,8 +8977,9 @@ impl Gallery {
                         Message::SwitchFacePick,
                     ),
                     self.motion_ms_slider("switch-ms", self.switch_ms, Message::SwitchMs),
-                    widget::meta(
+                    widget::label(
                         self.switch_timing(),
+                        widget::LabelFace::Meta,
                         tok,
                         named("switch-timing", Role::Status),
                     ),
@@ -8672,8 +9007,9 @@ impl Gallery {
                         self.slide_label(self.step_slide),
                         Message::StepSlide,
                     ));
-                    col = col.push(widget::meta(
+                    col = col.push(widget::label(
                         self.slide_dir_hint(),
+                        widget::LabelFace::Meta,
                         tok,
                         named("switch-slide-dir", Role::Status),
                     ));
@@ -8744,7 +9080,12 @@ impl Gallery {
                 let child: Element<'_, Message> = if self.attn_pulse {
                     widget::group_box(
                         self.catalog.t("motion.attn-pulse"),
-                        widget::label(uses, tok, named("pulse-body", Role::Status)),
+                        widget::label(
+                            uses,
+                            widget::LabelFace::Body,
+                            tok,
+                            named("pulse-body", Role::Status),
+                        ),
                         tok,
                         CardFace::Elevated,
                         named("pulse-card", Role::Group),
@@ -8777,7 +9118,12 @@ impl Gallery {
                         face_now,
                         Message::AttnFace,
                     ),
-                    widget::meta(uses, tok, named("attn-uses", Role::Status)),
+                    widget::label(
+                        uses,
+                        widget::LabelFace::Meta,
+                        tok,
+                        named("attn-uses", Role::Status)
+                    ),
                     icedtea::motion::attention(
                         child,
                         progress,
@@ -8802,7 +9148,12 @@ impl Gallery {
                         ButtonOpts::SHRINK,
                         btn("attn-play"),
                     ),
-                    widget::meta(hint, tok, named("field-hint", Role::Status)),
+                    widget::label(
+                        hint,
+                        widget::LabelFace::Meta,
+                        tok,
+                        named("field-hint", Role::Status)
+                    ),
                 ]
                 .spacing(10)
                 .width(Length::Fill)
@@ -8833,7 +9184,12 @@ impl Gallery {
                 let body = if self.disclose_inline {
                     widget::group_box(
                         self.catalog.t("motion.axis-inline"),
-                        widget::label(uses, tok, named("rail-body", Role::Status)),
+                        widget::label(
+                            uses,
+                            widget::LabelFace::Body,
+                            tok,
+                            named("rail-body", Role::Status),
+                        ),
                         tok,
                         CardFace::Elevated,
                         named("rail-card", Role::Group),
@@ -8850,7 +9206,12 @@ impl Gallery {
                         axis_now,
                         Message::DiscloseAxis,
                     ),
-                    widget::meta(uses, tok, named("disclose-uses", Role::Status)),
+                    widget::label(
+                        uses,
+                        widget::LabelFace::Meta,
+                        tok,
+                        named("disclose-uses", Role::Status)
+                    ),
                     widget::button(
                         if self.expander_open {
                             self.catalog.t("expand.collapse")
@@ -8882,12 +9243,20 @@ impl Gallery {
                 .into()
             }
             "main-window" => pattern::main_window(
-                pattern::menu_bar(&self.actions, tok, self.direction, &self.catalog),
+                pattern::menu_bar(&self.actions, tok, self.direction, &self.catalog, |_| {
+                    Message::Nop
+                }),
                 pattern::toolbar(self.actions.iter(), tok, self.direction),
                 column![
-                    widget::label("notes.txt", tok, named("Center", Role::Header)),
-                    widget::meta(
+                    widget::label(
+                        "notes.txt",
+                        widget::LabelFace::Body,
+                        tok,
+                        named("Center", Role::Header)
+                    ),
+                    widget::label(
                         self.catalog.t("win.hint"),
+                        widget::LabelFace::Meta,
                         tok,
                         named("center-body", Role::Status),
                     ),
@@ -8907,6 +9276,7 @@ impl Gallery {
                     self.direction,
                 ),
                 tok,
+                A11y::new("pat", Role::Group),
             ),
             other => panic!("gallery missing demo for {other}"),
         }
@@ -8924,7 +9294,6 @@ fn handled_ids() -> &'static [&'static str] {
         "split-button",
         "toggle-button",
         "checkbox",
-        "checkbox-indeterminate",
         "radio",
         "switch",
         "slider",
@@ -8964,9 +9333,6 @@ fn handled_ids() -> &'static [&'static str] {
         "accordion",
         "expander",
         "pagination",
-        "theme",
-        "colors",
-        "keys",
         "cheatsheet",
         "card",
         "rule",
@@ -9030,7 +9396,7 @@ mod tests {
 
     #[test]
     fn every_page_has_a_job() {
-        for page in icedtea::catalog::pages() {
+        for page in super::gallery_pages() {
             assert!(
                 !super::page_job(page, &icedtea::i18n::Catalog::builtin()).is_empty(),
                 "page {page} needs a job sentence"
@@ -9367,7 +9733,7 @@ mod tests {
 
     #[test]
     fn tour_log_and_grid_are_distinct_beats() {
-        let pages = icedtea::catalog::pages();
+        let pages = super::gallery_pages();
         let log_i = pages.iter().position(|p| *p == "log").unwrap();
         assert!(log_i < super::theme_page_index());
         let log = (0..super::tour_len())
@@ -9393,7 +9759,7 @@ mod tests {
 
     #[test]
     fn tour_visits_catalog_pages() {
-        let pages = icedtea::catalog::pages();
+        let pages = super::gallery_pages();
         assert_eq!(
             super::tour_len(),
             pages.len() + 1 + super::extra_beat_count()
@@ -9451,6 +9817,21 @@ mod tests {
             );
         }
         assert_eq!(handled.len(), icedtea::catalog::ENTRIES.len());
+    }
+
+    #[test]
+    fn extra_gallery_pages_build() {
+        let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
+        for page in ["theme", "colors", "keys"] {
+            g.page = page;
+            let _ = g.view();
+        }
+        assert!(super::gallery_pages().contains(&"theme"));
+        assert!(super::gallery_pages().contains(&"colors"));
+        assert!(super::gallery_pages().contains(&"keys"));
+        assert!(icedtea::catalog::get("theme").is_none());
+        assert!(icedtea::catalog::get("colors").is_none());
+        assert!(icedtea::catalog::get("keys").is_none());
     }
 
     #[test]
@@ -10232,7 +10613,6 @@ mod tests {
         assert!(src.contains("widget::value_field("));
         assert!(src.contains("widget::highlighted_code("));
         assert!(src.contains("widget::markdown_view("));
-        assert!(src.contains("widget::code_block("));
         let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
         for page in ["selectable", "value-field", "code", "markdown", "type"] {
             g.page = page;
@@ -10609,7 +10989,7 @@ mod tests {
         assert!(group.contains("Length::Fill"));
         let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
         let _ = g.update(super::Message::Language("اردو".into()));
-        for page in icedtea::catalog::pages() {
+        for page in super::gallery_pages() {
             let label = super::page_label(page, &g.catalog);
             assert!(!label.is_empty(), "ur nav label empty for {page}");
             assert_ne!(label, page, "ur nav label missing fill for {page}");
@@ -10620,7 +11000,7 @@ mod tests {
             );
         }
         let _ = g.update(super::Message::Language("עברית".into()));
-        for page in icedtea::catalog::pages() {
+        for page in super::gallery_pages() {
             let label = super::page_label(page, &g.catalog);
             assert!(!label.is_empty(), "he nav label empty for {page}");
             assert_ne!(label, page, "he nav label missing fill for {page}");

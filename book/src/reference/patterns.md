@@ -21,10 +21,10 @@ Constructor: [`pattern::dialog_sheet`](https://docs.rs/icedtea/latest/icedtea/pa
 [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Primary and optional cancel, plus extra actions and an optional header
-icon. Escape sends Cancel when that button is set. Native file
-dialogs go through `icedtea::native_dialog`. In-window modals sit on
-`pattern::modal_card` with a 0–1 `progress` for enter/exit.
+Pass `A11y`. Primary accept is required. `DialogOpts` holds cancel,
+extra actions, header icon, and a dim backdrop with 0–1 `progress`.
+Escape sends Cancel when that button is set. Native file dialogs go
+through `icedtea::native_dialog` (an iced `Task`).
 
 ### List/detail
 
@@ -35,8 +35,8 @@ Constructor: [`pattern::list_detail`](https://docs.rs/icedtea/latest/icedtea/pat
 [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-`sidebar` is `layout::fixed` or `layout::FILL`. Children fill their
-panes. Pass `Direction` so the list sits on the start side.
+Pass `A11y`. `sidebar` is `layout::fixed` or `layout::FILL`. Children
+fill their panes. Pass `Direction` so the list sits on the start side.
 
 ### Inspector
 
@@ -47,7 +47,7 @@ Constructor: [`pattern::inspector`](https://docs.rs/icedtea/latest/icedtea/patte
 [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Three panes. The application owns selection in the list.
+Pass `A11y`. Three panes. The application owns selection in the list.
 
 ### Drawer
 
@@ -58,9 +58,9 @@ Constructor: [`pattern::drawer`](https://docs.rs/icedtea/latest/icedtea/pattern/
 [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-`open` is the committed pane. `progress` is 0 (gone) to 1 (220 dp).
-Closed at 0 paints content only.
-Escape closes an open drawer when `on_close` is set.
+Pass `A11y`. `open` is the committed pane. `progress` is 0 (gone) to
+1 (220 dp). Closed at 0 paints content only. Escape closes an open
+drawer when `on_close` is set.
 
 ### Workspace
 
@@ -118,7 +118,7 @@ Constructor: [`pattern::navigation_view`](https://docs.rs/icedtea/latest/icedtea
 [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-`NavStack` is push / pop / replace. Pass window width.
+Pass `A11y`. `NavStack` is push / pop / replace. Pass window width.
 `Breakpoint::from_width` picks beside vs stacked. See
 [Navigation](../navigation.md).
 
@@ -131,8 +131,8 @@ Constructor: [`pattern::tab_view`](https://docs.rs/icedtea/latest/icedtea/patter
 [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Select and close messages. The application paints the body for the
-active tab.
+Pass `A11y`. Select and close messages. The application paints the
+body for the active tab.
 
 ### Preferences
 
@@ -143,8 +143,8 @@ Constructor: [`pattern::preferences_page`](https://docs.rs/icedtea/latest/icedte
 [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-`PrefGroup` is a title plus key/value rows. Empty query shows every
-group.
+Pass `A11y`. `PrefGroup` is a title plus key/value rows. Empty query
+shows every group.
 
 ### About
 
@@ -155,9 +155,9 @@ Constructor: [`pattern::about_page`](https://docs.rs/icedtea/latest/icedtea/patt
 [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Strings are the application's. Catalog supplies chrome labels
-(`Catalog::for_locale`: English, Vietnamese, Japanese, Chinese,
-Arabic, Urdu).
+Pass `A11y`. Strings are the application's. Catalog supplies chrome
+labels (`Catalog::for_locale`: English, Vietnamese, Japanese,
+Chinese, Arabic, Urdu).
 
 ### Status page
 
@@ -168,7 +168,8 @@ Constructor: [`pattern::status_page`](https://docs.rs/icedtea/latest/icedtea/pat
 [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Title, body, and an optional action. Use when a list has no rows.
+Pass `A11y`. Title, body, and an optional action. Use when a list
+has no rows.
 
 ### Command palette
 
@@ -179,8 +180,8 @@ Constructor: [`pattern::command_palette_view`](https://docs.rs/icedtea/latest/ic
 [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-`CommandPalette` owns the query and hits. Empty query shows
-favorites, then recent. Pass [`PaletteOpts`](https://docs.rs/icedtea/latest/icedtea/palette/struct.PaletteOpts.html)
+Pass `A11y`. `CommandPalette` owns the query and hits. Empty query
+shows favorites, then recent. Pass [`PaletteOpts`](https://docs.rs/icedtea/latest/icedtea/palette/struct.PaletteOpts.html)
 for group headings, row face, empty omit, size, and highlight.
 A nested page or `ask` keeps the query field. `progress` fades and
 slides the panel. See [Overlay windows](../overlay-windows.md).
@@ -194,7 +195,7 @@ Constructor: [`pattern::main_window`](https://docs.rs/icedtea/latest/icedtea/pat
 [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Pass the four regions as `Element`s. [First window](../first-window.md)
+Pass `A11y`. Pass the four regions as `Element`s. [First window](../first-window.md)
 is the smaller form: toolbar plus one control.
 
 ### Side sheet
@@ -207,6 +208,6 @@ Constructor: [`pattern::side_sheet`](https://docs.rs/icedtea/latest/icedtea/patt
 [icedtea](https://crates.io/crates/icedtea) ·
 [iced](https://crates.io/crates/iced)
 
-`end` docks the trailing edge. Optional dismiss closes the sheet.
-`progress` fades the scrim and slides the pane.
+Pass `A11y`. `end` docks the trailing edge. Optional dismiss closes
+the sheet. `progress` fades the scrim and slides the pane.
 

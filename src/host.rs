@@ -6,8 +6,25 @@ use iced::Task;
 
 use crate::dialog::{DialogKind, DialogResult, DialogSpec};
 
-/// Native file/folder dialog via `rfd`. Message/confirm/color/font stay in-app.
-pub fn native_dialog(spec: &DialogSpec) -> DialogResult {
+/// Native file/folder dialog via `rfd`. Message/confirm/color/font stay in-app
+/// and yield [`DialogResult::Cancel`] without opening a picker.
+///
+/// ```
+/// use icedtea::dialog::{DialogResult, DialogSpec};
+/// let mut got = None;
+/// let _task = icedtea::native_dialog(DialogSpec::message("x"), |r| {
+///     got = Some(r);
+/// });
+/// assert_eq!(got, Some(DialogResult::Cancel));
+/// ```
+pub fn native_dialog<M: Send + 'static>(
+    spec: DialogSpec,
+    to_msg: impl FnOnce(DialogResult) -> M,
+) -> Task<M> {
+    Task::done(to_msg(dialog_result(&spec)))
+}
+
+fn dialog_result(spec: &DialogSpec) -> DialogResult {
     if !spec.is_native_file() {
         return DialogResult::Cancel;
     }
@@ -46,4 +63,18 @@ pub fn paste_text<M: Send + 'static>(
     to_msg: impl Fn(Option<String>) -> M + Send + 'static,
 ) -> Task<M> {
     iced::clipboard::read().map(to_msg)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn native_dialog_cancels_a_message_spec_without_a_picker() {
+        let mut got = None;
+        let _task = native_dialog(DialogSpec::message("x"), |r| {
+            got = Some(r);
+        });
+        assert_eq!(got, Some(DialogResult::Cancel));
+    }
 }

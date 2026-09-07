@@ -10,7 +10,7 @@
 //! | Surface | Constructor | Who owns text | Range copy | Select all |
 //! | --- | --- | --- | --- | --- |
 //! | Body / path | [`crate::widget::selectable`], [`crate::widget::value_field`] | App `text_editor::Content` / [`crate::field::Selectables`] | `Content::selection()` → [`crate::copy_text`] | `Action::SelectAll` / [`crate::field::Selectables::perform`] |
-//! | Code | [`crate::widget::highlighted_code`], [`crate::widget::code_block`] | App `Content` | same | `Action::SelectAll` |
+//! | Code | [`crate::widget::highlighted_code`] | App `Content` | same | `Action::SelectAll` |
 //! | Markdown | [`crate::widget::markdown_view`] | Structured paint (per block) | [`MarkdownSpan`] → [`crate::copy_text`] | [`markdown_select_all`] |
 //!
 //! Chrome (menus, buttons, status meta) is not drag-selectable.

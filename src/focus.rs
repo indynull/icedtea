@@ -196,7 +196,7 @@ fn ring_bounds(bounds: iced::Rectangle, width: f32) -> iced::Rectangle {
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let body = widget::label("rows", tok, A11y::new("rows", Role::List));
+/// let body = widget::label("rows", widget::LabelFace::Body, tok, A11y::new("rows", Role::List));
 /// let _: icedtea::Element<'_, ()> = icedtea::focus::target(body, tok, true);
 /// ```
 pub fn target<'a, M: Clone + 'a>(
@@ -288,7 +288,7 @@ pub fn target_keys_open<'a, M: Clone + 'a>(
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let body = widget::label("rows", tok, A11y::new("rows", Role::List));
+/// let body = widget::label("rows", widget::LabelFace::Body, tok, A11y::new("rows", Role::List));
 /// let _: icedtea::Element<'_, ()> = icedtea::focus::group(body, tok, true);
 /// ```
 pub fn group<'a, M: Clone + 'a>(
@@ -362,7 +362,7 @@ pub fn group_keys_open<'a, M: Clone + 'a>(
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let body = widget::label("hits", tok, A11y::new("hits", Role::List));
+/// let body = widget::label("hits", widget::LabelFace::Body, tok, A11y::new("hits", Role::List));
 /// let _: icedtea::Element<'_, ()> =
 ///     icedtea::focus::intercept_keys(body, tok, true, |_| None);
 /// ```
@@ -1373,10 +1373,10 @@ mod tests {
                 face.x, row.x
             ),
         );
-        let mut box_el: iced::Element<'_, bool> = crate::widget::checkbox(
+        let mut box_el: iced::Element<'_, crate::widget::CheckState> = crate::widget::checkbox(
             "Accept",
-            false,
-            |v| v,
+            crate::widget::CheckState::Unchecked,
+            |s| s,
             tok,
             crate::a11y::A11y::new("Accept", crate::a11y::Role::Checkbox),
         );
@@ -1473,6 +1473,7 @@ mod tests {
         assert!(pump_click(&mut start, true));
         let body = crate::widget::label(
             "go",
+            crate::widget::LabelFace::Body,
             tok,
             crate::a11y::A11y::new("go", crate::a11y::Role::Button),
         );
@@ -1532,6 +1533,7 @@ mod tests {
         let tok = crate::theme::named("dark").tokens;
         let body = crate::widget::label(
             "rows",
+            crate::widget::LabelFace::Body,
             tok,
             crate::a11y::A11y::new("rows", crate::a11y::Role::List),
         );
@@ -1587,6 +1589,7 @@ mod tests {
         let tok = crate::theme::named("dark").tokens;
         let body = crate::widget::label(
             "rows",
+            crate::widget::LabelFace::Body,
             tok,
             crate::a11y::A11y::new("rows", crate::a11y::Role::List),
         );
@@ -1599,6 +1602,7 @@ mod tests {
         let a = target(
             crate::widget::label(
                 "a",
+                crate::widget::LabelFace::Body,
                 tok,
                 crate::a11y::A11y::new("a", crate::a11y::Role::List),
             ),
@@ -1608,6 +1612,7 @@ mod tests {
         let b = target(
             crate::widget::label(
                 "b",
+                crate::widget::LabelFace::Body,
                 tok,
                 crate::a11y::A11y::new("b", crate::a11y::Role::List),
             ),
@@ -1727,6 +1732,7 @@ mod tests {
         let tok = crate::theme::named("dark").tokens;
         let empty = crate::widget::label(
             "x",
+            crate::widget::LabelFace::Body,
             tok,
             crate::a11y::A11y::new("x", crate::a11y::Role::Status),
         );
@@ -1775,6 +1781,7 @@ mod tests {
         let mut esc = crate::focus::dismiss_on_escape(
             crate::widget::label(
                 "x",
+                crate::widget::LabelFace::Body,
                 tok,
                 crate::a11y::A11y::new("x", crate::a11y::Role::Status),
             ),
@@ -1923,6 +1930,7 @@ mod tests {
         let tok = crate::theme::named("dark").tokens;
         let body = crate::widget::label(
             "hits",
+            crate::widget::LabelFace::Body,
             tok,
             crate::a11y::A11y::new("hits", crate::a11y::Role::List),
         );

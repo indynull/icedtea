@@ -64,7 +64,7 @@ pub const MAP: &[MapRow] = &[
     MapRow {
         id: "checkbox-indeterminate",
         m3: "Checkbox (indeterminate)",
-        fate: Fate::Map,
+        fate: Fate::Delete,
     },
     MapRow {
         id: "radio",
@@ -274,17 +274,17 @@ pub const MAP: &[MapRow] = &[
     MapRow {
         id: "theme",
         m3: "Color system",
-        fate: Fate::Map,
+        fate: Fate::Delete,
     },
     MapRow {
         id: "colors",
         m3: "Color system",
-        fate: Fate::Map,
+        fate: Fate::Delete,
     },
     MapRow {
         id: "keys",
         m3: "App bars (shortcuts)",
-        fate: Fate::Desktop,
+        fate: Fate::Delete,
     },
     MapRow {
         id: "cheatsheet",

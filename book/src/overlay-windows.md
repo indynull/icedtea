@@ -29,7 +29,7 @@ application window at `Level::Normal` (Dock / task switcher). Size and
 position stay. The application chooses when to summon, hide, or pop
 out.
 
-In-window modals use `pattern::modal_card` on a dim backdrop. Native
+In-window modals use `pattern::dialog_sheet` with `DialogOpts` on a dim backdrop. Native
 file dialogs go through `icedtea::native_dialog`; message, confirm,
 color, and font stay in-app (`dialog::InAppDialog`).
 

@@ -439,7 +439,7 @@ pub fn progress_run(phase: f32, reduced: bool) -> (f32, f32, f32) {
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let paint = tok.fade(1.0);
-/// let body = widget::label("Sheet", paint, A11y::new("Sheet", Role::Status));
+/// let body = widget::label("Sheet", widget::LabelFace::Body, paint, A11y::new("Sheet", Role::Status));
 /// let _: icedtea::Element<'_, ()> = motion::overlay(
 ///     body,
 ///     1.0,
@@ -479,7 +479,7 @@ pub fn overlay<'a, M: 'a>(
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let body = widget::label("more", tok, A11y::new("more", Role::Status));
+/// let body = widget::label("more", widget::LabelFace::Body, tok, A11y::new("more", Role::Status));
 /// let _: icedtea::Element<'_, ()> = motion::expand(
 ///     body,
 ///     1.0,
@@ -527,8 +527,8 @@ pub fn expand<'a, M: 'a>(
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let leaving = widget::label("one", tok, A11y::new("one", Role::Status));
-/// let incoming = widget::label("two", tok, A11y::new("two", Role::Status));
+/// let leaving = widget::label("one", widget::LabelFace::Body, tok, A11y::new("one", Role::Status));
+/// let incoming = widget::label("two", widget::LabelFace::Body, tok, A11y::new("two", Role::Status));
 /// let _: icedtea::Element<'_, ()> = motion::switch(
 ///     leaving,
 ///     incoming,
@@ -571,7 +571,7 @@ pub fn switch<'a, M: 'a>(
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let field = widget::label("Name", tok, A11y::new("Name", Role::Status));
+/// let field = widget::label("Name", widget::LabelFace::Body, tok, A11y::new("Name", Role::Status));
 /// let _: icedtea::Element<'_, ()> = motion::attention(
 ///     field,
 ///     0.0,
@@ -1466,11 +1466,21 @@ mod tests {
     #[test]
     fn overlay_and_expand_constructors_build() {
         let tok = named("dark").tokens;
-        let body = widget::label("Sheet", tok, A11y::new("Sheet", Role::Status));
+        let body = widget::label(
+            "Sheet",
+            widget::LabelFace::Body,
+            tok,
+            A11y::new("Sheet", Role::Status),
+        );
         let _: Element<'_, ()> =
             overlay(body, 0.5, Slide::Up, tok, A11y::new("motion", Role::Group));
         let reduced = tok.with_reduced_motion(true);
-        let body = widget::label("more", reduced, A11y::new("more", Role::Status));
+        let body = widget::label(
+            "more",
+            widget::LabelFace::Body,
+            reduced,
+            A11y::new("more", Role::Status),
+        );
         let _: Element<'_, ()> = expand(
             body,
             0.3,
@@ -1597,7 +1607,14 @@ mod tests {
         let vp = iced::Rectangle::new(iced::Point::ORIGIN, iced::Size::new(320.0, 240.0));
         let miss =
             iced::Rectangle::new(iced::Point::new(800.0, 800.0), iced::Size::new(10.0, 10.0));
-        let body = || widget::label("Sheet", tok, A11y::new("Sheet", Role::Status));
+        let body = || {
+            widget::label(
+                "Sheet",
+                widget::LabelFace::Body,
+                tok,
+                A11y::new("Sheet", Role::Status),
+            )
+        };
         for slide in [
             Slide::None,
             Slide::Up,
@@ -2036,8 +2053,22 @@ mod tests {
     #[test]
     fn switch_and_attention_constructors_build() {
         let tok = named("dark").tokens;
-        let a = || widget::label("one", tok, A11y::new("one", Role::Status));
-        let b = || widget::label("two", tok, A11y::new("two", Role::Status));
+        let a = || {
+            widget::label(
+                "one",
+                widget::LabelFace::Body,
+                tok,
+                A11y::new("one", Role::Status),
+            )
+        };
+        let b = || {
+            widget::label(
+                "two",
+                widget::LabelFace::Body,
+                tok,
+                A11y::new("two", Role::Status),
+            )
+        };
         let vp = iced::Rectangle::new(iced::Point::ORIGIN, iced::Size::new(320.0, 240.0));
         for face in [
             SwitchFace::FadeThrough,
@@ -2078,7 +2109,12 @@ mod tests {
         use iced::{Font, Pixels, Point, Size, Theme};
 
         let tok = named("dark").tokens;
-        let body = widget::label("more", tok, A11y::new("more", Role::Status));
+        let body = widget::label(
+            "more",
+            widget::LabelFace::Body,
+            tok,
+            A11y::new("more", Role::Status),
+        );
         let mut layer = ExpandLayer {
             content: body,
             progress: 1.0,

@@ -9,10 +9,9 @@ and fills unset fields from its arguments (slider value, field error,
 expander open, toast copy).
 
 Chrome rows (`toolbar`, `menu_bar`, `status_bar`, `command_bar`) take
-the action table; the buttons they paint already carry `A11y`. Window
-recipes (`dialog_sheet`, `list_detail`, `main_window`) take children
-and tokens. Layout recipes such as `layout::pack` and `layout::wrap`
-do not take `A11y`.
+the action table; the buttons they paint already carry `A11y`.
+`dialog_sheet` takes caller `A11y`. Layout recipes such as
+`layout::pack` and `layout::wrap` do not take `A11y`.
 
 Empty caption uses the accessible name. A visible caption is left
 alone; decorative chrome may pass an empty name. `disabled` drops

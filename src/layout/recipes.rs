@@ -201,7 +201,7 @@ pub fn overlay_center<'a, M: 'a>(backdrop: Element<'a, M>, card: Element<'a, M>)
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let cell = widget::label("7", tok, A11y::new("7", Role::Header));
+/// let cell = widget::label("7", widget::LabelFace::Body, tok, A11y::new("7", Role::Header));
 /// let _: icedtea::Element<'_, ()> = layout::pad(vec![cell], 1, 8);
 /// ```
 pub fn pad<'a, M: 'a>(cells: Vec<Element<'a, M>>, columns: usize, spacing: u32) -> Element<'a, M> {
@@ -304,8 +304,8 @@ pub fn stack_child<'a, M: 'a>(children: Vec<Element<'a, M>>, active: usize) -> E
 /// }
 /// let on_sash = Msg::Sash;
 /// let _: icedtea::Element<'_, Msg> = layout::split_view(
-///     widget::label("nav", tok, A11y::new("nav", Role::Status)),
-///     widget::label("body", tok, A11y::new("body", Role::Status)),
+///     widget::label("nav", widget::LabelFace::Body, tok, A11y::new("nav", Role::Status)),
+///     widget::label("body", widget::LabelFace::Body, tok, A11y::new("body", Role::Status)),
 ///     SplitState::new(Axis::Horizontal, 0.3),
 ///     400.0,
 ///     on_sash,

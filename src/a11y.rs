@@ -605,7 +605,8 @@ mod tests {
         );
         let box_rec = A11y::new("Accept", Role::Checkbox).with_checked(true);
         assert!(box_rec.apply_checked(false));
-        let _: Element<'_, bool> = widget::checkbox("Accept", false, |on| on, tok, box_rec);
+        let _: Element<'_, widget::CheckState> =
+            widget::checkbox("Accept", widget::CheckState::Unchecked, |s| s, tok, box_rec);
         let field = A11y::new("Email", Role::Group)
             .merge_error(Some("Enter a valid address."))
             .merge_hint("We never share your email.");

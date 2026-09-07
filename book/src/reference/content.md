@@ -30,14 +30,15 @@ drag-selectable. Drag across headings, paragraphs, and lists uses
 
 ### Label
 
-**`label`** — A line of body text.
+**`label`** — A line of type.
 
 Constructor: [`widget::label`](https://docs.rs/icedtea/latest/icedtea/widget/fn.label.html)
 
 [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Platform sans. Empty string is an empty node; still pass `A11y`.
+`LabelFace` picks Body, Meta, Display, or Figure. Platform sans.
+Empty string is an empty node; still pass `A11y`.
 
 
 ### Icon
@@ -127,7 +128,7 @@ Pass `A11y`.
 
 ### Code
 
-**`code`** — Highlighted source.
+**`code`** — Source panel. `syntax` is an iced highlighter token; `None` is plain monospace.
 
 Constructor: [`widget::highlighted_code`](https://docs.rs/icedtea/latest/icedtea/widget/fn.highlighted_code.html)
 

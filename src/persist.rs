@@ -147,12 +147,29 @@ impl UiState {
         .join("ui.json")
     }
 
-    pub fn load_file(path: &Path) -> Result<Self, PersistError> {
+    /// Read `path` and map the result into an application message.
+    pub fn load_file<M: Send + 'static>(
+        path: impl AsRef<Path>,
+        to_msg: impl FnOnce(Result<Self, PersistError>) -> M,
+    ) -> iced::Task<M> {
+        iced::Task::done(to_msg(Self::read_path(path.as_ref())))
+    }
+
+    /// Write this blob to `path` and map the result into an application message.
+    pub fn save_file<M: Send + 'static>(
+        &self,
+        path: impl AsRef<Path>,
+        to_msg: impl FnOnce(Result<(), PersistError>) -> M,
+    ) -> iced::Task<M> {
+        iced::Task::done(to_msg(self.write_path(path.as_ref())))
+    }
+
+    fn read_path(path: &Path) -> Result<Self, PersistError> {
         let text = std::fs::read_to_string(path)?;
         Ok(Self::from_json(&text)?)
     }
 
-    pub fn save_file(&self, path: &Path) -> Result<(), PersistError> {
+    fn write_path(&self, path: &Path) -> Result<(), PersistError> {
         if let Some(dir) = parent_dir(path) {
             std::fs::create_dir_all(dir)?;
         }
@@ -228,8 +245,16 @@ mod tests {
         assert!(p.ends_with("ui.json"));
         let dir = std::env::temp_dir().join("icedtea-persist-test");
         let file = dir.join("ui.json");
-        ui.save_file(&file).unwrap();
-        let loaded = UiState::load_file(&file).unwrap();
+        let mut save = None;
+        let _ = ui.save_file(&file, |r| {
+            save = Some(r);
+        });
+        save.unwrap().unwrap();
+        let mut loaded = None;
+        let _ = UiState::load_file(&file, |r| {
+            loaded = Some(r);
+        });
+        let loaded = loaded.unwrap().unwrap();
         assert_eq!(loaded.theme, "light");
         assert_eq!(loaded.family.as_deref(), Some("github"));
         assert!(loaded.follow_os);
@@ -249,17 +274,37 @@ mod tests {
         assert!(named_only.workspace.is_none());
         assert!((back.font_scale - 1.125).abs() < f32::EPSILON);
         assert_eq!(back.accent.as_deref(), Some("#88c0d0"));
-        assert!(UiState::load_file(Path::new("/no/such/icedtea.json")).is_err());
+        let mut missing = None;
+        let _ = UiState::load_file(Path::new("/no/such/icedtea.json"), |r| {
+            missing = Some(r);
+        });
+        assert!(missing.unwrap().is_err());
         let blocker = std::env::temp_dir().join("icedtea-persist-not-a-dir");
         std::fs::write(&blocker, b"x").unwrap();
-        assert!(ui.save_file(&blocker.join("ui.json")).is_err());
+        let mut blocked = None;
+        let _ = ui.save_file(blocker.join("ui.json"), |r| {
+            blocked = Some(r);
+        });
+        assert!(blocked.unwrap().is_err());
         let _ = std::fs::remove_file(&blocker);
         let rel = std::env::temp_dir().join("icedtea-rel-only.json");
-        ui.save_file(&rel).unwrap();
+        let mut rel_save = None;
+        let _ = ui.save_file(&rel, |r| {
+            rel_save = Some(r);
+        });
+        rel_save.unwrap().unwrap();
         let _ = std::fs::remove_file(&rel);
         let cwd_file = Path::new("icedtea-persist-cwd.json");
-        ui.save_file(cwd_file).unwrap();
-        let loaded_cwd = UiState::load_file(cwd_file).unwrap();
+        let mut cwd_save = None;
+        let _ = ui.save_file(cwd_file, |r| {
+            cwd_save = Some(r);
+        });
+        cwd_save.unwrap().unwrap();
+        let mut loaded_cwd = None;
+        let _ = UiState::load_file(cwd_file, |r| {
+            loaded_cwd = Some(r);
+        });
+        let loaded_cwd = loaded_cwd.unwrap().unwrap();
         assert_eq!(loaded_cwd.theme, "light");
         let _ = std::fs::remove_file(cwd_file);
         assert!(parent_dir(Path::new("ui.json")).is_none());

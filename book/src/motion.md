@@ -42,7 +42,7 @@ Build overlay and switch children with
 [`Tokens::fade`](https://docs.rs/icedtea/latest/icedtea/theme/struct.Tokens.html#method.fade).
 For switch, use `SwitchFace::incoming_fade` / `outgoing_fade`.
 
-`modal_card`, `side_sheet`, `command_palette_view`, `context_menu`,
+`dialog_sheet`, `side_sheet`, `command_palette_view`, `context_menu`,
 `cascade_menu`, `drawer`, `expander`, `accordion_view`, and `tree_view`
 take that same 0–1 progress (`tree_view` as `animating: Option<(id, progress)>`).
 

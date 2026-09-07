@@ -1080,10 +1080,7 @@ def ltr_island_hits(root: Path) -> list[str]:
     """Code constructors must stay left-to-right (Firefox LTR islands)."""
     hits: list[str] = []
     src = _production_src(root / "src" / "widget.rs")
-    for fn, nxt in (
-        ("pub fn code_block", "pub fn hyperlink"),
-        ("pub fn highlighted_code", "fn editor_frame"),
-    ):
+    for fn, nxt in (("pub fn highlighted_code", "fn editor_frame"),):
         if fn not in src or nxt not in src:
             hits.append(f"missing {fn}")
             continue

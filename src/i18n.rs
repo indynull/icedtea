@@ -537,7 +537,8 @@ mod tests {
         let mut table = crate::action::ActionTable::new();
         table.insert(crate::action::Action::new("file.save", ja.t("save"), ()));
         let tok = crate::theme::named("dark").tokens;
-        let _: crate::Element<'_, ()> = crate::pattern::menu_bar(&table, tok, loc.direction, &ja);
+        let _: crate::Element<'_, ()> =
+            crate::pattern::menu_bar(&table, tok, loc.direction, &ja, |_| ());
         let _: crate::Element<'_, ()> = crate::pattern::toolbar(table.iter(), tok, Direction::Ltr);
         let _: crate::Element<'_, ()> =
             crate::pattern::status_bar("ok", None, None, &table, tok, Direction::Ltr);
@@ -567,7 +568,8 @@ mod tests {
         let mut table = crate::action::ActionTable::new();
         table.insert(crate::action::Action::new("file.save", ar.t("save"), ()));
         let tok = crate::theme::named("dark").tokens;
-        let _: crate::Element<'_, ()> = crate::pattern::menu_bar(&table, tok, loc.direction, &ar);
+        let _: crate::Element<'_, ()> =
+            crate::pattern::menu_bar(&table, tok, loc.direction, &ar, |_| ());
         let _: crate::Element<'_, ()> = crate::pattern::toolbar(table.iter(), tok, loc.direction);
         let _: crate::Element<'_, ()> =
             crate::pattern::status_bar("ok", None, None, &table, tok, loc.direction);

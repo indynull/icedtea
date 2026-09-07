@@ -121,8 +121,9 @@ impl Tasks {
         let tok = theme::named("dark").tokens;
         let mut list = icedtea::iced::widget::column![].spacing(8);
         if self.rows.is_empty() {
-            list = list.push(widget::meta(
+            list = list.push(widget::label(
                 "No tasks yet. Type one and press Add.",
+                widget::LabelFace::Meta,
                 tok,
                 A11y::new("empty", Role::Status),
             ));
@@ -131,8 +132,8 @@ impl Tasks {
                 let id = row.id;
                 list = list.push(widget::checkbox(
                     row.title.clone(),
-                    row.done,
-                    move |done| Message::Toggle(id, done),
+                    widget::CheckState::from(row.done),
+                    move |s| Message::Toggle(id, matches!(s, widget::CheckState::Checked)),
                     tok,
                     A11y::new(row.title.clone(), Role::Checkbox).with_checked(row.done),
                 ));

@@ -43,7 +43,6 @@ pub const ENTRIES: &[Entry] = &[
     Entry { id: "switch", title: "Switch", group: "Controls", page: "controls" },
     Entry { id: "range-slider", title: "Range slider", group: "Controls", page: "controls" },
     Entry { id: "icon-button", title: "Icon button", group: "Controls", page: "controls" },
-    Entry { id: "checkbox-indeterminate", title: "Indeterminate checkbox", group: "Controls", page: "controls" },
     Entry { id: "split-button", title: "Split button", group: "Controls", page: "controls" },
     Entry { id: "toggle-button", title: "Toggle button", group: "Controls", page: "controls" },
     // Search first so Enter submit status is on the first screenful.
@@ -87,9 +86,6 @@ pub const ENTRIES: &[Entry] = &[
     Entry { id: "accordion", title: "Accordion", group: "Collections", page: "sections" },
     Entry { id: "expander", title: "Expander", group: "Collections", page: "sections" },
     Entry { id: "tabs", title: "Tabs", group: "Collections", page: "sections" },
-    Entry { id: "theme", title: "Theme", group: "Chrome", page: "theme" },
-    Entry { id: "colors", title: "Colors", group: "Chrome", page: "colors" },
-    Entry { id: "keys", title: "Keys", group: "Chrome", page: "keys" },
     Entry { id: "cheatsheet", title: "Cheatsheet", group: "Chrome", page: "keys" },
     // Pack then wrap so idle QA shows hug/share and measuring reflow first.
     Entry { id: "pack", title: "Pack", group: "Chrome", page: "layout" },
@@ -177,6 +173,9 @@ pub fn page_title(page: &str) -> &'static str {
         "workspace" => "Workspace",
         "motion" => "Motion",
         "expand-motion" => "Expand motion",
+        "keys" => "Keys",
+        "theme" => "Theme",
+        "colors" => "Colors",
         id => get(id).map(|e| e.title).unwrap_or("Page"),
     }
 }
@@ -199,7 +198,7 @@ pub fn constructor(id: &str) -> Option<(&'static str, &'static str)> {
         "split-button" => ("widget", "split_button"),
         "toggle-button" => ("widget", "toggle_button"),
         "checkbox" => ("widget", "checkbox"),
-        "checkbox-indeterminate" => ("widget", "checkbox_indeterminate"),
+
         "radio" => ("widget", "radio"),
         "switch" => ("widget", "switch"),
         "slider" => ("widget", "slider"),
@@ -240,9 +239,6 @@ pub fn constructor(id: &str) -> Option<(&'static str, &'static str)> {
         "accordion" => ("widget", "accordion_view"),
         "expander" => ("widget", "expander"),
         "pagination" => ("widget", "pagination"),
-        "theme" => ("theme", "named"),
-        "colors" => ("theme", "mix"),
-        "keys" => ("key", "handle"),
         "cheatsheet" => ("pattern", "cheatsheet"),
         "card" => ("widget", "group_box"),
         "rule" => ("widget", "rule_h"),
@@ -322,7 +318,7 @@ mod tests {
         );
         assert!(ENTRIES.len() >= 40);
         assert_eq!(get("table").unwrap().group, "Collections");
-        assert_eq!(get("theme").unwrap().group, "Chrome");
+        assert_eq!(get("cheatsheet").unwrap().group, "Chrome");
         assert_eq!(get("time").unwrap().group, "Fields");
         assert_eq!(get("button").unwrap().page, "controls");
         assert_eq!(get("checkbox").unwrap().page, "controls");
@@ -344,8 +340,7 @@ mod tests {
             "command-bar",
             "context-menu",
             "scrollbar",
-            "colors",
-            "keys",
+            "cheatsheet",
             "button",
             "list",
         ] {
@@ -353,6 +348,7 @@ mod tests {
         }
         for id in crate::m3::mapping::deleted_ids() {
             assert!(get(id).is_none());
+            assert!(constructor(id).is_none());
         }
         for name in [
             "install.md",
@@ -655,8 +651,6 @@ mod tests {
     fn every_catalog_id_has_one_shipped_constructor() {
         let widget = include_str!("widget.rs");
         let pattern = include_str!("pattern.rs");
-        let theme = include_str!("theme.rs");
-        let key = include_str!("key.rs");
         let layout = include_str!("layout/flow.rs");
         let motion = include_str!("motion.rs");
         let map = [
@@ -668,7 +662,6 @@ mod tests {
             ("split-button", "split_button", widget),
             ("toggle-button", "toggle_button", widget),
             ("checkbox", "checkbox", widget),
-            ("checkbox-indeterminate", "checkbox_indeterminate", widget),
             ("radio", "radio", widget),
             ("switch", "switch", widget),
             ("slider", "slider", widget),
@@ -709,9 +702,6 @@ mod tests {
             ("accordion", "accordion_view", widget),
             ("expander", "expander", widget),
             ("pagination", "pagination", widget),
-            ("theme", "named", theme),
-            ("colors", "mix", theme),
-            ("keys", "handle", key),
             ("cheatsheet", "cheatsheet", pattern),
             ("card", "group_box", widget),
             ("rule", "rule_h", widget),
@@ -884,7 +874,7 @@ mod tests {
             "toolbar",
             "A11y"
         ));
-        assert!(!fn_params_mention(
+        assert!(fn_params_mention(
             include_str!("pattern.rs"),
             "dialog_sheet",
             "A11y"

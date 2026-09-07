@@ -12,12 +12,10 @@ Widget constructors on this page take `A11y`. Menu, toolbar, status,
 command bar, and cheatsheet take the action table. `layout::pack` and
 `layout::wrap` do not. iced 0.14 publishes the widget id only.
 
-### Theme
+### Colorways
 
-**`theme`** — Look up a built-in colorway by name.
-
-Constructor: [`theme::named`](https://docs.rs/icedtea/latest/icedtea/theme/fn.named.html)
-
+[`theme::named`](https://docs.rs/icedtea/latest/icedtea/theme/fn.named.html)
+looks up a built-in colorway.
 [source](https://github.com/indynull/icedtea/blob/main/src/theme.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
@@ -28,24 +26,20 @@ Persist defaults follow-OS on that pair. Register more on
 `with_elevation`) and restore from `UiState::look`. See
 [Theming](../theming.md).
 
-### Colors
+### Washes
 
-**`colors`** — Blend two colors for washes.
-
-Constructor: [`theme::mix`](https://docs.rs/icedtea/latest/icedtea/theme/fn.mix.html)
-
+[`theme::mix`](https://docs.rs/icedtea/latest/icedtea/theme/fn.mix.html)
+blends two colors for washes.
 [source](https://github.com/indynull/icedtea/blob/main/src/theme.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
 `amount` 0 is the background, 1 is the foreground. Hover, pressed,
 and selection washes use this.
 
-### Keys
+### Shortcuts
 
-**`keys`** — Resolve a key event against the action table.
-
-Constructor: [`key::handle`](https://docs.rs/icedtea/latest/icedtea/key/fn.handle.html)
-
+[`key::handle`](https://docs.rs/icedtea/latest/icedtea/key/fn.handle.html)
+resolves a key event against the action table.
 [source](https://github.com/indynull/icedtea/blob/main/src/key.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
@@ -66,7 +60,8 @@ Constructor: [`pattern::cheatsheet`](https://docs.rs/icedtea/latest/icedtea/patt
 [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Empty query lists every enabled action. Disabled actions stay out.
+Pass `A11y`. Empty query lists every enabled action. Disabled actions
+stay out.
 
 ### Card
 
@@ -163,6 +158,7 @@ Constructor: [`widget::banner`](https://docs.rs/icedtea/latest/icedtea/widget/fn
 [icedtea](https://crates.io/crates/icedtea)
 
 Use for “offline” or “update available”. Optional button message.
+`tone` paints a callout wash.
 
 Pass `A11y`.
 
@@ -186,9 +182,9 @@ Constructor: [`pattern::context_menu`](https://docs.rs/icedtea/latest/icedtea/pa
 [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Stack on the window with the click point. Click-away and Escape
-dismiss. Rows fill the card. Empty table still paints a card.
-`progress` is 0 (gone) to 1 (rest).
+Pass `A11y`. Stack on the window with the click point. Click-away
+and Escape dismiss. Rows fill the card. Empty table still paints a
+card. `progress` is 0 (gone) to 1 (rest).
 
 ### Breadcrumb
 
@@ -238,7 +234,7 @@ Constructor: [`pattern::status_bar`](https://docs.rs/icedtea/latest/icedtea/patt
 [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs) ·
 [icedtea](https://crates.io/crates/icedtea)
 
-Left is status copy (`meta`, or `info_bar` when a tone is set). Right
+Left is status copy (`label` with `LabelFace::Meta`, or `banner` when a tone is set). Right
 is each enabled shortcut as two faces (chord in `Tokens.text`, title
 in `Tokens.muted` at meta size), or an optional caption string. An
 empty table shows status only. `ActionTable::footer_hints` returns

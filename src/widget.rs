@@ -481,126 +481,96 @@ pub fn icon_svg<'a, M: 'a>(glyph: impl Into<Glyph>, tok: Tokens, a11y: A11y) -> 
     a11y::attach(pic.into(), &a11y)
 }
 
-/// A line of body text.
+/// Type step and layout for [`label`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LabelFace {
+    /// Body copy. Platform sans, on-surface.
+    #[default]
+    Body,
+    /// Muted caption. Shrink-wraps so a chrome row can sit it next to a
+    /// pick. A Fill sibling (`labeled_control`, field) needs the parent
+    /// column to `align_x(align_start)` or this lands on physical left.
+    Meta,
+    /// Muted end-aligned line above a display reading.
+    Display,
+    /// Segmented large figures on the type scale (clocks, meters).
+    Figure,
+}
+
+/// A line of UI text.
 ///
-/// Platform sans. Empty string is an empty node; still pass `A11y`.
+/// [`LabelFace::Body`] is platform sans. Empty string is an empty node;
+/// still pass `A11y`. [`LabelFace::Meta`] shrinks. [`LabelFace::Display`]
+/// is an end-aligned mute line. [`LabelFace::Figure`] splits glyphs.
 ///
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
 /// use icedtea::theme;
-/// use icedtea::widget;
+/// use icedtea::widget::{self, LabelFace};
 /// let tok = theme::named("dark").tokens;
 /// let _: icedtea::Element<'_, ()> =
-///     widget::label("Name", tok, A11y::new("Name", Role::Header));
-/// ```
-pub fn label<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
-    let s = a11y.apply_name(s);
-    a11y::attach(
-        text(s)
-            .size(tok.body())
-            .color(tok.scheme().on_surface)
-            .font(typo::UI)
-            .into(),
-        &a11y,
-    )
-}
-
-/// Muted end-aligned line above a display reading.
-pub fn display_line<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
-    let s = a11y.apply_name(s);
-    a11y::attach(
-        container(
-            text(s)
-                .size(tok.meta())
-                .color(tok.scheme().on_surface_variant)
-                .font(typo::UI),
-        )
-        .width(Length::Fill)
-        .align_x(crate::i18n::align_end(tok.direction))
-        .into(),
-        &a11y,
-    )
-}
-
-/// Segmented large figures on the type scale (clocks, meters).
-pub fn figure_display<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
-    let s = a11y.apply_name(s);
-    let mut r = Row::new().spacing(gap(tok)).align_y(Alignment::Center);
-    for ch in s.chars() {
-        r = r.push(
-            text(ch.to_string())
-                .size(tok.display())
-                .font(typo::UI_BOLD)
-                .color(tok.scheme().on_surface),
-        );
-    }
-    a11y::attach(r.into(), &a11y)
-}
-
-/// Muted caption. Shrink-wraps so a chrome row can sit it next to a
-/// pick. A Fill sibling (`labeled_control`, field) needs the parent
-/// column to `align_x(align_start)` or this lands on physical left.
-///
-/// ```
-/// use icedtea::a11y::{A11y, Role};
-/// use icedtea::theme;
-/// use icedtea::widget;
-/// let tok = theme::named("dark").tokens;
+///     widget::label("Name", LabelFace::Body, tok, A11y::new("Name", Role::Header));
 /// let _: icedtea::Element<'_, ()> =
-///     widget::meta("Every named variant", tok, A11y::new("hint", Role::Status));
+///     widget::label("hint", LabelFace::Meta, tok, A11y::new("hint", Role::Status));
+/// let _: icedtea::Element<'_, ()> =
+///     widget::label("6 × 4 =", LabelFace::Display, tok, A11y::new("expr", Role::Status));
+/// let _: icedtea::Element<'_, ()> =
+///     widget::label("12:40", LabelFace::Figure, tok, A11y::new("clock", Role::Status));
 /// ```
-pub fn meta<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
-    let s = a11y.apply_name(s);
-    a11y::attach(
-        text(s)
-            .size(tok.meta())
-            .color(tok.scheme().on_surface_variant)
-            .into(),
-        &a11y,
-    )
-}
-
-/// A monospace panel the user can drag-select and copy.
-///
-/// The application owns the buffer and posts `Content::selection()`
-/// with [`crate::copy_text`]. Typing does not change the text.
-/// Disabled still allows select-and-copy.
-///
-///
-/// ```
-/// use icedtea::a11y::{A11y, Role};
-/// use icedtea::theme;
-/// use icedtea::widget;
-/// let tok = theme::named("dark").tokens;
-/// let content = icedtea::iced::widget::text_editor::Content::with_text("fn main() {}");
-/// let on_select = |action| action;
-/// let _: icedtea::Element<'_, _> = widget::code_block(
-///     &content,
-///     on_select,
-///     tok,
-///     A11y::new("src", Role::TextBox),
-/// );
-/// ```
-pub fn code_block<'a, M: Clone + 'a>(
-    content: &'a Content,
-    on_action: impl Fn(text_editor::Action) -> M + 'a,
+pub fn label<'a, M: 'a>(
+    s: impl Into<String>,
+    face: LabelFace,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let e = text_editor(content)
-        .height(Length::Shrink)
-        .padding(inset(tok))
-        .font(typo::MONO)
-        .size(tok.code())
-        .wrapping(iced::widget::text::Wrapping::Word)
-        .style(editor_style(tok))
-        .on_action(move |a| on_action(select_only(a)));
-    container(e)
-        .width(Length::Fill)
-        .style(move |_| editor_frame(tok))
-        .id(Id::from(a11y.node_id()))
-        .into()
+    let s = a11y.apply_name(s);
+    match face {
+        LabelFace::Body => a11y::attach(
+            text(s)
+                .size(tok.body())
+                .color(tok.scheme().on_surface)
+                .font(typo::UI)
+                .into(),
+            &a11y,
+        ),
+        LabelFace::Meta => a11y::attach(
+            text(s)
+                .size(tok.meta())
+                .color(tok.scheme().on_surface_variant)
+                .into(),
+            &a11y,
+        ),
+        LabelFace::Display => a11y::attach(
+            container(
+                text(s)
+                    .size(tok.meta())
+                    .color(tok.scheme().on_surface_variant)
+                    .font(typo::UI),
+            )
+            .width(Length::Fill)
+            .align_x(crate::i18n::align_end(tok.direction))
+            .into(),
+            &a11y,
+        ),
+        LabelFace::Figure => {
+            let mut r = Row::new().spacing(gap(tok)).align_y(Alignment::Center);
+            for ch in s.chars() {
+                r = r.push(
+                    text(ch.to_string())
+                        .size(tok.display())
+                        .font(typo::UI_BOLD)
+                        .color(tok.scheme().on_surface),
+                );
+            }
+            a11y::attach(r.into(), &a11y)
+        }
+    }
+}
+
+/// Crate-internal mute caption ([`LabelFace::Meta`]).
+pub(crate) fn meta<'a, M: 'a>(s: impl Into<String>, tok: Tokens, a11y: A11y) -> Element<'a, M> {
+    label(s, LabelFace::Meta, tok, a11y)
 }
 
 /// A text link that sends a message.
@@ -800,59 +770,114 @@ pub fn toggle_button<'a, M: Clone + 'a>(
     })
 }
 
-/// Check or clear a boolean.
+/// Check, clear, or mark a partial selection.
 ///
-/// The application owns the bool. The message carries the next value.
-/// Disabled keeps the box and ignores clicks. An empty label is the
-/// box only (shrink width) so it can sit in a row next to a title.
+/// The application owns [`CheckState`]. Press cycles through
+/// [`CheckState::toggle`]. Disabled keeps the box and ignores clicks.
+/// An empty label is the box only (shrink width) so it can sit in a
+/// row next to a title.
 ///
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
 /// use icedtea::theme;
-/// use icedtea::widget;
+/// use icedtea::widget::{self, CheckState};
 /// let tok = theme::named("dark").tokens;
-/// let on_toggle = |on| on;
-/// let _: icedtea::Element<'_, bool> = widget::checkbox(
+/// let on_toggle = |s| s;
+/// let _: icedtea::Element<'_, CheckState> = widget::checkbox(
 ///     "Accept",
-///     true,
+///     CheckState::Checked,
 ///     on_toggle,
 ///     tok,
 ///     A11y::new("Accept", Role::Checkbox).with_checked(true),
 /// );
+/// let _: icedtea::Element<'_, CheckState> = widget::checkbox(
+///     "Select all",
+///     CheckState::Indeterminate,
+///     on_toggle,
+///     tok,
+///     A11y::new("Select all", Role::Checkbox),
+/// );
 /// ```
 pub fn checkbox<'a, M: Clone + 'a>(
     label_s: impl Into<String>,
-    checked: bool,
-    msg: impl Fn(bool) -> M + 'a,
+    state: CheckState,
+    msg: impl Fn(CheckState) -> M + 'a,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let a11y = a11y.merge_checked(checked);
     let caption: String = label_s.into();
     let empty = caption.is_empty();
     let name = a11y.apply_name(caption);
-    let is_on = a11y.apply_checked(checked);
     let msg = std::rc::Rc::new(msg);
-    let mut c = iced_checkbox(is_on).style(style::checkbox_style(tok));
-    if !a11y.disabled {
-        let msg = msg.clone();
-        c = c.on_toggle(move |v| msg(v));
+    match state {
+        CheckState::Indeterminate => {
+            let s = tok.scheme();
+            let box_face = container(
+                text("−")
+                    .size(tok.meta())
+                    .color(s.on_primary)
+                    .width(Length::Fill)
+                    .align_x(Alignment::Center),
+            )
+            .width(16)
+            .height(16)
+            .center_x(16)
+            .center_y(16)
+            .style(move |_| indeterminate_box_face(tok));
+            let row = if empty {
+                box_face.into()
+            } else {
+                labeled_control(box_face.into(), name.clone(), tok, a11y.disabled, None)
+            };
+            if a11y.disabled {
+                return a11y::attach(row, &a11y);
+            }
+            let next = state.toggle();
+            let keys_msg = msg.clone();
+            let on_key = move |press| activate_key(&press).then_some(keys_msg(next));
+            a11y::attach(
+                crate::focus::target_keys(
+                    mouse_area(row).on_press(msg(next)).into(),
+                    tok,
+                    true,
+                    on_key,
+                ),
+                &a11y,
+            )
+        }
+        CheckState::Checked | CheckState::Unchecked => {
+            let checked = matches!(state, CheckState::Checked);
+            let a11y = a11y.merge_checked(checked);
+            let is_on = a11y.apply_checked(checked);
+            let mut c = iced_checkbox(is_on).style(style::checkbox_style(tok));
+            if !a11y.disabled {
+                let msg = msg.clone();
+                c = c.on_toggle(move |v| msg(CheckState::from(v)));
+            }
+            let can = !a11y.disabled;
+            let keys_msg = msg.clone();
+            let on_key =
+                move |press| activate_key(&press).then_some(keys_msg(CheckState::from(!is_on)));
+            let face = if empty {
+                crate::focus::target_keys(c.into(), tok, can, on_key)
+            } else {
+                crate::focus::target_keys_start(
+                    labeled_control(
+                        c.into(),
+                        name,
+                        tok,
+                        a11y.disabled,
+                        can.then(|| msg(CheckState::from(!is_on))),
+                    ),
+                    tok,
+                    can,
+                    on_key,
+                )
+            };
+            a11y::attach(face, &a11y)
+        }
     }
-    let can = !a11y.disabled;
-    let keys_msg = msg.clone();
-    let on_key = move |press| activate_key(&press).then_some(keys_msg(!is_on));
-    let face = if empty {
-        crate::focus::target_keys(c.into(), tok, can, on_key)
-    } else {
-        crate::focus::target_keys_start(
-            labeled_control(c.into(), name, tok, a11y.disabled, can.then(|| msg(!is_on))),
-            tok,
-            can,
-            on_key,
-        )
-    };
-    a11y::attach(face, &a11y)
 }
 
 /// Three-state checkbox value (M3 indeterminate for “partial”).
@@ -1086,75 +1111,19 @@ impl CheckState {
     }
 }
 
-/// Map a binary checkbox flip into [`CheckState`].
-pub fn check_state_from_bool(on: bool) -> CheckState {
-    if on {
-        CheckState::Checked
-    } else {
-        CheckState::Unchecked
+impl From<bool> for CheckState {
+    fn from(on: bool) -> Self {
+        if on {
+            Self::Checked
+        } else {
+            Self::Unchecked
+        }
     }
 }
 
-/// Checkbox with optional indeterminate (partial) state.
-///
-/// The application owns [`CheckState`]. Press cycles through
-/// [`CheckState::toggle`]. Disabled freezes the face.
-///
-/// ```
-/// use icedtea::a11y::{A11y, Role};
-/// use icedtea::theme;
-/// use icedtea::widget::{self, CheckState};
-/// let tok = theme::named("dark").tokens;
-/// let on_toggle = |s| s;
-/// let _: icedtea::Element<'_, CheckState> = widget::checkbox_indeterminate(
-///     "Select all",
-///     CheckState::Indeterminate,
-///     on_toggle,
-///     tok,
-///     A11y::new("Select all", Role::Checkbox),
-/// );
-/// ```
-pub fn checkbox_indeterminate<'a, M: Clone + 'a>(
-    label_s: impl Into<String>,
-    state: CheckState,
-    msg: impl Fn(CheckState) -> M + 'a,
-    tok: Tokens,
-    a11y: A11y,
-) -> Element<'a, M> {
-    let name = a11y.apply_name(label_s);
-    match state {
-        CheckState::Checked | CheckState::Unchecked => {
-            let on = matches!(state, CheckState::Checked);
-            checkbox(
-                name,
-                on,
-                move |next| msg(check_state_from_bool(next)),
-                tok,
-                a11y.with_checked(on),
-            )
-        }
-        CheckState::Indeterminate => {
-            let s = tok.scheme();
-            let box_face = container(
-                text("−")
-                    .size(tok.meta())
-                    .color(s.on_primary)
-                    .width(Length::Fill)
-                    .align_x(Alignment::Center),
-            )
-            .width(16)
-            .height(16)
-            .center_x(16)
-            .center_y(16)
-            .style(move |_| indeterminate_box_face(tok));
-            let row = labeled_control(box_face.into(), name.clone(), tok, a11y.disabled, None);
-            if a11y.disabled {
-                return a11y::attach(row, &a11y);
-            }
-            let next = state.toggle();
-            a11y::attach(mouse_area(row).on_press(msg(next)).into(), &a11y)
-        }
-    }
+/// Map a binary checkbox flip into [`CheckState`].
+pub fn check_state_from_bool(on: bool) -> CheckState {
+    CheckState::from(on)
 }
 
 fn indeterminate_box_face(tok: Tokens) -> iced::widget::container::Style {
@@ -2828,11 +2797,11 @@ fn selectable_style(
     }
 }
 
-/// Syntax-highlighted code. `syntax` is an iced highlighter token (`rs`, `py`, …).
+/// Source panel. `syntax` is an iced highlighter token (`rs`, `py`, …);
+/// `None` is plain monospace (no highlighter).
 /// `theme_name` picks a highlighter face that fits the UI colorway.
 /// `height` is icedtea size language ([`crate::layout::FILL`] or
 /// [`crate::layout::fixed`]).
-/// Highlighted source.
 ///
 /// The application owns the buffer and the language name. Highlighter
 /// face follows the active colorway. Typing does not change the
@@ -2849,7 +2818,7 @@ fn selectable_style(
 /// let on_edit = |action| action;
 /// let _: icedtea::Element<'_, _> = widget::highlighted_code(
 ///     &content,
-///     "rs",
+///     Some("rs"),
 ///     on_edit,
 ///     tok,
 ///     "dark",
@@ -2857,11 +2826,21 @@ fn selectable_style(
 ///     true,
 ///     A11y::new("src", Role::TextBox),
 /// );
+/// let _: icedtea::Element<'_, _> = widget::highlighted_code(
+///     &content,
+///     None,
+///     on_edit,
+///     tok,
+///     "dark",
+///     icedtea::layout::SHRINK,
+///     true,
+///     A11y::new("plain", Role::TextBox),
+/// );
 /// ```
 #[allow(clippy::too_many_arguments)]
 pub fn highlighted_code<'a, M: Clone + 'a>(
     content: &'a Content,
-    syntax: &str,
+    syntax: Option<&str>,
     on_action: impl Fn(text_editor::Action) -> M + 'a,
     tok: Tokens,
     theme_name: &str,
@@ -2869,27 +2848,41 @@ pub fn highlighted_code<'a, M: Clone + 'a>(
     wrap: bool,
     a11y: A11y,
 ) -> Element<'a, M> {
-    let theme = crate::theme::code_highlight(theme_name);
     let wrapping = if wrap {
         iced::widget::text::Wrapping::Word
     } else {
         iced::widget::text::Wrapping::None
     };
-    let e = text_editor(content)
-        .height(height)
-        .padding(inset(tok))
-        .style(editor_style(tok))
-        .highlight(syntax, theme)
-        .font(typo::MONO)
-        .size(tok.code())
-        .wrapping(wrapping)
-        .on_action(move |a| on_action(select_only(a)));
-    container(e)
-        .width(Length::Fill)
-        .height(height)
-        .style(move |_| editor_frame(tok))
-        .id(Id::from(a11y.node_id()))
-        .into()
+    let editor: Element<'a, M> = if let Some(lang) = syntax {
+        text_editor(content)
+            .height(height)
+            .padding(inset(tok))
+            .style(editor_style(tok))
+            .highlight(lang, crate::theme::code_highlight(theme_name))
+            .font(typo::MONO)
+            .size(tok.code())
+            .wrapping(wrapping)
+            .on_action(move |a| on_action(select_only(a)))
+            .into()
+    } else {
+        text_editor(content)
+            .height(height)
+            .padding(inset(tok))
+            .style(editor_style(tok))
+            .font(typo::MONO)
+            .size(tok.code())
+            .wrapping(wrapping)
+            .on_action(move |a| on_action(select_only(a)))
+            .into()
+    };
+    a11y::attach(
+        container(editor)
+            .width(Length::Fill)
+            .height(height)
+            .style(move |_| editor_frame(tok))
+            .into(),
+        &a11y,
+    )
 }
 
 fn editor_frame(tok: Tokens) -> iced::widget::container::Style {
@@ -3743,6 +3736,7 @@ pub fn form_group<'a, M: Clone + 'a>(
         } else {
             label(
                 row.label,
+                LabelFace::Body,
                 tok,
                 A11y::new(format!("form-label-{i}"), Role::Header),
             )
@@ -4085,6 +4079,7 @@ pub fn date_stepper<'a, M: Clone + 'a>(
                 ),
                 label(
                     shown.clone(),
+                    LabelFace::Body,
                     tok,
                     a11y.child(Role::Status).with_value(shown),
                 ),
@@ -4458,28 +4453,27 @@ fn markdown_measure_style() -> markdown::Style {
     })
 }
 
-/// Jump list of headings. The application owns history. `selected` is
-/// the heading's item index from [`MdHeading::index`].
-///
-/// ```
-/// use icedtea::a11y::{A11y, Role};
-/// use icedtea::theme;
-/// use icedtea::widget;
-/// let tok = theme::named("dark").tokens;
-/// let doc = widget::parse("# Hi\n\n## Next");
-/// let heads = doc.headings();
-/// let _: icedtea::Element<'_, usize> = widget::markdown_outline(
-///     &heads,
-///     Some(heads[0].index),
-///     |i| i,
-///     tok,
-///     A11y::new("outline", Role::List),
-/// );
-/// ```
-pub fn markdown_outline<'a, M: Clone + 'a>(
+/// Optional outline on [`markdown_view`].
+pub struct MarkdownOpts<'a, M> {
+    pub headings: Option<&'a [MdHeading]>,
+    pub selected: Option<usize>,
+    pub on_jump: Option<std::rc::Rc<dyn Fn(usize) -> M + 'a>>,
+}
+
+impl<M> Default for MarkdownOpts<'_, M> {
+    fn default() -> Self {
+        Self {
+            headings: None,
+            selected: None,
+            on_jump: None,
+        }
+    }
+}
+
+fn markdown_outline<'a, M: Clone + 'a>(
     headings: &'a [MdHeading],
     selected: Option<usize>,
-    on_jump: impl Fn(usize) -> M + Copy + 'a,
+    on_jump: impl Fn(usize) -> M + 'a,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
@@ -4561,6 +4555,7 @@ pub fn parse(source: &str) -> MarkdownDoc {
 /// let on_link = |_uri| MarkdownPointer::Release;
 /// let on_pointer = |ev| ev;
 /// let state = markdown_select(&doc.items, MarkdownSelect::default(), MarkdownPointer::Press, tok);
+/// let heads = doc.headings();
 /// let _: icedtea::Element<'_, _> = widget::markdown_view(
 ///     &doc.items,
 ///     Some(&state.span),
@@ -4568,6 +4563,11 @@ pub fn parse(source: &str) -> MarkdownDoc {
 ///     tok,
 ///     on_link,
 ///     A11y::new("md", Role::Group),
+///     widget::MarkdownOpts {
+///         headings: Some(&heads),
+///         selected: heads.first().map(|h| h.index),
+///         on_jump: Some(std::rc::Rc::new(|_i| MarkdownPointer::Release)),
+///     },
 /// );
 /// ```
 pub fn markdown_view<'a, M: Clone + 'a>(
@@ -4577,11 +4577,21 @@ pub fn markdown_view<'a, M: Clone + 'a>(
     tok: Tokens,
     on_link: impl Fn(markdown::Uri) -> M + Copy + 'a,
     a11y: A11y,
+    opts: MarkdownOpts<'a, M>,
 ) -> Element<'a, M> {
     let settings = crate::select::markdown_paint_settings(markdown_style(tok), tok);
     let fill = tok.scheme().secondary_container;
     let live = span.copied().filter(|s| !s.is_empty());
     let mut col = Column::new().spacing(settings.spacing).width(Length::Fill);
+    if let (Some(heads), Some(on_jump)) = (opts.headings, opts.on_jump) {
+        col = col.push(markdown_outline(
+            heads,
+            opts.selected,
+            move |i| on_jump(i),
+            tok,
+            A11y::new(a11y.name.clone(), Role::List).with_disabled(a11y.disabled),
+        ));
+    }
     for (i, item) in items.iter().enumerate() {
         let viewer = MarkdownPaint {
             items,
@@ -5016,7 +5026,12 @@ pub fn tooltip_rich<'a, M: Clone + 'a>(
     }
     let mut col = Column::new().spacing(2);
     if !title.is_empty() {
-        col = col.push(label(title.clone(), tok, A11y::new(title, Role::Header)));
+        col = col.push(label(
+            title.clone(),
+            LabelFace::Body,
+            tok,
+            A11y::new(title, Role::Header),
+        ));
     }
     if !body.is_empty() {
         col = col.push(meta(body.clone(), tok, A11y::new(body, Role::Status)));
@@ -5063,15 +5078,16 @@ pub fn rule_h<'a, M: 'a>(tok: Tokens, a11y: A11y) -> Element<'a, M> {
     )
 }
 
-/// Compact square close control. Same size in toasts, tabs, and chips.
-pub fn dismiss_button<'a, M: Clone + 'a>(msg: M, tok: Tokens, a11y: A11y) -> Element<'a, M> {
-    let mut b = iced_button(icon_svg(Icon::Close, tok, A11y::new("close", Role::Image)))
-        .padding(4)
-        .style(style::joined_button_style(tok, Variant::Ghost));
-    if let Some(m) = a11y.apply_message(Some(msg)) {
-        b = b.on_press(m);
-    }
-    a11y::attach(b.into(), &a11y)
+/// Compact close: [`icon_button`] with [`Icon::Close`].
+pub(crate) fn dismiss_button<'a, M: Clone + 'a>(msg: M, tok: Tokens, a11y: A11y) -> Element<'a, M> {
+    icon_button(
+        Icon::Close,
+        Some(msg),
+        tok,
+        Variant::Ghost,
+        ControlSize::Compact,
+        a11y,
+    )
 }
 
 /// Chip fill, ink, and border for a variant (M3 filter: Quiet = outline, Primary = selected fill).
@@ -5466,32 +5482,49 @@ fn rail_mark<'a, M: 'a>(tok: Tokens) -> Element<'a, M> {
 /// A page-level message with an optional action.
 ///
 /// Use for “offline” or “update available”. Optional button message.
-/// Corners follow [`Tokens::shape`] ([`crate::m3::shape::Component::Banner`]).
+/// `tone` paints a callout wash ([`ToastKind`]); `None` is the default
+/// banner face. Corners follow [`Tokens::shape`]
+/// ([`crate::m3::shape::Component::Banner`]).
 ///
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
 /// use icedtea::theme;
+/// use icedtea::toast::ToastKind;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let _: icedtea::Element<'_, ()> = widget::banner(
 ///     "Update available",
 ///     Some(("Install".into(), ())),
+///     None,
 ///     tok,
 ///     A11y::new("Update available", Role::Status),
+/// );
+/// let _: icedtea::Element<'_, ()> = widget::banner(
+///     "Watch this",
+///     None,
+///     Some(ToastKind::Warning),
+///     tok,
+///     A11y::new("Watch this", Role::Status),
 /// );
 /// ```
 pub fn banner<'a, M: Clone + 'a>(
     text_s: impl Into<String>,
     action: Option<(String, M)>,
+    tone: Option<ToastKind>,
     tok: Tokens,
     a11y: A11y,
 ) -> Element<'a, M> {
     let a11y = a11y.merge_live(a11y::Live::Polite);
     let text_s = a11y.apply_name(text_s);
-    let mut r = row![label(text_s.clone(), tok, A11y::new(text_s, Role::Status))]
-        .spacing(inset(tok))
-        .align_y(Alignment::Center);
+    let mut r = row![label(
+        text_s.clone(),
+        LabelFace::Body,
+        tok,
+        A11y::new(text_s, Role::Status)
+    )]
+    .spacing(inset(tok))
+    .align_y(Alignment::Center);
     if let Some((t, m)) = action {
         r = r.push(button(
             t.clone(),
@@ -5507,40 +5540,10 @@ pub fn banner<'a, M: Clone + 'a>(
         container(r)
             .width(Length::Fill)
             .padding(inset(tok))
-            .style(move |_| style::banner(tok))
-            .into(),
-        &a11y,
-    )
-}
-
-/// An inline info bar.
-///
-/// Tone comes from `Variant`. Empty body is title only.
-///
-///
-/// ```
-/// use icedtea::a11y::{A11y, Role};
-/// use icedtea::theme;
-/// use icedtea::toast::ToastKind;
-/// use icedtea::widget;
-/// let tok = theme::named("dark").tokens;
-/// let _: icedtea::Element<'_, ()> = widget::info_bar(
-///     ToastKind::Warning, "Watch this", tok, A11y::new("Watch this", Role::Status),
-/// );
-/// ```
-pub fn info_bar<'a, M: Clone + 'a>(
-    kind: ToastKind,
-    text_s: impl Into<String>,
-    tok: Tokens,
-    a11y: A11y,
-) -> Element<'a, M> {
-    let a11y = a11y.merge_live(a11y::Live::Polite);
-    let text_s = a11y.apply_name(text_s);
-    a11y::attach(
-        container(label(text_s.clone(), tok, A11y::new(text_s, Role::Status)))
-            .width(Length::Fill)
-            .padding(inset(tok))
-            .style(move |_| style::callout(tok, kind))
+            .style(move |_| match tone {
+                Some(kind) => style::callout(tok, kind),
+                None => style::banner(tok),
+            })
             .into(),
         &a11y,
     )
@@ -5589,6 +5592,7 @@ pub fn breadcrumb<'a, M: Clone + 'a>(
         } else {
             r = r.push(label(
                 name.clone(),
+                LabelFace::Body,
                 tok,
                 A11y::new(name.clone(), Role::Header),
             ));
@@ -5648,7 +5652,12 @@ pub fn toast_view<'a, M: Clone + 'a>(
     let paint = tok.fade(t);
     let face = container(
         row![
-            label(text_s.clone(), paint, A11y::new(text_s, Role::Status),),
+            label(
+                text_s.clone(),
+                LabelFace::Body,
+                paint,
+                A11y::new(text_s, Role::Status),
+            ),
             Space::new().width(Length::Fill),
             dismiss_button(
                 dismiss,
@@ -8542,6 +8551,80 @@ mod tests {
         }
     }
 
+    #[test]
+    fn one_constructor_covers_folded_faces() {
+        let tok = named("dark").tokens;
+        let a = |n| A11y::new(n, Role::Status);
+        let _: Element<'_, CheckState> = checkbox(
+            "all",
+            CheckState::Indeterminate,
+            |s| s,
+            tok,
+            A11y::new("all", Role::Checkbox),
+        );
+        let _: Element<'_, ()> = banner("watch", None, Some(ToastKind::Warning), tok, a("watch"));
+        let code = Content::with_text("fn main() {}");
+        let _: Element<'_, ()> = highlighted_code(
+            &code,
+            None,
+            |_| (),
+            tok,
+            "dark",
+            Length::Shrink,
+            true,
+            a("plain"),
+        );
+        let _: Element<'_, ()> = highlighted_code(
+            &code,
+            Some("rs"),
+            |_| (),
+            tok,
+            "dark",
+            crate::layout::FILL,
+            true,
+            a("rs"),
+        );
+        let _: Element<'_, ()> = label("hi", LabelFace::Body, tok, a("hi"));
+        let _: Element<'_, ()> = label("m", LabelFace::Meta, tok, a("m"));
+        let _: Element<'_, ()> = label("6", LabelFace::Display, tok, a("6"));
+        let _: Element<'_, ()> = label("12", LabelFace::Figure, tok, a("12"));
+        let _: Element<'_, ()> = icon_button(
+            Icon::Close,
+            Some(()),
+            tok,
+            Variant::Ghost,
+            ControlSize::Compact,
+            A11y::button("close"),
+        );
+        let product = include_str!("widget.rs")
+            .split("#[cfg(test)]")
+            .next()
+            .unwrap();
+        must(!product.contains("pub fn code_block("), "code_block gone");
+        must(!product.contains("pub fn info_bar("), "info_bar gone");
+        must(
+            !product.contains("pub fn dismiss_button("),
+            "dismiss_button not public",
+        );
+        must(
+            !product.contains("pub fn checkbox_indeterminate("),
+            "checkbox_indeterminate gone",
+        );
+        must(
+            !product.contains("pub fn display_line("),
+            "display_line gone",
+        );
+        must(
+            !product.contains("pub fn figure_display("),
+            "figure_display gone",
+        );
+        must(
+            !product.contains("pub fn markdown_outline("),
+            "outline not public",
+        );
+        must(!product.contains("pub fn meta<"), "meta not public");
+    }
+
     fn vc_scroll_click(_: VisibleWindow) -> ItemClick {
         ItemClick::primary(99)
     }
@@ -8728,10 +8811,10 @@ mod tests {
     #[test]
     fn checkbox_enter_toggles_when_focused() {
         let tok = named("dark").tokens;
-        let mut el: Element<'_, bool> = checkbox(
+        let mut el: Element<'_, CheckState> = checkbox(
             "Accept",
-            false,
-            |on| on,
+            CheckState::Unchecked,
+            |s| s,
             tok,
             A11y::new("Accept", Role::Checkbox),
         );
@@ -8744,7 +8827,7 @@ mod tests {
                 keyboard::Key::Character(" ".into()),
             ],
         );
-        assert_eq!(got, vec![true, true]);
+        assert_eq!(got, vec![CheckState::Checked, CheckState::Checked]);
     }
 
     #[test]
@@ -8922,7 +9005,7 @@ mod tests {
         let mut el: Element<'_, bool> = expander(
             "Notes",
             None,
-            label("body", tok, A11y::new("body", Role::Group)),
+            label("body", LabelFace::Body, tok, A11y::new("body", Role::Group)),
             Peek::Pixels(0.0),
             false,
             0.0,
@@ -9035,8 +9118,8 @@ mod tests {
         let mut el: Element<'_, usize> = accordion_view(
             &titles,
             vec![
-                label("one", tok, A11y::new("one", Role::Group)),
-                label("two", tok, A11y::new("two", Role::Group)),
+                label("one", LabelFace::Body, tok, A11y::new("one", Role::Group)),
+                label("two", LabelFace::Body, tok, A11y::new("two", Role::Group)),
             ],
             &state,
             1.0,
@@ -9368,8 +9451,8 @@ mod tests {
         let tok = named("dark").tokens;
         let st = SplitState::new(Axis::Horizontal, 0.4);
         let mut el: Element<'_, SashEvent> = layout::split_view(
-            label("a", tok, A11y::new("a", Role::Group)),
-            label("b", tok, A11y::new("b", Role::Group)),
+            label("a", LabelFace::Body, tok, A11y::new("a", Role::Group)),
+            label("b", LabelFace::Body, tok, A11y::new("b", Role::Group)),
             st,
             400.0,
             |e| e,
@@ -9659,7 +9742,7 @@ mod tests {
     fn scroll_keys_run_only_while_focused() {
         let tok = named("dark").tokens;
         let tall = iced::widget::column![
-            label("a", tok, A11y::new("a", Role::Status)),
+            label("a", LabelFace::Body, tok, A11y::new("a", Role::Status)),
             Space::new().height(400),
         ]
         .into();
@@ -9695,7 +9778,7 @@ mod tests {
     fn scroll_keys_leave_a_focused_sibling() {
         let tok = named("dark").tokens;
         let tall = iced::widget::column![
-            label("a", tok, A11y::new("a", Role::Status)),
+            label("a", LabelFace::Body, tok, A11y::new("a", Role::Status)),
             Space::new().height(400),
         ]
         .into();
@@ -9707,8 +9790,8 @@ mod tests {
         let mut el: Element<'_, Ev> = iced::widget::column![
             checkbox(
                 "Accept",
-                false,
-                Ev::Check,
+                CheckState::Unchecked,
+                |s| Ev::Check(matches!(s, CheckState::Checked)),
                 tok,
                 A11y::new("Accept", Role::Checkbox),
             ),
@@ -9746,7 +9829,7 @@ mod tests {
     fn scroll_page_down_moves_offset() {
         let tok = named("dark").tokens;
         let tall = iced::widget::column![
-            label("a", tok, A11y::new("a", Role::Status)),
+            label("a", LabelFace::Body, tok, A11y::new("a", Role::Status)),
             Space::new().height(400),
         ]
         .into();
@@ -9887,7 +9970,7 @@ mod tests {
     fn scroll_disabled_is_not_focusable() {
         let tok = named("dark").tokens;
         let mut el: Element<'_, ()> = scroll(
-            label("body", tok, A11y::new("body", Role::Group)),
+            label("body", LabelFace::Body, tok, A11y::new("body", Role::Group)),
             tok,
             A11y::new("pane", Role::Group).with_disabled(true),
             false,
@@ -9928,7 +10011,7 @@ mod tests {
         }
         let tok = named("dark").tokens;
         let mut el: Element<'_, ()> = scroll(
-            label("body", tok, A11y::new("body", Role::Group)),
+            label("body", LabelFace::Body, tok, A11y::new("body", Role::Group)),
             tok,
             A11y::new("pane", Role::Group),
             false,
@@ -9955,7 +10038,7 @@ mod tests {
     fn scroll_click_focuses() {
         let tok = named("dark").tokens;
         let mut el: Element<'_, ()> = scroll(
-            label("body", tok, A11y::new("body", Role::Group)),
+            label("body", LabelFace::Body, tok, A11y::new("body", Role::Group)),
             tok,
             A11y::new("pane", Role::Group),
             false,
@@ -10027,7 +10110,7 @@ mod tests {
             |_click| win,
             None,
             tok,
-            |_| label("row", tok, A11y::new("r", Role::ListItem)),
+            |_| label("row", LabelFace::Body, tok, A11y::new("r", Role::ListItem)),
             A11y::new("cards", Role::List),
         );
         let (n, focused) = focusable_after_click(
@@ -10053,7 +10136,14 @@ mod tests {
             |click| click,
             None,
             tok,
-            |i| label(format!("r{i}"), tok, A11y::new("r", Role::ListItem)),
+            |i| {
+                label(
+                    format!("r{i}"),
+                    LabelFace::Body,
+                    tok,
+                    A11y::new("r", Role::ListItem),
+                )
+            },
             A11y::new("cards", Role::List),
         );
         let down = press_only(
@@ -10118,7 +10208,14 @@ mod tests {
             |click| click,
             None,
             tok,
-            |i| label(format!("r{i}"), tok, A11y::new("r", Role::ListItem)),
+            |i| {
+                label(
+                    format!("r{i}"),
+                    LabelFace::Body,
+                    tok,
+                    A11y::new("r", Role::ListItem),
+                )
+            },
             A11y::new("cards", Role::List).with_disabled(true),
         );
         let dead_got = press_messages(
@@ -10164,8 +10261,8 @@ mod tests {
         let mut el: Element<'_, usize> = accordion_view(
             &titles,
             vec![
-                label("one", tok, A11y::new("one", Role::Group)),
-                label("two", tok, A11y::new("two", Role::Group)),
+                label("one", LabelFace::Body, tok, A11y::new("one", Role::Group)),
+                label("two", LabelFace::Body, tok, A11y::new("two", Role::Group)),
             ],
             &state,
             1.0,
@@ -10252,7 +10349,12 @@ mod tests {
         use iced::advanced::widget::Tree;
         use iced::{Font, Pixels, Point, Rectangle, Size};
         let tok = named("dark").tokens;
-        let face = label("row", tok, A11y::new("row", Role::ListItem));
+        let face = label(
+            "row",
+            LabelFace::Body,
+            tok,
+            A11y::new("row", Role::ListItem),
+        );
         let mut el: Element<'_, ItemClick> = item_press(face, |button, modifiers| ItemClick {
             id: 3,
             button,
@@ -10313,7 +10415,12 @@ mod tests {
     #[test]
     fn item_press_primary_fires_on_release() {
         let tok = named("dark").tokens;
-        let face = label("row", tok, A11y::new("row", Role::ListItem));
+        let face = label(
+            "row",
+            LabelFace::Body,
+            tok,
+            A11y::new("row", Role::ListItem),
+        );
         let mut el: Element<'_, ItemClick> = item_press(face, |button, modifiers| ItemClick {
             id: 1,
             button,
@@ -10342,7 +10449,12 @@ mod tests {
         use iced::advanced::widget::Tree;
         use iced::{Font, Pixels, Point, Rectangle, Size};
         let tok = named("dark").tokens;
-        let face = label("row", tok, A11y::new("row", Role::ListItem));
+        let face = label(
+            "row",
+            LabelFace::Body,
+            tok,
+            A11y::new("row", Role::ListItem),
+        );
         let mut el: Element<'_, ItemClick> = item_press(face, |button, modifiers| ItemClick {
             id: 1,
             button,
@@ -10704,7 +10816,12 @@ mod tests {
         };
         let _: Element<'_, ()> = toast_view(&toast, (), tok, A11y::new("Saved", Role::Status));
         let _: Element<'_, ()> = tooltip_wrap(
-            label("Hover", tok, A11y::new("Hover", Role::Header)),
+            label(
+                "Hover",
+                LabelFace::Body,
+                tok,
+                A11y::new("Hover", Role::Header),
+            ),
             "Tip",
             TooltipAnchor::Follow,
             tok,
@@ -10720,6 +10837,7 @@ mod tests {
         let _: Element<'_, ()> = banner(
             "Update available",
             Some(("Install".into(), ())),
+            None,
             tok,
             A11y::new("Update available", Role::Status),
         );
@@ -11057,10 +11175,19 @@ mod tests {
         let btn = |n: &str| A11y::button(n);
         let role = |n: &str, r: Role| A11y::new(n, r);
         let _: Element<'_, ()> = icon_svg(Icon::Search, tok, role("search", Role::Image));
-        let _: Element<'_, ()> = label("Hi", tok, role("Hi", Role::Header));
+        let _: Element<'_, ()> = label("Hi", LabelFace::Body, tok, role("Hi", Role::Header));
         let _: Element<'_, ()> = meta("m", tok, role("m", Role::Status));
         let snippet = Content::with_text("fn");
-        let _: Element<'_, ()> = code_block(&snippet, |_| (), tok, role("fn", Role::Group));
+        let _: Element<'_, ()> = highlighted_code(
+            &snippet,
+            None,
+            |_| (),
+            tok,
+            "dark",
+            Length::Shrink,
+            true,
+            role("fn", Role::Group),
+        );
         let _: Element<'_, ()> = hyperlink("l", (), tok, role("l", Role::Link));
         let _: Element<'_, ()> = button(
             "B",
@@ -11083,8 +11210,14 @@ mod tests {
             },
             btn("7"),
         );
-        let _: Element<'_, ()> = display_line("6 × 4 =", tok, role("expr", Role::Status));
-        let _: Element<'_, ()> = figure_display("12:40", tok, role("clock", Role::Status));
+        let _: Element<'_, ()> = label(
+            "6 × 4 =",
+            LabelFace::Display,
+            tok,
+            role("expr", Role::Status),
+        );
+        let _: Element<'_, ()> =
+            label("12:40", LabelFace::Figure, tok, role("clock", Role::Status));
         let glyph = A11y::button("Backspace");
         let _: Element<'_, ()> = button(
             "⌫",
@@ -11140,7 +11273,7 @@ mod tests {
         );
         let _: Element<'_, ()> = checkbox(
             "c",
-            true,
+            CheckState::Checked,
             |_| (),
             tok,
             role("c", Role::Checkbox).with_checked(true),
@@ -11255,28 +11388,28 @@ mod tests {
                 tok.scheme().surface_container_highest
             ))
         );
-        let _: Element<'_, ()> = checkbox_indeterminate(
+        let _: Element<'_, ()> = checkbox(
             "all",
             CheckState::Indeterminate,
             |_| (),
             tok,
             role("tri", Role::Checkbox),
         );
-        let _: Element<'_, ()> = checkbox_indeterminate(
+        let _: Element<'_, ()> = checkbox(
             "on",
             CheckState::Checked,
             |_| (),
             tok,
             role("tri-on", Role::Checkbox),
         );
-        let _: Element<'_, ()> = checkbox_indeterminate(
+        let _: Element<'_, ()> = checkbox(
             "off",
             CheckState::Unchecked,
             |_| (),
             tok,
             role("tri-off", Role::Checkbox).with_disabled(true),
         );
-        let _: Element<'_, ()> = checkbox_indeterminate(
+        let _: Element<'_, ()> = checkbox(
             "ind-d",
             CheckState::Indeterminate,
             |_| (),
@@ -11503,14 +11636,14 @@ mod tests {
         );
         let _: Element<'_, ()> = spinner(tok, 0.25, role("spin", Role::Progress));
         let _: Element<'_, ()> = busy_overlay(
-            label("Body", tok, role("Body", Role::Status)),
+            label("Body", LabelFace::Body, tok, role("Body", Role::Status)),
             true,
             0.2,
             tok,
             role("busy", Role::Group),
         );
         let _: Element<'_, ()> = busy_overlay(
-            label("Idle", tok, role("Idle", Role::Status)),
+            label("Idle", LabelFace::Body, tok, role("Idle", Role::Status)),
             false,
             0.0,
             tok,
@@ -11544,11 +11677,11 @@ mod tests {
             unnamed,
         );
         let unnamed_c = A11y::new("", Role::Checkbox);
-        let _: Element<'_, ()> = checkbox("box", true, |_| (), tok, unnamed_c);
+        let _: Element<'_, ()> = checkbox("box", CheckState::Checked, |_| (), tok, unnamed_c);
         let ca = A11y::new("off", Role::Checkbox)
             .with_checked(true)
             .with_disabled(true);
-        let _: Element<'_, ()> = checkbox("off", false, |_| (), tok, ca);
+        let _: Element<'_, ()> = checkbox("off", CheckState::Unchecked, |_| (), tok, ca);
         let _: Element<'_, ()> = number_input(
             3.0,
             |_| (),
@@ -11739,7 +11872,7 @@ mod tests {
             role("edit-empty", Role::Group).with_disabled(true),
         );
         let mut tip: Element<'_, ()> = tooltip_rich(
-            label("Save", tok, role("Save", Role::Header)),
+            label("Save", LabelFace::Body, tok, role("Save", Role::Header)),
             "Save",
             "Write the buffer.",
             None,
@@ -11749,7 +11882,7 @@ mod tests {
         );
         draw_once(&mut tip);
         let _: Element<'_, ()> = tooltip_rich(
-            label("x", tok, role("x", Role::Header)),
+            label("x", LabelFace::Body, tok, role("x", Role::Header)),
             "",
             "",
             None,
@@ -11827,12 +11960,19 @@ mod tests {
         );
         let items = markdown::parse("# Hi");
         let items: Vec<_> = items.collect();
-        let _: Element<'_, ()> =
-            markdown_view(&items, None, |_| (), tok, |_| (), role("md", Role::Group));
+        let _: Element<'_, ()> = markdown_view(
+            &items,
+            None,
+            |_| (),
+            tok,
+            |_| (),
+            role("md", Role::Group),
+            MarkdownOpts::default(),
+        );
         let code = Content::with_text("fn main() {}\n");
         let _: Element<'_, ()> = highlighted_code(
             &code,
-            "rs",
+            Some("rs"),
             |_| (),
             tok,
             "dark",
@@ -11843,7 +11983,7 @@ mod tests {
         let light = named("light").tokens;
         let _: Element<'_, ()> = highlighted_code(
             &code,
-            "py",
+            Some("py"),
             |_| (),
             light,
             "solarized-light",
@@ -11854,7 +11994,7 @@ mod tests {
         let mocha = named("catppuccin-mocha").tokens;
         let _: Element<'_, ()> = highlighted_code(
             &code,
-            "rs",
+            Some("rs"),
             |_| (),
             mocha,
             "catppuccin-mocha",
@@ -11864,7 +12004,7 @@ mod tests {
         );
         let _: Element<'_, ()> = highlighted_code(
             &code,
-            "rs",
+            Some("rs"),
             |_| (),
             tok,
             "dark",
@@ -11883,7 +12023,7 @@ mod tests {
             &[],
         );
         let _: Element<'_, ()> = tooltip_wrap(
-            label("x", tok, role("x", Role::Header)),
+            label("x", LabelFace::Body, tok, role("x", Role::Header)),
             "tip",
             TooltipAnchor::Follow,
             tok,
@@ -12019,15 +12159,27 @@ mod tests {
         );
         let _: Element<'_, ()> = group_box(
             "g",
-            label("x", tok, role("x", Role::Header)),
+            label("x", LabelFace::Body, tok, role("x", Role::Header)),
             tok,
             CardFace::Elevated,
             role("g", Role::Group),
             None,
         );
-        let _: Element<'_, ()> = banner("b", Some(("go".into(), ())), tok, role("b", Role::Status));
-        let _: Element<'_, ()> = banner("b", None, tok, role("b", Role::Status));
-        let _: Element<'_, ()> = info_bar(ToastKind::Warning, "w", tok, role("w", Role::Status));
+        let _: Element<'_, ()> = banner(
+            "b",
+            Some(("go".into(), ())),
+            None,
+            tok,
+            role("b", Role::Status),
+        );
+        let _: Element<'_, ()> = banner("b", None, None, tok, role("b", Role::Status));
+        let _: Element<'_, ()> = banner(
+            "w",
+            None,
+            Some(ToastKind::Warning),
+            tok,
+            role("w", Role::Status),
+        );
         let _: Element<'_, ()> = breadcrumb(
             &[("Home".into(), Some(())), ("Here".into(), None)],
             tok,
@@ -12278,14 +12430,14 @@ mod tests {
         let acc = Accordion { open: Some(0) };
         let _: Element<'_, ()> = accordion_view(
             &["A".into()],
-            vec![label("b", tok, role("b", Role::Header))],
+            vec![label("b", LabelFace::Body, tok, role("b", Role::Header))],
             &acc,
             1.0,
             |_| (),
             tok,
             role("acc", Role::Group),
         );
-        let note = label("more", tok, role("more", Role::Status));
+        let note = label("more", LabelFace::Body, tok, role("more", Role::Status));
         let _: Element<'_, bool> = expander(
             "Notes",
             None,
@@ -12297,7 +12449,7 @@ mod tests {
             tok,
             role("exp", Role::Group),
         );
-        let note = label("more", tok, role("more", Role::Status));
+        let note = label("more", LabelFace::Body, tok, role("more", Role::Status));
         let _: Element<'_, bool> = expander(
             "Notes",
             None,
@@ -12351,7 +12503,7 @@ mod tests {
             .node_id()
             .contains("button|Save|1"));
         let _: Element<'_, ()> = scroll(
-            label("log", tok, role("log", Role::Status)),
+            label("log", LabelFace::Body, tok, role("log", Role::Status)),
             tok,
             role("scroll", Role::Group),
             true,
@@ -12359,7 +12511,7 @@ mod tests {
             None::<fn(_) -> ()>,
         );
         let _: Element<'_, ()> = scroll(
-            label("body", tok, role("body", Role::Status)),
+            label("body", LabelFace::Body, tok, role("body", Role::Status)),
             tok,
             role("scroll", Role::Group),
             false,
@@ -12432,6 +12584,7 @@ mod tests {
             tok,
             |_| (),
             role("md", Role::Group),
+            MarkdownOpts::default(),
         );
         let md = markdown_style(tok);
         let s = tok.scheme();
@@ -12449,16 +12602,33 @@ mod tests {
         let deep = parse("# A\n\n## B\n\n### C\n\n#### D\n\n##### E\n\n###### F\n");
         let levels: Vec<u8> = deep.headings().iter().map(|h| h.level).collect();
         assert_eq!(levels, vec![1, 2, 3, 4, 5, 6]);
-        let _: Element<'_, ()> = markdown_outline(
-            &heads,
-            Some(heads[0].index),
+        let _: Element<'_, ()> = markdown_view(
+            &outlined.items,
+            None,
             |_| (),
             tok,
+            |_| (),
             role("outline", Role::List),
+            MarkdownOpts {
+                headings: Some(&heads),
+                selected: Some(heads[0].index),
+                on_jump: Some(std::rc::Rc::new(|_| ())),
+            },
         );
         let none: [MdHeading; 0] = [];
-        let _: Element<'_, ()> =
-            markdown_outline(&none, None, |_| (), tok, role("outline-empty", Role::List));
+        let _: Element<'_, ()> = markdown_view(
+            &outlined.items,
+            None,
+            |_| (),
+            tok,
+            |_| (),
+            role("outline-empty", Role::List),
+            MarkdownOpts {
+                headings: Some(&none),
+                selected: None,
+                on_jump: Some(std::rc::Rc::new(|_| ())),
+            },
+        );
         must(
             outlined.item_offset(heads[1].index, tok) > outlined.item_offset(heads[0].index, tok),
             "later heading sits below the first",
@@ -12646,7 +12816,7 @@ mod tests {
         );
         draw_once(&mut vert_off);
         let mut tip_b: Element<'_, ()> = tooltip_wrap(
-            label("H", tok, role("Hb", Role::Header)),
+            label("H", LabelFace::Body, tok, role("Hb", Role::Header)),
             "tip",
             TooltipAnchor::Bottom,
             tok,
@@ -12654,7 +12824,7 @@ mod tests {
         );
         draw_once(&mut tip_b);
         let mut tip_s: Element<'_, ()> = tooltip_wrap(
-            label("H", tok, role("Hs", Role::Header)),
+            label("H", LabelFace::Body, tok, role("Hs", Role::Header)),
             "tip",
             TooltipAnchor::Start,
             tok,
@@ -12663,7 +12833,7 @@ mod tests {
         draw_once(&mut tip_s);
         let mut filled_card: Element<'_, ()> = group_box(
             "F",
-            label("x", tok, role("xf", Role::Status)),
+            label("x", LabelFace::Body, tok, role("xf", Role::Status)),
             tok,
             CardFace::Filled,
             role("cf", Role::Group),
@@ -12718,7 +12888,7 @@ mod tests {
         draw_once(&mut still);
         let mut card: Element<'_, ()> = group_box(
             "Box",
-            label("x", tok, role("x", Role::Status)),
+            label("x", LabelFace::Body, tok, role("x", Role::Status)),
             tok,
             CardFace::Outlined,
             role("c", Role::Group),
@@ -12735,7 +12905,7 @@ mod tests {
         );
         draw_once(&mut mark);
         let mut tip: Element<'_, ()> = tooltip_rich(
-            label("H", tok, role("H", Role::Header)),
+            label("H", LabelFace::Body, tok, role("H", Role::Header)),
             "Save",
             "Write.",
             Some(("More".into(), ())),
@@ -12834,7 +13004,12 @@ mod tests {
         );
         let mut rail: Element<'_, ()> = group_box(
             "Brief",
-            label("body", tok, A11y::new("body", Role::Status)),
+            label(
+                "body",
+                LabelFace::Body,
+                tok,
+                A11y::new("body", Role::Status),
+            ),
             tok,
             CardFace::Rail,
             A11y::new("brief", Role::Group),
@@ -12843,7 +13018,7 @@ mod tests {
         draw_once(&mut rail);
         let mut empty_title: Element<'_, ()> = group_box(
             "",
-            label("x", tok, A11y::new("x", Role::Status)),
+            label("x", LabelFace::Body, tok, A11y::new("x", Role::Status)),
             tok,
             CardFace::Rail,
             A11y::new("empty", Role::Group),
@@ -12860,7 +13035,7 @@ mod tests {
         );
         let mut empty_named: Element<'_, ()> = group_box(
             "",
-            label("x", tok, A11y::new("x", Role::Status)),
+            label("x", LabelFace::Body, tok, A11y::new("x", Role::Status)),
             tok,
             CardFace::Filled,
             A11y::new("trail", Role::Group),
@@ -12880,7 +13055,12 @@ mod tests {
         let rtl = tok.with_direction(crate::i18n::Direction::Rtl);
         let mut rtl_rail: Element<'_, ()> = group_box(
             "Brief",
-            label("body", rtl, A11y::new("rtl-body", Role::Status)),
+            label(
+                "body",
+                LabelFace::Body,
+                rtl,
+                A11y::new("rtl-body", Role::Status),
+            ),
             rtl,
             CardFace::Rail,
             A11y::new("rtl-brief", Role::Group),
@@ -12911,7 +13091,12 @@ mod tests {
         );
         let mut el: Element<'_, ()> = group_box(
             "Brief",
-            label("body", tok, A11y::new("body", Role::Status)),
+            label(
+                "body",
+                LabelFace::Body,
+                tok,
+                A11y::new("body", Role::Status),
+            ),
             tok,
             CardFace::Elevated,
             A11y::new("brief", Role::Group),
@@ -13026,10 +13211,19 @@ mod tests {
         let role = |n: &str, r: Role| A11y::new(n, r);
         let code = Content::with_text("fn main() {}\n");
         let mut painted: Vec<Element<'_, ()>> = vec![
-            code_block(&code, |_| (), tok, role("fn", Role::Group)),
+            highlighted_code(
+                &code,
+                None,
+                |_| (),
+                tok,
+                "dark",
+                Length::Shrink,
+                true,
+                role("fn", Role::Group),
+            ),
             hyperlink("l", (), tok, role("l", Role::Link)),
             busy_overlay(
-                label("Body", tok, role("Body", Role::Status)),
+                label("Body", LabelFace::Body, tok, role("Body", Role::Status)),
                 true,
                 0.2,
                 tok,
@@ -13076,7 +13270,7 @@ mod tests {
             ),
             highlighted_code(
                 &code,
-                "rs",
+                Some("rs"),
                 |_| (),
                 tok,
                 "dark",
@@ -13105,7 +13299,7 @@ mod tests {
                 btn("x"),
             ),
             tooltip_wrap(
-                label("n", tok, role("n", Role::Status)),
+                label("n", LabelFace::Body, tok, role("n", Role::Status)),
                 "tip",
                 TooltipAnchor::Follow,
                 tok,
@@ -13121,14 +13315,20 @@ mod tests {
             ),
             group_box(
                 "Box",
-                label("in", tok, role("in", Role::Status)),
+                label("in", LabelFace::Body, tok, role("in", Role::Status)),
                 tok,
                 CardFace::Elevated,
                 role("box", Role::Group),
                 None,
             ),
-            banner("Hi", None, tok, role("ban", Role::Status)),
-            info_bar(ToastKind::Info, "n", tok, role("ib", Role::Status)),
+            banner("Hi", None, None, tok, role("ban", Role::Status)),
+            banner(
+                "n",
+                None,
+                Some(ToastKind::Info),
+                tok,
+                role("ib", Role::Status),
+            ),
         ];
         for el in &mut painted {
             draw_once(el);
@@ -13170,7 +13370,7 @@ mod tests {
         let acc = Accordion { open: Some(0) };
         let mut av = accordion_view(
             &["A".into()],
-            vec![label("b", tok, role("b", Role::Header))],
+            vec![label("b", LabelFace::Body, tok, role("b", Role::Header))],
             &acc,
             1.0,
             |_| (),
@@ -13378,16 +13578,20 @@ mod tests {
             role("vf", Role::Group).with_disabled(true),
         );
         draw_once(&mut dead_vf);
-        let mut dead_block = code_block(
+        let mut dead_block = highlighted_code(
             &code,
+            None,
             |_| (),
             tok,
+            "dark",
+            Length::Shrink,
+            true,
             role("blk", Role::TextBox).with_disabled(true),
         );
         draw_once(&mut dead_block);
         let mut dead_code = highlighted_code(
             &code,
-            "rs",
+            Some("rs"),
             |_| (),
             tok,
             "dark",
@@ -13419,7 +13623,7 @@ mod tests {
         draw_once(&mut instant);
         let mut closed = accordion_view(
             &["A".into()],
-            vec![label("b", tok, role("b", Role::Header))],
+            vec![label("b", LabelFace::Body, tok, role("b", Role::Header))],
             &Accordion { open: None },
             0.0,
             |_| (),
@@ -13430,7 +13634,7 @@ mod tests {
         let mut exp_shut = expander(
             "Notes",
             None,
-            label("more", tok, role("more", Role::Status)),
+            label("more", LabelFace::Body, tok, role("more", Role::Status)),
             48.0,
             false,
             0.0,
@@ -13442,7 +13646,7 @@ mod tests {
         let mut exp_open = expander(
             "Notes",
             None,
-            label("more", tok, role("more", Role::Status)),
+            label("more", LabelFace::Body, tok, role("more", Role::Status)),
             48.0,
             true,
             1.0,
@@ -13454,7 +13658,7 @@ mod tests {
         let mut exp_off = expander(
             "Notes",
             None,
-            label("more", tok, role("more", Role::Status)),
+            label("more", LabelFace::Body, tok, role("more", Role::Status)),
             48.0,
             false,
             0.0,
@@ -14167,7 +14371,7 @@ mod tests {
         let tok = named("dark").tokens;
         let code = highlighted_code(
             &content,
-            "md",
+            Some("md"),
             |_| (),
             tok,
             "dark",
@@ -14205,7 +14409,16 @@ mod tests {
         );
         assert_eq!(body.as_widget().size().height, Length::Shrink);
         assert_eq!(body.as_widget().size().width, Length::Fill);
-        let block = code_block(&content, |_| (), tok, A11y::new("src", Role::TextBox));
+        let block = highlighted_code(
+            &content,
+            None,
+            |_| (),
+            tok,
+            "dark",
+            Length::Shrink,
+            true,
+            A11y::new("src", Role::TextBox),
+        );
         assert_eq!(block.as_widget().size().height, Length::Shrink);
         let src = include_str!("widget.rs");
         let hl = src
@@ -14220,7 +14433,7 @@ mod tests {
         assert!(hl.contains("wrapping"));
         assert!(!hl.contains("if !a11y.disabled"));
         let block_src = src
-            .split("pub fn code_block")
+            .split("pub fn highlighted_code")
             .nth(1)
             .unwrap()
             .split("/// A text link")
@@ -14363,7 +14576,14 @@ mod tests {
             |_| (),
             Some(Id::from("vc-scroll")),
             tok,
-            |i| label(format!("r{i}"), tok, A11y::new("r", Role::ListItem)),
+            |i| {
+                label(
+                    format!("r{i}"),
+                    LabelFace::Body,
+                    tok,
+                    A11y::new("r", Role::ListItem),
+                )
+            },
             A11y::new("vc", Role::List),
         );
         draw_once(&mut el);
@@ -14378,7 +14598,8 @@ mod tests {
             None,
             tok,
             {
-                let paint = |_: usize| label("x", tok, A11y::new("x", Role::ListItem));
+                let paint =
+                    |_: usize| label("x", LabelFace::Body, tok, A11y::new("x", Role::ListItem));
                 let _ = paint(0);
                 paint
             },
@@ -14418,7 +14639,14 @@ mod tests {
             |_| window,
             None,
             tok,
-            |i| label(format!("r{i}"), tok, A11y::new("r", Role::ListItem)),
+            |i| {
+                label(
+                    format!("r{i}"),
+                    LabelFace::Body,
+                    tok,
+                    A11y::new("r", Role::ListItem),
+                )
+            },
             A11y::new("vc", Role::List),
         );
         let mut tree = Tree::new(el.as_widget());
@@ -14481,6 +14709,7 @@ mod tests {
             tok,
             |_| (),
             A11y::new("md", Role::Group),
+            MarkdownOpts::default(),
         );
         let plain = crate::select::markdown_plain(&doc.items);
         assert!(plain.contains("Title") && plain.contains("Second block."));
@@ -14529,6 +14758,7 @@ mod tests {
             tok,
             |_| crate::select::MarkdownPointer::Release,
             A11y::new("md-span", Role::Group),
+            MarkdownOpts::default(),
         );
         draw_once(&mut painted);
         assert!(st.span.text(&doc.items).contains("Title"));
@@ -14544,6 +14774,7 @@ mod tests {
             tok,
             |_| (),
             A11y::new("md-head", Role::Group),
+            MarkdownOpts::default(),
         );
         draw_once(&mut part);
         let nested = parse("- first\n  - nested\n- second");
@@ -14571,6 +14802,7 @@ mod tests {
             tok,
             |_| (),
             A11y::new("md-nest", Role::Group),
+            MarkdownOpts::default(),
         );
         draw_once(&mut nest);
     }
@@ -14591,6 +14823,7 @@ mod tests {
             tok,
             |_| crate::select::MarkdownPointer::Release,
             A11y::new("md-press", Role::Group),
+            MarkdownOpts::default(),
         );
         let mut tree = Tree::new(el.as_widget());
         let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
@@ -15088,7 +15321,7 @@ mod tests {
         assert!((after.scroll - 4.0).abs() < 0.01);
         let mut scroller: Element<'_, f32> = scroll(
             iced::widget::column![
-                label("a", tok, A11y::new("a", Role::Status)),
+                label("a", LabelFace::Body, tok, A11y::new("a", Role::Status)),
                 Space::new().height(800.0),
             ]
             .into(),
@@ -15196,7 +15429,7 @@ mod tests {
 
         let mut scroller: Element<'_, f32> = scroll(
             iced::widget::column![
-                label("a", tok, A11y::new("a", Role::Status)),
+                label("a", LabelFace::Body, tok, A11y::new("a", Role::Status)),
                 Space::new().height(800.0),
             ]
             .into(),
@@ -15461,9 +15694,9 @@ mod tests {
             smallest_descendant_width(&mut pick, iced::Size::new(280.0, 40.0)) < 48.0,
             "radio mark must stay a small start child",
         );
-        let mut box_el: Element<'_, bool> = checkbox(
+        let mut box_el: Element<'_, CheckState> = checkbox(
             "Accept",
-            false,
+            CheckState::Unchecked,
             |v| v,
             tok,
             A11y::new("Accept", Role::Checkbox),
@@ -15549,10 +15782,10 @@ mod tests {
         use iced::{Font, Pixels, Size};
 
         let src = include_str!("widget.rs")
-            .split("pub fn meta<")
+            .split("LabelFace::Meta =>")
             .nth(1)
             .unwrap()
-            .split("/// A monospace panel")
+            .split("LabelFace::Display =>")
             .next()
             .unwrap();
         must(
@@ -15813,7 +16046,12 @@ mod tests {
         assert_eq!(closed_disclosure(tok), "◂");
 
         let titles = ["Files".into()];
-        let body = label("body", tok, A11y::new("body", Role::Status));
+        let body = label(
+            "body",
+            LabelFace::Body,
+            tok,
+            A11y::new("body", Role::Status),
+        );
         let mut acc: Element<'_, usize> = accordion_view(
             &titles,
             vec![body],
@@ -15848,9 +16086,9 @@ mod tests {
         let tok = named("dark")
             .tokens
             .with_direction(crate::i18n::Direction::Rtl);
-        let mut box_el: Element<'_, bool> = checkbox(
+        let mut box_el: Element<'_, CheckState> = checkbox(
             "Accept",
-            true,
+            CheckState::Checked,
             |on| on,
             tok,
             A11y::new("Accept", Role::Checkbox).with_checked(true),
@@ -15918,15 +16156,20 @@ mod tests {
     #[test]
     fn empty_checkbox_label_is_shrink_width() {
         let tok = named("dark").tokens;
-        let mut named_box: Element<'_, bool> = checkbox(
+        let mut named_box: Element<'_, CheckState> = checkbox(
             "Accept",
-            false,
+            CheckState::Unchecked,
             |on| on,
             tok,
             A11y::new("Accept", Role::Checkbox),
         );
-        let mut empty: Element<'_, bool> =
-            checkbox("", false, |on| on, tok, A11y::new("row", Role::Checkbox));
+        let mut empty: Element<'_, CheckState> = checkbox(
+            "",
+            CheckState::Unchecked,
+            |s| s,
+            tok,
+            A11y::new("row", Role::Checkbox),
+        );
         let named_w = layout_size(&mut named_box, iced::Size::new(320.0, 48.0)).width;
         let empty_w = layout_size(&mut empty, iced::Size::new(320.0, 48.0)).width;
         must(
@@ -17684,7 +17927,12 @@ mod tests {
     #[test]
     fn expander_trail_keeps_the_string_title() {
         let tok = named("dark").tokens;
-        let body = label("more", tok, A11y::new("more", Role::Status));
+        let body = label(
+            "more",
+            LabelFace::Body,
+            tok,
+            A11y::new("more", Role::Status),
+        );
         let count = badge(
             "3",
             None,
@@ -17704,7 +17952,12 @@ mod tests {
             tok,
             A11y::new("Notes", Role::Group),
         );
-        let body = label("more", tok, A11y::new("more", Role::Status));
+        let body = label(
+            "more",
+            LabelFace::Body,
+            tok,
+            A11y::new("more", Role::Status),
+        );
         let _: Element<'_, bool> = expander(
             "Notes",
             None,
@@ -17788,7 +18041,7 @@ mod tests {
             }
             messages
         };
-        let mut box_el: Element<'_, CheckState> = checkbox_indeterminate(
+        let mut box_el: Element<'_, CheckState> = checkbox(
             "all",
             CheckState::Unchecked,
             |s| s,
@@ -18074,12 +18327,12 @@ mod tests {
         let tall = || {
             Column::new()
                 .spacing(8)
-                .push(label("one", tok, a11y("one")))
-                .push(label("two", tok, a11y("two")))
-                .push(label("three", tok, a11y("three")))
-                .push(label("four", tok, a11y("four")))
-                .push(label("five", tok, a11y("five")))
-                .push(label("six", tok, a11y("six")))
+                .push(label("one", LabelFace::Body, tok, a11y("one")))
+                .push(label("two", LabelFace::Body, tok, a11y("two")))
+                .push(label("three", LabelFace::Body, tok, a11y("three")))
+                .push(label("four", LabelFace::Body, tok, a11y("four")))
+                .push(label("five", LabelFace::Body, tok, a11y("five")))
+                .push(label("six", LabelFace::Body, tok, a11y("six")))
                 .into()
         };
         let mut shut: Element<'_, bool> = expander(
@@ -18136,8 +18389,8 @@ mod tests {
             .with_direction(crate::i18n::Direction::Rtl);
         let titles = ["Files".to_string(), "Appearance".to_string()];
         let bodies = vec![
-            label("a", tok, A11y::new("a", Role::Status)),
-            label("b", tok, A11y::new("b", Role::Status)),
+            label("a", LabelFace::Body, tok, A11y::new("a", Role::Status)),
+            label("b", LabelFace::Body, tok, A11y::new("b", Role::Status)),
         ];
         let acc = crate::collection::Accordion { open: Some(0) };
         let mut el: Element<'_, usize> = accordion_view(
@@ -18202,7 +18455,12 @@ mod tests {
         let mut el: Element<'_, bool> = expander(
             "Notes",
             Some(trail),
-            label("more", tok, A11y::new("more", Role::Status)),
+            label(
+                "more",
+                LabelFace::Body,
+                tok,
+                A11y::new("more", Role::Status),
+            ),
             Peek::Lines(2),
             false,
             0.0,
@@ -18282,7 +18540,12 @@ mod tests {
         let mut el: Element<'_, bool> = expander(
             "Notes",
             None,
-            label("body-line", tok, A11y::new("body-line", Role::Status)),
+            label(
+                "body-line",
+                LabelFace::Body,
+                tok,
+                A11y::new("body-line", Role::Status),
+            ),
             Peek::Lines(2),
             true,
             1.0,
@@ -18326,6 +18589,7 @@ mod tests {
             None,
             label(
                 "more",
+                LabelFace::Body,
                 named("dark").tokens,
                 A11y::new("more", Role::Status),
             ),
@@ -18444,7 +18708,14 @@ mod tests {
     fn open_accordion_shows_a_body_under_its_header() {
         let tok = named("dark").tokens;
         let titles = ["Files".into()];
-        let body = || label("New, Open, Save", tok, A11y::new("body", Role::Status));
+        let body = || {
+            label(
+                "New, Open, Save",
+                LabelFace::Body,
+                tok,
+                A11y::new("body", Role::Status),
+            )
+        };
         let mut closed: Element<'_, ()> = accordion_view(
             &titles,
             vec![body()],
@@ -18993,7 +19264,7 @@ mod tests {
                     "Ok",
                     checkbox(
                         "Ok",
-                        false,
+                        CheckState::Unchecked,
                         |_| 99usize,
                         tok,
                         A11y::new("Ok", Role::Checkbox),
@@ -19259,7 +19530,7 @@ mod tests {
                 "",
                 checkbox(
                     "Remember",
-                    false,
+                    CheckState::Unchecked,
                     |_| 99usize,
                     tok,
                     A11y::new("Remember", Role::Checkbox),
@@ -19325,7 +19596,7 @@ mod tests {
                     "Ok",
                     checkbox(
                         "Ok",
-                        false,
+                        CheckState::Unchecked,
                         |_| 99usize,
                         tok,
                         A11y::new("Ok", Role::Checkbox),
@@ -19526,7 +19797,12 @@ mod tests {
         let acc = Accordion { open: Some(0) };
         let mut accordion: Element<'_, usize> = accordion_view(
             &["Files".into()],
-            vec![label("body", pill, A11y::new("body", Role::Status))],
+            vec![label(
+                "body",
+                LabelFace::Body,
+                pill,
+                A11y::new("body", Role::Status),
+            )],
             &acc,
             1.0,
             |i| i,
@@ -19849,10 +20125,30 @@ mod tests {
 
         let tall = Column::new()
             .spacing(8)
-            .push(label("one", tok, A11y::new("one", Role::Status)))
-            .push(label("two", tok, A11y::new("two", Role::Status)))
-            .push(label("three", tok, A11y::new("three", Role::Status)))
-            .push(label("four", tok, A11y::new("four", Role::Status)))
+            .push(label(
+                "one",
+                LabelFace::Body,
+                tok,
+                A11y::new("one", Role::Status),
+            ))
+            .push(label(
+                "two",
+                LabelFace::Body,
+                tok,
+                A11y::new("two", Role::Status),
+            ))
+            .push(label(
+                "three",
+                LabelFace::Body,
+                tok,
+                A11y::new("three", Role::Status),
+            ))
+            .push(label(
+                "four",
+                LabelFace::Body,
+                tok,
+                A11y::new("four", Role::Status),
+            ))
             .into();
         let mut mid: Element<'_, bool> = expander(
             "Notes",
@@ -19869,7 +20165,12 @@ mod tests {
 
         let mut acc: Element<'_, ()> = accordion_view(
             &["A".into()],
-            vec![label("b", tok, A11y::new("b", Role::Header))],
+            vec![label(
+                "b",
+                LabelFace::Body,
+                tok,
+                A11y::new("b", Role::Header),
+            )],
             &Accordion { open: Some(0) },
             0.4,
             |_| (),
@@ -20116,7 +20417,12 @@ mod tests {
         use iced::advanced::widget::Tree;
         use iced::{Event, Font, Pixels, Point, Rectangle, Size};
         let tok = named("dark").tokens;
-        let face = label("row", tok, A11y::new("row", Role::ListItem));
+        let face = label(
+            "row",
+            LabelFace::Body,
+            tok,
+            A11y::new("row", Role::ListItem),
+        );
         let mut el: Element<'_, ItemClick> = item_press(face, |button, modifiers| ItemClick {
             id: 1,
             button,
@@ -20169,8 +20475,12 @@ mod tests {
             );
         }
         assert!(messages.is_empty());
-        let mut cap: Element<'_, ()> =
-            capture_press(label("pad", tok, A11y::new("pad", Role::Group)));
+        let mut cap: Element<'_, ()> = capture_press(label(
+            "pad",
+            LabelFace::Body,
+            tok,
+            A11y::new("pad", Role::Group),
+        ));
         drive_tree(&mut cap, Size::new(80.0, 40.0));
     }
 
@@ -20186,6 +20496,7 @@ mod tests {
             tok,
             |_| crate::select::MarkdownPointer::Release,
             A11y::new("md", Role::Group),
+            MarkdownOpts::default(),
         );
         drive_tree(&mut el, iced::Size::new(400.0, 240.0));
         let url = String::from("https://example.com");

@@ -36,7 +36,7 @@ use crate::typo;
 use crate::variant::Variant;
 use crate::widget::{
     button, dismiss_button, group_box, icon_svg, label, meta, scroll, search_input, tab_bar,
-    text_input, ButtonOpts, CardFace, FieldOpts,
+    text_input, ButtonOpts, CardFace, FieldOpts, LabelFace,
 };
 
 /// Group actions by the id prefix before `.` (`file.save` → `file`).
@@ -100,16 +100,18 @@ fn bind_menu_pick<M: Clone>(entries: Vec<(String, M)>) -> impl Fn(String) -> M {
 /// use icedtea::theme;
 /// let tok = theme::named("dark").tokens;
 /// let mut table = ActionTable::new();
-/// table.insert(Action::new("file.save", "Save", ()));
+/// table.insert(Action::new("file.save", "Save", false));
 /// let cat = Catalog::builtin();
-/// let _: icedtea::Element<'_, ()> =
-///     pattern::menu_bar(&table, tok, Direction::Ltr, &cat);
+/// let on_open = |open| open;
+/// let _: icedtea::Element<'_, bool> =
+///     pattern::menu_bar(&table, tok, Direction::Ltr, &cat, on_open);
 /// ```
 pub fn menu_bar<'a, M: Clone + 'a>(
     table: &'a ActionTable<M>,
     tok: Tokens,
     dir: Direction,
     cat: &Catalog,
+    on_open: impl Fn(bool) -> M + Clone + 'a,
 ) -> Element<'a, M> {
     let groups = order(dir, menu_groups(table));
     let mut titles = Row::new()
@@ -130,6 +132,7 @@ pub fn menu_bar<'a, M: Clone + 'a>(
             heading,
             labels,
             bind_menu_pick(entries),
+            on_open.clone(),
             tok,
         ));
     }
@@ -251,7 +254,7 @@ pub fn command_bar<'a, M: Clone + 'a>(
 
 /// Footer text plus shortcut hints from the same table.
 ///
-/// `tone` paints the left with [`crate::widget::info_bar`] when set,
+/// `tone` paints the left with [`crate::widget::banner`] when set,
 /// otherwise meta. `caption` is one right-rail string when set.
 /// `None` paints each enabled shortcut as two faces: the chord in
 /// [`Tokens::text`], the title in [`Tokens::muted`] at meta size.
@@ -292,7 +295,13 @@ pub fn status_bar<'a, M: Clone + 'a>(
 ) -> Element<'a, M> {
     let status = status.into();
     let left: Element<'a, M> = if let Some(kind) = tone {
-        crate::widget::info_bar(kind, status.clone(), tok, A11y::new(status, Role::Status))
+        crate::widget::banner(
+            status.clone(),
+            None,
+            Some(kind),
+            tok,
+            A11y::new(status, Role::Status),
+        )
     } else {
         meta(status.clone(), tok, A11y::new(status, Role::Status))
     };
@@ -404,6 +413,7 @@ fn status_hint_rail<'a, M: Clone + 'a>(
 ///     1.0,
 ///     PaletteOpts::new(),
 ///     tok,
+///     A11y::new("pat", Role::Group),
 /// );
 /// ```
 #[allow(clippy::too_many_arguments)]
@@ -420,6 +430,7 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
     progress: f32,
     opts: crate::palette::PaletteOpts<'a, M>,
     tok: Tokens,
+    a11y: A11y,
 ) -> Element<'a, M> {
     let t = crate::motion::visual(progress, tok.reduced_motion);
     let paint = tok.fade(t);
@@ -528,12 +539,15 @@ pub fn command_palette_view<'a, M: Clone + 'a>(
         .max_height(opts.max_height)
         .align_x(align_start(dir))
         .style(move |_| style::fade_face(style::menu_sheet(tok), t));
-    crate::motion::overlay(
-        panel.into(),
-        t,
-        crate::motion::Slide::Down,
-        tok,
-        A11y::new("palette", Role::Menu),
+    crate::a11y::attach(
+        crate::motion::overlay(
+            panel.into(),
+            t,
+            crate::motion::Slide::Down,
+            tok,
+            a11y.clone(),
+        ),
+        &a11y,
     )
 }
 
@@ -768,6 +782,7 @@ pub(crate) fn match_ranges(query: &str, title: &str) -> Vec<(usize, usize)> {
 ///     "Create an item to begin.",
 ///     Some(("New".into(), ())),
 ///     tok,
+///     A11y::new("pat", Role::Group),
 /// );
 /// ```
 pub fn status_page<'a, M: Clone + 'a>(
@@ -775,11 +790,17 @@ pub fn status_page<'a, M: Clone + 'a>(
     body: impl Into<String>,
     action: Option<(String, M)>,
     tok: Tokens,
+    a11y: A11y,
 ) -> Element<'a, M> {
     let title = title.into();
     let body = body.into();
     let mut col = column![
-        label(title.clone(), tok, A11y::new(title, Role::Header)),
+        label(
+            title.clone(),
+            LabelFace::Body,
+            tok,
+            A11y::new(title, Role::Header)
+        ),
         meta(body.clone(), tok, A11y::new(body, Role::Status)),
     ]
     .spacing(tok.density.gap())
@@ -795,13 +816,16 @@ pub fn status_page<'a, M: Clone + 'a>(
             A11y::button(t),
         ));
     }
-    container(col)
-        .padding(tok.density.inset() * 2.0)
-        .center_x(Length::Fill)
-        .center_y(Length::Fill)
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .into()
+    crate::a11y::attach(
+        container(col)
+            .padding(tok.density.inset() * 2.0)
+            .center_x(Length::Fill)
+            .center_y(Length::Fill)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into(),
+        &a11y,
+    )
 }
 
 /// Name, version, license, and credits.
@@ -813,13 +837,21 @@ pub fn status_page<'a, M: Clone + 'a>(
 ///
 ///
 /// ```
+/// use icedtea::a11y::{A11y, Role};
 /// use icedtea::i18n::Catalog;
 /// use icedtea::pattern;
 /// use icedtea::theme;
 /// let tok = theme::named("dark").tokens;
 /// let cat = Catalog::builtin();
-/// let _: icedtea::Element<'_, ()> =
-///     pattern::about_page("icedtea", "0.2.0", "MIT", "Credits", tok, &cat);
+/// let _: icedtea::Element<'_, ()> = pattern::about_page(
+///     "icedtea",
+///     "0.2.0",
+///     "MIT",
+///     "Credits",
+///     tok,
+///     &cat,
+///     A11y::new("about", Role::Dialog),
+/// );
 /// ```
 pub fn about_page<'a, M: Clone + 'a>(
     name: &'a str,
@@ -828,10 +860,11 @@ pub fn about_page<'a, M: Clone + 'a>(
     credits: &'a str,
     tok: Tokens,
     cat: &'a Catalog,
+    a11y: A11y,
 ) -> Element<'a, M> {
     const ABOUT_WIDTH: f32 = 420.0;
     let inner = (ABOUT_WIDTH - 2.0 * tok.density.sheet()).max(120.0);
-    container(group_box(
+    let page = container(group_box(
         cat.t("about"),
         column![
             text(name).size(tok.page()).color(tok.scheme().on_surface),
@@ -854,7 +887,8 @@ pub fn about_page<'a, M: Clone + 'a>(
         None,
     ))
     .width(Length::Fixed(ABOUT_WIDTH))
-    .into()
+    .into();
+    crate::a11y::attach(page, &a11y)
 }
 
 /// Searchable preferences groups.
@@ -898,7 +932,8 @@ pub fn filter_prefs<'a>(groups: &'a [PrefGroup], query: &str) -> Vec<&'a PrefGro
 /// }];
 /// let on_query = |q| q;
 /// let _: icedtea::Element<'_, String> =
-///     pattern::preferences_page(&groups, "", on_query, tok, &cat);
+///     pattern::preferences_page(&groups, "", on_query, tok, &cat,
+///         A11y::new("pat", Role::Group));
 /// ```
 pub fn preferences_page<'a, M: Clone + 'a>(
     groups: &'a [PrefGroup],
@@ -906,6 +941,7 @@ pub fn preferences_page<'a, M: Clone + 'a>(
     on_query: impl Fn(String) -> M + 'a,
     tok: Tokens,
     cat: &Catalog,
+    a11y: A11y,
 ) -> Element<'a, M> {
     let filtered = filter_prefs(groups, query);
     let mut body = Column::new().spacing(tok.density.inset());
@@ -931,7 +967,7 @@ pub fn preferences_page<'a, M: Clone + 'a>(
             None,
         ));
     }
-    column![
+    let page = column![
         text_input(
             cat.t("search"),
             query,
@@ -952,7 +988,8 @@ pub fn preferences_page<'a, M: Clone + 'a>(
         ),
     ]
     .spacing(tok.density.inset())
-    .into()
+    .into();
+    crate::a11y::attach(page, &a11y)
 }
 
 /// A sidebar list beside a filling detail pane.
@@ -968,8 +1005,8 @@ pub fn preferences_page<'a, M: Clone + 'a>(
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let _: icedtea::Element<'_, ()> = pattern::list_detail(
-///     widget::label("Inbox", tok, A11y::new("Inbox", icedtea::a11y::Role::Header)),
-///     widget::label("Detail", tok, A11y::new("Detail", icedtea::a11y::Role::Header)),
+///     widget::label("Inbox", widget::LabelFace::Body, tok, A11y::new("Inbox", icedtea::a11y::Role::Header)),
+///     widget::label("Detail", widget::LabelFace::Body, tok, A11y::new("Detail", icedtea::a11y::Role::Header)),
 ///     icedtea::layout::fixed(icedtea::layout::LIST_PANE),
 ///     tok,
 ///     icedtea::i18n::Direction::Ltr,
@@ -981,6 +1018,7 @@ pub fn list_detail<'a, M: 'a>(
     sidebar: Length,
     tok: Tokens,
     dir: Direction,
+    a11y: A11y,
 ) -> Element<'a, M> {
     // List pad clears the panel edge and the rail; detail gets a full inset.
     let g = tok.density.gap();
@@ -1019,7 +1057,7 @@ pub fn list_detail<'a, M: 'a>(
     for child in order(dir, [list_pane, rule, detail_pane]) {
         row = row.push(child);
     }
-    row.width(Length::Fill).height(Length::Fill).into()
+    crate::a11y::attach(row.width(Length::Fill).height(Length::Fill).into(), &a11y)
 }
 
 /// Sidebar beside content, or a stack with Back.
@@ -1041,8 +1079,8 @@ pub fn list_detail<'a, M: 'a>(
 /// let cat = Catalog::builtin();
 /// let on_back = ();
 /// let _: icedtea::Element<'_, ()> = pattern::navigation_view(
-///     widget::label("Mail", tok, A11y::new("Mail", icedtea::a11y::Role::Header)),
-///     widget::label("Inbox", tok, A11y::new("Inbox", icedtea::a11y::Role::Header)),
+///     widget::label("Mail", widget::LabelFace::Body, tok, A11y::new("Mail", icedtea::a11y::Role::Header)),
+///     widget::label("Inbox", widget::LabelFace::Body, tok, A11y::new("Inbox", icedtea::a11y::Role::Header)),
 ///     &nav,
 ///     1600.0,
 ///     on_back,
@@ -1061,9 +1099,17 @@ pub fn navigation_view<'a, M: Clone + 'a>(
     tok: Tokens,
     cat: &Catalog,
     dir: Direction,
+    a11y: A11y,
 ) -> Element<'a, M> {
     if crate::layout::Breakpoint::from_width(width).sidebar_beside() {
-        list_detail(sidebar, content, crate::layout::fixed(260.0), tok, dir)
+        list_detail(
+            sidebar,
+            content,
+            crate::layout::fixed(260.0),
+            tok,
+            dir,
+            a11y,
+        )
     } else {
         let top = if nav.can_back() {
             button(
@@ -1078,7 +1124,10 @@ pub fn navigation_view<'a, M: Clone + 'a>(
         } else {
             crate::widget::icon_svg(Icon::Menu, tok, A11y::new("menu", Role::Image))
         };
-        column![top, content].spacing(tok.density.gap()).into()
+        crate::a11y::attach(
+            column![top, content].spacing(tok.density.gap()).into(),
+            &a11y,
+        )
     }
 }
 
@@ -1246,7 +1295,7 @@ pub fn nav_rail<'a, M: Clone + 'a>(
 /// let on_close = Msg::Close;
 /// let _: icedtea::Element<'_, Msg> = pattern::tab_view(
 ///     &tabs,
-///     widget::label("Notes", tok, A11y::new("Notes", icedtea::a11y::Role::Header)),
+///     widget::label("Notes", widget::LabelFace::Body, tok, A11y::new("Notes", icedtea::a11y::Role::Header)),
 ///     on_select,
 ///     on_close,
 ///     tok,
@@ -1258,23 +1307,27 @@ pub fn tab_view<'a, M: Clone + 'a>(
     on_select: impl Fn(usize) -> M + Copy + 'a,
     on_close: impl Fn(usize) -> M + Copy + 'a,
     tok: Tokens,
+    a11y: A11y,
 ) -> Element<'a, M> {
-    column![
-        tab_bar(
-            tabs,
-            on_select,
-            on_close,
-            0.0,
-            false,
-            tok,
-            A11y::new("tabs", Role::Tab)
-        ),
-        body
-    ]
-    .spacing(0)
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .into()
+    crate::a11y::attach(
+        column![
+            tab_bar(
+                tabs,
+                on_select,
+                on_close,
+                0.0,
+                false,
+                tok,
+                A11y::new("tabs", Role::Tab)
+            ),
+            body
+        ]
+        .spacing(0)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .into(),
+        &a11y,
+    )
 }
 
 /// Menu, toolbar, center, and status docked together.
@@ -1294,9 +1347,10 @@ pub fn tab_view<'a, M: Clone + 'a>(
 /// let save = ();
 /// table.insert(Action::new("file.save", "Save", save));
 /// let cat = Catalog::builtin();
-/// let menu = pattern::menu_bar(&table, tok, Direction::Ltr, &cat);
+/// let on_open = |_open| ();
+/// let menu = pattern::menu_bar(&table, tok, Direction::Ltr, &cat, on_open);
 /// let tools = pattern::toolbar(table.iter(), tok, Direction::Ltr);
-/// let center = widget::label("notes.txt", tok, A11y::new("doc", icedtea::a11y::Role::Header));
+/// let center = widget::label("notes.txt", widget::LabelFace::Body, tok, A11y::new("doc", icedtea::a11y::Role::Header));
 /// let status = pattern::status_bar("ok", None, None, &table, tok, Direction::Ltr);
 /// let _: icedtea::Element<'_, ()> = pattern::main_window(
 ///     menu,
@@ -1304,6 +1358,7 @@ pub fn tab_view<'a, M: Clone + 'a>(
 ///     center,
 ///     status,
 ///     tok,
+///     A11y::new("pat", Role::Group),
 /// );
 /// ```
 pub fn main_window<'a, M: Clone + 'a>(
@@ -1312,39 +1367,28 @@ pub fn main_window<'a, M: Clone + 'a>(
     center: Element<'a, M>,
     status: Element<'a, M>,
     tok: Tokens,
+    a11y: A11y,
 ) -> Element<'a, M> {
-    container(layout::dock(
-        Some(column![menu, toolbar].into()),
-        Some(status),
-        None,
-        None,
-        center,
-    ))
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .style(move |_| style::shell(tok))
-    .into()
+    crate::a11y::attach(
+        container(layout::dock(
+            Some(column![menu, toolbar].into()),
+            Some(status),
+            None,
+            None,
+            center,
+        ))
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .style(move |_| style::shell(tok))
+        .into(),
+        &a11y,
+    )
 }
 
 /// In-window modal: scene, dim wash, then the centered sheet.
-///
-/// `progress` is 0 (gone) to 1 (rest). Pass `1.0` for a static open
-/// card. The application owns [`iced::Animation`] and interpolates.
-///
-/// ```
-/// use icedtea::a11y::A11y;
-/// use icedtea::pattern;
-/// use icedtea::theme;
-/// use icedtea::widget;
-/// let tok = theme::named("dark").tokens;
-/// let _: icedtea::Element<'_, ()> = pattern::modal_card(
-///     widget::label(" ", tok, A11y::new("dim", icedtea::a11y::Role::Status)),
-///     pattern::dialog_sheet("Save", "Overwrite?", ("Save".into(), ()), None, None::<(String, ())>, None, tok),
-///     1.0,
-///     tok,
-/// );
-/// ```
-pub fn modal_card<'a, M: 'a>(
+/// Dim scene plus a centered card. Used by [`dialog_sheet`] when
+/// [`DialogOpts::backdrop`] is set.
+fn modal_card<'a, M: 'a>(
     backdrop: Element<'a, M>,
     card: Element<'a, M>,
     progress: f32,
@@ -1376,37 +1420,72 @@ pub fn modal_card<'a, M: 'a>(
         .into()
 }
 
+/// Optional extras for [`dialog_sheet`].
+pub struct DialogOpts<'a, M> {
+    pub cancel: Option<(String, M)>,
+    pub extra: Vec<(String, M)>,
+    pub icon: Option<Icon>,
+    pub backdrop: Option<Element<'a, M>>,
+    pub progress: f32,
+}
+
+impl<M> Default for DialogOpts<'_, M> {
+    fn default() -> Self {
+        Self {
+            cancel: None,
+            extra: Vec::new(),
+            icon: None,
+            backdrop: None,
+            progress: 1.0,
+        }
+    }
+}
+
 /// A confirm / message / save sheet.
 ///
-/// Primary and optional cancel messages.
+/// Primary accept is required. Cancel, extra actions, header icon,
+/// and a dim backdrop live on [`DialogOpts`].
 ///
 ///
 /// ```
-/// use icedtea::pattern;
+/// use icedtea::a11y::{A11y, Role};
+/// use icedtea::pattern::{self, DialogOpts};
 /// use icedtea::theme;
+/// use icedtea::widget::{self, LabelFace};
 /// let tok = theme::named("dark").tokens;
+/// let scene = widget::label(" ", LabelFace::Body, tok, A11y::new("dim", Role::Status));
 /// let _: icedtea::Element<'_, ()> = pattern::dialog_sheet(
 ///     "Save",
 ///     "Overwrite notes.txt?",
 ///     ("Save".into(), ()),
-///     Some(("Cancel".into(), ())),
-///     None::<(String, ())>,
-///     None,
 ///     tok,
+///     A11y::new("Save", Role::Dialog),
+///     DialogOpts {
+///         cancel: Some(("Cancel".into(), ())),
+///         backdrop: Some(scene),
+///         progress: 1.0,
+///         ..DialogOpts::default()
+///     },
 /// );
 /// ```
 pub fn dialog_sheet<'a, M: Clone + 'a>(
     title: impl Into<String>,
     body: impl Into<String>,
     accept: (String, M),
-    cancel: Option<(String, M)>,
-    extra: impl IntoIterator<Item = (String, M)>,
-    icon: Option<Icon>,
     tok: Tokens,
+    a11y: A11y,
+    opts: DialogOpts<'a, M>,
 ) -> Element<'a, M> {
     let title = title.into();
     let body = body.into();
-    let escape = cancel.as_ref().map(|(_, m)| m.clone());
+    let escape = opts.cancel.as_ref().map(|(_, m)| m.clone());
+    let DialogOpts {
+        cancel,
+        extra,
+        icon,
+        backdrop,
+        progress,
+    } = opts;
     // M3 dialog: extra, cancel (text) then confirm (filled), toward the end.
     let mut acts: Vec<Element<'a, M>> = Vec::new();
     for (t, m) in extra {
@@ -1473,7 +1552,12 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
         container(
             column![
                 head,
-                label(body.clone(), tok, A11y::new(body, Role::Status)),
+                label(
+                    body.clone(),
+                    LabelFace::Body,
+                    tok,
+                    A11y::new(body, Role::Status)
+                ),
                 actions,
             ]
             .spacing(tok.density.sheet())
@@ -1483,13 +1567,18 @@ pub fn dialog_sheet<'a, M: Clone + 'a>(
         .width(Length::Fill)
         .style(move |_| style::dialog_sheet_face(tok))
         .into(),
-        &A11y::new(title, Role::Dialog),
+        &a11y,
     );
-    match escape {
+    let sheet = match escape {
         Some(m) => crate::focus::dismiss_on_escape(sheet, m),
+        None => sheet,
+    };
+    match backdrop {
+        Some(scene) => modal_card(scene, sheet, progress, tok),
         None => sheet,
     }
 }
+
 /// One titled group of menu actions (M3 menu section).
 #[derive(Debug, Clone)]
 pub struct MenuSection<M> {
@@ -1697,9 +1786,9 @@ pub fn cascade_menu<'a, M: Clone + 'a>(
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let body = widget::label("Props", tok, A11y::new("Props", Role::Status));
+/// let body = widget::label("Props", widget::LabelFace::Body, tok, A11y::new("Props", Role::Status));
 /// let _: icedtea::Element<'_, ()> = pattern::side_sheet(
-///     widget::label("Scene", tok, A11y::new("Scene", Role::Status)),
+///     widget::label("Scene", widget::LabelFace::Body, tok, A11y::new("Scene", Role::Status)),
 ///     "Inspector",
 ///     body,
 ///     Some(()),
@@ -1719,12 +1808,18 @@ pub fn side_sheet<'a, M: Clone + 'a>(
     width: f32,
     progress: f32,
     tok: Tokens,
+    a11y: A11y,
 ) -> Element<'a, M> {
     let title = title.into();
     let t = crate::motion::visual(progress, tok.reduced_motion);
     let paint = tok.fade(t);
     let mut head_kids: Vec<Element<'a, M>> = vec![
-        label(title.clone(), paint, A11y::new(title.clone(), Role::Header)),
+        label(
+            title.clone(),
+            LabelFace::Body,
+            paint,
+            A11y::new(title.clone(), Role::Header),
+        ),
         Space::new().width(Length::Fill).into(),
     ];
     if let Some(m) = on_dismiss {
@@ -1779,7 +1874,7 @@ pub fn side_sheet<'a, M: Clone + 'a>(
         dock_row = dock_row.push(kid);
     }
     let docked = container(dock_row).width(Length::Fill).height(Length::Fill);
-    Stack::new()
+    let sheet_stack = Stack::new()
         .push(backdrop)
         .push(
             container(Space::new().width(Length::Fill).height(Length::Fill))
@@ -1790,7 +1885,8 @@ pub fn side_sheet<'a, M: Clone + 'a>(
         .push(docked)
         .width(Length::Fill)
         .height(Length::Fill)
-        .into()
+        .into();
+    crate::a11y::attach(sheet_stack, &a11y)
 }
 
 fn context_row_h(density: crate::density::Density) -> f32 {
@@ -1847,6 +1943,7 @@ pub fn context_origin(origin: Point, size: Size, viewport: Size) -> Point {
 ///     (),
 ///     1.0,
 ///     tok,
+///     A11y::new("pat", Role::Group),
 /// );
 /// ```
 pub fn context_menu<'a, M: Clone + 'a>(
@@ -1856,6 +1953,7 @@ pub fn context_menu<'a, M: Clone + 'a>(
     on_dismiss: M,
     progress: f32,
     tok: Tokens,
+    a11y: A11y,
 ) -> Element<'a, M> {
     let t = crate::motion::visual(progress, tok.reduced_motion);
     let paint = tok.fade(t);
@@ -1933,7 +2031,7 @@ pub fn context_menu<'a, M: Clone + 'a>(
         .width(Length::Fill)
         .height(Length::Fill)
         .into();
-    crate::focus::dismiss_on_escape(stack, on_dismiss)
+    crate::a11y::attach(crate::focus::dismiss_on_escape(stack, on_dismiss), &a11y)
 }
 
 /// Master, detail, and a side inspector stay in one row.
@@ -1948,12 +2046,13 @@ pub fn context_menu<'a, M: Clone + 'a>(
 /// use icedtea::theme;
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
-/// let lab = |s| widget::label(s, tok, A11y::new(s, Role::Status));
+/// let lab = |s| widget::label(s, widget::LabelFace::Body, tok, A11y::new(s, Role::Status));
 /// let _: icedtea::Element<'_, ()> = pattern::inspector(
 ///     lab("List"),
 ///     lab("Body"),
 ///     lab("Props"),
 ///     tok,
+///     A11y::new("pat", Role::Group),
 /// );
 /// ```
 pub fn inspector<'a, M: 'a>(
@@ -1961,6 +2060,7 @@ pub fn inspector<'a, M: 'a>(
     detail: Element<'a, M>,
     props: Element<'a, M>,
     tok: Tokens,
+    a11y: A11y,
 ) -> Element<'a, M> {
     let list_pane: Element<'a, M> = container(list)
         .width(layout::fixed(200.0))
@@ -1982,7 +2082,7 @@ pub fn inspector<'a, M: 'a>(
     for child in order(tok.direction, [list_pane, detail_pane, props_pane]) {
         row = row.push(child);
     }
-    row.into()
+    crate::a11y::attach(row.into(), &a11y)
 }
 
 /// Nested dock tree: splits with a sash, tab groups, and leaf chrome.
@@ -2017,7 +2117,7 @@ pub fn inspector<'a, M: 'a>(
 /// let _: icedtea::Element<'_, Msg> = pattern::workspace(
 ///     &root,
 ///     |id| {
-///         widget::label(id, tok, A11y::new(id, Role::Status))
+///         widget::label(id, widget::LabelFace::Body, tok, A11y::new(id, Role::Status))
 ///     },
 ///     |_id| None,
 ///     icedtea::iced::Size::new(400.0, 240.0),
@@ -2111,7 +2211,7 @@ where
             let body = (paint.pane)(id);
             let on_tab = paint.on_tab;
             let pick = move |i| on_tab(gi, i);
-            tab_view(&tabs, body, pick, pick, tok)
+            tab_view(&tabs, body, pick, pick, tok, A11y::new("pat", Role::Group))
         }
         crate::workspace::DockNode::Split {
             axis,
@@ -2168,7 +2268,7 @@ where
 /// let dock = ();
 /// let _: icedtea::Element<'_, ()> = pattern::tool_panel(
 ///     "Outline",
-///     widget::label("files", tok, A11y::new("files", Role::Status)),
+///     widget::label("files", widget::LabelFace::Body, tok, A11y::new("files", Role::Status)),
 ///     Some(dock),
 ///     "Dock",
 ///     tok,
@@ -2226,8 +2326,8 @@ pub fn tool_panel<'a, M: Clone + 'a>(
 /// let tok = theme::named("dark").tokens;
 /// let _: icedtea::Element<'_, ()> = pattern::drawer(
 ///     true,
-///     widget::label("nav", tok, A11y::new("nav", Role::Group)),
-///     widget::label("main", tok, A11y::new("main", Role::Status)),
+///     widget::label("nav", widget::LabelFace::Body, tok, A11y::new("nav", Role::Group)),
+///     widget::label("main", widget::LabelFace::Body, tok, A11y::new("main", Role::Status)),
 ///     1.0,
 ///     (),
 ///     tok,
@@ -2240,11 +2340,12 @@ pub fn drawer<'a, M: Clone + 'a>(
     progress: f32,
     on_close: M,
     tok: Tokens,
+    a11y: A11y,
 ) -> Element<'a, M> {
     let t = crate::motion::visual(progress, tok.reduced_motion);
     if !open && t <= 0.0 {
         let _ = on_close;
-        content
+        crate::a11y::attach(content, &a11y)
     } else {
         let pane = crate::motion::expand(
             container(pane).width(220.0).into(),
@@ -2254,9 +2355,19 @@ pub fn drawer<'a, M: Clone + 'a>(
             tok,
             A11y::new("drawer-pane", Role::Group),
         );
-        crate::focus::dismiss_on_escape(
-            list_detail(pane, content, Length::Shrink, tok, tok.direction),
-            on_close,
+        crate::a11y::attach(
+            crate::focus::dismiss_on_escape(
+                list_detail(
+                    pane,
+                    content,
+                    Length::Shrink,
+                    tok,
+                    tok.direction,
+                    a11y.clone(),
+                ),
+                on_close,
+            ),
+            &a11y,
         )
     }
 }
@@ -2273,12 +2384,14 @@ pub fn drawer<'a, M: Clone + 'a>(
 /// let tok = theme::named("dark").tokens;
 /// let mut table = ActionTable::new();
 /// table.insert(Action::new("file.save", "Save", ()));
-/// let _: icedtea::Element<'_, ()> = pattern::cheatsheet(&table, "", tok);
+/// let _: icedtea::Element<'_, ()> =
+///     pattern::cheatsheet(&table, "", tok, A11y::new("pat", Role::Group));
 /// ```
 pub fn cheatsheet<'a, M: Clone + 'a>(
     table: &ActionTable<M>,
     query: &str,
     tok: Tokens,
+    a11y: A11y,
 ) -> Element<'a, M> {
     let q = query.trim().to_ascii_lowercase();
     let rail = crate::chrome::SCROLL_RAIL_WIDTH;
@@ -2308,6 +2421,7 @@ pub fn cheatsheet<'a, M: Clone + 'a>(
         let mut line = Row::new().align_y(Alignment::Center);
         let title: Element<'a, M> = label(
             a.title.clone(),
+            LabelFace::Body,
             tok,
             A11y::new(a.title.clone(), Role::Status),
         );
@@ -2322,12 +2436,12 @@ pub fn cheatsheet<'a, M: Clone + 'a>(
         scroll(
             col.into(),
             tok,
-            A11y::new("cheatsheet", Role::Group),
+            a11y.clone(),
             false,
             None,
             None::<fn(_) -> M>,
         ),
-        &A11y::new("cheatsheet", Role::Group),
+        &a11y,
     )
 }
 
@@ -2534,11 +2648,22 @@ mod tests {
         let tok = crate::theme::named("dark").tokens;
         let mut el: Element<'_, u8> = drawer(
             true,
-            crate::widget::label("n", tok, A11y::new("n", Role::Group)),
-            crate::widget::label("c", tok, A11y::new("c", Role::Status)),
+            crate::widget::label(
+                "n",
+                crate::widget::LabelFace::Body,
+                tok,
+                A11y::new("n", Role::Group),
+            ),
+            crate::widget::label(
+                "c",
+                crate::widget::LabelFace::Body,
+                tok,
+                A11y::new("c", Role::Status),
+            ),
             1.0,
             1,
             tok,
+            A11y::new("drawer", Role::Group),
         );
         use iced::advanced::clipboard;
         use iced::advanced::layout::{Layout, Limits};
@@ -2639,10 +2764,14 @@ mod tests {
             "Save",
             "Overwrite?",
             ("Save".into(), ()),
-            Some(("Cancel".into(), ())),
-            [("Keep".into(), ())],
-            Some(Icon::Warning),
             tok,
+            A11y::new("Save", Role::Dialog),
+            DialogOpts {
+                cancel: Some(("Cancel".into(), ())),
+                extra: vec![("Keep".into(), ())],
+                icon: Some(Icon::Warning),
+                ..DialogOpts::default()
+            },
         );
         draw_once(&mut dlg);
     }
@@ -2683,10 +2812,13 @@ mod tests {
                 "Save",
                 "Overwrite?",
                 ("Save".into(), ()),
-                Some(("Cancel".into(), ())),
-                [("Don't save".into(), ())],
-                None,
                 tok,
+                A11y::new("Save", Role::Dialog),
+                DialogOpts {
+                    cancel: Some(("Cancel".into(), ())),
+                    extra: vec![("Don't save".into(), ())],
+                    ..DialogOpts::default()
+                },
             )
         };
         let ltr_w = action_widths(&mut mk(ltr));
@@ -2761,24 +2893,81 @@ mod tests {
             tok,
             A11y::new("c2", Role::Menu),
         );
-        let body = label("x", tok, A11y::new("x", Role::Status));
-        let scene = label("s", tok, A11y::new("s", Role::Status));
-        let mut sheet: Element<'_, ()> =
-            side_sheet(scene, "I", body, Some(()), true, 240.0, 1.0, tok);
+        let body = label(
+            "x",
+            crate::widget::LabelFace::Body,
+            tok,
+            A11y::new("x", Role::Status),
+        );
+        let scene = label(
+            "s",
+            crate::widget::LabelFace::Body,
+            tok,
+            A11y::new("s", Role::Status),
+        );
+        let mut sheet: Element<'_, ()> = side_sheet(
+            scene,
+            "I",
+            body,
+            Some(()),
+            true,
+            240.0,
+            1.0,
+            tok,
+            A11y::new("pat", Role::Group),
+        );
         draw_once(&mut sheet);
-        let body = label("x", tok, A11y::new("x", Role::Status));
-        let scene = label("s", tok, A11y::new("s", Role::Status));
-        let _: Element<'_, ()> = side_sheet(scene, "L", body, None, false, 100.0, 1.0, tok);
+        let body = label(
+            "x",
+            crate::widget::LabelFace::Body,
+            tok,
+            A11y::new("x", Role::Status),
+        );
+        let scene = label(
+            "s",
+            crate::widget::LabelFace::Body,
+            tok,
+            A11y::new("s", Role::Status),
+        );
+        let _: Element<'_, ()> = side_sheet(
+            scene,
+            "L",
+            body,
+            None,
+            false,
+            100.0,
+            1.0,
+            tok,
+            A11y::new("pat", Role::Group),
+        );
         let rtl = tok.with_direction(crate::i18n::Direction::Rtl);
-        let body = label("x", rtl, A11y::new("x", Role::Status));
-        let scene = label("s", rtl, A11y::new("s", Role::Status));
-        let mut rtl_end: Element<'_, ()> =
-            side_sheet(scene, "I", body, Some(()), true, 240.0, 1.0, rtl);
+        let body = label("x", LabelFace::Body, rtl, A11y::new("x", Role::Status));
+        let scene = label("s", LabelFace::Body, rtl, A11y::new("s", Role::Status));
+        let mut rtl_end: Element<'_, ()> = side_sheet(
+            scene,
+            "I",
+            body,
+            Some(()),
+            true,
+            240.0,
+            1.0,
+            rtl,
+            A11y::new("pat", Role::Group),
+        );
         draw_once(&mut rtl_end);
-        let body = label("x", rtl, A11y::new("x", Role::Status));
-        let scene = label("s", rtl, A11y::new("s", Role::Status));
-        let mut rtl_start: Element<'_, ()> =
-            side_sheet(scene, "L", body, None, false, 100.0, 1.0, rtl);
+        let body = label("x", LabelFace::Body, rtl, A11y::new("x", Role::Status));
+        let scene = label("s", LabelFace::Body, rtl, A11y::new("s", Role::Status));
+        let mut rtl_start: Element<'_, ()> = side_sheet(
+            scene,
+            "L",
+            body,
+            None,
+            false,
+            100.0,
+            1.0,
+            rtl,
+            A11y::new("pat", Role::Group),
+        );
         draw_once(&mut rtl_start);
         assert!(MenuSection::<()>::untitled([]).title.is_none());
         assert!(MenuSection::<()>::new("", []).title.is_none());
@@ -2904,8 +3093,8 @@ mod tests {
             bind_menu_pick(vec![("Open".into(), 1u8), ("Save".into(), 2)])("Open".into()),
             1
         );
-        let _: Element<'_, ()> = menu_bar(&table, tok, ltr, &cat);
-        let _: Element<'_, ()> = menu_bar(&table, tok, rtl, &cat);
+        let _: Element<'_, ()> = menu_bar(&table, tok, ltr, &cat, |_| ());
+        let _: Element<'_, ()> = menu_bar(&table, tok, rtl, &cat, |_| ());
         let src = include_str!("pattern.rs");
         let bar_src = src
             .split("pub fn menu_bar")
@@ -2932,29 +3121,30 @@ mod tests {
             .unwrap();
         assert!(sec_src.contains("align_start(tok.direction)"));
         let empty = ActionTable::new();
-        let _: Element<'_, ()> = menu_bar(&empty, tok, ltr, &cat);
+        let _: Element<'_, ()> = menu_bar(&empty, tok, ltr, &cat, |_| ());
         let mut disabled = ActionTable::new();
         let mut dead = Action::new("file.dead", "Dead", ());
         dead.enabled = false;
         disabled.insert(dead);
-        let _: Element<'_, ()> = menu_bar(&disabled, tok, ltr, &cat);
+        let _: Element<'_, ()> = menu_bar(&disabled, tok, ltr, &cat, |_| ());
         let _: Element<'_, ()> = dialog_sheet(
             "Save",
             "Overwrite notes.txt?",
             ("Save".into(), ()),
-            Some(("Cancel".into(), ())),
-            None::<(String, ())>,
-            None,
             tok,
+            A11y::new("Save", Role::Dialog),
+            DialogOpts {
+                cancel: Some(("Cancel".into(), ())),
+                ..DialogOpts::default()
+            },
         );
         let _: Element<'_, ()> = dialog_sheet(
             "Note",
             "Hello",
             ("OK".into(), ()),
-            None,
-            None::<(String, ())>,
-            None,
             tok,
+            A11y::new("Note", Role::Dialog),
+            DialogOpts::default(),
         );
         let acts: Vec<_> = table.iter().collect();
         let src = include_str!("pattern.rs");
@@ -3066,6 +3256,7 @@ mod tests {
             1.0,
             crate::palette::PaletteOpts::new(),
             tok,
+            A11y::new("pat", Role::Group),
         );
         let dead_res: Vec<&Action<()>> = disabled.iter().collect();
         let _: Element<'_, ()> = command_palette_view(
@@ -3081,6 +3272,7 @@ mod tests {
             1.0,
             crate::palette::PaletteOpts::new(),
             tok,
+            A11y::new("pat", Role::Group),
         );
         // Long hit lists scroll inside a fixed height (n > 12).
         let mut many = ActionTable::new();
@@ -3088,27 +3280,106 @@ mod tests {
             many.insert(Action::new(format!("cmd.{i}"), format!("Command {i}"), ()));
         }
         let many_res: Vec<&Action<()>> = many.iter().collect();
-        let _: Element<'_, ()> = status_page("Empty", "Nothing", Some(("New".into(), ())), tok);
-        let _: Element<'_, ()> = status_page("Empty", "Nothing", None, tok);
-        let _: Element<'_, ()> = about_page("App", "0.1.0", "MIT", "us", tok, &cat);
-        let _: Element<'_, ()> = preferences_page(&prefs, "", |_| (), tok, &cat);
-        let _: Element<'_, ()> = preferences_page(&prefs, "nope", |_| (), tok, &cat);
-        let lab = |s: &str| crate::widget::label::<()>(s, tok, A11y::new(s, Role::Header));
+        let _: Element<'_, ()> = status_page(
+            "Empty",
+            "Nothing",
+            Some(("New".into(), ())),
+            tok,
+            A11y::new("pat", Role::Group),
+        );
         let _: Element<'_, ()> =
-            list_detail(lab("l"), lab("d"), crate::layout::fixed(260.0), tok, ltr);
-        let _: Element<'_, ()> = list_detail(lab("l"), lab("d"), crate::layout::FILL, tok, rtl);
+            status_page("Empty", "Nothing", None, tok, A11y::new("pat", Role::Group));
+        let _: Element<'_, ()> = about_page(
+            "App",
+            "0.1.0",
+            "MIT",
+            "us",
+            tok,
+            &cat,
+            A11y::new("about", Role::Dialog),
+        );
+        let _: Element<'_, ()> =
+            preferences_page(&prefs, "", |_| (), tok, &cat, A11y::new("pat", Role::Group));
+        let _: Element<'_, ()> = preferences_page(
+            &prefs,
+            "nope",
+            |_| (),
+            tok,
+            &cat,
+            A11y::new("pat", Role::Group),
+        );
+        let lab = |s: &str| {
+            crate::widget::label::<()>(s, LabelFace::Body, tok, A11y::new(s, Role::Header))
+        };
+        let _: Element<'_, ()> = list_detail(
+            lab("l"),
+            lab("d"),
+            crate::layout::fixed(260.0),
+            tok,
+            ltr,
+            A11y::new("pat", Role::Group),
+        );
+        let _: Element<'_, ()> = list_detail(
+            lab("l"),
+            lab("d"),
+            crate::layout::FILL,
+            tok,
+            rtl,
+            A11y::new("pat", Role::Group),
+        );
         let nav = NavStack::new("home");
         let mut deep = nav.clone();
         deep.push("x");
-        let _: Element<'_, ()> =
-            navigation_view(lab("s"), lab("c"), &nav, 900.0, (), tok, &cat, ltr);
-        let _: Element<'_, ()> =
-            navigation_view(lab("s"), lab("c"), &deep, 400.0, (), tok, &cat, rtl);
-        let _: Element<'_, ()> =
-            navigation_view(lab("s"), lab("c"), &nav, 400.0, (), tok, &cat, ltr);
+        let _: Element<'_, ()> = navigation_view(
+            lab("s"),
+            lab("c"),
+            &nav,
+            900.0,
+            (),
+            tok,
+            &cat,
+            ltr,
+            A11y::new("pat", Role::Group),
+        );
+        let _: Element<'_, ()> = navigation_view(
+            lab("s"),
+            lab("c"),
+            &deep,
+            400.0,
+            (),
+            tok,
+            &cat,
+            rtl,
+            A11y::new("pat", Role::Group),
+        );
+        let _: Element<'_, ()> = navigation_view(
+            lab("s"),
+            lab("c"),
+            &nav,
+            400.0,
+            (),
+            tok,
+            &cat,
+            ltr,
+            A11y::new("pat", Role::Group),
+        );
         let tabs = Tabs::new(["A"]);
-        let _: Element<'_, ()> = tab_view(&tabs, lab("b"), |_| (), |_| (), tok);
-        let _: Element<'_, ()> = main_window(lab("m"), lab("t"), lab("c"), lab("s"), tok);
+        let _: Element<'_, ()> = tab_view(
+            &tabs,
+            lab("b"),
+            |_| (),
+            |_| (),
+            tok,
+            A11y::new("pat", Role::Group),
+        );
+        let _: Element<'_, ()> = main_window(
+            lab("m"),
+            lab("t"),
+            lab("c"),
+            lab("s"),
+            tok,
+            A11y::new("pat", Role::Group),
+        );
         let _: Element<'_, ()> = modal_card(lab("b"), lab("c"), 1.0, tok);
         let _: Element<'_, ()> = context_menu(
             table.iter().cloned(),
@@ -3117,6 +3388,7 @@ mod tests {
             (),
             1.0,
             tok,
+            A11y::new("pat", Role::Group),
         );
         fn paint(el: &mut Element<'_, ()>) {
             use iced::advanced::layout::{Layout, Limits};
@@ -3168,7 +3440,7 @@ mod tests {
             walk(layout, &mut best);
             best
         }
-        let mut bar = menu_bar(&table, tok, ltr, &cat);
+        let mut bar = menu_bar(&table, tok, ltr, &cat, |_| ());
         paint(&mut bar);
         let mut tb = toolbar(acts.iter().copied(), tok, ltr);
         paint(&mut tb);
@@ -3196,6 +3468,7 @@ mod tests {
             1.0,
             crate::palette::PaletteOpts::new(),
             tok,
+            A11y::new("pat", Role::Group),
         );
         paint(&mut pal);
         let mut many_pal = command_palette_view(
@@ -3211,6 +3484,7 @@ mod tests {
             1.0,
             crate::palette::PaletteOpts::new(),
             tok,
+            A11y::new("pat", Role::Group),
         );
         paint(&mut many_pal);
         let ask = crate::palette::Prompt {
@@ -3231,11 +3505,26 @@ mod tests {
             1.0,
             crate::palette::PaletteOpts::new(),
             tok,
+            A11y::new("pat", Role::Group),
         );
         paint(&mut asked);
-        let mut page = status_page("Empty", "Nothing", Some(("New".into(), ())), tok);
+        let mut page = status_page(
+            "Empty",
+            "Nothing",
+            Some(("New".into(), ())),
+            tok,
+            A11y::new("pat", Role::Group),
+        );
         paint(&mut page);
-        let mut about = about_page("App", "0.1.0", "MIT", "us", tok, &cat);
+        let mut about = about_page(
+            "App",
+            "0.1.0",
+            "MIT",
+            "us",
+            tok,
+            &cat,
+            A11y::new("about", Role::Dialog),
+        );
         paint(&mut about);
         let rtl = tok.with_direction(Direction::Rtl);
         let mut about_rtl = about_page(
@@ -3245,11 +3534,20 @@ mod tests {
             "iced 0.14 ڈیسک ٹاپ اطلاقیوں کے ویجٹ اور چوکھٹا۔",
             rtl,
             &cat,
+            A11y::new("about", Role::Dialog),
         );
         paint(&mut about_rtl);
-        let mut prefs_el = preferences_page(&prefs, "", |_| (), tok, &cat);
+        let mut prefs_el =
+            preferences_page(&prefs, "", |_| (), tok, &cat, A11y::new("pat", Role::Group));
         paint(&mut prefs_el);
-        let mut mw = main_window(lab("m"), lab("t"), lab("c"), lab("s"), tok);
+        let mut mw = main_window(
+            lab("m"),
+            lab("t"),
+            lab("c"),
+            lab("s"),
+            tok,
+            A11y::new("pat", Role::Group),
+        );
         paint(&mut mw);
         let vp = iced::Size::new(640.0, 400.0);
         let two = context_card_size(2, vp, tok.density);
@@ -3266,6 +3564,7 @@ mod tests {
             (),
             1.0,
             tok,
+            A11y::new("pat", Role::Group),
         );
         paint(&mut cm);
         let cm_src = src
@@ -3287,6 +3586,7 @@ mod tests {
             (),
             1.0,
             pill,
+            A11y::new("pat", Role::Group),
         );
         paint(&mut cm_pill);
         let theme = crate::theme::iced_theme("dark", pill);
@@ -3309,6 +3609,7 @@ mod tests {
             (),
             0.5,
             tok,
+            A11y::new("pat", Role::Group),
         );
         paint(&mut edge);
         let none: [Action<()>; 0] = [];
@@ -3319,18 +3620,51 @@ mod tests {
             (),
             0.0,
             tok,
+            A11y::new("pat", Role::Group),
         );
         paint(&mut empty);
         let many: Vec<Action<()>> = (0..30)
             .map(|i| Action::new(format!("a.{i}"), format!("A{i}"), ()))
             .collect();
-        let mut long = context_menu(many, iced::Point::new(8.0, 8.0), vp, (), 1.0, tok);
+        let mut long = context_menu(
+            many,
+            iced::Point::new(8.0, 8.0),
+            vp,
+            (),
+            1.0,
+            tok,
+            A11y::new("pat", Role::Group),
+        );
         paint(&mut long);
-        let mut ld = list_detail(lab("l"), lab("d"), crate::layout::fixed(260.0), tok, ltr);
+        let mut ld = list_detail(
+            lab("l"),
+            lab("d"),
+            crate::layout::fixed(260.0),
+            tok,
+            ltr,
+            A11y::new("pat", Role::Group),
+        );
         paint(&mut ld);
-        let mut nv = navigation_view(lab("s"), lab("c"), &nav, 900.0, (), tok, &cat, ltr);
+        let mut nv = navigation_view(
+            lab("s"),
+            lab("c"),
+            &nav,
+            900.0,
+            (),
+            tok,
+            &cat,
+            ltr,
+            A11y::new("pat", Role::Group),
+        );
         paint(&mut nv);
-        let mut tv = tab_view(&tabs, lab("b"), |_| (), |_| (), tok);
+        let mut tv = tab_view(
+            &tabs,
+            lab("b"),
+            |_| (),
+            |_| (),
+            tok,
+            A11y::new("pat", Role::Group),
+        );
         paint(&mut tv);
         let mut mc = modal_card(lab("b"), lab("c"), 1.0, tok);
         paint(&mut mc);
@@ -3349,6 +3683,7 @@ mod tests {
             0.4,
             crate::palette::PaletteOpts::new(),
             tok,
+            A11y::new("pat", Role::Group),
         );
         paint(&mut pal_mid);
         let mut notes = ActionTable::new();
@@ -3367,6 +3702,7 @@ mod tests {
             1.0,
             crate::palette::PaletteOpts::new(),
             tok,
+            A11y::new("pat", Role::Group),
         );
         paint(&mut el);
         let none: Vec<&Action<()>> = Vec::new();
@@ -3383,12 +3719,22 @@ mod tests {
             1.0,
             crate::palette::PaletteOpts::new(),
             tok,
+            A11y::new("pat", Role::Group),
         );
         paint(&mut miss);
         let body = lab("x");
         let scene = lab("s");
-        let mut sheet_mid: Element<'_, ()> =
-            side_sheet(scene, "I", body, Some(()), true, 240.0, 0.4, tok);
+        let mut sheet_mid: Element<'_, ()> = side_sheet(
+            scene,
+            "I",
+            body,
+            Some(()),
+            true,
+            240.0,
+            0.4,
+            tok,
+            A11y::new("pat", Role::Group),
+        );
         paint(&mut sheet_mid);
         let mut cb = command_bar(table.iter(), tok, ltr);
         paint(&mut cb);
@@ -3396,24 +3742,31 @@ mod tests {
             "Note",
             "Hello",
             ("OK".into(), ()),
-            None,
-            None::<(String, ())>,
-            None,
             tok,
+            A11y::new("Note", Role::Dialog),
+            DialogOpts::default(),
         );
         paint(&mut dlg);
         let mut dlg2 = dialog_sheet(
             "Save",
             "Overwrite?",
             ("Save".into(), ()),
-            Some(("Cancel".into(), ())),
-            None::<(String, ())>,
-            None,
             tok,
+            A11y::new("Save", Role::Dialog),
+            DialogOpts {
+                cancel: Some(("Cancel".into(), ())),
+                ..DialogOpts::default()
+            },
         );
         paint(&mut dlg2);
 
-        let mut insp = inspector(lab("l"), lab("d"), lab("p"), tok);
+        let mut insp = inspector(
+            lab("l"),
+            lab("d"),
+            lab("p"),
+            tok,
+            A11y::new("pat", Role::Group),
+        );
         paint(&mut insp);
         let root = crate::workspace::DockNode::leaf("edit", "Edit");
         let mut ws = workspace(
@@ -3436,22 +3789,54 @@ mod tests {
             A11y::new("tp", Role::Group),
         );
         paint(&mut tp);
-        let mut dr = drawer(true, lab("n"), lab("c"), 1.0, (), tok);
+        let mut dr = drawer(
+            true,
+            lab("n"),
+            lab("c"),
+            1.0,
+            (),
+            tok,
+            A11y::new("pat", Role::Group),
+        );
         paint(&mut dr);
-        let mut mid = drawer(true, lab("n"), lab("c"), 0.4, (), tok);
+        let mut mid = drawer(
+            true,
+            lab("n"),
+            lab("c"),
+            0.4,
+            (),
+            tok,
+            A11y::new("pat", Role::Group),
+        );
         paint(&mut mid);
-        let mut shut = drawer(false, lab("n"), lab("c"), 0.0, (), tok);
+        let mut shut = drawer(
+            false,
+            lab("n"),
+            lab("c"),
+            0.0,
+            (),
+            tok,
+            A11y::new("pat", Role::Group),
+        );
         paint(&mut shut);
-        let mut closing = drawer(false, lab("n"), lab("c"), 0.5, (), tok);
+        let mut closing = drawer(
+            false,
+            lab("n"),
+            lab("c"),
+            0.5,
+            (),
+            tok,
+            A11y::new("pat", Role::Group),
+        );
         paint(&mut closing);
-        let mut sheet = cheatsheet(&table, "sa", tok);
+        let mut sheet = cheatsheet(&table, "sa", tok, A11y::new("pat", Role::Group));
         paint(&mut sheet);
         let mut extra = ActionTable::new();
         extra.insert(Action::new("file.save", "Save", ()));
         let mut dead = Action::new("edit.redo", "Redo", ());
         dead.enabled = false;
         extra.insert(dead);
-        let mut miss = cheatsheet(&extra, "zzzz", tok);
+        let mut miss = cheatsheet(&extra, "zzzz", tok, A11y::new("pat", Role::Group));
         paint(&mut miss);
         let root = crate::workspace::DockNode::tabs(
             vec![
@@ -3571,6 +3956,7 @@ mod tests {
             Msg::Dismiss,
             1.0,
             tok,
+            A11y::new("pat", Role::Group),
         );
         let mut tree = Tree::new(el.as_widget());
         let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
@@ -3646,6 +4032,7 @@ mod tests {
             (),
             1.0,
             tok,
+            A11y::new("pat", Role::Group),
         );
         let mut tree = Tree::new(el.as_widget());
         let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
@@ -3706,6 +4093,7 @@ mod tests {
             1.0,
             opts,
             tok,
+            A11y::new("pat", Role::Group),
         );
         let mut tree = Tree::new(el.as_widget());
         let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
@@ -3894,7 +4282,7 @@ mod tests {
             use iced::advanced::layout::Limits;
             use iced::advanced::widget::Tree;
             use iced::{Font, Pixels, Size};
-            let mut el: Element<'_, ()> = cheatsheet(table, "", tok);
+            let mut el: Element<'_, ()> = cheatsheet(table, "", tok, A11y::new("pat", Role::Group));
             let mut tree = Tree::new(el.as_widget());
             let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
                 Font::DEFAULT,

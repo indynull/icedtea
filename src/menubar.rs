@@ -141,19 +141,23 @@ fn pick_and_close<M>(is_open: &mut bool, on_select: &dyn Fn(String) -> M, option
 const TITLE_PAD: [u16; 2] = [4, 10];
 
 /// One menu title ("File") whose items float in an iced overlay list.
+/// `on_open` fires with the next open state so the application can set
+/// [`crate::key::KeyContext::modal_open`].
 pub fn drop_menu<'a, M: Clone + 'a>(
     title: impl Into<String>,
     options: Vec<String>,
     on_select: impl Fn(String) -> M + 'a,
+    on_open: impl Fn(bool) -> M + 'a,
     tok: Tokens,
 ) -> Element<'a, M> {
-    MenuTitle::new(title.into(), options, on_select, tok).into()
+    MenuTitle::new(title.into(), options, on_select, on_open, tok).into()
 }
 
 struct MenuTitle<'a, Message> {
     title: String,
     options: Vec<String>,
     on_select: Box<dyn Fn(String) -> Message + 'a>,
+    on_open: Box<dyn Fn(bool) -> Message + 'a>,
     tok: Tokens,
     padding: Padding,
     text_size: Pixels,
@@ -166,12 +170,14 @@ impl<'a, Message> MenuTitle<'a, Message> {
         title: String,
         options: Vec<String>,
         on_select: impl Fn(String) -> Message + 'a,
+        on_open: impl Fn(bool) -> Message + 'a,
         tok: Tokens,
     ) -> Self {
         Self {
             title,
             options,
             on_select: Box::new(on_select),
+            on_open: Box::new(on_open),
             tok,
             padding: Padding::from(TITLE_PAD),
             text_size: Pixels::from(tok.body()),
@@ -257,6 +263,7 @@ where
                     if state.is_open {
                         state.hovered_option = None;
                     }
+                    shell.publish((self.on_open)(next));
                     shell.capture_event();
                 }
             }
@@ -264,6 +271,7 @@ where
                 match key {
                     keyboard::Key::Named(Named::Escape) if escape_closes(state.is_open) => {
                         state.is_open = false;
+                        shell.publish((self.on_open)(false));
                         shell.capture_event();
                     }
                     keyboard::Key::Named(Named::ArrowDown) => {
@@ -758,8 +766,9 @@ mod tests {
         let mut open = true;
         assert_eq!(pick_and_close(&mut open, &pick, "Save".into()), 2);
         assert!(!open);
-        let _: Element<'_, u8> = drop_menu("File", vec!["Open".into(), "Save".into()], pick, tok);
-        let empty: Element<'_, ()> = drop_menu("Help", vec!["About".into()], |_| (), tok);
+        let _: Element<'_, u8> =
+            drop_menu("File", vec!["Open".into(), "Save".into()], pick, |_| 0, tok);
+        let empty: Element<'_, ()> = drop_menu("Help", vec!["About".into()], |_| (), |_| (), tok);
         let _ = empty;
         assert!(overlay_list_width(&[] as &[&str], Padding::from(TITLE_PAD), 14.0) >= 160.0);
         let _: Element<'_, u8> = split_more(
@@ -817,6 +826,7 @@ mod tests {
             "File".into(),
             vec!["Open".into(), "Save    ctrl+s".into()],
             |s| s,
+            |open| if open { "OPEN".into() } else { "SHUT".into() },
             tok,
         );
         let mut tree = Tree::new(&widget as &dyn Widget<String, Theme, iced_tiny_skia::Renderer>);
@@ -950,6 +960,10 @@ mod tests {
             Vector::ZERO,
         )
         .is_some());
+        assert!(
+            messages.iter().any(|m| m == "OPEN"),
+            "opening the title publishes on_open(true), got {messages:?}"
+        );
 
         {
             let mut ov = Widget::<String, Theme, iced_tiny_skia::Renderer>::overlay(
@@ -1215,7 +1229,10 @@ mod tests {
             &viewport,
             &mut messages,
         );
-        assert!(messages.is_empty());
+        assert!(
+            messages.iter().all(|m| m == "OPEN" || m == "SHUT"),
+            "only open/close messages, got {messages:?}"
+        );
     }
 
     #[test]

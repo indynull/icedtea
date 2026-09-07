@@ -1071,11 +1071,15 @@ impl OsChrome {
 /// accent reads).
 ///
 /// ```
-/// let chrome = icedtea::theme::os_chrome();
-/// let _ = chrome.primary;
+/// let mut got = None;
+/// let _task = icedtea::theme::os_chrome(|c| {
+///     got = Some(c);
+///     c
+/// });
+/// assert!(got.is_some());
 /// ```
-pub fn os_chrome() -> OsChrome {
-    crate::host_chrome::snapshot()
+pub fn os_chrome<M: Send + 'static>(to_msg: impl FnOnce(OsChrome) -> M) -> iced::Task<M> {
+    iced::Task::done(to_msg(crate::host_chrome::snapshot()))
 }
 
 /// Emits a full [`OsChrome`] when the desktop accent or color-scheme
@@ -1438,6 +1442,16 @@ mod tests {
     }
 
     #[test]
+    fn os_chrome_returns_a_task_with_the_snapshot() {
+        let mut got = None;
+        let _task = os_chrome(|c| {
+            got = Some(c);
+            c
+        });
+        assert!(got.is_some());
+    }
+
+    #[test]
     fn os_chrome_fills_only_set_fields_when_follow_os() {
         let tok = named("dark").tokens;
         let accent = Color::from_rgb8(0, 122, 255);
@@ -1485,7 +1499,11 @@ mod tests {
         );
         let _ = listen_os_chrome();
         // Snapshot is safe off the main thread (returns empty fields if host panics).
-        let _ = apply_os_chrome(tok, true, os_chrome());
+        let mut snap = None;
+        let _ = os_chrome(|c| {
+            snap = Some(c);
+        });
+        let _ = apply_os_chrome(tok, true, snap.unwrap());
     }
 
     #[test]

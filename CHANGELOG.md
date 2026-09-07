@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### Feature
+
+- `checkbox` takes `CheckState` (checked, unchecked, indeterminate).
+- `label` takes `LabelFace` (Body, Meta, Display, Figure).
+- `banner` takes an optional `ToastKind` tone.
+- `highlighted_code` takes `Option<&str>` syntax; `None` is plain.
+- `markdown_view` takes `MarkdownOpts` for an outline.
+- `dialog_sheet` takes caller `A11y` and `DialogOpts` (cancel, extras,
+  icon, dim backdrop).
+- `menu_bar` publishes open and close through `on_open`.
+- `native_dialog`, `UiState::load_file` / `save_file`, and
+  `theme::os_chrome` return iced `Task`.
+- Drawing patterns take caller `A11y`.
+
+### Bug fix
+
+- `widget::scroll` is documented as `ThemedScroll` (24 px rail).
+
+### Chore
+
+- Catalog ids `theme`, `colors`, `keys`, and `checkbox-indeterminate`
+  are gone. One catalog id is one drawing constructor.
+
 ## 0.16.2 — 2026-09-06
 
 ### Feature
