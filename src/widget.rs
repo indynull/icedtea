@@ -8562,6 +8562,13 @@ mod tests {
             tok,
             A11y::new("all", Role::Checkbox),
         );
+        let _: Element<'_, CheckState> = checkbox(
+            "",
+            CheckState::Indeterminate,
+            |s| s,
+            tok,
+            A11y::new("empty-tri", Role::Checkbox),
+        );
         let _: Element<'_, ()> = banner("watch", None, Some(ToastKind::Warning), tok, a("watch"));
         let code = Content::with_text("fn main() {}");
         let _: Element<'_, ()> = highlighted_code(

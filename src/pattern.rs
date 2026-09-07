@@ -2774,6 +2774,25 @@ mod tests {
             },
         );
         draw_once(&mut dlg);
+        let scene = crate::widget::label(
+            " ",
+            crate::widget::LabelFace::Body,
+            tok,
+            A11y::new("dim", Role::Status),
+        );
+        let mut dimmed: Element<'_, ()> = dialog_sheet(
+            "Save",
+            "Overwrite?",
+            ("Save".into(), ()),
+            tok,
+            A11y::new("Save", Role::Dialog),
+            DialogOpts {
+                backdrop: Some(scene),
+                progress: 1.0,
+                ..DialogOpts::default()
+            },
+        );
+        draw_once(&mut dimmed);
     }
 
     #[test]

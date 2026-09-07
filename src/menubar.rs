@@ -790,6 +790,18 @@ mod tests {
     use super::*;
     use crate::theme::named;
 
+    fn must(ok: bool, msg: impl std::fmt::Display) {
+        if !ok {
+            panic!("{msg}");
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "cover-must")]
+    fn must_rejects_a_failed_check() {
+        must(false, "cover-must");
+    }
+
     #[test]
     fn title_is_not_sized_like_the_longest_item() {
         let pad = Padding::from(TITLE_PAD);
@@ -1070,9 +1082,9 @@ mod tests {
             Vector::ZERO,
         )
         .is_some());
-        assert!(
+        must(
             messages.iter().any(|m| m == "OPEN"),
-            "opening the title publishes on_open(true), got {messages:?}"
+            format!("opening the title publishes on_open(true), got {messages:?}"),
         );
 
         {
@@ -1089,6 +1101,24 @@ mod tests {
                 .as_overlay_mut()
                 .layout(&renderer, Size::new(800.0, 600.0));
             let ol = Layout::new(&node);
+            ov.as_overlay()
+                .draw(&mut renderer, &theme, &style, ol, over);
+            let _ = ov.as_overlay().mouse_interaction(ol, over, &renderer);
+            struct Nop;
+            impl iced::advanced::widget::Operation for Nop {
+                fn traverse(
+                    &mut self,
+                    operate: &mut dyn FnMut(&mut dyn iced::advanced::widget::Operation),
+                ) {
+                    operate(self);
+                }
+            }
+            let mut nop = Nop;
+            iced::advanced::widget::Operation::traverse(&mut nop, &mut |op| {
+                ov.as_overlay_mut().operate(ol, &renderer, op);
+            });
+            let _ = ov.as_overlay_mut().overlay(ol, &renderer);
+            let _ = ov.as_overlay().index();
             let at = Point::new(ol.bounds().x + 8.0, ol.bounds().y + 8.0);
             let cursor = mouse::Cursor::Available(at);
             {
@@ -1112,9 +1142,9 @@ mod tests {
             }
         }
         assert!(messages.contains(&"Open".to_string()));
-        assert!(
+        must(
             messages.iter().any(|m| m == "SHUT"),
-            "picking a row publishes on_open(false), got {messages:?}"
+            format!("picking a row publishes on_open(false), got {messages:?}"),
         );
         messages.clear();
 
@@ -1151,9 +1181,9 @@ mod tests {
             &viewport,
             &mut messages,
         );
-        assert!(
+        must(
             messages.iter().any(|m| m == "SHUT"),
-            "Escape publishes on_open(false), got {messages:?}"
+            format!("Escape publishes on_open(false), got {messages:?}"),
         );
         pump_title(
             &mut widget,
@@ -1347,9 +1377,9 @@ mod tests {
             &viewport,
             &mut messages,
         );
-        assert!(
+        must(
             messages.iter().all(|m| m == "OPEN" || m == "SHUT"),
-            "only open/close messages, got {messages:?}"
+            format!("only open/close messages, got {messages:?}"),
         );
     }
 

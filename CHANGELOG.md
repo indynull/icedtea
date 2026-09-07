@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.17.0 — 2026-09-07
+
 ### Feature
 
 - `checkbox` takes `CheckState` (checked, unchecked, indeterminate).
