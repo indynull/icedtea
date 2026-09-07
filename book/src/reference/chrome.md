@@ -211,7 +211,9 @@ Constructor: [`pattern::menu_bar`](https://docs.rs/icedtea/latest/icedtea/patter
 [icedtea](https://crates.io/crates/icedtea)
 
 Groups by the id prefix before `.` (`file.save` → File). Disabled
-actions stay out of the pick list.
+actions stay out of the pick list. `on_open` publishes true when a
+title opens and false on Escape or a pick so
+`KeyContext.modal_open` follows the model.
 
 ### Toolbar
 

@@ -5,7 +5,9 @@ menus, toolbars, shortcuts, footer hints, and the command palette.
 `update` decides what happens when that message arrives.
 
 `key::handle` plus `KeyContext` is the default path. An open modal
-consumes (even if a field is focused). Otherwise focused text owns
+consumes (even if a field is focused). Set `KeyContext.modal_open`
+from `menu_bar` / `drop_menu` `on_open` (true on open, false on
+Escape or a pick). Otherwise focused text owns
 unmodified typing. Otherwise the focused `focus::target` owns arrows,
 Page, Home, End, Enter, and Space. Wrap the window `view` with
 `focus::cycle` so Tab walks those targets. `run!` already listens;

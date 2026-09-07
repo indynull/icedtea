@@ -18,6 +18,9 @@ use iced::{
     Theme, Vector,
 };
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::style;
 use crate::theme::{hover_fill, pressed_fill, Tokens};
 
@@ -133,9 +136,94 @@ pub fn escape_closes(is_open: bool) -> bool {
     is_open
 }
 
-fn pick_and_close<M>(is_open: &mut bool, on_select: &dyn Fn(String) -> M, option: String) -> M {
+fn pick_and_close<M>(
+    is_open: &mut bool,
+    on_select: &dyn Fn(String) -> M,
+    on_open: &dyn Fn(bool) -> M,
+    option: String,
+) -> (M, M) {
     *is_open = false;
-    on_select(option)
+    (on_open(false), on_select(option))
+}
+
+/// After iced's menu publishes the close, emit the pending pick.
+struct NotifyClose<'a, Message, Theme, Renderer> {
+    content: overlay::Element<'a, Message, Theme, Renderer>,
+    pending_pick: Rc<RefCell<Option<Message>>>,
+}
+
+impl<Message, Theme, Renderer> overlay::Overlay<Message, Theme, Renderer>
+    for NotifyClose<'_, Message, Theme, Renderer>
+where
+    Renderer: renderer::Renderer,
+{
+    fn layout(&mut self, renderer: &Renderer, bounds: Size) -> layout::Node {
+        self.content.as_overlay_mut().layout(renderer, bounds)
+    }
+
+    fn draw(
+        &self,
+        renderer: &mut Renderer,
+        theme: &Theme,
+        style: &renderer::Style,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+    ) {
+        self.content
+            .as_overlay()
+            .draw(renderer, theme, style, layout, cursor);
+    }
+
+    fn operate(
+        &mut self,
+        layout: Layout<'_>,
+        renderer: &Renderer,
+        operation: &mut dyn iced::advanced::widget::Operation,
+    ) {
+        self.content
+            .as_overlay_mut()
+            .operate(layout, renderer, operation);
+    }
+
+    fn update(
+        &mut self,
+        event: &Event,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &Renderer,
+        clipboard: &mut dyn Clipboard,
+        shell: &mut Shell<'_, Message>,
+    ) {
+        self.content
+            .as_overlay_mut()
+            .update(event, layout, cursor, renderer, clipboard, shell);
+        if let Some(pick) = self.pending_pick.borrow_mut().take() {
+            shell.publish(pick);
+        }
+    }
+
+    fn mouse_interaction(
+        &self,
+        layout: Layout<'_>,
+        cursor: mouse::Cursor,
+        renderer: &Renderer,
+    ) -> mouse::Interaction {
+        self.content
+            .as_overlay()
+            .mouse_interaction(layout, cursor, renderer)
+    }
+
+    fn overlay<'b>(
+        &'b mut self,
+        layout: Layout<'b>,
+        renderer: &Renderer,
+    ) -> Option<overlay::Element<'b, Message, Theme, Renderer>> {
+        self.content.as_overlay_mut().overlay(layout, renderer)
+    }
+
+    fn index(&self) -> f32 {
+        self.content.as_overlay().index()
+    }
 }
 
 const TITLE_PAD: [u16; 2] = [4, 10];
@@ -163,6 +251,7 @@ struct MenuTitle<'a, Message> {
     text_size: Pixels,
     menu_class: menu::StyleFn<'a, Theme>,
     last_status: Option<TitleStatus>,
+    pending_pick: Rc<RefCell<Option<Message>>>,
 }
 
 impl<'a, Message> MenuTitle<'a, Message> {
@@ -183,6 +272,7 @@ impl<'a, Message> MenuTitle<'a, Message> {
             text_size: Pixels::from(tok.body()),
             menu_class: Box::new(style::overlay_menu_style(tok)),
             last_status: None,
+            pending_pick: Rc::new(RefCell::new(None)),
         }
     }
 }
@@ -295,11 +385,14 @@ where
                     keyboard::Key::Named(Named::Enter) => {
                         if let Some(i) = state.hovered_option {
                             if let Some(opt) = self.options.get(i).cloned() {
-                                shell.publish(pick_and_close(
+                                let (shut, pick) = pick_and_close(
                                     &mut state.is_open,
                                     self.on_select.as_ref(),
+                                    self.on_open.as_ref(),
                                     opt,
-                                ));
+                                );
+                                shell.publish(shut);
+                                shell.publish(pick);
                                 shell.capture_event();
                             }
                         }
@@ -409,12 +502,20 @@ where
         let bounds = layout.bounds();
         let font = renderer.default_font();
         let on_select = &self.on_select;
+        let on_open = &self.on_open;
+        let pending = Rc::clone(&self.pending_pick);
+        let is_open = &mut state.is_open;
         let width = overlay_list_width(&self.options, self.padding, self.text_size.0);
         let menu = Menu::new(
             &mut state.menu,
             &self.options,
             &mut state.hovered_option,
-            |option| pick_and_close(&mut state.is_open, on_select, option),
+            move |option| {
+                let (shut, pick) =
+                    pick_and_close(is_open, on_select.as_ref(), on_open.as_ref(), option);
+                *pending.borrow_mut() = Some(pick);
+                shut
+            },
             None,
             &self.menu_class,
         )
@@ -422,12 +523,15 @@ where
         .padding(self.padding)
         .font(font)
         .text_size(self.text_size);
-        Some(menu.overlay(
-            layout.position() + translation,
-            *viewport,
-            bounds.height,
-            Length::Shrink,
-        ))
+        Some(overlay::Element::new(Box::new(NotifyClose {
+            content: menu.overlay(
+                layout.position() + translation,
+                *viewport,
+                bounds.height,
+                Length::Shrink,
+            ),
+            pending_pick: Rc::clone(&self.pending_pick),
+        })))
     }
 }
 
@@ -655,7 +759,10 @@ where
             &mut state.menu,
             &self.labels,
             &mut state.hovered_option,
-            |option| pick_and_close(&mut state.is_open, on_select, option),
+            |option| {
+                state.is_open = false;
+                on_select(option)
+            },
             None,
             &self.menu_class,
         )
@@ -708,7 +815,7 @@ mod tests {
             assert_eq!(text_advance(&ch.to_string(), size), size);
         }
         let draw = include_str!("menubar.rs")
-            .split("fn draw(")
+            .split("content: self.title.clone()")
             .nth(1)
             .unwrap()
             .split("fn overlay(")
@@ -764,7 +871,10 @@ mod tests {
         }
         assert_eq!(pick("Open".into()), 1);
         let mut open = true;
-        assert_eq!(pick_and_close(&mut open, &pick, "Save".into()), 2);
+        let on_open = |opened: bool| if opened { 10u8 } else { 11 };
+        let (shut, picked) = pick_and_close(&mut open, &pick, &on_open, "Save".into());
+        assert_eq!(shut, 11);
+        assert_eq!(picked, 2);
         assert!(!open);
         let _: Element<'_, u8> =
             drop_menu("File", vec!["Open".into(), "Save".into()], pick, |_| 0, tok);
@@ -1002,6 +1112,10 @@ mod tests {
             }
         }
         assert!(messages.contains(&"Open".to_string()));
+        assert!(
+            messages.iter().any(|m| m == "SHUT"),
+            "picking a row publishes on_open(false), got {messages:?}"
+        );
         messages.clear();
 
         pump_title(
@@ -1036,6 +1150,10 @@ mod tests {
             over,
             &viewport,
             &mut messages,
+        );
+        assert!(
+            messages.iter().any(|m| m == "SHUT"),
+            "Escape publishes on_open(false), got {messages:?}"
         );
         pump_title(
             &mut widget,

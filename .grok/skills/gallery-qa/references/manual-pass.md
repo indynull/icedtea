@@ -79,6 +79,8 @@ page — nothing else should have changed unless the demo says so.
 ### Overlays (dialogs, palette, context)
 
 - Dialog: dim wash obvious; primary/cancel clear; focus in sheet.
+- Menu bar: open publishes `on_open(true)`; Escape or a pick publishes
+  `on_open(false)` so `KeyContext.modal_open` follows the model.
 - Context: open via demo path; nested flyout **row-aligned**, gap from
   parent, not covering the parent title by accident.
 - Palette: filter narrows list; highlight moves.

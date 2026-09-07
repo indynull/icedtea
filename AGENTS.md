@@ -133,7 +133,9 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   implements `From<keyboard::Event>`. `ctrl` in a shortcut is the
   host accelerator (Command on macOS, Control elsewhere). `key::press`
   and `Shortcut::parse` cover F1-F24. `KeyContext::capturing_layer`
-  reports the same three states `handle` uses.
+  reports the same three states `handle` uses. `menu_bar` / `drop_menu`
+  `on_open` publishes true on open and false on Escape or a pick so
+  `KeyContext.modal_open` follows the model.
 - Focus chrome: `focus::target` / `target_keys` paint a 2 dp ring
   (inset one density grid, Field radius) on **one control face**.
   A list, `virtual_column`, tree, grid, table, labeled row, slider

@@ -19,6 +19,8 @@
 ### Bug fix
 
 - `widget::scroll` is documented as `ThemedScroll` (24 px rail).
+- A menu pick publishes `on_open(false)` so `KeyContext.modal_open`
+  follows the model.
 
 ### Chore
 

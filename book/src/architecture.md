@@ -88,7 +88,9 @@ unmodified typing. Otherwise the focused `focus::target` owns arrows,
 Page, Home, End, Enter, and Space. Tab walks targets (`focus::cycle`).
 `run!` subscribes `key::listen`. Application windows call
 `ActionTable::seed_quit`. Open menus, picks, context menus, drawers,
-and cancel dialogs close on Escape. `item_press` primary fires on
+and cancel dialogs close on Escape. `menu_bar` `on_open` publishes
+that open and close (including a pick) so `KeyContext.modal_open`
+follows the model. `item_press` primary fires on
 release; `ListOpts.on_context` is the secondary click. Otherwise
 `key::handle` matches the action table. A filling `scroll` pane
 takes arrows without painting a ring. See [Actions](actions.md).
