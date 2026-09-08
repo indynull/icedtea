@@ -1,20 +1,23 @@
 # icedtea
 
 icedtea is reusable widgets and chrome for native desktop applications
-on [iced](https://iced.rs/). Design system, layouts, window chrome,
-actions mapped to messages, widgets, and patterns.
+on [iced](https://iced.rs/). Constructors return `Element`s and emit
+the application's messages. The application owns state.
 
-Contract: this file's Library section, `catalog::ENTRIES`, and the
-book. App-authoring index: [`docs/agents/`](docs/agents/llms.txt)
-(`llms.txt` plus one file per catalog group; generated). Work list:
-[`TODO.md`](TODO.md) (internal; do not package or link from README).
-This file is how to work in the repo. It wins over visitor home
-rules when they conflict.
+**Compose:** [`docs/agents/llms.txt`](docs/agents/llms.txt) (generated
+index plus one file per catalog group). Start from
+[`examples/hello.rs`](examples/hello.rs). A list plus on-disk SQLite is
+[`examples/tasks.rs`](examples/tasks.rs). Open the constructor rustdoc
+for the job (`*Opts`, `*Face`, compiling example). Do not invent iced
+`button` / `column` chrome, a stylesheet, or a second renderer.
 
-When the human corrects an icedtea approach that will recur, append one
-concrete line to **this file** (Always / Never). Tighten a duplicate
-instead of adding another. Do not put icedtea lessons in a home-level
-rules file.
+This file is how to **maintain** the crate. It wins over visitor home
+rules when they conflict. Work list: [`TODO.md`](TODO.md) (internal;
+do not package or link from README). When the human corrects an
+icedtea approach that will recur, append one Always / Never here.
+Tighten a duplicate. Do not put icedtea lessons in a home-level
+rules file. Catalog tests, constructor rustdoc, and `docs/agents/`
+own the public surface. Do not restate those here.
 
 ```bash
 just lint           # format check + clippy -D warnings
@@ -49,254 +52,73 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
 
 ## Library
 
-- Track iced. Do not fork it or add a second renderer. `run!` /
-  `bootstrap` start the window.
-- Constructors return `Element`s and emit the application's messages.
-  Do not own application state or business logic.
-- Layout, styling, and logic are Rust. No stylesheet or markup
-  language.
-- An `ActionTable` of `Action`s feeds menus, toolbars, shortcuts,
-  context menus, footer hints, and the command palette. Each Action is
-  declared once.
-- **Material Design 3** foundations in `m3` (color roles, type scale,
-  shape, elevation, density, control states). `Tokens::scheme()` maps
-  short fields onto those roles. `light` and `dark` are a neutral
-  desktop pair; persist defaults `follow_os` on so host chrome layers
-  onto that pair. A named colorway is a choice. `Tokens` also carries
-  density, `font_scale`, `ShapePolicy`, and `ElevationPolicy`. Default
-  chrome is `ShapePolicy::Desktop` (`m3::Component` → shape **None**,
-  0 dp). `UiState::look` and `Boot` apply the same fields. High-contrast
-  and community colorways remain; apps may register more that implement
-  the same roles. See `m3::mapping` for catalog inventory.
-  Always derive catalog `text` / `muted` with `theme::auto_ink` on the
-  canvas (87% / 60%). Never dump a terminal `foreground` into those
-  fields. `theme::mix` builds washes. Resting drop comes from
-  `Component::elevation()` (snapshot `styles/elevation`). Elevated
-  faces (button, card, chip) are Level 1 on that constructor. Search
-  is Level 0. Never a hardcoded shadow that disagrees with that
-  table. `style::tests::resting_elevation_matches_material_table`
-  is the check. Filled card and `group_box` Filled are fill only;
-  outline is `CardFace::Outlined`. Selected card is a wash, not a
-  2 dp primary frame.
-- User-facing text uses `typo::UI` (`Font::DEFAULT`, platform sans).
-  Code uses `typo::MONO` (`Font::MONOSPACE`). Never bundle a font
-  file. Apps that want a named family load it on the iced application
-  themselves (`Boot::fonts`) and may call `typo::bind_sans_family`.
-  `run!` / `daemon!` call `typo::install_platform_faces`
-  so those generics bind to installed faces (normal + bold for UI).
-  Apps that start iced without those macros must call it before the
-  first frame.
-- Every public drawing constructor takes `a11y::A11y` and calls
-  `a11y::attach` (name, role, value, disabled, checked). Chrome rows
-  (`toolbar`, `menu_bar`, `status_bar`, `command_bar`) take an
-  `ActionTable`. Layout `pack` / `wrap` take neither. iced 0.14 has
-  no accesskit slot; the widget id carries the node id.
-- Always size `pick_list` trailing marks from
-  `m3::density::TRAILING_ICON` (24 dp, 20 dp Compact) and
-  `Density::inset` on the **end**. Own the Material drop mark in
-  the constructor. Never iced `Handle::Arrow` (physical-right)
-  and never a sibling overlay that misses clicks.
-- Lists and tables virtualize when row counts leave the hundreds
-  (`collection::visible_range` + scroll offset). Their rail uses
-  `collection::scroller_span` with a 24px minimum handle. `scroll`
-  is `ThemedScroll` (24 px minimum handle, not iced's 2 px scroller).
-  Free-form expand cards use
-  `virtual_column` + `expand_card_heights` (extend list windowing; do
-  not add a second list model).
-- Split sash: grip emits `SashEvent::Press` only. Move and release come
-  from `layout::listen_sash` (window-space pointer) into
-  `SashDrag::apply`. `mouse_area::on_move` is local hover on the 6px
-  grip and cannot drive a drag.
-- Chrome rows (menu, toolbar, status, breadcrumb, form) take
-  `i18n::Direction` from `Boot` / `Prepared::direction`. Use
-  `i18n::order`, `align_start` / `align_end`, and `inline_pad`.
-  Never physical left/right for chrome that mirrors (iced
-  `Alignment::Start` is physical left). Paths, URLs, and code stay
-  left-to-right islands. Flip directional icons, twisties, and
-  progress; keep text, digits, checkmarks, media controls, logos,
-  and size pairs (`1920x1080`) unflipped. Arabic, Urdu, and Persian
-  clocks use Eastern digits; Hebrew uses 123
-  (`ClockDigits::for_lang`). Bar:
-  `.grok/skills/gallery-qa/references/rtl.md` (SCORE map; sources
-  `firefox-rtl.md`, `ms-bidi.md`, `ms-flowdirection.md`). Chrome
-  stays one line; markdown, code wrap-on, cards, and job/hint wrap.
-- Never Fill+align `text` inside an iced 0.14 `button` (drops
-  right-to-left glyphs). Shrink the title or wrap shrink text in a
-  fill container. Page titles: `i18n::order` plus a filling spacer.
-  `meta` stays shrink (look-strip rows sit it next to a pick). The
-  column that holds a caption beside a Fill control must
-  `align_x(align_start)`, or the caption lands on physical left and
-  the page looks empty. Form labels: Fixed gutter plus `align_start`.
-- Key order: an open modal consumes (even if a field is focused);
-  otherwise focused text owns unmodified typing; otherwise the
-  focused `focus::target` or `focus::group` owns arrows, Page, Home,
-  End, Enter, and Space; otherwise `key::handle` matches the action
-  table. Tab /
-  Shift+Tab walk targets via `focus::cycle` (wrap the window `view`).
-  `run!` / `daemon!` subscribe `key::listen`; the application message
-  implements `From<keyboard::Event>`. `ctrl` in a shortcut is the
-  host accelerator (Command on macOS, Control elsewhere). `key::press`
-  and `Shortcut::parse` cover F1-F24. `KeyContext::capturing_layer`
-  reports the same three states `handle` uses. `menu_bar` / `drop_menu`
-  `on_open` publishes true on open and false on Escape or a pick so
-  `KeyContext.modal_open` follows the model.
-- Focus chrome: `focus::target` / `target_keys` paint a 2 dp ring
-  (inset one density grid, Field radius) on **one control face**.
-  A list, `virtual_column`, tree, grid, table, labeled row, slider
-  marks column, or strip is `focus::group` / `group_keys` (or
-  `intercept_keys`). The ring hugs one face (button, radio mark),
-  including when `i18n::order` puts the caption first.
-  A slider has no box: keys sit on the rail. A button group outline
-  hugs the cells. Never a Field-radius ring around a caption, min/max
-  pair, or a stack of cards, and never a Fill outline after the last
-  joined action. WCAG 2.4.7 and APG roving tabindex put
-  the indicator on the focused item, not the ancestor.
-- Always emit `docs/agents/` with `just agents-doc` in the same
-  change as `catalog::ENTRIES`, constructor rustdoc, or
-  `m3::mapping`. `just check` fails when the pack is stale. Never
-  hand-edit those files.
-- A widget or pattern is public only when it is themed (all visual
-  states), keyboard-complete, tested, documented, listed in
-  `catalog::ENTRIES`, and shown on a gallery page. Small related
-  widgets share a page. Unfinished surfaces are not exported.
-- One catalog id, one public constructor. That `pub fn` takes `A11y`
-  and tokens (chrome rows take an `ActionTable`). Rustdoc with a
-  working example sits immediately above it. The map in `catalog`
-  tests names that function. Image is `image_slot`, scroll is
-  `scroll`, keys subscribe with `key::listen`, sidebar recipe
-  is `Breakpoint::from_width`.
-- One path per feature. Pick it and delete the other. Fallbacks re-grow.
-  Pre-1.0: change the public constructor, `key::handle`, or `Boot`
-  field and update gallery, hello, book, and tests in the same cut.
-  Never add an opt-out, deprecated alias, or second constructor so an
-  old 0.x caller keeps compiling.
-- Always put optional extras on a constructor in one `*Opts` on that
-  same call (`ButtonOpts`, `ListOpts`, `FieldOpts`). Never a second
-  `pub fn` for the same catalog id.
-- Always vary a constructor’s painted look with a `*Face` enum on that
-  same call (`RowFace`, `CardFace`, `FieldFace`, `TreeFace`). Never a
-  second catalog widget or a stylesheet for the same job. Prefer a new
-  face on an existing constructor over a new catalog id.
+Catalog tests, constructor rustdoc, and `docs/agents/` own: one
+catalog id / one constructor, rustdoc example and job, handbook
+completeness, hello as the first path, A11y on drawing constructors,
+crate-root tour, reader path without maintainer process. Do not
+repeat those here.
+
+- Track iced. No fork, no second renderer, no stylesheet. `run!` /
+  `bootstrap` start the window. Window size and kind come from iced
+  `window::Settings` on `Boot`.
+- Constructors do not own application state. One `ActionTable`; each
+  Action is declared once. One path per feature: change the public
+  constructor and update gallery, hello, book, and tests in the same
+  cut. Never an opt-out, deprecated alias, or second `pub fn` for the
+  same catalog id. Optional extras are one `*Opts` on that call.
+  Painted variants are one `*Face` on that call.
 - Always add a constructor when a shipping application needs the
-  paint and the function names a **job** any icedtea application
-  could call (a face, a chrome row, a window knob). Product protocol
-  and store stay in the application. The first-window example is a
-  compact compose of those jobs; it is not the filter for what the
-  library may grow.
-- Always size chrome pad and inter-item gap from `Tokens.density`
-  (`Density::gap`, `Density::inset`, `pad` on the control face).
-  `ControlSize` Compact and Comfortable stay explicit per-control
-  overrides; Default follows density.
-- Select and copy: code and fields use `text_editor` + `select_only`
-  and app-owned `Content` / `Selectables` (clean multi-line highlight).
-  Markdown uses structured paint (`markdown_view` via
-  `iced_selection::markdown`) so layout stays real; selection is
-  paint-side within each block. Do not flatten the document into one
-  mixed-size `Rich` — that breaks layout and selection paint. Full
-  document copy is `copy_text` on `MarkdownDoc::source`. Contract:
-  `select` module rustdoc. Gallery demos only public constructors.
-- Always recapture handbook stills with `just book-stills` in the same change when the painted constructor or chrome in a published still changes. Update `.grok/skills/gallery-qa/references/visual.md` in that change (still path + idle must-show). Never hand-edit those PNGs or generate them. Always `read_file` that still in the same turn after recapture when pad, icon, height, or alignment changed. A passing layout test is not the visual pass.
-- Always score gallery paint by reading the `visual.md` still then the captured shot. Never treat `SCORE.md`, a constructor-body substring (`include_str`, `contains("i18n::order")`), leftover-English source lists, or a generated image as the visual pass. Never call `image_gen` during gallery QA.
-- Never run `just gallery-qa --backend host` from an agent session. Capture on Xephyr. Host activates the window and moves the pointer on their seat.
-- Never put tour GIFs, handbook stills, or `book/` in the crate `include`. Icons and `assets/themes/catalog.json` are compiled in. `gallery.gif` stays in git for README as the last tagged tour; the guide is GitHub Pages. crates.io cap is 10 MiB.
-- Always record the README/handbook tour with `just gallery-gif` (writes `tmp/gallery.gif`). Score that local file after a paint change. Never commit it, and never commit `assets/gallery.gif` or `book/src/gallery.gif`, except when tagging a version: `just gallery-gif persist` then include those two paths in `Update changelog for X.Y.Z`.
-- Always take window size, decorations, transparency, and kind from iced `window::Settings` on `Boot`. Never add a second renderer or a Smithay client loop in the widget crate. Layer-shell waits on iced; a later `host*` opener is allowed only if iced still cannot and another application needs that role (same isolation as native dialogs). Never host another client’s Wayland surface (that is the web-view non-goal). Product protocol (accounts, sessions, host services) stays in the application.
-- Always drop `target/llvm-cov-target` after a passing local coverage
-  run. `just clean` is `cargo clean`. Only `just cov` and the test jobs
-  set `CARGO_INCREMENTAL=0`. Targeted `cargo test` /
-  `cargo check` / `just test` leave incremental on.
-- Never prefix a targeted cargo command with `CARGO_INCREMENTAL=0`.
-  That rebuilds iced and the workspace on every turn.
-- Always keep `TODO.md` current with the shipped library. Sort items
-  into Do / Consider / discard in the same change. Never leave Order
-  or Do pointing at finished work. Never park or discard a job because
-  no application has asked for it.
-- Coverage fail-under is 100 on lcov/Codecov source-line hits
-  (`codecov.yml` project and patch target after the three host
-  uploads). Always run local `just cov` (`scripts/check_lcov.py`
-  empty) on this tree before saying ready to push or tag. Never
-  leave counted `DA,0` for continuous integration to find. Agents
-  must pass that Codecov check. Never fail a continuous-integration
-  test job on one host's lcov `DA,0`. Do not use
-  `llvm-cov --fail-under-lines` (macro expansions). Never rewrite
-  production so a coverage counter stops flagging a line. Cover the
-  real path or leave the miss.
-- `catalog::ENTRIES` is the gallery checklist. Adding an export means
-  adding an entry, a constructor rustdoc example, the catalog test
-  map row, and a gallery page in the same change. Related atoms share
-  a page. Gallery pages use representative content (full markdown
-  document, multi-language highlighted code, variants and disabled).
-  A one-line stub is not a page. Live samples update application
-  state. Never demo a usable control with `Nop` or a hardcoded value.
-  When a page looks broken, read the widget (offset, stick, viewport)
-  before blaming seed data.
-- Never leave a gallery QA ugly as residual when the fix is known.
-  Residual only when the path is genuinely blocked (unclear fix,
-  other host, missing pointer).
-- 4 dp M3 spacing grid (default density 8 dp, 48 dp touch). Design-system
-  numbers live in `m3` / `density`, `typo`, `chrome`, and tokens — not
-  one-off magic in widgets.
-- Never leave a process-global `OnceLock` or env mutation that freezes
-  the first workspace, locale, or theme for the process lifetime.
-- Experiments live in `icedtea` or `icedtea-gallery`. Never add a
-  proof-of-work app as a workspace member or document it in README,
-  the book, or this file.
-- Never grow `CHANGELOG.md` Unreleased into a session diary. 0.1.0 on
-  crates.io was a publish check. 0.2 is the first library cut. Never
-  call icedtea a product in user-facing copy; it is a UI library.
-  Write each version section as bullets under Feature, Bug fix, and
-  Chore (omit an empty heading). One public thing per bullet. Never
-  topic subheadings (controls, collections, theme). Never a prose
-  paragraph that lists several adds. Unreleased is those version
-  notes. Splitting a diary is not the pass.
-- Gallery fixtures (sample documents, language snippets, bitmaps) live
-  in `icedtea-gallery`. Never export them from `icedtea`.
-- Never ship a document undo stack. The application owns document
-  history.
-- Performance: first useful frame quickly; scrolling and typing stay
-  smooth at ordinary data sizes; virtualized collections for large
-  data. Measure before claiming.
-- Always write crate-root rustdoc as a teaching tour: what icedtea is,
-  a first compose that uses one `Action` plus chrome, the noun map
-  (Boot, tokens, Action, constructors, patterns), and links into the
-  owning modules. README is a short first path, a picture of the
-  window, and links. Never `include_str!` the README as the crate-root
-  body.
-- Always write constructor rustdoc as a job: when to call it, the
-  arguments that matter, disabled/empty, a compiling call that names
-  the message. Do not title rustdoc with a catalog id.
-- Always keep the guide catalog-complete: every `ENTRIES` id appears
-  under its catalog group with rustdoc, source, and crates.io (or
-  docs.rs) links. Composition chapters teach how to put pieces
-  together; the reference lists the pieces. Never send readers to
-  the gallery from README, the guide, or crate-root rustdoc. The
-  gallery is a demo. Those pages are a brain-dead copy of the public
-  constructors an app would call—same messages, tokens, and A11y.
-  Never stage dual-pane or other glue that invents a path the library
-  does not ship.
-- Always use one first-path program (`examples/hello.rs`): one
-  `Action`, chrome that consumes the table, a filling editor, status.
-  README, crate-root, and First window include that program. Never
-  lead with a counter.
-- Never put maintainer process (coverage fail-under, publish pipeline,
-  “one catalog id / one constructor”) on the reader path (README,
-  introduction, first-window, widget reference). That contract lives
-  in this file.
+  paint and the function names a job any icedtea app could call.
+  Product protocol and store stay in the application.
+- Always emit `docs/agents/` with `just agents-doc` in the same
+  change as `ENTRIES`, constructor rustdoc, or `m3::mapping`. Never
+  hand-edit those files.
+- A widget is public only when it is themed, keyboard-complete,
+  tested, documented, in `ENTRIES`, and on a gallery page. Related
+  atoms share a page. Unfinished surfaces are not exported. Adding
+  an export is entry + rustdoc example + catalog map row + gallery
+  page + book section in the same change.
+- Design-system numbers live in `m3` / `density`, `typo`, `chrome`,
+  and tokens. Chrome pad and gap come from `Tokens.density`. Never
+  bundle a font file. Resting drop is `Component::elevation()`;
+  `style::tests::resting_elevation_matches_material_table` is the
+  check. Catalog `text` / `muted` come from `theme::auto_ink`.
+- `pick_list` trailing marks: `m3::density::TRAILING_ICON` and
+  `Density::inset` on the end. Never iced `Handle::Arrow`.
+- Split sash: grip emits `SashEvent::Press` only. Move and release
+  come from `layout::listen_sash` into `SashDrag::apply`.
+- Direction, focus, and keys: constructor rustdoc and
+  `.grok/skills/gallery-qa/references/rtl.md`. Never physical
+  left/right for chrome that mirrors. Never a Field-radius ring
+  around a caption or a stack of cards.
+- Select and copy: `select` module rustdoc. Do not flatten markdown
+  into one mixed-size `Rich`.
+- Always recapture handbook stills with `just book-stills` when the
+  painted constructor in a published still changes. Update
+  `visual.md` in that change. Score still then shot. Never
+  `image_gen` during gallery QA. Never `just gallery-qa --backend
+  host` from an agent session (Xephyr). Never leave a known ugly as
+  residual.
+- Never put tour GIFs, handbook stills, or `book/` in the crate
+  `include`. Persist `gallery.gif` only when tagging
+  (`just gallery-gif persist`).
+- Only `just cov` and the test jobs set `CARGO_INCREMENTAL=0`.
+  Never prefix a targeted cargo command with it. Drop
+  `target/llvm-cov-target` after a passing local `just cov`.
+- Always keep `TODO.md` current. Coverage fail-under is 100 on
+  counted lcov `DA` hits (`codecov.yml`; local `scripts/check_lcov.py`
+  empty). Never rewrite production so a counter stops flagging a
+  line. Never fail a host test job on that host's `DA,0`.
+- Never a process-global `OnceLock` that freezes the first
+  workspace, locale, or theme. Experiments stay in `icedtea` or
+  `icedtea-gallery`. Gallery fixtures stay in the gallery crate.
+- Never grow Unreleased into a session diary. One public thing per
+  changelog bullet under Feature, Bug fix, and Chore. Never call
+  icedtea a product in user-facing copy.
+- Never put maintainer process on the reader path (README,
+  introduction, first-window, widget reference).
 
-A third-party app ships with only icedtea for chrome, actions, layout,
-and theme. A compact tool does not import iced `button`, window
-resize, or keyboard key enums to finish. The gallery is the document
-shell; the README pad is the tool-sized window.
-
-When generating an icedtea application: start from `examples/hello.rs`
-(one Action, chrome, editor, status). A list plus an on-disk SQLite file
-is `book/src/cookbook/tasks.md` and `examples/tasks.rs`. Constructors
-return `Element`s and emit the application's messages. The application
-owns state and any database. Do not add a second renderer, a
-stylesheet, or gallery-only glue. Do not send the reader to the
-gallery.
-
-Rejected alternatives live once under Non-goals below. Do not add a
+Rejected alternatives live once under Non-goals. Do not add a
 “what it is not” section anywhere else.
 
 ## Non-goals

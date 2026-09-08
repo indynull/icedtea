@@ -18,10 +18,6 @@ Source of truth is rustdoc plus `catalog::ENTRIES`. The agent
 index is generated. `AGENTS.md` is a short router. Skills score
 paint; they do not restate library law.
 
-- Shrink `AGENTS.md` to what icedtea is, `examples/hello.rs`, open
-  the constructor rustdoc for that job, and a link to the generated
-  index. Delete Always / Never lines that catalog tests already
-  enforce.
 - Skills keep scoring procedure (Xephyr, still, locale). A design
   guideline that can be a rustdoc sentence or a constructor test
   leaves the skill.

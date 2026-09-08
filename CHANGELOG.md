@@ -6,6 +6,7 @@
 
 - Generated `docs/agents/` from the catalog (`llms.txt` and one
   file per group).
+- `AGENTS.md` is a router into that pack.
 
 ## 0.17.0 — 2026-09-08
 
