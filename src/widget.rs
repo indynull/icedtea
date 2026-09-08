@@ -9453,6 +9453,102 @@ mod tests {
     }
 
     #[test]
+    fn pick_list_enter_opens_only_when_focused() {
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, &str> = pick_list(
+            ["a", "b"],
+            Some("a"),
+            |s| s,
+            tok,
+            ControlSize::Default,
+            A11y::new("pick", Role::ComboBox),
+        );
+        let mut tree = Tree::new(el.as_widget());
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            iced::Font::DEFAULT,
+            iced::Pixels::from(16u32),
+        ));
+        let size = Size::new(200.0, 40.0);
+        let limits = layout::Limits::new(Size::ZERO, size);
+        let node = el.as_widget_mut().layout(&mut tree, &renderer, &limits);
+        let layout = Layout::new(&node);
+        let viewport = iced::Rectangle::new(iced::Point::ORIGIN, size);
+        let enter = Event::Keyboard(keyboard::Event::KeyPressed {
+            key: keyboard::Key::Named(keyboard::key::Named::Enter),
+            modified_key: keyboard::Key::Named(keyboard::key::Named::Enter),
+            physical_key: keyboard::key::Physical::Unidentified(
+                keyboard::key::NativeCode::Unidentified,
+            ),
+            location: keyboard::Location::Standard,
+            modifiers: keyboard::Modifiers::empty(),
+            text: None,
+            repeat: false,
+        });
+        {
+            let mut messages = Vec::<&str>::new();
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            el.as_widget_mut().update(
+                &mut tree,
+                &enter,
+                layout,
+                mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        let closed =
+            el.as_widget_mut()
+                .overlay(&mut tree, layout, &renderer, &viewport, iced::Vector::ZERO);
+        assert!(
+            closed.is_none(),
+            "unfocused Enter must not open the pick menu"
+        );
+        drop(closed);
+        {
+            use iced::advanced::widget::operation::{focusable::Focusable, Operation};
+            struct FocusAll;
+            impl Operation<()> for FocusAll {
+                fn focusable(
+                    &mut self,
+                    _id: Option<&Id>,
+                    _bounds: iced::Rectangle,
+                    state: &mut dyn Focusable,
+                ) {
+                    state.focus();
+                }
+                fn traverse(&mut self, operate: &mut dyn FnMut(&mut dyn Operation<()>)) {
+                    operate(self);
+                }
+            }
+            let mut op = FocusAll;
+            el.as_widget_mut()
+                .operate(&mut tree, layout, &renderer, &mut op);
+        }
+        {
+            let mut messages = Vec::<&str>::new();
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            el.as_widget_mut().update(
+                &mut tree,
+                &enter,
+                layout,
+                mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
+        }
+        let open =
+            el.as_widget_mut()
+                .overlay(&mut tree, layout, &renderer, &viewport, iced::Vector::ZERO);
+        assert!(open.is_some(), "focused Enter must open the pick menu");
+    }
+
+    #[test]
     fn split_view_arrow_nudges_sash() {
         use crate::layout::{self, Axis, SashEvent, SplitState};
         let tok = named("dark").tokens;

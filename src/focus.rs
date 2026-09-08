@@ -524,7 +524,10 @@ impl<'a, Message: Clone> iced::advanced::Widget<Message, iced::Theme, iced::Rend
                 if self.apply_keys(tree, event, shell) {
                     return;
                 }
-                if self.open_on_activate && !shell.is_event_captured() {
+                if self.open_on_activate
+                    && tree.state.downcast_ref::<TargetState>().focused
+                    && !shell.is_event_captured()
+                {
                     if let Some(press) = crate::key::press(kev) {
                         if activate_press(&press) {
                             let at = iced::mouse::Cursor::Available(layout.bounds().center());
