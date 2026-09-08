@@ -1,17 +1,8 @@
-## Material Design 3
-
-Source of what Material says: `references/material/INDEX.md`
-(`just material-snapshot`). icedtea’s desktop map is `src/m3/`.
-Read those before scoring elevation, shape, type, or trailing icons.
-
-- Spacing on a **4 dp grid**; default density 8 dp gap, 48 dp touch targets.
-- Controls show M3 states: enabled, disabled, hovered, focused, pressed, selected/error where defined.
-- Surfaces use token roles only (`Tokens::scheme()`); no one-off hex.
-- Desktop chrome is **rectangular** (M3 shape None / 0 dp). Rounded pills are ugly unless intentional geometry (slider thumb).
-- Type hierarchy: label < body < title (M3 type scale via `typo`).
-- Data table: selected row ≠ zebra stripe; focused cell is outline on selection wash.
-
 # Gallery QA rubric
+
+Material numbers: `references/material/INDEX.md` and `src/m3/`.
+Read those before scoring elevation, shape, type, or trailing icons.
+Do not copy the tables here.
 
 Score every shot (and every live page) **ok / ugly / broken**. Prefer
 one primary class per defect. Severity first, then taste.
@@ -50,9 +41,8 @@ ok row or a constructor-source substring is not a score for that page.
 - Shared leading edges for labels/fields in a column
 - Buttons in a row share height and baseline; split primary + overflow same height
 - Icons optically centered in hit boxes; chevrons are chevrons, not dots
-- Trailing pick / menu / list icons: **24 dp** (20 dp Compact),
-  **12 dp** from the trailing edge at default density
-  (`references/m3-trailing-icon.md`). A body-sized or 4 dp-flush
+- Trailing pick / menu / list icons: score
+  `references/m3-trailing-icon.md`. A body-sized or 4 dp-flush
   chevron is **ugly**. A disc or missing mark is **broken**.
 - Text and chrome clear card edges (no flush titles); ~12–16px page inset
 - Body not under status/menu; nav selection matches the open page
@@ -113,10 +103,9 @@ the shot (not a zero-width bar).
 - Virtualized rows do not paint **over** filters, headers, or siblings
 - Soft container clip is not enough when backgrounds fill layout boxes —
   library needs a real scissor/layer for overscan
-- `widget::scroll` (`ThemedScroll`, 24 px rail) and any sibling
-  scroller clip **below** sticky chrome.
-  Section titles and rows must not paint through a Search field or other
-  header that sits above the list (opaque header + scissor, not hope)
+- Catalog scroll and any sibling scroller clip **below** sticky
+  chrome. Section titles and rows must not paint through a Search
+  field or other header that sits above the list.
 - First useful frame shows content (empty list until scroll message = broken)
 - Sticky/frozen columns stay put; horizontal scroll does not orphan them
 - Overlays (menu, context, palette, dialog) sit above content with clear

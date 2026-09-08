@@ -75,28 +75,24 @@ Shots land under `tmp/gallery-qa/<timestamp>/` (or `--out DIR`).
    (not for UI, not for animals, not for anything). Score only the
    book still in `visual.md` and the captured `shots/*.png`. No
    hand-edited PNGs.
-7. **Drive the shipped constructor.** Tests call `pick_list`,
-   `widget::scroll`, or the public fn under review from a real start
-   state. Do not assert only a private helper, and do not start past
-   the widget. `widget::scroll` is `ThemedScroll` (24 px rail). Iced's
-   2 px scroller is not the catalog scrollbar.
+7. **Drive the shipped constructor.** Tests call the public fn under
+   review from a real start state. Do not assert only a private helper,
+   and do not start past the widget.
 8. **Score the local tour** after a paint change (`just gallery-gif`
    writes `tmp/gallery.gif`; handbook stills stay in-tree). A source
    fix whose recaptured GIF still shows the old mark is **broken**.
    Persist the GIF on a version tag, not in the fix commit.
-9. **Trailing-icon geometry** is `references/m3-trailing-icon.md`
-   (24 dp / 12 dp default). Do not accept a body-sized or 4 dp-flush
-   chevron as residual when the Material numbers are in-repo.
+9. **Trailing marks.** Score the painted size against
+   `references/m3-trailing-icon.md`. A body-sized or 4 dp-flush
+   chevron is not residual.
 10. **Idle must show the constructor under review.** Shared pages pack
     unpublished or changed hosts above the fold (`pack_at` / catalog
     order). A look-strip neighbor is not a Fields/select score.
 11. **Compare to the still.** For every idle shot, `read_file` the
     still in `references/visual.md`, then the QA shot. Skip no page
     class (readout, motion, chrome). Locale shots use the same still
-    plus `rtl.md` (progress from start, Eastern digits on ar/ur including
-    badge counts, wrap, start/end order). A `SCORE.md` row or a constructor-source
-    substring (`include_str`, `src.contains("i18n::order")`, leftover
-    English lists) is **not** this compare. The bar is the pixels.
+    plus `rtl.md`. A `SCORE.md` row or a constructor-source substring
+    is **not** this compare. The bar is the pixels.
 12. **New or changed paint updates the still map.** Adding a catalog
     constructor or page, or changing how one looks, recaptures that
     book still and rewrites the `visual.md` must-show in the same
@@ -108,59 +104,31 @@ Shots land under `tmp/gallery-qa/<timestamp>/` (or `--out DIR`).
     strip and menu stay one line. A wrap that only appears at that
     default is still **broken**. A 1600-wide SCORE ok is not proof
     the first page is clean.
-14. **A Fill child makes the parent Fill.** A shrink button beside a
-    Fill toast or scroller snaps to physical left unless that column
-    is `width(Fill)` plus `align_x(align_start)`. Score the button
-    after a toast is visible, not only the idle empty queue.
+14. **Score Fill + shrink together.** A shrink button beside a Fill
+    toast or scroller snaps to physical left when the column is not
+    Fill + `align_start`. Score the button after a toast is visible,
+    not only the idle empty queue.
 15. **Locale density must match English.** Open the English shot, then
     the locale shot of the same page. Hints, pick captions, form
     labels, and image-slot captions sit under the heading (or slot)
-    on the **start** edge. Form fields (search, text, password,
-    number, textarea) put placeholder and caret on start (right in
-    RTL). A page whose widgets exist but look empty
-    (captions on physical left, a large unused gap on start) is
-    **broken**. Do not score “constructors present” as clean.
+    on the **start** edge. Form fields put placeholder and caret on
+    start (right in RTL). A page whose widgets exist but look empty
+    is **broken**. Do not score “constructors present” as clean.
 16. **Catalog fill is not leftover English.** Score the still’s
-    must-show: vi may keep loanwords (`Markdown`, `Accordion`, `hover`);
-    colorway ids (`dark`), the gallery face id (`Noto Sans`), and icon slugs (`chevron`) stay ids. Do not
-    park those as residual and do not invent translations for them.
-    Leftover Latin is broken only where the still names it (`Markdown`
-    on ja/zh/ar/ur/he, `Enter` / `Contain, cover`, raw key `ok`,
-    leftover `Code` on the type mono sample).
-    ja main-window status `OK` is catalog fill, not the raw key.
-    The `rustdoc` host link is the docs.rs label, not leftover English.
-    A job or widget-job line that names a physical left or right after
-    the layout mirrors is leftover (hint lies): use the pane name.
-    Theme family hint leftover Latin `Family` on ja/vi is broken
-    (系統 / Nhóm). About credits that overflow the group box on
-    he/ar are broken: mixed-bidi `iced 0.14` plus Hebrew/Arabic
-    does not wrap under `Length::Fill` or `Wrapping::Glyph`. Put
-    `iced 0.14` on its own catalog line and give the credits a
-    definite inner width. `clip(true)` alone hides the line; that
-    is not a wrap. Filename sample `notes.txt` and key chords
-    (`ctrl+n`) are LTR islands, not leftover English. Hebrew painted
-    numbers stay Western (`2` / `9`); only ar/ur/fa use Eastern.
-    Eastern percents use the Arabic percent sign (`٤٠٪` / `١٠٠٪`);
-    a bidi-split leftover `40%` or `٪٤` is broken.
-    The confirm card stays centered on the dim wash — that is the
-    modal, not a start-align miss.
-17. **Material numbers** come from `references/material/` (refresh
-    with `just material-snapshot`) and the desktop map in `src/m3/`.
-    When scoring elevation, shape, type, spacing, motion, or trailing
-    icons, read the matching snapshot page. Do not invent Material
-    values from memory. A documented desktop approximation in
-    `src/m3` is not a miss.
-    Resting **drop**: read `Component::elevation()` and snapshot
-    `styles/elevation`. Score the painted shadow on Desktop
-    (`ElevationPolicy::Flat` zeros every drop). Elevated faces
-    (button, card, chip) are Level 1 on that constructor. A still
-    or `visual.md` line that matches a wrong assignment is not the
-    pass — fix the constructor, then recapture. The unit check is
-    `style::tests::resting_elevation_matches_material_table`.
-18. **Composite focus.** A list, virtual column, grid, table, or tree
-    must not grow a Field-radius ring around the pane. Score the item
-    face (row wash, outlined tile). A second stadium wrapping two
-    cards or the whole tile wall is **broken**.
+    must-show (`visual.md` + `rtl.md`). Colorway ids, face ids, icon
+    slugs, filename samples, and key chords stay as they are. Leftover
+    Latin is broken only where the still names it. Hebrew painted
+    numbers stay Western; ar/ur/fa use Eastern (including `%` → `٪`).
+    The confirm card stays centered on the dim wash.
+17. **Material numbers** come from `references/material/` and `src/m3/`.
+    Read the snapshot page when scoring elevation, shape, type,
+    spacing, motion, or trailing icons. Do not invent values. A
+    documented desktop approximation in `src/m3` is not a miss.
+    Score the painted drop against `Component::elevation()`; the
+    assignment check is `style::tests::resting_elevation_matches_material_table`.
+18. **Composite focus.** Score the item face (row wash, outlined tile).
+    A Field-radius stadium around the pane, two cards, or the tile
+    wall is **broken**.
 19. **Icon fields.** After changing pad, icon size, or field height,
     `read_file` the still. Search glass and placeholder share the bar
     midline. A layout test is not that look.
@@ -271,28 +239,18 @@ fix (colors hint, grid hint, cheatsheet title/shortcut) is not
 done after one locale — recapture that beat for every fill
 language and re-read those shots before claiming clean.
 
-`pattern::cheatsheet` rows follow window direction: action title
-on the start, shortcut on the end, rail gutter via `inline_pad`.
-LTR title-left / shortcut-right on `ar` / `ur` / `he` is broken.
+Score the pixels, not a constructor-body grep:
 
-Badge counts are painted numbers. `widget::badge` maps them through
-`Tokens.clock_digits`. Score ar/ur tab badges, the expander count,
-and the tree selected id as Eastern (`٢` / `٩` / `٣`), not leftover
-`2` / `9` / `3`. Hebrew stays Western.
-
-Closable tabs: score the idle 14 / 27 shot. Order is icon, title,
-badge, then close on the end (left in RTL). A physical
-`row![label, dismiss]` puts close on the start. The proof is that
-close mark, not `src.contains("i18n::order")`.
-
-Job and widget-job lines: score the painted caption. A line that
-names a physical left or right after the layout mirrors is hint
-lies (detail / properties / places rail / files rail).
-
-Side sheet after `sheet true`: docks on the end (left in RTL). Close
-sits on the sheet end. A physical `row![Fill, sheet]` parks the
-sheet on start in RTL. The confirm card stays centered — that is
-the modal, not a miss.
+- Cheatsheet: title on start, shortcut on end. LTR title-left on
+  `ar` / `ur` / `he` is broken.
+- Badge / expander / tree selected id: Eastern on ar/ur (`٢` / `٩` /
+  `٣`). Hebrew stays Western.
+- Closable tabs (idle 14 / 27): icon, title, badge, close on the end
+  (left in RTL). The close mark is the proof.
+- Job lines: painted caption. A physical left or right after the
+  layout mirrors is leftover.
+- Side sheet after `sheet true`: docks on the end; close on the
+  sheet end. The confirm card stays centered.
 
 ## Not this skill
 
@@ -305,13 +263,9 @@ the modal, not a miss.
 - `references/visual.md` — still + must-show per page  
 - `references/rubric.md` — what counts as broken/ugly  
 - `references/material/INDEX.md` — Material spec snapshot (`just material-snapshot`)
-- `src/m3/shape.rs` `Component::elevation()` — resting drop table
-- `style::tests::resting_elevation_matches_material_table` — constructor assignment  
-- `references/m3-trailing-icon.md` — pick / menu / list trailing mark  
+- `references/m3-trailing-icon.md` — trailing-mark sizes to score
 - `references/rtl.md` — SCORE map  
-- `references/firefox-rtl.md` — Firefox RTL Guidelines  
-- `references/ms-bidi.md` — Microsoft bidirectional design  
-- `references/ms-flowdirection.md` — Microsoft FlowDirection / layout  
+- `references/firefox-rtl.md` / `ms-bidi.md` / `ms-flowdirection.md`
 - `references/manual-pass.md` — pointer / live protocol  
 - `scripts/gallery_qa.py` — capture harness  
-- `AGENTS.md` — library contract  
+- Constructor rustdoc and `src/m3` — library law (do not copy it here)

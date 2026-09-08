@@ -18,9 +18,6 @@ Source of truth is rustdoc plus `catalog::ENTRIES`. The agent
 index is generated. `AGENTS.md` is a short router. Skills score
 paint; they do not restate library law.
 
-- Skills keep scoring procedure (Xephyr, still, locale). A design
-  guideline that can be a rustdoc sentence or a constructor test
-  leaves the skill.
 - After the emit is stable, a query surface answers a catalog id
   (or a job such as pick a number) with the constructor, `*Opts` /
   `*Face`, tokens, `A11y`, and the compiling snippet.

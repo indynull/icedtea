@@ -22,15 +22,11 @@ button groups, tabs, dialogs, and chrome rows share it. Set it from
 `Boot` / `Prepared::direction`. It does not follow the OS by itself
 ([ms-flowdirection.md](ms-flowdirection.md)).
 
-- Start/end for chrome: `i18n::order`, `align_start`, `align_end`,
-  `inline_pad`. iced `Alignment::Start` is physical left. Empty-field
-  placeholder, value, and caret origin follow start (`align_x_start`
-  on `text_input`, `search_input`, `number_input`,
-  `password_input`). Search clear is ordered with the mark and field,
-  not appended on physical right. Textarea is a stable Fill field.
-  iced 0.14 has no editor writing direction — do not shrink-wrap a
-  right-hand slab (caret ahead of Urdu, newline on the opposite
-  edge). Track [iced#3294](https://github.com/iced-rs/iced/pull/3294).
+- Start/end for chrome. iced `Alignment::Start` is physical left.
+  Empty-field placeholder, value, and caret origin follow start.
+  Search clear sits with the mark and field, not on physical right.
+  Textarea is a stable Fill field (iced 0.14 has no editor writing
+  direction; a shrinking right-hand slab is not the score).
 - Hints (`meta`), pick captions, and form labels sit on the start
   edge under their heading. A shrink caption in a Fill column lands
   on physical left and the page looks empty — that is **broken**.
@@ -51,9 +47,9 @@ button groups, tabs, dialogs, and chrome rows share it. Set it from
 Read the lists in [firefox-rtl.md](firefox-rtl.md) (What to mirror /
 What NOT to mirror / LTR text inside RTL contexts). icedtea bindings:
 
-- Flip: directional icons and motion (`icon_svg` rotates Chevron and
-  Back), twisties (unless the island is LTR), field adornments to the
-  opposite inline side, nav and dialog action order (`i18n::order`).
+- Flip: directional icons and motion, twisties (unless the island is
+  LTR), field adornments to the opposite inline side, nav and dialog
+  action order.
 - Keep: text and numbers, text-or-number icons, symmetric marks,
   checkmarks, media transport, logos, size pairs (`1920x1080`), unit
   order (`10 px`).
@@ -73,19 +69,17 @@ What NOT to mirror / LTR text inside RTL contexts). icedtea bindings:
 Western digits on Arabic, Urdu, or Persian **painted numbers** are
 **broken** (clocks, progress percents, remaining time, list range,
 badge counts, tree selected id, look-strip type percents, field
-character counts).
-`ClockDigits::map_str` is the one map (`%` becomes `٪` so `40%` is
-`٤٠٪`, not a bidi-split `٪٤`). Hebrew uses 123 — do not park Hebrew
-`2` / `9` / `100%` as leftover or as a digits miss.
+character counts). `40%` must paint as `٤٠٪`, not a bidi-split `٪٤`.
+Hebrew uses 123 — do not park Hebrew `2` / `9` / `100%` as leftover
+or as a digits miss.
 Gallery SCORE runs every fill language; right-to-left shot rows
 fire on `ar`, `ur`, and `he`. Filename samples (`notes.txt`) and
 key chords (`ctrl+n`) stay LTR islands. A confirm card centered
 on the dim wash is the modal, not a start-align miss.
 
 Linear progress and other time motion fill from the **start** edge
-(right in RTL). `progress` orders fill portions with `i18n::order`.
-`slider` fills from start the same way (min on start, max on
-end). A physical-left fill or `0`/`1` pinned left/right is **broken**.
+(right in RTL). Slider min on start, max on end. A physical-left
+fill or `0`/`1` pinned left/right is **broken**.
 
 Status and job notes after a control press use the locale fill and
 `ClockDigits` (`گروپ ٢`, not leftover English `Group 2`). Job and
@@ -134,7 +128,7 @@ enough — the library tests drive two parent widths.
 | Button groups and checks | `layout-controls` / `rtl_checkbox` |
 | Titles paint (no empty pads) | `layout-button-face` / `rtl_themed_button`; `faces-controls` |
 | Chrome stays one line | `wrap-chrome` |
-| Painted numbers on ar/ur/fa | `digits-eastern` (`ClockDigits::map_str`, `progress_label`) |
+| Painted numbers on ar/ur/fa | `digits-eastern` |
 | Progress fill from start | `layout-progress` / `rtl_progress` |
 | Readout percent row | `gallery-readout-order` |
 | Controls pack and slider pair | `gallery-controls-pack` |

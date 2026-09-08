@@ -14,16 +14,10 @@ metadata:
 **Objective:** keep named colorways readable on their own paper.
 Paper, accents, and status stay hex. Body and mute ink are derived.
 
-The function is [`theme::auto_ink`](../../../src/theme.rs).
-`catalog_from_json` ignores JSON `text` / `muted` / `foreground`.
-`high-contrast` is defined in Rust next to the catalog.
-
-```rust
-// Rec. 601 brightness of canvas < 0.5 → white, else black.
-// Mix that ink toward the paper.
-theme::auto_ink(canvas, 0.87) // Tokens.text   (Textual $text)
-theme::auto_ink(canvas, 0.60) // Tokens.muted  (Textual $text-muted)
-```
+The function is [`theme::auto_ink`](../../../src/theme.rs)
+(rustdoc has the 87 / 60 mix). `catalog_from_json` ignores JSON
+`text` / `muted` / `foreground`. `high-contrast` is defined in Rust
+next to the catalog.
 
 Check: `theme::tests::catalog_body_and_mute_follow_auto_ink`.
 
@@ -46,22 +40,7 @@ the way VS Code's terminal contrast lift does).
 different body color pass it there. Follow-OS host `text` /
 `muted` still overwrite when `follow_os` is on.
 
-## Other kits (how they get final ink)
-
-Full notes: `references/derivation.md`.
-
-| Kit | Body ink |
-| --- | --- |
-| **Textual** | `$text` / `$text-muted` = `auto 87%` / `auto 60%` on the widget paper. Rec. 601, then mix white or black. Catalog `foreground` is a different token. |
-| **COSMIC** (`cosmic-theme`) | 100-step OKLCH lightness ramp from the seed. Text is 70 steps from paper (fallback 50). Optional `text_tint` swaps the ramp. Closest iced desktop sibling. |
-| **Base16 / Tinted** | Explicit slots. `base00` paper, `base05` body, `base03` comments. Solarized `base05` is mid-gray on purpose. |
-| **VS Code / xterm.js** | Keep the cell foreground. Lift luminance to WCAG 4.5:1 (`minimumContrastRatio`). Washes ANSI. |
-| **WezTerm** | Same lift, opt-in (`text_min_contrast_ratio`). |
-| **Ghostty** | `foreground` and `background` are explicit. `palette-generate` interpolates indices 16–255 in Lab from the base 16 plus fg/bg. Does not invent body ink. |
-| **themer** | `shade0` paper, `shade6`/`shade7` body. Explicit. |
-| **Tabby** | White or black from WCAG 3:1 on the tab paper. |
-| **Terminal.Gui** | Focus swaps Normal fg/bg; other roles brighten or dim. |
-| **Material 3** | HCT tone from a seed. icedtea maps aliases onto those roles **after** ink is chosen. |
+Survey of other kits: `references/derivation.md`.
 
 ## Common mistakes
 
