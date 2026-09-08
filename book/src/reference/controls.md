@@ -104,6 +104,9 @@ Constructor: [`widget::switch`](https://docs.rs/icedtea/latest/icedtea/widget/fn
 
 Same contract as checkbox: the application owns the bool. Disabled
 freezes the thumb.
+`SwitchOpts::FORM` is a settings row (track then caption, Fill).
+`SwitchOpts::BAR` is a toolbar control (caption then track, shrink)
+at `ControlSize` height, next to a compact pick.
 Space and Enter toggle when the switch is focused.
 
 Pass `A11y`.

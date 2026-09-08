@@ -1407,6 +1407,7 @@ mod tests {
             false,
             |v| v,
             tok,
+            crate::widget::SwitchOpts::FORM,
             crate::a11y::A11y::new("Notify", crate::a11y::Role::Switch),
         );
         let mut tree = Tree::new(tog.as_widget());

@@ -1022,6 +1022,40 @@ impl ControlSize {
     }
 }
 
+/// How [`switch`] sits in a row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SwitchFace {
+    /// Settings stack: track then caption, Fill width.
+    #[default]
+    Form,
+    /// Toolbar: caption then track, shrink width.
+    Bar,
+}
+
+/// Size and row for [`switch`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SwitchOpts {
+    pub size: ControlSize,
+    pub face: SwitchFace,
+}
+
+impl SwitchOpts {
+    pub const FORM: Self = Self {
+        size: ControlSize::Default,
+        face: SwitchFace::Form,
+    };
+    pub const BAR: Self = Self {
+        size: ControlSize::Compact,
+        face: SwitchFace::Bar,
+    };
+}
+
+impl Default for SwitchOpts {
+    fn default() -> Self {
+        Self::FORM
+    }
+}
+
 /// Size of a [`button`]. Shrink is the default control face.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ButtonOpts {
@@ -1405,12 +1439,15 @@ pub fn icon_button_toggle<'a, M: Clone + 'a>(
 /// Same contract as checkbox: the application owns the bool. Disabled
 /// freezes the thumb. Track corners follow [`Tokens::shape`]
 /// ([`crate::m3::shape::Component::Track`]).
+/// [`SwitchOpts::FORM`] is a settings row (track then caption, Fill).
+/// [`SwitchOpts::BAR`] is a toolbar control (caption then track, shrink)
+/// at [`ControlSize`] height so it sits next to a compact pick.
 ///
 ///
 /// ```
 /// use icedtea::a11y::{A11y, Role};
 /// use icedtea::theme;
-/// use icedtea::widget;
+/// use icedtea::widget::{self, SwitchOpts};
 /// let tok = theme::named("dark").tokens;
 /// let on_toggle = |on| on;
 /// let _: icedtea::Element<'_, bool> = widget::switch(
@@ -1418,7 +1455,16 @@ pub fn icon_button_toggle<'a, M: Clone + 'a>(
 ///     false,
 ///     on_toggle,
 ///     tok,
+///     SwitchOpts::FORM,
 ///     A11y::new("Sounds", Role::Switch),
+/// );
+/// let _: icedtea::Element<'_, bool> = widget::switch(
+///     "Tail",
+///     true,
+///     on_toggle,
+///     tok,
+///     SwitchOpts::BAR,
+///     A11y::new("Tail", Role::Switch),
 /// );
 /// ```
 pub fn switch<'a, M: Clone + 'a>(
@@ -1426,6 +1472,7 @@ pub fn switch<'a, M: Clone + 'a>(
     on: bool,
     msg: impl Fn(bool) -> M + 'a,
     tok: Tokens,
+    opts: SwitchOpts,
     a11y: A11y,
 ) -> Element<'a, M> {
     let a11y = a11y.merge_toggled(on).merge_checked(on);
@@ -1439,15 +1486,44 @@ pub fn switch<'a, M: Clone + 'a>(
     }
     let can = !a11y.disabled;
     let keys_msg = msg.clone();
-    a11y::attach(
-        crate::focus::target_keys_start(
-            labeled_control(t.into(), name, tok, a11y.disabled, can.then(|| msg(!on))),
+    let on_label = can.then(|| msg(!on));
+    let body = match opts.face {
+        SwitchFace::Form => crate::focus::target_keys_start(
+            labeled_control(t.into(), name, tok, a11y.disabled, on_label),
             tok,
             can,
             move |press| activate_key(&press).then_some(keys_msg(!on)),
         ),
-        &a11y,
-    )
+        SwitchFace::Bar => {
+            let type_px = match opts.size {
+                ControlSize::Compact => tok.meta(),
+                _ => tok.body(),
+            };
+            let ink = if a11y.disabled {
+                tok.scheme().on_surface_variant
+            } else {
+                tok.scheme().on_surface
+            };
+            let mut caption: Element<'a, M> = text(name).size(type_px).color(ink).into();
+            if let Some(click) = on_label {
+                caption = mouse_area(caption).on_press(click).into();
+            }
+            let mut r = Row::new().spacing(gap(tok)).align_y(Alignment::Center);
+            for kid in crate::i18n::order(tok.direction, [caption, t.into()]) {
+                r = r.push(kid);
+            }
+            crate::focus::target_keys(
+                container(r)
+                    .height(sized_control_height(tok, opts.size))
+                    .align_y(Alignment::Center)
+                    .into(),
+                tok,
+                can,
+                move |press| activate_key(&press).then_some(keys_msg(!on)),
+            )
+        }
+    };
+    a11y::attach(body, &a11y)
 }
 
 /// Pick one value from a small set.
@@ -8928,6 +9004,7 @@ mod tests {
             false,
             |on| on,
             tok,
+            SwitchOpts::FORM,
             A11y::new("Sounds", Role::Switch),
         );
         let got = pump_click_then_named(
@@ -8937,6 +9014,77 @@ mod tests {
             keyboard::key::Named::Enter,
         );
         assert_eq!(got, vec![true]);
+    }
+
+    #[test]
+    fn switch_bar_shrinks_to_content() {
+        let tok = named("dark").tokens;
+        let max = iced::Size::new(280.0, 48.0);
+        let mut form: Element<'_, bool> = switch(
+            "Tail",
+            false,
+            |on| on,
+            tok,
+            SwitchOpts::FORM,
+            A11y::new("Tail", Role::Switch),
+        );
+        let mut bar: Element<'_, bool> = switch(
+            "Tail",
+            false,
+            |on| on,
+            tok,
+            SwitchOpts::BAR,
+            A11y::new("Tail", Role::Switch),
+        );
+        let form_w = layout_size(&mut form, max).width;
+        let bar_w = layout_size(&mut bar, max).width;
+        must(
+            (form_w - max.width).abs() < 1.0,
+            format!("form switch must fill the row, got {form_w}"),
+        );
+        must(
+            bar_w < 160.0,
+            format!("bar switch must hug the caption and track, got {bar_w}"),
+        );
+    }
+
+    #[test]
+    fn switch_bar_enter_toggles_when_focused() {
+        let tok = named("dark").tokens;
+        let mut el: Element<'_, bool> = switch(
+            "Tail",
+            false,
+            |on| on,
+            tok,
+            SwitchOpts::BAR,
+            A11y::new("Tail", Role::Switch),
+        );
+        let got = pump_click_then_named(
+            &mut el,
+            Size::new(200.0, 40.0),
+            iced::Point::new(12.0, 12.0),
+            keyboard::key::Named::Enter,
+        );
+        assert_eq!(got, vec![true]);
+    }
+
+    #[test]
+    fn switch_bar_height_matches_compact_pick() {
+        let tok = named("dark").tokens;
+        let mut bar: Element<'_, bool> = switch(
+            "Tail",
+            false,
+            |on| on,
+            tok,
+            SwitchOpts::BAR,
+            A11y::new("Tail", Role::Switch),
+        );
+        let bar_h = layout_size(&mut bar, iced::Size::new(280.0, 80.0)).height;
+        let pick_h = pick_layout_height(ControlSize::Compact);
+        must(
+            (bar_h - pick_h).abs() <= 2.0,
+            format!("bar switch height {bar_h} must match compact pick {pick_h}"),
+        );
     }
 
     #[test]
@@ -11252,6 +11400,7 @@ mod tests {
             false,
             |on| on,
             tok,
+            SwitchOpts::FORM,
             A11y::new("Sounds", Role::Switch),
         );
         let _: Element<'_, f32> = slider(
@@ -11386,6 +11535,7 @@ mod tests {
             false,
             |_| (),
             tok,
+            SwitchOpts::FORM,
             role("s", Role::Switch).with_disabled(true),
         );
         let _: Element<'_, ()> = switch(
@@ -11393,6 +11543,7 @@ mod tests {
             true,
             |_| (),
             tok,
+            SwitchOpts::FORM,
             role("s2", Role::Switch).with_checked(true),
         );
         let _: Element<'_, ()> = radio("r", 1u8, Some(1u8), |_| (), tok, role("r", Role::Radio));
@@ -15822,6 +15973,7 @@ mod tests {
             false,
             |v| v,
             tok,
+            SwitchOpts::FORM,
             A11y::new("Notify", Role::Switch),
         );
         let thumb =

@@ -17,6 +17,8 @@
 - `native_dialog`, `UiState::load_file` / `save_file`, and
   `theme::os_chrome` return iced `Task`.
 - Drawing patterns take caller `A11y`.
+- `switch` takes `SwitchOpts` (`ControlSize` and `SwitchFace::Form`
+  or `Bar`).
 
 ### Bug fix
 

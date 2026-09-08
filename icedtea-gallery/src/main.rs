@@ -34,7 +34,7 @@ use icedtea::variant::Variant;
 use icedtea::widget;
 use icedtea::widget::{
     BadgeSize, ButtonOpts, CardFace, Cell, ChipKind, ControlSize, DateValue, ListOpts, MarkdownDoc,
-    TimeClock, TimeField, TimeValue,
+    SwitchOpts, TimeClock, TimeField, TimeValue,
 };
 use icedtea::{Boot, Element, Task};
 use samples::CodeLang;
@@ -4947,6 +4947,15 @@ impl Gallery {
                     hosted.insert(r + 1, tog);
                 }
             }
+            // Compact Tail/Raw must sit on the idle first screen.
+            if let Some(i) = hosted.iter().position(|e| e.id == "switch") {
+                let sw = hosted.remove(i);
+                if let Some(s) = hosted.iter().position(|e| e.id == "segmented-button") {
+                    hosted.insert(s + 1, sw);
+                } else {
+                    hosted.push(sw);
+                }
+            }
         }
         if page == "fields" {
             // Column 1: search, search-view, text-input.
@@ -5319,34 +5328,37 @@ impl Gallery {
             .align_x(icedtea::i18n::align_start(tok.direction))
             .into(),
             "switch" => column![
-                widget::label(
-                    self.catalog.t("hint.switch"),
-                    widget::LabelFace::Meta,
-                    tok,
-                    named("switch-hint", Role::Status),
+                dir_row(
+                    tok.direction,
+                    tok.density.gap(),
+                    [
+                        widget::switch(
+                            self.catalog.t("switch.tail"),
+                            self.on,
+                            Message::Switch,
+                            tok,
+                            SwitchOpts::BAR,
+                            named("Tail", Role::Switch).with_checked(self.on),
+                        ),
+                        widget::switch(
+                            self.catalog.t("switch.raw"),
+                            true,
+                            Message::Sounds,
+                            tok,
+                            SwitchOpts::BAR,
+                            named("Raw", Role::Switch)
+                                .with_checked(true)
+                                .with_disabled(true),
+                        ),
+                    ],
                 ),
                 widget::switch(
                     self.catalog.t("switch.notify"),
                     self.on,
                     Message::Switch,
                     tok,
+                    SwitchOpts::FORM,
                     named("Notify", Role::Switch).with_checked(self.on),
-                ),
-                widget::switch(
-                    self.catalog.t("switch.sounds"),
-                    self.sounds,
-                    Message::Sounds,
-                    tok,
-                    named("Sounds", Role::Switch).with_checked(self.sounds),
-                ),
-                widget::switch(
-                    self.catalog.t("check.locked"),
-                    true,
-                    Message::Switch,
-                    tok,
-                    named("Locked", Role::Switch)
-                        .with_checked(true)
-                        .with_disabled(true),
                 ),
             ]
             .spacing(8)
@@ -7826,6 +7838,7 @@ impl Gallery {
                     self.on,
                     Message::Switch,
                     tok,
+                    SwitchOpts::FORM,
                     named("busy-flag", Role::Switch).with_checked(self.on),
                 ),
                 container(widget::busy_overlay(
@@ -8851,6 +8864,7 @@ impl Gallery {
                         self.reduced_motion,
                         Message::ReduceMotion,
                         tok,
+                        SwitchOpts::FORM,
                         named("reduce-motion", Role::Switch).with_checked(self.reduced_motion),
                     ),
                     dir_row(
