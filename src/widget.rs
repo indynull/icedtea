@@ -2067,7 +2067,7 @@ pub fn progress_ring<'a, M: 'a>(
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let _: icedtea::Element<'_, ()> = widget::busy_overlay(
-///     widget::label("Doc", tok, A11y::new("Doc", Role::Status)),
+///     widget::label("Doc", widget::LabelFace::Body, tok, A11y::new("Doc", Role::Status)),
 ///     true,
 ///     0.2,
 ///     tok,
@@ -5039,7 +5039,7 @@ fn markdown_style(tok: Tokens) -> markdown::Style {
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let _: icedtea::Element<'_, ()> = widget::tooltip_wrap(
-///     widget::label("Hover", tok, A11y::new("Hover", Role::Header)),
+///     widget::label("Hover", widget::LabelFace::Body, tok, A11y::new("Hover", Role::Header)),
 ///     "Tip",
 ///     widget::TooltipAnchor::Follow,
 ///     tok,
@@ -5077,7 +5077,7 @@ pub fn tooltip_wrap<'a, M: 'a>(
 /// use icedtea::widget;
 /// let tok = theme::named("dark").tokens;
 /// let _: icedtea::Element<'_, ()> = widget::tooltip_rich(
-///     widget::label("Hover", tok, A11y::new("Hover", Role::Header)),
+///     widget::label("Hover", widget::LabelFace::Body, tok, A11y::new("Hover", Role::Header)),
 ///     "Save",
 ///     "Write the buffer to disk.",
 ///     Some(("Learn more".into(), ())),
@@ -5455,7 +5455,7 @@ pub fn badge<'a, M: 'a>(
 /// let tok = theme::named("dark").tokens;
 /// let _: icedtea::Element<'_, ()> = widget::group_box(
 ///     "Document",
-///     widget::label("buffer.txt", tok, A11y::new("buffer", Role::Header)),
+///     widget::label("buffer.txt", widget::LabelFace::Body, tok, A11y::new("buffer", Role::Header)),
 ///     tok,
 ///     widget::CardFace::Rail,
 ///     A11y::new("Document", Role::Group),
@@ -5777,7 +5777,12 @@ fn toast_style(
 /// ```
 /// use icedtea::a11y::{A11y, Role};
 /// let tok = icedtea::theme::named("dark").tokens;
-/// let child = icedtea::widget::label::<()>("line", tok, A11y::new("line", Role::Status));
+/// let child = icedtea::widget::label::<()>(
+///     "line",
+///     icedtea::widget::LabelFace::Body,
+///     tok,
+///     A11y::new("line", Role::Status),
+/// );
 /// let _: icedtea::Element<'_, ()> = icedtea::widget::scroll(
 ///     child,
 ///     tok,
@@ -6763,7 +6768,7 @@ fn card_row<'a, M: 'a>(
 ///     on_click,
 ///     None,
 ///     tok,
-///     |i| widget::label(format!("row {i}"), tok, A11y::new("r", Role::ListItem)),
+///     |i| widget::label(format!("row {i}"), widget::LabelFace::Body, tok, A11y::new("r", Role::ListItem)),
 ///     A11y::new("cards", Role::List),
 /// );
 /// ```
@@ -8306,7 +8311,7 @@ fn disclosure_header<'a, M: Clone + 'a>(
 /// let on_toggle = |i| i;
 /// let _: icedtea::Element<'_, usize> = widget::accordion_view(
 ///     &titles,
-///     vec![widget::label("New", tok, A11y::new("New", Role::Status))],
+///     vec![widget::label("New", widget::LabelFace::Body, tok, A11y::new("New", Role::Status))],
 ///     &Accordion { open: Some(0) },
 ///     1.0,
 ///     on_toggle,
@@ -8458,7 +8463,7 @@ fn peek_clip<'a, M: 'a>(child: Element<'a, M>, h: f32, tok: Tokens) -> Element<'
 /// use icedtea::variant::Variant;
 /// use icedtea::widget::{self, Peek};
 /// let tok = theme::named("dark").tokens;
-/// let body = widget::label("more", tok, A11y::new("more", Role::Status));
+/// let body = widget::label("more", widget::LabelFace::Body, tok, A11y::new("more", Role::Status));
 /// let count = widget::badge(
 ///     "3",
 ///     None,

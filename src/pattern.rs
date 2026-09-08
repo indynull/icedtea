@@ -389,6 +389,7 @@ fn status_hint_rail<'a, M: Clone + 'a>(
 ///
 ///
 /// ```
+/// use icedtea::a11y::{A11y, Role};
 /// use icedtea::action::{Action, ActionTable};
 /// use icedtea::palette::PaletteOpts;
 /// use icedtea::pattern;
@@ -774,6 +775,7 @@ pub(crate) fn match_ranges(query: &str, title: &str) -> Vec<(usize, usize)> {
 ///
 ///
 /// ```
+/// use icedtea::a11y::{A11y, Role};
 /// use icedtea::pattern;
 /// use icedtea::theme;
 /// let tok = theme::named("dark").tokens;
@@ -921,6 +923,7 @@ pub fn filter_prefs<'a>(groups: &'a [PrefGroup], query: &str) -> Vec<&'a PrefGro
 ///
 ///
 /// ```
+/// use icedtea::a11y::{A11y, Role};
 /// use icedtea::i18n::Catalog;
 /// use icedtea::pattern::{self, PrefGroup};
 /// use icedtea::theme;
@@ -1010,6 +1013,7 @@ pub fn preferences_page<'a, M: Clone + 'a>(
 ///     icedtea::layout::fixed(icedtea::layout::LIST_PANE),
 ///     tok,
 ///     icedtea::i18n::Direction::Ltr,
+///     A11y::new("list-detail", icedtea::a11y::Role::Group),
 /// );
 /// ```
 pub fn list_detail<'a, M: 'a>(
@@ -1087,6 +1091,7 @@ pub fn list_detail<'a, M: 'a>(
 ///     tok,
 ///     &cat,
 ///     icedtea::i18n::Direction::Ltr,
+///     A11y::new("nav", icedtea::a11y::Role::Group),
 /// );
 /// ```
 #[allow(clippy::too_many_arguments)]
@@ -1299,6 +1304,7 @@ pub fn nav_rail<'a, M: Clone + 'a>(
 ///     on_select,
 ///     on_close,
 ///     tok,
+///     A11y::new("tabs", icedtea::a11y::Role::Group),
 /// );
 /// ```
 pub fn tab_view<'a, M: Clone + 'a>(
@@ -1336,7 +1342,7 @@ pub fn tab_view<'a, M: Clone + 'a>(
 ///
 ///
 /// ```
-/// use icedtea::a11y::A11y;
+/// use icedtea::a11y::{A11y, Role};
 /// use icedtea::action::{Action, ActionTable};
 /// use icedtea::i18n::{Catalog, Direction};
 /// use icedtea::pattern;
@@ -1796,6 +1802,7 @@ pub fn cascade_menu<'a, M: Clone + 'a>(
 ///     320.0,
 ///     1.0,
 ///     tok,
+///     A11y::new("sheet", Role::Group),
 /// );
 /// ```
 #[allow(clippy::too_many_arguments)]
@@ -1928,6 +1935,7 @@ pub fn context_origin(origin: Point, size: Size, viewport: Size) -> Point {
 ///
 ///
 /// ```
+/// use icedtea::a11y::{A11y, Role};
 /// use icedtea::action::{Action, ActionTable};
 /// use icedtea::pattern;
 /// use icedtea::theme;
@@ -2331,6 +2339,7 @@ pub fn tool_panel<'a, M: Clone + 'a>(
 ///     1.0,
 ///     (),
 ///     tok,
+///     A11y::new("drawer", Role::Group),
 /// );
 /// ```
 pub fn drawer<'a, M: Clone + 'a>(
@@ -2378,6 +2387,7 @@ pub fn drawer<'a, M: Clone + 'a>(
 ///
 ///
 /// ```
+/// use icedtea::a11y::{A11y, Role};
 /// use icedtea::action::{Action, ActionTable};
 /// use icedtea::pattern;
 /// use icedtea::theme;
