@@ -12,6 +12,30 @@
   families. Do not vendor a face. Apps that want a named family
   still load it themselves.
 
+### Agent docs
+
+Source of truth is rustdoc plus `catalog::ENTRIES`. The agent
+index is generated. `AGENTS.md` is a short router. Skills score
+paint; they do not restate library law.
+
+- Emit `docs/agents/llms.txt` and one file per catalog group from
+  `ENTRIES`, constructor rustdoc (first paragraph), `m3::mapping`,
+  and `examples/hello.rs`. Each row is id, group, job line, docs.rs
+  and source links. First pack is the app-authoring index (compose
+  a window from constructors).
+- `just agents-doc` writes that pack. `just agents-doc --check`
+  fails `just check` when the emit is stale.
+- Shrink `AGENTS.md` to what icedtea is, `examples/hello.rs`, open
+  the constructor rustdoc for that job, and a link to the generated
+  index. Delete Always / Never lines that catalog tests already
+  enforce.
+- Skills keep scoring procedure (Xephyr, still, locale). A design
+  guideline that can be a rustdoc sentence or a constructor test
+  leaves the skill.
+- After the emit is stable, a query surface answers a catalog id
+  (or a job such as pick a number) with the constructor, `*Opts` /
+  `*Face`, tokens, `A11y`, and the compiling snippet.
+
 ### Blocked on iced
 
 - RTL `textarea`: iced 0.14 `text_editor` has no writing direction
