@@ -9650,9 +9650,9 @@ mod tests {
         let closed =
             el.as_widget_mut()
                 .overlay(&mut tree, layout, &renderer, &viewport, iced::Vector::ZERO);
-        assert!(
+        must(
             closed.is_none(),
-            "unfocused Enter must not open the pick menu"
+            "unfocused Enter must not open the pick menu",
         );
         drop(closed);
         {
@@ -9674,6 +9674,30 @@ mod tests {
             let mut op = FocusAll;
             el.as_widget_mut()
                 .operate(&mut tree, layout, &renderer, &mut op);
+        }
+        {
+            let release = Event::Keyboard(keyboard::Event::KeyReleased {
+                key: keyboard::Key::Named(keyboard::key::Named::Enter),
+                modified_key: keyboard::Key::Named(keyboard::key::Named::Enter),
+                physical_key: keyboard::key::Physical::Unidentified(
+                    keyboard::key::NativeCode::Unidentified,
+                ),
+                location: keyboard::Location::Standard,
+                modifiers: keyboard::Modifiers::empty(),
+            });
+            let mut messages = Vec::<&str>::new();
+            let mut shell = iced::advanced::Shell::new(&mut messages);
+            let mut clipboard = iced::advanced::clipboard::Null;
+            el.as_widget_mut().update(
+                &mut tree,
+                &release,
+                layout,
+                mouse::Cursor::Unavailable,
+                &renderer,
+                &mut clipboard,
+                &mut shell,
+                &viewport,
+            );
         }
         {
             let mut messages = Vec::<&str>::new();
@@ -11545,6 +11569,26 @@ mod tests {
             tok,
             SwitchOpts::FORM,
             role("s2", Role::Switch).with_checked(true),
+        );
+        assert_eq!(SwitchOpts::default(), SwitchOpts::FORM);
+        let _: Element<'_, ()> = switch(
+            "s3",
+            true,
+            |_| (),
+            tok,
+            SwitchOpts::BAR,
+            role("s3", Role::Switch).with_disabled(true),
+        );
+        let _: Element<'_, ()> = switch(
+            "s4",
+            false,
+            |_| (),
+            tok,
+            SwitchOpts {
+                size: ControlSize::Default,
+                face: SwitchFace::Bar,
+            },
+            role("s4", Role::Switch),
         );
         let _: Element<'_, ()> = radio("r", 1u8, Some(1u8), |_| (), tok, role("r", Role::Radio));
         let _: Element<'_, ()> = radio(
