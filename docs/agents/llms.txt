@@ -1,0 +1,142 @@
+# icedtea
+
+> Native desktop widgets and chrome for iced. Constructors return
+> Elements and emit the application's messages.
+
+Your program owns the data. One Action table feeds menus, toolbars,
+shortcuts, and the command palette. Call a constructor for a job.
+Start from `examples/hello.rs`.
+
+This file is generated from `catalog::ENTRIES` and constructor
+rustdoc. Run `just agents-doc` after those change.
+
+## Compose
+
+- [First window](examples/hello.rs): `run!`, `Boot`, `ActionTable`,
+  `seed_quit`, `From<keyboard::Event>`, `key::handle`, `focus::cycle`
+- [Task list](examples/tasks.rs): list plus on-disk SQLite
+- [Crate rustdoc](https://docs.rs/icedtea/latest/icedtea/): Boot,
+  tokens, Action, `native_dialog`, `theme::named`, `theme::follow`
+- Heading jump: `MarkdownDoc::item_offset` then
+  `icedtea::iced::widget::operation::scroll_to` with
+  `AbsoluteOffset { x: None, y: Some(y) }`
+- A path crate should copy this repo's `Cargo.lock` so a fresh
+  resolve stays on rustc 1.89
+- Keys: set `KeyContext.modal_open` when a palette or menu is open
+  so Escape and arrows stay on that layer
+- Open a row's rustdoc for the signature, `*Opts`, `*Face`, and the
+  compiling example. The one-line job is not the full call
+- Native file open/save is `icedtea::native_dialog` + `DialogSpec`
+  (crate rustdoc host). Catalog `dialogs` is the in-window sheet
+- Palette: keep `CommandPalette` in the app; paint it in an iced
+  `stack` over the window
+- A path crate next to this repo needs an empty `[workspace]`
+  table so Cargo does not treat it as a member
+
+## [Controls](controls.md)
+
+- [button](https://docs.rs/icedtea/latest/icedtea/widget/fn.button.html): Press a labeled control to send a message. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [toggle-icon-button](https://docs.rs/icedtea/latest/icedtea/widget/fn.icon_button_toggle.html): Icon button that stays pressed while on. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [slider](https://docs.rs/icedtea/latest/icedtea/widget/fn.slider.html): Pick a number on a range. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [button-group](https://docs.rs/icedtea/latest/icedtea/widget/fn.button_group.html): Related actions in one strip (M3 button group). [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [segmented-button](https://docs.rs/icedtea/latest/icedtea/widget/fn.segmented_button.html): Exclusive choice among labeled segments (M3 segmented button). [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [checkbox](https://docs.rs/icedtea/latest/icedtea/widget/fn.checkbox.html): Check, clear, or mark a partial selection. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [radio](https://docs.rs/icedtea/latest/icedtea/widget/fn.radio.html): Pick one value from a small set. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [switch](https://docs.rs/icedtea/latest/icedtea/widget/fn.switch.html): A sliding on/off control. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [range-slider](https://docs.rs/icedtea/latest/icedtea/widget/fn.range_slider.html): Inclusive low/high pair on one range (M3 range slider as two linked thumbs). [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [icon-button](https://docs.rs/icedtea/latest/icedtea/widget/fn.icon_button.html): Icon-only press control (toolbar density). [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [split-button](https://docs.rs/icedtea/latest/icedtea/widget/fn.split_button.html): A primary press plus a more menu. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [toggle-button](https://docs.rs/icedtea/latest/icedtea/widget/fn.toggle_button.html): A button that stays pressed while on. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+
+## [Fields](fields.md)
+
+- [search](https://docs.rs/icedtea/latest/icedtea/widget/fn.search_input.html): A query field: one Search-radius bar with the glass inside. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [search-view](https://docs.rs/icedtea/latest/icedtea/widget/fn.search_view.html): Docked search results under a search field (M3 search view, desktop). [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [text-input](https://docs.rs/icedtea/latest/icedtea/widget/fn.text_input.html): Single-line field. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [field-support](https://docs.rs/icedtea/latest/icedtea/widget/fn.field_support.html): Field stack with optional supporting or error text under the control. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [password](https://docs.rs/icedtea/latest/icedtea/widget/fn.password_input.html): A masked single-line editor. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [secret](https://docs.rs/icedtea/latest/icedtea/widget/fn.secret_field.html): A settings row: masked field, reveal, and copy. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [value-field](https://docs.rs/icedtea/latest/icedtea/widget/fn.value_field.html): A labeled read-only value the user can select and copy. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [textarea](https://docs.rs/icedtea/latest/icedtea/widget/fn.textarea.html): Multiline editor. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [suggest](https://docs.rs/icedtea/latest/icedtea/widget/fn.suggest_field.html): Text field plus a keyboard-complete pick list; the application owns the suggestion slice for the whole `view` (store it on the app; a local `Vec` cannot outlive the `Element`). [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [select](https://docs.rs/icedtea/latest/icedtea/widget/fn.pick_list.html): Pick one string from a list. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [form](https://docs.rs/icedtea/latest/icedtea/widget/fn.form_group.html): Form group that owns Tab and Shift+Tab among mixed fields. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [number](https://docs.rs/icedtea/latest/icedtea/widget/fn.number_input.html): Edit a numeric value with step buttons. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [date](https://docs.rs/icedtea/latest/icedtea/widget/fn.date_stepper.html): Pick a calendar date. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [time](https://docs.rs/icedtea/latest/icedtea/widget/fn.time_picker.html): Step hour, minute, second, or period on a 24-hour value. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+
+## [Readout](readout.md)
+
+- [progress](https://docs.rs/icedtea/latest/icedtea/widget/fn.progress.html): A determinate bar from 0 to 1. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [progress-ring](https://docs.rs/icedtea/latest/icedtea/widget/fn.progress_ring.html): Circular progress: arc sweep follows `value`. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [spinner](https://docs.rs/icedtea/latest/icedtea/widget/fn.spinner.html): Eight dots around a circle. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+
+## [Content](content.md)
+
+- [label](https://docs.rs/icedtea/latest/icedtea/widget/fn.label.html): A line of UI text (`LabelFace`: Body, Meta, Display, Figure). [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [icon](https://docs.rs/icedtea/latest/icedtea/widget/fn.icon_svg.html): Paint a chrome glyph. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [tooltip](https://docs.rs/icedtea/latest/icedtea/widget/fn.tooltip_wrap.html): Hover text on a child. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [rich-tooltip](https://docs.rs/icedtea/latest/icedtea/widget/fn.tooltip_rich.html): Hover title plus supporting copy on a child (M3 rich tooltip). [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [link](https://docs.rs/icedtea/latest/icedtea/widget/fn.hyperlink.html): A text link that sends a message. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [markdown](https://docs.rs/icedtea/latest/icedtea/widget/fn.markdown_view.html): A parsed markdown document (`parse`, `MarkdownDoc::headings`, `item_offset`, `MarkdownOpts`). [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [code](https://docs.rs/icedtea/latest/icedtea/widget/fn.highlighted_code.html): Source panel. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [image](https://docs.rs/icedtea/latest/icedtea/widget/fn.image_slot.html): An image slot that keeps its box. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [selectable](https://docs.rs/icedtea/latest/icedtea/widget/fn.selectable.html): Body the user can drag-select and copy. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+
+## [Collections](collections.md)
+
+- [virtual-column](https://docs.rs/icedtea/latest/icedtea/widget/fn.virtual_column.html): A virtualized column of app-built rows with known heights. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [list](https://docs.rs/icedtea/latest/icedtea/widget/fn.list_view.html): A virtualized row list. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [pagination](https://docs.rs/icedtea/latest/icedtea/widget/fn.pagination.html): Page through a long list. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [log](https://docs.rs/icedtea/latest/icedtea/widget/fn.log_view.html): Append-only lines. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [grid](https://docs.rs/icedtea/latest/icedtea/widget/fn.item_grid.html): Tiles that share the row width. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [table](https://docs.rs/icedtea/latest/icedtea/widget/fn.data_table.html): A virtualized table. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [tree](https://docs.rs/icedtea/latest/icedtea/widget/fn.tree_view.html): Heading or file tree (`TreeNode`, `tree_toggle`, `TreeFace`, `crate::collection::ItemClick`). [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [accordion](https://docs.rs/icedtea/latest/icedtea/widget/fn.accordion_view.html): An open row shows a body under the header. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [expander](https://docs.rs/icedtea/latest/icedtea/widget/fn.expander.html): A card that clips its child until opened. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [tabs](https://docs.rs/icedtea/latest/icedtea/widget/fn.tab_bar.html): A tab bar over a body the application paints. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+
+## [Chrome](chrome.md)
+
+- [cheatsheet](https://docs.rs/icedtea/latest/icedtea/pattern/fn.cheatsheet.html): A searchable shortcut list from the action table. [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
+- [pack](https://docs.rs/icedtea/latest/icedtea/layout/fn.pack.html): Measuring row or column. [source](https://github.com/indynull/icedtea/blob/main/src/layout/flow.rs)
+- [wrap](https://docs.rs/icedtea/latest/icedtea/layout/fn.wrap.html): Measuring wrap. [source](https://github.com/indynull/icedtea/blob/main/src/layout/flow.rs)
+- [filter-chips](https://docs.rs/icedtea/latest/icedtea/widget/fn.filter_chips.html): Multi-select filter chips (M3 filter chip set). [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [chip](https://docs.rs/icedtea/latest/icedtea/widget/fn.chip.html): A compact labeled pill. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [badge](https://docs.rs/icedtea/latest/icedtea/widget/fn.badge.html): A count or status mark. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [card](https://docs.rs/icedtea/latest/icedtea/widget/fn.group_box.html): A titled panel around children. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [rule](https://docs.rs/icedtea/latest/icedtea/widget/fn.rule_h.html): A horizontal divider. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [banner](https://docs.rs/icedtea/latest/icedtea/widget/fn.banner.html): A page-level message with an optional action. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [command-bar](https://docs.rs/icedtea/latest/icedtea/pattern/fn.command_bar.html): The toolbar row, denser. [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
+- [context-menu](https://docs.rs/icedtea/latest/icedtea/pattern/fn.context_menu.html): Place a context menu at `origin` in the window. [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
+- [sectioned-menu](https://docs.rs/icedtea/latest/icedtea/pattern/fn.sectioned_menu.html): Vertical menu list with optional section titles and hairline dividers. [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
+- [cascade-menu](https://docs.rs/icedtea/latest/icedtea/pattern/fn.cascade_menu.html): Two-level cascade: primary list, optional open submenu panel. [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
+- [breadcrumb](https://docs.rs/icedtea/latest/icedtea/widget/fn.breadcrumb.html): A path of links. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [menu](https://docs.rs/icedtea/latest/icedtea/pattern/fn.menu_bar.html): An in-window menu bar from one `ActionTable` (`crate::i18n::Catalog`, `on_open`). [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
+- [toolbar](https://docs.rs/icedtea/latest/icedtea/pattern/fn.toolbar.html): A row of action buttons from the same table as the menu. [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
+- [status-bar](https://docs.rs/icedtea/latest/icedtea/pattern/fn.status_bar.html): Footer text plus shortcut hints from the same table. [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
+- [busy](https://docs.rs/icedtea/latest/icedtea/widget/fn.busy_overlay.html): Dim plus spinner over `child` when `busy`. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [toast](https://docs.rs/icedtea/latest/icedtea/widget/fn.toast_view.html): A transient notice. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [scrollbar](https://docs.rs/icedtea/latest/icedtea/widget/fn.scroll.html): A themed scroller with a usable handle. [source](https://github.com/indynull/icedtea/blob/main/src/widget.rs)
+- [motion](https://docs.rs/icedtea/latest/icedtea/motion/fn.overlay.html): Fade and slide a child for overlay enter/exit. [source](https://github.com/indynull/icedtea/blob/main/src/motion.rs)
+- [switch-motion](https://docs.rs/icedtea/latest/icedtea/motion/fn.switch.html): Replace `outgoing` with `incoming` from a 0..=1 progress. [source](https://github.com/indynull/icedtea/blob/main/src/motion.rs)
+- [attention-motion](https://docs.rs/icedtea/latest/icedtea/motion/fn.attention.html): Shake or pulse a child from a 0..=1 progress. [source](https://github.com/indynull/icedtea/blob/main/src/motion.rs)
+- [expand-motion](https://docs.rs/icedtea/latest/icedtea/motion/fn.expand.html): Clip a child between a peek size and its open size on one `Axis`. [source](https://github.com/indynull/icedtea/blob/main/src/motion.rs)
+
+## [Patterns](patterns.md)
+
+- [side-sheet](https://docs.rs/icedtea/latest/icedtea/pattern/fn.side_sheet.html): Docked supporting pane (M3 side sheet) over a dimmed scene. [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
+- [dialogs](https://docs.rs/icedtea/latest/icedtea/pattern/fn.dialog_sheet.html): An in-window confirm / message / save sheet (`DialogOpts`). [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
+- [list-detail](https://docs.rs/icedtea/latest/icedtea/pattern/fn.list_detail.html): A sidebar list beside a filling detail pane. [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
+- [inspector](https://docs.rs/icedtea/latest/icedtea/pattern/fn.inspector.html): Master, detail, and a side inspector stay in one row. [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
+- [drawer](https://docs.rs/icedtea/latest/icedtea/pattern/fn.drawer.html): Compact-width side pane beside `content`. [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
+- [workspace](https://docs.rs/icedtea/latest/icedtea/pattern/fn.workspace.html): Nested dock tree: splits with a sash, tab groups, and leaf chrome. [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
+- [tool-panel](https://docs.rs/icedtea/latest/icedtea/pattern/fn.tool_panel.html): Title chrome plus a Dock control. [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
+- [nav-rail](https://docs.rs/icedtea/latest/icedtea/pattern/fn.nav_rail.html): Compact destination rail beside content (desktop map of M3 navigation rail). [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
+- [navigation](https://docs.rs/icedtea/latest/icedtea/pattern/fn.navigation_view.html): Sidebar beside content, or a stack with Back. [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
+- [tab-view](https://docs.rs/icedtea/latest/icedtea/pattern/fn.tab_view.html): Tabs plus a filling body. [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
+- [preferences](https://docs.rs/icedtea/latest/icedtea/pattern/fn.preferences_page.html): Searchable preference groups. [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
+- [about](https://docs.rs/icedtea/latest/icedtea/pattern/fn.about_page.html): Name, version, license, and credits. [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
+- [status-page](https://docs.rs/icedtea/latest/icedtea/pattern/fn.status_page.html): Centered empty or error state. [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
+- [palette](https://docs.rs/icedtea/latest/icedtea/pattern/fn.command_palette_view.html): Fuzzy find over the action table (`crate::palette::CommandPalette` results, `crate::palette::PaletteOpts`; stack over the window). [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)
+- [main-window](https://docs.rs/icedtea/latest/icedtea/pattern/fn.main_window.html): Menu, toolbar, center, and status docked together. [source](https://github.com/indynull/icedtea/blob/main/src/pattern.rs)

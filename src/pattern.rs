@@ -87,7 +87,8 @@ fn bind_menu_pick<M: Clone>(entries: Vec<(String, M)>) -> impl Fn(String) -> M {
     move |chosen| pick_menu_message(&entries, &chosen)
 }
 
-/// An in-window menu bar from one [`ActionTable`].
+/// An in-window menu bar from one [`ActionTable`] ([`crate::i18n::Catalog`],
+/// `on_open`).
 ///
 /// Groups by the id prefix before `.`. Disabled actions stay out of
 /// the pick list.
@@ -380,7 +381,8 @@ fn status_hint_rail<'a, M: Clone + 'a>(
     Some(a11y::attach(row.into(), &A11y::new(name, Role::Status)))
 }
 
-/// Fuzzy find over the action table.
+/// Fuzzy find over the action table ([`crate::palette::CommandPalette`]
+/// results, [`crate::palette::PaletteOpts`]; stack over the window).
 ///
 /// Pass `CommandPalette::results` and [`crate::palette::PaletteOpts`]. An empty query
 /// lists favorites, then recent. The query field stays up when a nested
@@ -1447,7 +1449,8 @@ impl<M> Default for DialogOpts<'_, M> {
     }
 }
 
-/// A confirm / message / save sheet.
+/// An in-window confirm / message / save sheet ([`DialogOpts`]).
+/// Native file pick is [`crate::native_dialog`].
 ///
 /// Primary accept is required. Cancel, extra actions, header icon,
 /// and a dim backdrop live on [`DialogOpts`].

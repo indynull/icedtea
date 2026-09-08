@@ -5,9 +5,11 @@ on [iced](https://iced.rs/). Design system, layouts, window chrome,
 actions mapped to messages, widgets, and patterns.
 
 Contract: this file's Library section, `catalog::ENTRIES`, and the
-book. Work list: [`TODO.md`](TODO.md) (internal; do not package or
-link from README). This file is how to work in the repo. It wins over
-visitor home rules when they conflict.
+book. App-authoring index: [`docs/agents/`](docs/agents/llms.txt)
+(`llms.txt` plus one file per catalog group; generated). Work list:
+[`TODO.md`](TODO.md) (internal; do not package or link from README).
+This file is how to work in the repo. It wins over visitor home
+rules when they conflict.
 
 When the human corrects an icedtea approach that will recur, append one
 concrete line to **this file** (Always / Never). Tighten a duplicate
@@ -17,7 +19,7 @@ rules file.
 ```bash
 just lint           # format check + clippy -D warnings
 just deny           # cargo deny (advisories, licenses, sources)
-just check          # lint, test, docs, coverage
+just check          # agent index, lint, docs, coverage
 just clean          # cargo clean (debug, release, coverage trees)
 cargo run -p icedtea-gallery
 just gallery-qa     # visual QA (shots under tmp/gallery-qa/); see .grok/skills/gallery-qa
@@ -25,6 +27,7 @@ just gallery-gif    # recapture assets/gallery.gif when the gallery shell change
 just book-stills    # recapture book/src/images/ constructor stills
 just material-symbols  # fetch Material Symbols Sharp for Glyph::Bytes
 just material-snapshot  # Material spec pages for gallery QA
+just agents-doc     # emit docs/agents/ from catalog rustdoc
 ```
 
 ## Tree
@@ -35,6 +38,7 @@ just material-snapshot  # Material spec pages for gallery QA
 | `icedtea-gallery/` | Shipping gallery; every `catalog::ENTRIES` id appears on a page |
 | `book/` | Guide (mdBook). Published from `main` to GitHub Pages |
 | `TODO.md` | Remaining work |
+| `docs/agents/` | Generated agent pack (`llms.txt` + group files) |
 | `assets/icons/` | Chrome SVGs |
 | `.github/workflows/ci.yml` | Linux lint, docs, and cargo-deny; tests with coverage on Linux, macOS, Windows |
 | `.github/workflows/publish.yml` | Tag `vX.Y.Z` publishes `icedtea` to crates.io and opens a GitHub release from that version's changelog |
@@ -147,6 +151,10 @@ Rust 1.89, edition 2021, iced 0.14. License MIT.
   pair, or a stack of cards, and never a Fill outline after the last
   joined action. WCAG 2.4.7 and APG roving tabindex put
   the indicator on the focused item, not the ancestor.
+- Always emit `docs/agents/` with `just agents-doc` in the same
+  change as `catalog::ENTRIES`, constructor rustdoc, or
+  `m3::mapping`. `just check` fails when the pack is stale. Never
+  hand-edit those files.
 - A widget or pattern is public only when it is themed (all visual
   states), keyboard-complete, tested, documented, listed in
   `catalog::ENTRIES`, and shown on a gallery page. Small related
@@ -315,7 +323,8 @@ Rejected alternatives live once under Non-goals below. Do not add a
 
 ## Check and coverage
 
-`just check` is the **public** local handoff: `just lint` (`cargo fmt
+`just check` is the **public** local handoff: `just agents-doc --check`,
+`just lint` (`cargo fmt
 --all -- --check`, clippy workspace `-D warnings`), `just doc`,
 `just cov` (`cargo llvm-cov --workspace` with
 `--ignore-filename-regex 'src[/\\]host'`). That is the one test run
@@ -334,7 +343,7 @@ lines the other hosts cover). Local `just cov` still runs
 Codecov check to 100. Local `just test` / `just clippy` / `just doc`
 keep the debug incremental graph. `just clean` is `cargo clean`.
 Recipes: `just lint`, `just fmt-check`, `just clippy`, `just test`,
-`just doc`, `just deny`, `just cov`.
+`just doc`, `just deny`, `just cov`, `just agents-doc`.
 
 **Agent verification (default: targeted, not full `just check`)**
 
@@ -348,6 +357,7 @@ Do not default to full `just check` after every edit. Prefer:
 | Compile only | `cargo check -p icedtea` / `-p icedtea-gallery` |
 | Style on touched files | `just lint` (or `cargo fmt --all` then package/workspace clippy `-D warnings`) |
 | Public API / rustdoc examples changed | `cargo test -p icedtea --doc` and/or `just doc` |
+| Catalog rustdoc, `ENTRIES`, or `m3::mapping` | `just agents-doc` then `--check` |
 | Coverage-sensitive branch work | `just cov` (or module tests first, cov before handoff) |
 | Feature complete / pre-push / “ready for review” | full `just check` |
 

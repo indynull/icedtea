@@ -18,13 +18,6 @@ Source of truth is rustdoc plus `catalog::ENTRIES`. The agent
 index is generated. `AGENTS.md` is a short router. Skills score
 paint; they do not restate library law.
 
-- Emit `docs/agents/llms.txt` and one file per catalog group from
-  `ENTRIES`, constructor rustdoc (first paragraph), `m3::mapping`,
-  and `examples/hello.rs`. Each row is id, group, job line, docs.rs
-  and source links. First pack is the app-authoring index (compose
-  a window from constructors).
-- `just agents-doc` writes that pack. `just agents-doc --check`
-  fails `just check` when the emit is stale.
 - Shrink `AGENTS.md` to what icedtea is, `examples/hello.rs`, open
   the constructor rustdoc for that job, and a link to the generated
   index. Delete Always / Never lines that catalog tests already

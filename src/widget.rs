@@ -497,7 +497,7 @@ pub enum LabelFace {
     Figure,
 }
 
-/// A line of UI text.
+/// A line of UI text ([`LabelFace`]: Body, Meta, Display, Figure).
 ///
 /// [`LabelFace::Body`] is platform sans. Empty string is an empty node;
 /// still pass `A11y`. [`LabelFace::Meta`] shrinks. [`LabelFace::Display`]
@@ -2457,8 +2457,9 @@ pub fn field_support<'a, M: 'a>(
     a11y::attach(col.into(), &a11y)
 }
 
-/// Text field plus a keyboard-complete pick list. The application
-/// owns the suggestion strings and the pick message.
+/// Text field plus a keyboard-complete pick list; the application
+/// owns the suggestion slice for the whole `view` (store it on the
+/// app; a local `Vec` cannot outlive the `Element`).
 /// A text field with a pick list of completions.
 ///
 /// The application owns the query and the suggestion list. Picking a
@@ -4508,7 +4509,9 @@ impl MarkdownDoc {
     }
 
     /// Estimated Y of item `index` in the default markdown column.
-    /// Pass to `scroll_to` on the document scroller after an outline jump.
+    /// Pass to `icedtea::iced::widget::operation::scroll_to` with
+    /// `scrollable::AbsoluteOffset { x: None, y: Some(y) }` on the
+    /// document scroller after an outline jump.
     pub fn item_offset(&self, index: usize, tok: crate::theme::Tokens) -> f32 {
         self.items
             .iter()
@@ -4599,7 +4602,8 @@ pub fn parse(source: &str) -> MarkdownDoc {
     }
 }
 
-/// A parsed markdown document.
+/// A parsed markdown document (`parse`, `MarkdownDoc::headings`,
+/// `item_offset`, [`MarkdownOpts`]).
 ///
 /// Parse with [`parse`], then view with [`markdown_view`]. Truncate by
 /// slicing the source before parse.
@@ -7738,8 +7742,10 @@ where
     )
 }
 
-/// Heading or file tree. The disclosure control emits `on_toggle`; the
-/// row label emits `on_select`. `selected` is the app-owned id.
+/// Heading or file tree (`TreeNode`, `tree_toggle`, [`TreeFace`],
+/// [`crate::collection::ItemClick`]). The disclosure control emits
+/// `on_toggle`; the row label emits `on_select`. `selected` is the
+/// app-owned id.
 ///
 /// [`TreeFace::Outline`] is a tight heading tree (no marks).
 /// [`TreeFace::Files`] is an explorer (folder and file marks from

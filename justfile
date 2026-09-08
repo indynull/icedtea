@@ -1,4 +1,4 @@
-# Public check: lint, tests, docs, coverage.
+# Public check: agent index, lint, docs, coverage.
 set shell := ["bash", "-eu", "-o", "pipefail", "-c"]
 
 default:
@@ -15,6 +15,12 @@ clippy:
 
 # Fast style gate. No tests, docs, or coverage.
 lint: fmt-check clippy
+
+# Generated agent pack from catalog rustdoc.
+#   just agents-doc
+#   just agents-doc --check
+agents-doc *args:
+    python3 scripts/agents_doc.py {{args}}
 
 test:
     cargo test --workspace --all-features
@@ -39,7 +45,12 @@ cov:
     rm -rf target/llvm-cov-target target/llvm-cov target/lcov.info
 
 # Handoff: lint, docs, and one instrumented test run.
-check: lint doc cov
+check: agents-index lint doc cov
+
+[private]
+agents-index:
+    python3 scripts/agents_doc.py --self-test
+    python3 scripts/agents_doc.py --check
 
 clean:
     cargo clean

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Chore
+
+- Generated `docs/agents/` from the catalog (`llms.txt` and one
+  file per group).
+
 ## 0.17.0 — 2026-09-08
 
 ### Feature
