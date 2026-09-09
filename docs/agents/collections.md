@@ -68,7 +68,7 @@ Desktop: Data table (desktop)
 
 Heading or file tree (`TreeNode`, `tree_toggle`, `TreeFace`, `crate::collection::ItemClick`). The disclosure control emits `on_toggle`; the row label emits `on_select`. `selected` is the app-owned id.
 
-`TreeFace::Outline` is a tight heading tree (no marks). `TreeFace::Files` is an explorer (folder and file marks from `dir`). Both paint the selected wash across the full row (indent through trailing slot). The twisty stays its own press. Density scales pad, gap, and indent. The application owns expand state. Leaf rows have no twisty. `animating` is the branch that is opening or closing and its 0–1 height progress. `None` paints the committed tree. `TreeNode::trailing` is the same `crate::collection::RowSlot` as `list_view`; `crate::collection::RowSlot::Text` is a badge (`RowSlot::text` is Quiet). Outline wraps the title; Files stays one clipped line.
+`TreeFace::Outline` is a tight heading tree (no marks). `TreeFace::Files` is an explorer (folder and file marks from `dir`). Both paint the selected wash across the full row (indent through trailing slot). The twisty stays its own press. Density scales pad, gap, and indent. The application owns expand state. Leaf rows have no twisty. `animating` is the branch that is opening or closing and its 0–1 height progress. `None` paints the committed tree. `TreeNode::trailing` is the same `crate::collection::RowSlot` as `list_view`; `crate::collection::RowSlot::Text` is a badge (`RowSlot::text` is Quiet). Outline wraps the title inside its slot; Files stays one line. The title clips so a trailing badge stays on the end, clear of the name.
 
 Constructor: `widget::tree_view`
 Desktop: Lists (tree)

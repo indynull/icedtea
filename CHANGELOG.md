@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Bug fix
+
+- `tree_view` clips the title so a trailing badge stays on the end.
+
 ### Chore
 
 - Generated `docs/agents/` from the catalog (`llms.txt` and one

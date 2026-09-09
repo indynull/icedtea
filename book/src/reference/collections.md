@@ -131,9 +131,10 @@ Constructor: [`widget::tree_view`](https://docs.rs/icedtea/latest/icedtea/widget
 The application owns expand state. Leaf rows have no twisty. Empty
 tree is an empty column. `animating` is the branch that is opening or
 closing and its 0–1 height progress. [`TreeFace::Outline`](https://docs.rs/icedtea/latest/icedtea/widget/enum.TreeFace.html)
-is a tight heading tree; titles wrap in the leftover row width.
+is a tight heading tree; titles wrap inside their slot.
 `TreeFace::Files` is an explorer: folder and file marks from `dir`,
-one clipped title line. Selected wash covers the full row. `Tokens.density` scales
+one title line. Both clip the title so a trailing badge stays on the
+end. Selected wash covers the full row. `Tokens.density` scales
 pad, gap, and indent. `TreeNode::trailing` is the same
 [`RowSlot`](https://docs.rs/icedtea/latest/icedtea/collection/enum.RowSlot.html)
 as `list_view`; `Text` is a badge (`RowSlot::text` is Quiet).

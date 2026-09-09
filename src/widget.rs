@@ -951,9 +951,10 @@ pub enum CardFace {
 /// How each tree row is painted.
 ///
 /// [`Self::Outline`] is a tight heading tree: no folder marks; the
-/// title wraps. [`Self::Files`] is an explorer: folder and file marks
-/// from `dir`, one clipped title line. Both paint the selected wash
-/// across the full row. Density still scales pad and indent.
+/// title wraps inside its slot. [`Self::Files`] is an explorer: folder
+/// and file marks from `dir`, one title line. Both clip the title so
+/// a trailing badge stays on the end. Selected wash covers the full
+/// row. Density still scales pad and indent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TreeFace {
     #[default]
@@ -7757,8 +7758,9 @@ where
 /// height progress. `None` paints the committed tree.
 /// `TreeNode::trailing` is the same [`crate::collection::RowSlot`] as
 /// `list_view`; [`crate::collection::RowSlot::Text`] is a badge
-/// (`RowSlot::text` is Quiet). Outline wraps the title; Files stays
-/// one clipped line.
+/// (`RowSlot::text` is Quiet). Outline wraps the title inside its
+/// slot; Files stays one line. The title clips so a trailing badge
+/// stays on the end, clear of the name.
 ///
 ///
 /// ```
@@ -7959,7 +7961,7 @@ fn tree_line<'a, M: Clone + 'a>(
         TreeFace::Outline => iced::widget::text::Wrapping::Word,
         TreeFace::Files => iced::widget::text::Wrapping::None,
     };
-    let mut title = container(start_label(
+    let title = container(start_label(
         label_s.clone(),
         tok.body(),
         tok.scheme().on_surface,
@@ -7969,10 +7971,8 @@ fn tree_line<'a, M: Clone + 'a>(
     ))
     .width(Length::Fill)
     .align_x(start)
-    .padding([v / 2.0, v]);
-    if face == TreeFace::Files {
-        title = title.clip(true);
-    }
+    .padding([v / 2.0, v])
+    .clip(true);
     let pick: Element<'a, M> = if a11y.disabled {
         title.into()
     } else {
@@ -10537,6 +10537,58 @@ mod tests {
         );
         assert_eq!(n, 1);
         assert_eq!(focused, 1);
+    }
+
+    #[test]
+    fn outline_tree_title_stays_clear_of_a_trailing_badge() {
+        use crate::collection::{RowSlot, TreeNode};
+        use iced::advanced::layout::Limits;
+        use iced::advanced::widget::Tree;
+        use iced::{Font, Pixels};
+
+        let tok = named("dark").tokens;
+        let tree = TreeNode::branch(
+            1,
+            "book",
+            vec![TreeNode::leaf(2, "introduction.md").with_trailing(RowSlot::text("md"))],
+        );
+        let mut el: Element<'_, u64> = tree_view(
+            &tree,
+            Some(2),
+            None,
+            |id| id,
+            |c| c.id,
+            TreeFace::Outline,
+            tok,
+            A11y::new("insp-tree", Role::Tree),
+        );
+        let renderer = iced::Renderer::Secondary(iced_tiny_skia::Renderer::new(
+            Font::DEFAULT,
+            Pixels::from(16u32),
+        ));
+        let mut state = Tree::new(el.as_widget());
+        let node = el.as_widget_mut().layout(
+            &mut state,
+            &renderer,
+            &Limits::new(iced::Size::ZERO, iced::Size::new(180.0, 240.0)),
+        );
+        fn row_title_and_badge(n: &iced::advanced::layout::Node) -> Option<(f32, f32)> {
+            let kids = n.children();
+            if kids.len() >= 3 {
+                let last = kids[kids.len() - 1].bounds();
+                let title = kids[kids.len() - 2].bounds();
+                if last.width > 4.0 && last.width < 48.0 && title.width > last.width {
+                    return Some((title.x + title.width, last.x));
+                }
+            }
+            kids.iter().find_map(row_title_and_badge)
+        }
+        let (title_end, badge_start) =
+            row_title_and_badge(&node).expect("outline row with a trailing badge");
+        assert!(
+            title_end <= badge_start + 0.5,
+            "title end {title_end} must sit before badge start {badge_start}"
+        );
     }
 
     #[test]
