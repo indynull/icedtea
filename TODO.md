@@ -12,16 +12,6 @@
   families. Do not vendor a face. Apps that want a named family
   still load it themselves.
 
-### Agent docs
-
-Source of truth is rustdoc plus `catalog::ENTRIES`. The agent
-index is generated. `AGENTS.md` is a short router. Skills score
-paint; they do not restate library law.
-
-- After the emit is stable, a query surface answers a catalog id
-  (or a job such as pick a number) with the constructor, `*Opts` /
-  `*Face`, tokens, `A11y`, and the compiling snippet.
-
 ### Blocked on iced
 
 - RTL `textarea`: iced 0.14 `text_editor` has no writing direction
