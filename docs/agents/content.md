@@ -62,7 +62,7 @@ Parse with `parse`, then view with `markdown_view`. Truncate by slicing the sour
 
 # Select and copy
 
-Painted with real markdown layout (headings, lists, code frames, quotes). Body is `Tokens::body`; H1 is `Tokens::page` (window title), not iced's 2× blog heading. Drag a range with `crate::select::markdown_select` so it can start in one block and end in another; pass the live `crate::select::MarkdownSpan` here. The view is not flattened into one mixed-size `Rich`. The document tree stays one `view_with` whether a range is empty or not. Pointer events reach `on_pointer` first so paint and Copy share that span (a double-click selects the word under the caret). A drag that leaves the document still posts Move (clamped) and Release. Ctrl+C / Cmd+C on a span is `crate::select::MarkdownSpan::text` via `crate::copy_text`. Full document copy is `MarkdownDoc::source`.
+Painted with real markdown layout (headings, lists, code frames, quotes). Body is `Tokens::body`; H1 is `Tokens::page` (window title), not iced's 2× blog heading. Drag a range with `crate::select::markdown_select` so it can start in one block and end in another; pass the live `crate::select::MarkdownSpan` here. The view is not flattened into one mixed-size `Rich`. The document tree stays one `view_with` whether a range is empty or not. Pointer events reach `on_pointer` first so paint and Copy share that span. Consecutive clicks expand the range: word, sentence, then the block. The primary+A chord selects every block. A drag that leaves the document still posts Move (clamped) and Release. Ctrl+C / Cmd+C on a span is `crate::select::MarkdownSpan::text` via `crate::copy_text`. Full document copy is `MarkdownDoc::source`.
 
 Constructor: `widget::markdown_view`
 Desktop: Typography (rich)

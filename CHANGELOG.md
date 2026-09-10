@@ -4,6 +4,9 @@
 
 ### Bug fix
 
+- Markdown select expands word, sentence, then block. Ctrl+A
+  selects the document. A multi-block range paints the gap between
+  blocks.
 - `tree_view` clips the title so a trailing badge stays on the end.
 
 ### Chore

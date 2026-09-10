@@ -118,11 +118,12 @@ window title). Links and inline code use
 Real markdown layout (headings, lists, code frames). Drag a range
 with `select::markdown_select` (X and Y plus the live `Tokens` so
 hit-testing matches the painted scale; a same-line drag is a
-range). A double-click selects the word under the caret. Pointer
-events reach `markdown_select` first so the painted highlight and
-Copy are that span. Copy is the span only. Select all is
-`markdown_select_all`. The whole source is a separate Copy-all
-path (`doc.source`).
+range). Consecutive clicks expand the range: word, sentence, then
+the block. Pointer events reach `markdown_select` first so the
+painted highlight and Copy are that span. A multi-block range
+paints the gap between blocks. Copy is the span only. Select all
+is the primary+A chord (`markdown_select_all`). The whole source
+is a separate Copy-all path (`doc.source`).
 
 Pass `A11y`.
 

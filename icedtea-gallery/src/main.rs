@@ -1386,7 +1386,7 @@ fn parse_inject_line(line: &str) -> Option<Message> {
             let a: f32 = parts.next()?.parse().ok()?;
             let y = parts.next().and_then(|s| s.parse().ok());
             Some(Message::MdPointer(match y {
-                Some(y) => icedtea::select::MarkdownPointer::Move { x: a, y },
+                Some(y) => icedtea::select::MarkdownPointer::at(a, y),
                 None => icedtea::select::MarkdownPointer::at_y(a),
             }))
         }
@@ -9926,7 +9926,7 @@ mod tests {
         ));
         // Double without a hover still no-ops on empty docs only.
         let _ = g.update(super::Message::MdPointer(
-            icedtea::select::MarkdownPointer::Move { x: 16.0, y: 8.0 },
+            icedtea::select::MarkdownPointer::at(16.0, 8.0),
         ));
         let _ = g.update(super::Message::MdPointer(
             icedtea::select::MarkdownPointer::Double,
@@ -9938,13 +9938,13 @@ mod tests {
             .any(|a| a.id.as_str() == "edit.copy" && a.enabled));
         g.md_sel = icedtea::select::MarkdownSelect::default();
         let _ = g.update(super::Message::MdPointer(
-            icedtea::select::MarkdownPointer::Move { x: 0.0, y: 8.0 },
+            icedtea::select::MarkdownPointer::at(0.0, 8.0),
         ));
         let _ = g.update(super::Message::MdPointer(
             icedtea::select::MarkdownPointer::Press,
         ));
         let _ = g.update(super::Message::MdPointer(
-            icedtea::select::MarkdownPointer::Move { x: 140.0, y: 8.0 },
+            icedtea::select::MarkdownPointer::at(140.0, 8.0),
         ));
         let _ = g.update(super::Message::MdPointer(
             icedtea::select::MarkdownPointer::Release,
@@ -9986,7 +9986,7 @@ mod tests {
         g.page = "markdown";
         g.pointer = icedtea::iced::Point::new(400.0, 80.0);
         let _ = g.update(super::Message::MdPointer(
-            icedtea::select::MarkdownPointer::Move { x: 16.0, y: 8.0 },
+            icedtea::select::MarkdownPointer::at(16.0, 8.0),
         ));
         let _ = g.update(super::Message::MdPointer(
             icedtea::select::MarkdownPointer::Double,
@@ -10019,13 +10019,13 @@ mod tests {
         let (mut g, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
         g.page = "markdown";
         let _ = g.update(super::Message::MdPointer(
-            icedtea::select::MarkdownPointer::Move { x: 0.0, y: 8.0 },
+            icedtea::select::MarkdownPointer::at(0.0, 8.0),
         ));
         let _ = g.update(super::Message::MdPointer(
             icedtea::select::MarkdownPointer::Press,
         ));
         let _ = g.update(super::Message::MdPointer(
-            icedtea::select::MarkdownPointer::Move { x: 48.0, y: 8.0 },
+            icedtea::select::MarkdownPointer::at(48.0, 8.0),
         ));
         let _ = g.update(super::Message::MdPointer(
             icedtea::select::MarkdownPointer::Release,
@@ -10666,7 +10666,7 @@ mod tests {
             "Suggest on any field. Pick fills the query.",
             "Saved notes.txt",
             "Inspector rows share a form label gutter. Copy posts the first selection.",
-            "Drag or double-click a range. Copy takes that text. Copy all posts the source.",
+            "Drag a range. Double-click a word, again for the sentence, again for the block. Ctrl+A selects all. Copy takes that text. Copy all posts the source.",
             "Drag to select. Language + UI colorway",
             "Primary action plus a chevron menu. Idle and disabled.",
             "Pressed (checked), idle, and disabled.",
