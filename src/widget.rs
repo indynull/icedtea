@@ -10640,7 +10640,11 @@ mod tests {
         let tree = TreeNode::branch(
             1,
             "book",
-            vec![TreeNode::leaf(2, "introduction.md").with_trailing(RowSlot::text("md"))],
+            vec![
+                TreeNode::leaf(2, "introduction.md").with_trailing(RowSlot::text("md")),
+                TreeNode::leaf(3, "reference.md")
+                    .with_trailing(RowSlot::text("a long trailing slot")),
+            ],
         );
         let mut el: Element<'_, u64> = tree_view(
             &tree,
@@ -10675,10 +10679,7 @@ mod tests {
         }
         let (title_end, badge_start) =
             row_title_and_badge(&node).expect("outline row with a trailing badge");
-        assert!(
-            title_end <= badge_start + 0.5,
-            "title end {title_end} must sit before badge start {badge_start}"
-        );
+        assert!(title_end <= badge_start + 0.5);
     }
 
     #[test]
