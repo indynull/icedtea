@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.17.1 — 2026-09-10
+
 ### Bug fix
 
 - Markdown select expands word, sentence, then block. Ctrl+A
