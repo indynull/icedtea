@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.17.2 — 2026-09-10
+
 ### Feature
 
 - Markdown copy posts the rendered span as plain text and HTML

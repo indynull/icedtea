@@ -1809,7 +1809,7 @@ dependencies = [
 
 [[package]]
 name = "icedtea"
-version = "0.17.1"
+version = "0.17.2"
 dependencies = [
  "arboard",
  "iced",
@@ -1829,7 +1829,7 @@ dependencies = [
 
 [[package]]
 name = "icedtea-gallery"
-version = "0.17.1"
+version = "0.17.2"
 dependencies = [
  "icedtea",
 ]
