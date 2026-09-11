@@ -9,6 +9,7 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ClipboardOp {
     Copy(String),
+    CopyRich { plain: String, html: String },
     PasteRequest,
 }
 
@@ -17,10 +18,25 @@ impl ClipboardOp {
         Self::Copy(text.into())
     }
 
+    pub fn copy_rich(plain: impl Into<String>, html: impl Into<String>) -> Self {
+        Self::CopyRich {
+            plain: plain.into(),
+            html: html.into(),
+        }
+    }
+
     pub fn text(&self) -> Option<&str> {
         match self {
             Self::Copy(s) => Some(s),
+            Self::CopyRich { plain, .. } => Some(plain),
             Self::PasteRequest => None,
+        }
+    }
+
+    pub fn html(&self) -> Option<&str> {
+        match self {
+            Self::CopyRich { html, .. } => Some(html),
+            Self::Copy(_) | Self::PasteRequest => None,
         }
     }
 }
@@ -36,6 +52,10 @@ impl MemoryClipboard {
         match op {
             ClipboardOp::Copy(s) => {
                 self.text = Some(s.clone());
+                None
+            }
+            ClipboardOp::CopyRich { plain, .. } => {
+                self.text = Some(plain.clone());
                 None
             }
             ClipboardOp::PasteRequest => self.text.clone(),
@@ -58,5 +78,14 @@ mod tests {
         );
         assert_eq!(ClipboardOp::copy("x").text(), Some("x"));
         assert!(ClipboardOp::PasteRequest.text().is_none());
+        let rich = ClipboardOp::copy_rich("a\tb", "<table><tr><td>a</td></tr></table>");
+        assert_eq!(rich.text(), Some("a\tb"));
+        assert_eq!(rich.html(), Some("<table><tr><td>a</td></tr></table>"));
+        clip.apply(&rich);
+        assert_eq!(
+            clip.apply(&ClipboardOp::PasteRequest).as_deref(),
+            Some("a\tb")
+        );
+        assert!(ClipboardOp::copy("x").html().is_none());
     }
 }

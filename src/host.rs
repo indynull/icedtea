@@ -58,6 +58,55 @@ pub fn copy_text<M>(text: impl Into<String>) -> Task<M> {
     iced::clipboard::write(text.into())
 }
 
+/// Clipboard write of plain text plus an HTML fragment.
+///
+/// Apps that paste only `text/plain` get `plain`. Rich editors (a
+/// browser, a document) read the HTML. When the host clipboard
+/// cannot take HTML, this writes `plain` through iced's clipboard.
+///
+/// ```
+/// let _task: iced::Task<()> = icedtea::copy_rich(
+///     "Name\tRole\nList\tcollection",
+///     "<table><tr><th>Name</th><th>Role</th></tr></table>",
+/// );
+/// ```
+pub fn copy_rich<M>(plain: impl Into<String>, html: impl Into<String>) -> Task<M> {
+    let plain = plain.into();
+    let html = html.into();
+    if write_html_clipboard(&plain, &html).is_ok() {
+        Task::none()
+    } else {
+        iced::clipboard::write(plain)
+    }
+}
+
+fn write_html_clipboard(plain: &str, html: &str) -> Result<(), arboard::Error> {
+    #[cfg(all(
+        unix,
+        not(any(target_os = "macos", target_os = "android", target_os = "ios"))
+    ))]
+    {
+        let plain = plain.to_string();
+        let html = html.to_string();
+        arboard::Clipboard::new()?;
+        std::thread::spawn(move || {
+            let Ok(mut cb) = arboard::Clipboard::new() else {
+                return;
+            };
+            use arboard::SetExtLinux;
+            let _ = cb.set().wait().html(&html, Some(&plain));
+        });
+        Ok(())
+    }
+    #[cfg(not(all(
+        unix,
+        not(any(target_os = "macos", target_os = "android", target_os = "ios"))
+    )))]
+    {
+        arboard::Clipboard::new()?.set_html(html, Some(plain))
+    }
+}
+
 /// Clipboard read; maps the OS paste into a message.
 pub fn paste_text<M: Send + 'static>(
     to_msg: impl Fn(Option<String>) -> M + Send + 'static,

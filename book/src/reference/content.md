@@ -15,18 +15,20 @@ Each constructor takes `A11y` unless noted. iced 0.14 publishes the widget id on
 Readable body, code, and markdown share one contract (module
 [`select`](https://docs.rs/icedtea/latest/icedtea/select/index.html)):
 drag a contiguous range of **visible** text, then host copy (Ctrl+C /
-Cmd+C or `icedtea::copy_text`). Typing does not apply on these
-surfaces.
+Cmd+C or `icedtea::copy_text` / `icedtea::copy_rich`). Typing does
+not apply on these surfaces.
 
 | Surface | Who owns the text | Range copy | Select all / full |
 | --- | --- | --- | --- |
 | [`selectable`](#selectable), code | App `text_editor::Content` via `select_only` | `Content::selection()` → `copy_text` | `Action::SelectAll` / whole buffer |
-| [`markdown`](#markdown) | Paint-side document (layout stays real) | `MarkdownSpan` → `copy_text` | `markdown_select_all` / `doc.source` |
+| [`markdown`](#markdown) | Paint-side document (layout stays real) | `MarkdownSpan` → `copy_rich` | `markdown_select_all` / `doc.source` |
 
 Labeled values use the same editor path under [Fields](fields.md#value-field)
 and `field::Selectables`. Chrome (menus, buttons, status meta) is not
 drag-selectable. Drag across headings, paragraphs, and lists uses
-`select::markdown_select` and `MarkdownSpan::text`.
+`select::markdown_select` and `MarkdownSpan::text` / `html`.
+Tables copy as the visible cells (tab-separated plain, a `<table>`
+in HTML), the same as selecting rendered markdown in a browser.
 
 ### Label
 
@@ -121,9 +123,10 @@ hit-testing matches the painted scale; a same-line drag is a
 range). Consecutive clicks expand the range: word, sentence, then
 the block. Pointer events reach `markdown_select` first so the
 painted highlight and Copy are that span. A multi-block range
-paints the gap between blocks. Copy is the span only. Select all
-is the primary+A chord (`markdown_select_all`). The whole source
-is a separate Copy-all path (`doc.source`).
+paints the gap between blocks. Copy is the span only: plain text plus HTML
+(`copy_rich`). Select all is the primary+A chord
+(`markdown_select_all`). The whole source is a separate Copy-all
+path (`doc.source`).
 
 Pass `A11y`.
 

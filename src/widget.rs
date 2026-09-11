@@ -4623,8 +4623,10 @@ pub fn parse(source: &str) -> MarkdownDoc {
 /// Consecutive clicks expand the range: word, sentence, then the block.
 /// The primary+A chord selects every block. A drag that
 /// leaves the document still posts Move (clamped) and Release.
-/// Ctrl+C / Cmd+C on a span is [`crate::select::MarkdownSpan::text`] via
-/// [`crate::copy_text`]. Full document copy is [`MarkdownDoc::source`].
+/// Ctrl+C / Cmd+C on a span is [`crate::select::MarkdownSpan::text`] plus
+/// [`crate::select::MarkdownSpan::html`] via [`crate::copy_rich`] (plain
+/// cells and a `<table>`, like a browser copy of rendered markdown).
+/// Full document source is [`MarkdownDoc::source`].
 ///
 ///
 /// ```
@@ -4636,7 +4638,7 @@ pub fn parse(source: &str) -> MarkdownDoc {
 /// let doc = widget::parse("# Hi\n\nBody.");
 /// let on_link = |_uri| MarkdownPointer::Release;
 /// let on_pointer = |ev| ev;
-/// let state = markdown_select(&doc.items, MarkdownSelect::default(), MarkdownPointer::Press, tok);
+/// let state = markdown_select(&doc.items, MarkdownSelect::default(), MarkdownPointer::Press, tok, &doc.source);
 /// let heads = doc.headings();
 /// let _: icedtea::Element<'_, _> = widget::markdown_view(
 ///     &doc.items,
@@ -15163,7 +15165,7 @@ mod tests {
             A11y::new("md", Role::Group),
             MarkdownOpts::default(),
         );
-        let plain = crate::select::markdown_plain(&doc.items);
+        let plain = crate::select::markdown_plain(&doc.items, &doc.source);
         assert!(plain.contains("Title") && plain.contains("Second block."));
         let src = include_str!("widget.rs");
         let md = src
@@ -15185,12 +15187,14 @@ mod tests {
             crate::select::MarkdownSelect::default(),
             crate::select::MarkdownPointer::at_y(0.0),
             tok,
+            &doc.source,
         );
         st = crate::select::markdown_select(
             &doc.items,
             st,
             crate::select::MarkdownPointer::Press,
             tok,
+            &doc.source,
         );
         let end_y = doc
             .items
@@ -15202,6 +15206,7 @@ mod tests {
             st,
             crate::select::MarkdownPointer::at_y(end_y),
             tok,
+            &doc.source,
         );
         let mut painted: Element<'_, crate::select::MarkdownPointer> = markdown_view(
             &doc.items,
@@ -15213,8 +15218,8 @@ mod tests {
             MarkdownOpts::default(),
         );
         draw_once(&mut painted);
-        assert!(st.span.text(&doc.items).contains("Title"));
-        assert!(st.span.text(&doc.items).contains("First"));
+        assert!(st.span.text(&doc.items, &doc.source).contains("Title"));
+        assert!(st.span.text(&doc.items, &doc.source).contains("First"));
         let head = crate::select::MarkdownSpan {
             start: crate::select::MarkdownPos { item: 0, offset: 0 },
             end: crate::select::MarkdownPos { item: 0, offset: 5 },
@@ -15330,10 +15335,10 @@ mod tests {
         );
         let mut st = crate::select::MarkdownSelect::default();
         for ev in first.iter().chain(second.iter()) {
-            st = crate::select::markdown_select(&doc.items, st, *ev, tok);
+            st = crate::select::markdown_select(&doc.items, st, *ev, tok, &doc.source);
         }
         assert!(!st.span.is_empty());
-        let copied = st.span.text(&doc.items);
+        let copied = st.span.text(&doc.items, &doc.source);
         assert!(!copied.is_empty());
         assert_ne!(copied, doc.source);
         let mut up = Vec::new();

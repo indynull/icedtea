@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Feature
+
+- Markdown copy posts the rendered span as plain text and HTML
+  (`copy_rich`). Tables are the visible cells.
+
 ## 0.17.1 — 2026-09-10
 
 ### Bug fix

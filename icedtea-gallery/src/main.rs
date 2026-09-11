@@ -4022,10 +4022,20 @@ impl Gallery {
             }
             Message::MdLink(uri) => self.note = format!("Open {uri}"),
             Message::MdPointer(ev) => {
-                self.md_sel =
-                    icedtea::select::markdown_select(&self.md.items, self.md_sel, ev, self.tokens);
+                self.md_sel = icedtea::select::markdown_select(
+                    &self.md.items,
+                    self.md_sel,
+                    ev,
+                    self.tokens,
+                    &self.md.source,
+                );
                 if !self.md_sel.span.is_empty() {
-                    let n = self.md_sel.span.text(&self.md.items).chars().count();
+                    let n = self
+                        .md_sel
+                        .span
+                        .text(&self.md.items, &self.md.source)
+                        .chars()
+                        .count();
                     self.note = format!(
                         "{} {}",
                         self.catalog.t("note.selected"),
@@ -4445,14 +4455,16 @@ impl Gallery {
                     .go_mut(false, icedtea::iced::time::Instant::now());
             }
             Message::EditCopy => {
-                let s = if self.page == "markdown" {
-                    if self.md_sel.span.is_empty() {
-                        String::new()
-                    } else {
-                        self.md_sel.span.text(&self.md.items)
+                if self.page == "markdown" {
+                    if !self.md_sel.span.is_empty() {
+                        let plain = self.md_sel.span.text(&self.md.items, &self.md.source);
+                        let html = self.md_sel.span.html(&self.md.items, &self.md.source);
+                        self.note = self.catalog.t("note.copied").into();
+                        self.context = None;
+                        return icedtea::copy_rich(plain, html);
                     }
                 } else {
-                    self.live_selection().unwrap_or_else(|| {
+                    let s = self.live_selection().unwrap_or_else(|| {
                         if self.page == "code" {
                             self.code_editor.text()
                         } else if self.page == "selectable" {
@@ -4460,12 +4472,12 @@ impl Gallery {
                         } else {
                             String::new()
                         }
-                    })
-                };
-                if !s.is_empty() {
-                    self.note = self.catalog.t("note.copied").into();
-                    self.context = None;
-                    return icedtea::copy_text(s);
+                    });
+                    if !s.is_empty() {
+                        self.note = self.catalog.t("note.copied").into();
+                        self.context = None;
+                        return icedtea::copy_text(s);
+                    }
                 }
             }
             Message::EditCut => {
@@ -4503,7 +4515,8 @@ impl Gallery {
             Message::Pasted(None) => self.note = self.catalog.t("note.clipboard-empty").into(),
             Message::EditSelectAll => {
                 if self.page == "markdown" {
-                    self.md_sel = icedtea::select::markdown_select_all(&self.md.items);
+                    self.md_sel =
+                        icedtea::select::markdown_select_all(&self.md.items, &self.md.source);
                 } else if self.page == "value-field" {
                     if let Some(id) = self.last_field.clone() {
                         self.fields
@@ -9883,10 +9896,21 @@ mod tests {
             icedtea::select::MarkdownPointer::Release,
         ));
         assert!(!g.md_sel.span.is_empty());
-        let copied = g.md_sel.span.text(&g.md.items);
+        let copied = g.md_sel.span.text(&g.md.items, &g.md.source);
         assert_ne!(copied, g.md.source);
         assert_eq!(g.copy_value(), g.md.source);
         assert!(copied.contains("Markdown") || copied.contains("Heading"));
+        assert!(
+            !copied.contains("[table]"),
+            "table copy is the cells: {copied}"
+        );
+        assert!(
+            copied.contains("Name") && copied.contains("List"),
+            "{copied}"
+        );
+        let html = g.md_sel.span.html(&g.md.items, &g.md.source);
+        assert!(html.contains("<table"), "{html}");
+        assert!(html.contains("<th>Name</th>"), "{html}");
         g.note.clear();
         let _ = g.update(super::Message::EditCopy);
         assert_eq!(g.note, "Copied");
@@ -9901,7 +9925,7 @@ mod tests {
         let _ = g.update(super::Message::EditSelectAll);
         assert_eq!(
             g.md_sel.span,
-            icedtea::select::MarkdownSpan::all(&g.md.items)
+            icedtea::select::MarkdownSpan::all(&g.md.items, &g.md.source)
         );
         assert!(g
             .context_actions()
@@ -9950,7 +9974,7 @@ mod tests {
             icedtea::select::MarkdownPointer::Release,
         ));
         assert!(!g.md_sel.span.is_empty());
-        let line = g.md_sel.span.text(&g.md.items);
+        let line = g.md_sel.span.text(&g.md.items, &g.md.source);
         assert_ne!(line, g.md.source);
         assert!(g
             .context_actions()
@@ -9992,7 +10016,7 @@ mod tests {
             icedtea::select::MarkdownPointer::Double,
         ));
         assert!(!g.md_sel.span.is_empty());
-        let line = g.md_sel.span.text(&g.md.items);
+        let line = g.md_sel.span.text(&g.md.items, &g.md.source);
         assert!(!line.is_empty());
         assert_ne!(line, g.md.source);
         assert!(g
@@ -10031,9 +10055,10 @@ mod tests {
             icedtea::select::MarkdownPointer::Release,
         ));
         assert!(!g.md_sel.span.is_empty());
-        let span = g.md_sel.span.text(&g.md.items);
+        let span = g.md_sel.span.text(&g.md.items, &g.md.source);
         let line =
-            icedtea::select::markdown_line_span(&g.md.items, 16.0, 8.0, g.tokens).text(&g.md.items);
+            icedtea::select::markdown_line_span(&g.md.items, 16.0, 8.0, g.tokens, &g.md.source)
+                .text(&g.md.items, &g.md.source);
         assert_ne!(span, g.md.source);
         assert_ne!(span, line);
         let kept = g.md_sel.span;
@@ -10048,7 +10073,7 @@ mod tests {
         g.note.clear();
         let _ = g.update(super::Message::EditCopy);
         assert_eq!(g.note, "Copied");
-        assert_eq!(g.md_sel.span.text(&g.md.items), span);
+        assert_eq!(g.md_sel.span.text(&g.md.items, &g.md.source), span);
         let (mut code, _) = super::Gallery::new(icedtea::i18n::Direction::Ltr);
         code.page = "code";
         code.code_editor

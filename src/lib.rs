@@ -234,7 +234,7 @@ pub mod window;
 pub mod workspace;
 
 pub use app::{bootstrap, Boot, Prepared};
-pub use host::{copy_text, native_dialog, paste_text};
+pub use host::{copy_rich, copy_text, native_dialog, paste_text};
 pub use iced::{self, Element, Task};
 
 /// Boot theme and window settings, then start iced's application builder.

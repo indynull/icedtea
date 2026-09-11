@@ -11,7 +11,7 @@
 //! | --- | --- | --- | --- | --- |
 //! | Body / path | [`crate::widget::selectable`], [`crate::widget::value_field`] | App `text_editor::Content` / [`crate::field::Selectables`] | `Content::selection()` → [`crate::copy_text`] | `Action::SelectAll` / [`crate::field::Selectables::perform`] |
 //! | Code | [`crate::widget::highlighted_code`] | App `Content` | same | `Action::SelectAll` |
-//! | Markdown | [`crate::widget::markdown_view`] | Structured paint (per block) | [`MarkdownSpan`] → [`crate::copy_text`] | [`markdown_select_all`] |
+//! | Markdown | [`crate::widget::markdown_view`] | Structured paint (per block) | [`MarkdownSpan`] → [`crate::copy_rich`] | [`markdown_select_all`] |
 //!
 //! Chrome (menus, buttons, status meta) is not drag-selectable.
 //!
@@ -20,7 +20,10 @@
 //! [`markdown_select`] so a range can start in one block and end in
 //! another. Highlight and Copy read that span. A press without a drag
 //! is empty. Consecutive clicks expand the range: word, sentence, then
-//! the block. The primary+A chord selects the whole document. Flattening
+//! the block. The primary+A chord selects the whole document. Copy of
+//! a markdown span is the visible text plus an HTML fragment
+//! ([`crate::copy_rich`]), the same as selecting rendered markdown in
+//! a browser. Tables are the cell text, not a marker. Flattening
 //! every block into one rich surface breaks layout, so it is not the
 //! shipped path.
 
@@ -100,11 +103,13 @@ fn measure_tok() -> Tokens {
 
 /// Plain text of a painted markdown document in document order.
 ///
-/// Top-level blocks are separated by blank lines. Useful for tests and
-/// for building a linear copy string; the live view selects per block.
-pub fn markdown_plain(items: &[Item]) -> String {
+/// Top-level blocks are separated by blank lines. Tables are the visible
+/// cells (tab-separated rows), taken from `source` because iced 0.14 keeps
+/// row cells private. Pass the same string [`crate::widget::MarkdownDoc`]
+/// parsed.
+pub fn markdown_plain(items: &[Item], source: &str) -> String {
     let settings = markdown_paint_settings(markdown_measure_style(), measure_tok());
-    let spans = markdown_document_spans(items, &settings);
+    let spans = markdown_document_spans(items, &settings, source);
     spans.iter().map(|s| s.text.as_ref()).collect()
 }
 
@@ -112,10 +117,122 @@ pub fn markdown_plain(items: &[Item]) -> String {
 pub(crate) fn markdown_document_spans(
     items: &[Item],
     settings: &Settings,
+    source: &str,
 ) -> Vec<Span<'static, markdown::Uri, Font>> {
+    let tables = parse_tables(source);
     let mut spans = Vec::new();
-    flatten_spans(items, settings, &mut spans, 0);
+    let mut table_i = 0;
+    flatten_spans(items, settings, &mut spans, 0, &tables, &mut table_i);
     spans
+}
+
+type TableGrid = Vec<Vec<String>>;
+
+fn parse_tables(source: &str) -> Vec<TableGrid> {
+    let parser = pulldown_cmark::Parser::new_ext(
+        source,
+        pulldown_cmark::Options::ENABLE_TABLES
+            | pulldown_cmark::Options::ENABLE_STRIKETHROUGH
+            | pulldown_cmark::Options::ENABLE_TASKLISTS,
+    );
+    let mut tables = Vec::new();
+    let mut current: Option<TableGrid> = None;
+    let mut row = Vec::new();
+    let mut cell = String::new();
+    let mut in_cell = false;
+    for ev in parser {
+        match ev {
+            pulldown_cmark::Event::Start(pulldown_cmark::Tag::Table(_)) => {
+                current = Some(Vec::new());
+            }
+            pulldown_cmark::Event::Start(pulldown_cmark::Tag::TableHead)
+            | pulldown_cmark::Event::Start(pulldown_cmark::Tag::TableRow) => {
+                row = Vec::new();
+            }
+            pulldown_cmark::Event::Start(pulldown_cmark::Tag::TableCell) => {
+                in_cell = true;
+                cell.clear();
+            }
+            pulldown_cmark::Event::Text(t) | pulldown_cmark::Event::Code(t) if in_cell => {
+                cell.push_str(&t);
+            }
+            pulldown_cmark::Event::End(pulldown_cmark::TagEnd::TableCell) => {
+                in_cell = false;
+                row.push(std::mem::take(&mut cell));
+            }
+            pulldown_cmark::Event::End(pulldown_cmark::TagEnd::TableHead)
+            | pulldown_cmark::Event::End(pulldown_cmark::TagEnd::TableRow) => {
+                if let Some(table) = current.as_mut() {
+                    table.push(std::mem::take(&mut row));
+                }
+            }
+            pulldown_cmark::Event::End(pulldown_cmark::TagEnd::Table) => {
+                if let Some(table) = current.take() {
+                    tables.push(table);
+                }
+            }
+            _ => {}
+        }
+    }
+    tables
+}
+
+fn table_plain(grid: &[Vec<String>]) -> String {
+    grid.iter()
+        .map(|row| row.join("\t"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn count_tables(item: &Item) -> usize {
+    match item {
+        Item::Table { .. } => 1,
+        Item::Quote(inner) => inner.iter().map(count_tables).sum(),
+        Item::List { bullets, .. } => bullets
+            .iter()
+            .map(|b| {
+                let kids = match b {
+                    Bullet::Point { items } | Bullet::Task { items, .. } => items.as_slice(),
+                };
+                kids.iter().map(count_tables).sum::<usize>()
+            })
+            .sum(),
+        _ => 0,
+    }
+}
+
+fn count_tables_before(items: &[Item], index: usize) -> usize {
+    items.iter().take(index).map(count_tables).sum()
+}
+
+fn header_grid(columns: &[markdown::Column], rows: &[markdown::Row]) -> TableGrid {
+    let header: Vec<String> = columns
+        .iter()
+        .map(|c| {
+            let settings = markdown_paint_settings(markdown_measure_style(), measure_tok());
+            let mut spans = Vec::new();
+            let mut table_i = 0;
+            flatten_spans(&c.header, &settings, &mut spans, 1, &[], &mut table_i);
+            spans.iter().map(|s| s.text.as_ref()).collect()
+        })
+        .collect();
+    let width = header.len();
+    let mut grid = vec![header];
+    for _ in rows {
+        grid.push(vec![String::new(); width]);
+    }
+    grid
+}
+
+fn table_grid_for(
+    columns: &[markdown::Column],
+    rows: &[markdown::Row],
+    tables: &[TableGrid],
+    table_i: &mut usize,
+) -> TableGrid {
+    let parsed = tables.get(*table_i).cloned();
+    *table_i += 1;
+    parsed.unwrap_or_else(|| header_grid(columns, rows))
 }
 
 fn flatten_spans(
@@ -123,6 +240,8 @@ fn flatten_spans(
     settings: &Settings,
     out: &mut Vec<Span<'static, markdown::Uri, Font>>,
     depth: usize,
+    tables: &[TableGrid],
+    table_i: &mut usize,
 ) {
     for (i, item) in items.iter().enumerate() {
         if i > 0 {
@@ -171,11 +290,11 @@ fn flatten_spans(
                     let kids = match bullet {
                         Bullet::Point { items } | Bullet::Task { items, .. } => items.as_slice(),
                     };
-                    flatten_spans(kids, settings, out, depth + 1);
+                    flatten_spans(kids, settings, out, depth + 1, tables, table_i);
                 }
             }
             Item::Quote(inner) => {
-                flatten_spans(inner, settings, out, depth + 1);
+                flatten_spans(inner, settings, out, depth + 1, tables, table_i);
             }
             Item::Rule => {
                 out.push(Span::new("———").size(settings.text_size));
@@ -186,10 +305,9 @@ fn flatten_spans(
                     out.push(Span::new(format!(" ({title})")).size(settings.text_size));
                 }
             }
-            Item::Table { .. } => {
-                // Row cell storage is private in iced 0.14; keep a marker so
-                // the document stays one continuous surface.
-                out.push(Span::new("[table]").size(settings.text_size));
+            Item::Table { columns, rows } => {
+                let grid = table_grid_for(columns, rows, tables, table_i);
+                out.push(Span::new(table_plain(&grid)).size(settings.text_size));
             }
         }
     }
@@ -203,6 +321,265 @@ fn heading_size(settings: &Settings, level: HeadingLevel) -> iced::Pixels {
         HeadingLevel::H4 => settings.h4_size,
         HeadingLevel::H5 => settings.h5_size,
         HeadingLevel::H6 => settings.h6_size,
+    }
+}
+
+fn item_plain_in(item: &Item, tables: &[TableGrid], table_i: &mut usize) -> String {
+    let settings = markdown_paint_settings(markdown_measure_style(), measure_tok());
+    let mut spans = Vec::new();
+    flatten_spans(
+        std::slice::from_ref(item),
+        &settings,
+        &mut spans,
+        0,
+        tables,
+        table_i,
+    );
+    spans.iter().map(|s| s.text.as_ref()).collect()
+}
+
+fn item_plain_at(items: &[Item], index: usize, tables: &[TableGrid]) -> String {
+    let mut table_i = count_tables_before(items, index);
+    item_plain_in(&items[index], tables, &mut table_i)
+}
+
+fn esc(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        match ch {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            _ => out.push(ch),
+        }
+    }
+    out
+}
+
+fn span_html(span: &Span<'_, markdown::Uri, Font>, piece: &str) -> String {
+    let mut t = esc(piece);
+    let mono = span
+        .font
+        .is_some_and(|f| matches!(f.family, iced::font::Family::Monospace) || f == Font::MONOSPACE);
+    if mono {
+        t = format!("<code>{t}</code>");
+    }
+    if span
+        .font
+        .is_some_and(|f| f.weight == iced::font::Weight::Bold)
+    {
+        t = format!("<strong>{t}</strong>");
+    }
+    if span
+        .font
+        .is_some_and(|f| f.style == iced::font::Style::Italic)
+    {
+        t = format!("<em>{t}</em>");
+    }
+    if span.strikethrough {
+        t = format!("<del>{t}</del>");
+    }
+    if let Some(href) = &span.link {
+        t = format!("<a href=\"{}\">{t}</a>", esc(href));
+    }
+    t
+}
+
+fn text_html(text: &Text, from: usize, to: usize) -> String {
+    let style = markdown_measure_style();
+    let mut at = 0usize;
+    let mut out = String::new();
+    for s in text.spans(style).iter() {
+        let n = s.text.len();
+        let a = from.max(at);
+        let b = to.min(at + n);
+        if a < b && a >= at {
+            let local_a = floor_char_boundary(&s.text, a - at);
+            let local_b = ceil_char_boundary(&s.text, (b - at).max(local_a));
+            if local_a < local_b && local_b <= s.text.len() {
+                out.push_str(&span_html(s, &s.text[local_a..local_b]));
+            }
+        }
+        at += n;
+    }
+    out
+}
+
+fn table_html(grid: &[Vec<String>]) -> String {
+    if grid.is_empty() {
+        return String::new();
+    }
+    let mut out = String::from("<table>\n<thead>\n<tr>");
+    for cell in &grid[0] {
+        out.push_str("<th>");
+        out.push_str(&esc(cell));
+        out.push_str("</th>");
+    }
+    out.push_str("</tr>\n</thead>\n");
+    if grid.len() > 1 {
+        out.push_str("<tbody>\n");
+        for row in &grid[1..] {
+            out.push_str("<tr>");
+            for cell in row {
+                out.push_str("<td>");
+                out.push_str(&esc(cell));
+                out.push_str("</td>");
+            }
+            out.push_str("</tr>\n");
+        }
+        out.push_str("</tbody>\n");
+    }
+    out.push_str("</table>");
+    out
+}
+
+fn table_html_from_plain(plain: &str) -> String {
+    let grid: TableGrid = plain
+        .lines()
+        .map(|line| line.split('\t').map(str::to_string).collect())
+        .filter(|row: &Vec<String>| !row.is_empty())
+        .collect();
+    table_html(&grid)
+}
+
+fn item_html(item: &Item, tables: &[TableGrid], table_i: &mut usize) -> String {
+    match item {
+        Item::Heading(level, text) => {
+            let n = heading_tag(*level);
+            format!("<{n}>{}</{n}>", text_html(text, 0, usize::MAX))
+        }
+        Item::Paragraph(text) => format!("<p>{}</p>", text_html(text, 0, usize::MAX)),
+        Item::CodeBlock { lines, code, .. } => {
+            let raw = if lines.is_empty() {
+                code.clone()
+            } else {
+                let style = markdown_measure_style();
+                lines
+                    .iter()
+                    .map(|line| {
+                        line.spans(style)
+                            .iter()
+                            .map(|s| s.text.as_ref())
+                            .collect::<String>()
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            };
+            format!("<pre><code>{}</code></pre>", esc(&raw))
+        }
+        Item::List { start, bullets } => {
+            let (open, close) = if start.is_some() {
+                ("<ol>", "</ol>")
+            } else {
+                ("<ul>", "</ul>")
+            };
+            let mut out = String::from(open);
+            for bullet in bullets {
+                out.push_str("<li>");
+                match bullet {
+                    Bullet::Task { done, items, .. } => {
+                        out.push_str(if *done {
+                            "<input type=\"checkbox\" checked disabled> "
+                        } else {
+                            "<input type=\"checkbox\" disabled> "
+                        });
+                        out.push_str(&items_html(items, tables, table_i));
+                    }
+                    Bullet::Point { items } => {
+                        out.push_str(&items_html(items, tables, table_i));
+                    }
+                }
+                out.push_str("</li>");
+            }
+            out.push_str(close);
+            out
+        }
+        Item::Quote(inner) => {
+            format!(
+                "<blockquote>{}</blockquote>",
+                items_html(inner, tables, table_i)
+            )
+        }
+        Item::Rule => "<hr>".into(),
+        Item::Image { alt, title, url } => {
+            let alt_s = text_html(alt, 0, usize::MAX);
+            if title.is_empty() {
+                format!(
+                    "<img alt=\"{}\" src=\"{}\">",
+                    esc(&strip_tags(&alt_s)),
+                    esc(url)
+                )
+            } else {
+                format!(
+                    "<img alt=\"{}\" src=\"{}\" title=\"{}\">",
+                    esc(&strip_tags(&alt_s)),
+                    esc(url),
+                    esc(title)
+                )
+            }
+        }
+        Item::Table { columns, rows } => {
+            let grid = table_grid_for(columns, rows, tables, table_i);
+            table_html(&grid)
+        }
+    }
+}
+
+fn items_html(items: &[Item], tables: &[TableGrid], table_i: &mut usize) -> String {
+    items
+        .iter()
+        .map(|item| item_html(item, tables, table_i))
+        .collect()
+}
+
+fn heading_tag(level: HeadingLevel) -> &'static str {
+    match level {
+        HeadingLevel::H1 => "h1",
+        HeadingLevel::H2 => "h2",
+        HeadingLevel::H3 => "h3",
+        HeadingLevel::H4 => "h4",
+        HeadingLevel::H5 => "h5",
+        HeadingLevel::H6 => "h6",
+    }
+}
+
+fn strip_tags(s: &str) -> String {
+    let mut out = String::new();
+    let mut in_tag = false;
+    for ch in s.chars() {
+        match ch {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => out.push(ch),
+            _ => {}
+        }
+    }
+    out
+}
+
+fn item_html_slice(
+    item: &Item,
+    plain: &str,
+    from: usize,
+    to: usize,
+    tables: &[TableGrid],
+    table_i: &mut usize,
+) -> String {
+    match item {
+        Item::Heading(level, text) => {
+            let n = heading_tag(*level);
+            format!("<{n}>{}</{n}>", text_html(text, from, to))
+        }
+        Item::Paragraph(text) => format!("<p>{}</p>", text_html(text, from, to)),
+        Item::Table { columns, rows } => {
+            let _ = table_grid_for(columns, rows, tables, table_i);
+            table_html_from_plain(&plain[from..to])
+        }
+        _ => {
+            let _ = (tables, table_i);
+            format!("<p>{}</p>", esc(&plain[from..to]))
+        }
     }
 }
 
@@ -260,12 +637,13 @@ impl MarkdownSpan {
 
     /// The whole document, start of the first block through the end of
     /// the last.
-    pub fn all(items: &[Item]) -> Self {
+    pub fn all(items: &[Item], source: &str) -> Self {
         if items.is_empty() {
             return Self::default();
         }
         let last = items.len() - 1;
-        let end = markdown_item_plain(&items[last]).len();
+        let tables = parse_tables(source);
+        let end = item_plain_at(items, last, &tables).len();
         Self {
             start: MarkdownPos { item: 0, offset: 0 },
             end: MarkdownPos {
@@ -276,16 +654,20 @@ impl MarkdownSpan {
     }
 
     /// Plain text of this range in document order (blocks joined by blank lines).
-    pub fn text(self, items: &[Item]) -> String {
+    ///
+    /// Tables are tab-separated cells from `source` (iced 0.14 keeps row
+    /// cells private). Same string [`crate::widget::MarkdownDoc`] parsed.
+    pub fn text(self, items: &[Item], source: &str) -> String {
         if items.is_empty() {
             return String::new();
         }
+        let tables = parse_tables(source);
         let last = items.len().saturating_sub(1);
         let start_i = self.start.item.min(last);
         let end_i = self.end.item.min(last);
         let mut out = String::new();
-        for (i, item) in items.iter().enumerate().take(end_i + 1).skip(start_i) {
-            let plain = markdown_item_plain(item);
+        for i in start_i..=end_i {
+            let plain = item_plain_at(items, i, &tables);
             let n = plain.len();
             let a = if i == start_i {
                 floor_char_boundary(&plain, self.start.offset.min(n))
@@ -301,6 +683,56 @@ impl MarkdownSpan {
                 out.push_str("\n\n");
             }
             out.push_str(&plain[a..b]);
+        }
+        out
+    }
+
+    /// HTML fragment of this range (browser copy of the rendered document).
+    ///
+    /// Pair with [`Self::text`] and [`crate::copy_rich`]. Tables are a
+    /// real `<table>`. Inline marks (bold, italic, code, links) stay in
+    /// the fragment.
+    pub fn html(self, items: &[Item], source: &str) -> String {
+        if items.is_empty() || self.is_empty() {
+            return String::new();
+        }
+        let tables = parse_tables(source);
+        let last = items.len().saturating_sub(1);
+        let start_i = self.start.item.min(last);
+        let end_i = self.end.item.min(last);
+        let mut out = String::new();
+        for i in start_i..=end_i {
+            let plain = item_plain_at(items, i, &tables);
+            let n = plain.len();
+            let a = if i == start_i {
+                floor_char_boundary(&plain, self.start.offset.min(n))
+            } else {
+                0
+            };
+            let b = if i == end_i {
+                ceil_char_boundary(&plain, self.end.offset.min(n).max(a))
+            } else {
+                n
+            };
+            if a >= b {
+                continue;
+            }
+            if !out.is_empty() {
+                out.push('\n');
+            }
+            let mut table_i = count_tables_before(items, i);
+            if a == 0 && b == n {
+                out.push_str(&item_html(&items[i], &tables, &mut table_i));
+            } else {
+                out.push_str(&item_html_slice(
+                    &items[i],
+                    &plain,
+                    a,
+                    b,
+                    &tables,
+                    &mut table_i,
+                ));
+            }
         }
         out
     }
@@ -395,14 +827,27 @@ pub struct MarkdownSelect {
 }
 
 /// Apply a pointer event to a document span. Layout stays structured.
+///
+/// `source` is the string [`crate::widget::MarkdownDoc`] parsed, so a
+/// table's caret and copy length match the visible cells.
 pub fn markdown_select(
     items: &[Item],
     mut state: MarkdownSelect,
     ev: MarkdownPointer,
     tok: Tokens,
+    source: &str,
 ) -> MarkdownSelect {
-    let caret =
-        |state: &MarkdownSelect| pos_at(items, state.hover_x, state.hover_y, tok, state.pane_width);
+    let tables = parse_tables(source);
+    let caret = |state: &MarkdownSelect| {
+        pos_at(
+            items,
+            state.hover_x,
+            state.hover_y,
+            tok,
+            state.pane_width,
+            &tables,
+        )
+    };
     match ev {
         MarkdownPointer::Press => {
             let pos = caret(&state);
@@ -414,7 +859,7 @@ pub fn markdown_select(
         MarkdownPointer::Extend => {
             let pos = caret(&state);
             state.dragging = true;
-            state.span = grained_drag(items, state.anchor, pos, state.grain);
+            state.span = grained_drag(items, state.anchor, pos, state.grain, &tables);
         }
         MarkdownPointer::Move { x, y, width } => {
             state.hover_x = x;
@@ -424,7 +869,7 @@ pub fn markdown_select(
             }
             if state.dragging {
                 let pos = caret(&state);
-                state.span = grained_drag(items, state.anchor, pos, state.grain);
+                state.span = grained_drag(items, state.anchor, pos, state.grain, &tables);
             }
         }
         MarkdownPointer::Double => {
@@ -432,27 +877,27 @@ pub fn markdown_select(
             state.dragging = true;
             state.grain = MarkdownGrain::Word;
             state.anchor = pos;
-            state.span = word_span_at(items, pos);
+            state.span = word_span_at(items, pos, &tables);
         }
         MarkdownPointer::Triple => {
             let pos = caret(&state);
             state.dragging = true;
             state.grain = MarkdownGrain::Sentence;
             state.anchor = pos;
-            state.span = sentence_span_at(items, pos);
+            state.span = sentence_span_at(items, pos, &tables);
         }
         MarkdownPointer::Block => {
             let pos = caret(&state);
             state.dragging = true;
             state.grain = MarkdownGrain::Block;
             state.anchor = pos;
-            state.span = block_span_at(items, pos);
+            state.span = block_span_at(items, pos, &tables);
         }
         MarkdownPointer::SelectAll => {
             let hover_x = state.hover_x;
             let hover_y = state.hover_y;
             let pane_width = state.pane_width;
-            state = markdown_select_all(items);
+            state = markdown_select_all(items, source);
             state.hover_x = hover_x;
             state.hover_y = hover_y;
             state.pane_width = pane_width;
@@ -466,8 +911,8 @@ pub fn markdown_select(
 
 /// Select every block. Same span [`MarkdownSpan::text`] uses for a
 /// full-document copy.
-pub fn markdown_select_all(items: &[Item]) -> MarkdownSelect {
-    let span = MarkdownSpan::all(items);
+pub fn markdown_select_all(items: &[Item], source: &str) -> MarkdownSelect {
+    let span = MarkdownSpan::all(items, source);
     MarkdownSelect {
         span,
         dragging: false,
@@ -483,11 +928,19 @@ pub fn markdown_select_all(items: &[Item]) -> MarkdownSelect {
 ///
 /// Y picks the block and line; X picks the column on that line so a
 /// same-line drag is a non-empty range.
-pub fn markdown_pos_at(items: &[Item], x: f32, y: f32, tok: Tokens) -> MarkdownPos {
-    pos_at(items, x, y, tok, 0.0)
+pub fn markdown_pos_at(items: &[Item], x: f32, y: f32, tok: Tokens, source: &str) -> MarkdownPos {
+    let tables = parse_tables(source);
+    pos_at(items, x, y, tok, 0.0, &tables)
 }
 
-fn pos_at(items: &[Item], x: f32, y: f32, tok: Tokens, width: f32) -> MarkdownPos {
+fn pos_at(
+    items: &[Item],
+    x: f32,
+    y: f32,
+    tok: Tokens,
+    width: f32,
+    tables: &[TableGrid],
+) -> MarkdownPos {
     if items.is_empty() {
         return MarkdownPos::default();
     }
@@ -496,7 +949,7 @@ fn pos_at(items: &[Item], x: f32, y: f32, tok: Tokens, width: f32) -> MarkdownPo
     let mut acc = 0.0;
     let mut pos = MarkdownPos::default();
     for (i, item) in items.iter().enumerate() {
-        let plain = markdown_item_plain(item);
+        let plain = item_plain_at(items, i, tables);
         let char_w = item_char_w(item, tok);
         let cols = wrap_cols(width, char_w);
         let lines = visual_lines(&plain, cols);
@@ -715,8 +1168,10 @@ fn find_fragment(
                     *at += 3 + title.len();
                 }
             }
-            Item::Table { .. } => {
-                *at += "[table]".len();
+            Item::Table { columns, rows } => {
+                let mut unused = 0;
+                let grid = table_grid_for(columns, rows, &[], &mut unused);
+                *at += table_plain(&grid).len();
             }
         }
     }
@@ -840,17 +1295,17 @@ fn empty_item_span(item: usize) -> MarkdownSpan {
     }
 }
 
-fn item_plain_at(items: &[Item], pos: MarkdownPos) -> (usize, String) {
+fn plain_at_pos(items: &[Item], pos: MarkdownPos, tables: &[TableGrid]) -> (usize, String) {
     let last = items.len().saturating_sub(1);
     let item = pos.item.min(last);
-    (item, markdown_item_plain(&items[item]))
+    (item, item_plain_at(items, item, tables))
 }
 
-fn word_span_at(items: &[Item], pos: MarkdownPos) -> MarkdownSpan {
+fn word_span_at(items: &[Item], pos: MarkdownPos, tables: &[TableGrid]) -> MarkdownSpan {
     if items.is_empty() {
         return MarkdownSpan::default();
     }
-    let (item, plain) = item_plain_at(items, pos);
+    let (item, plain) = plain_at_pos(items, pos, tables);
     if plain.is_empty() {
         return empty_item_span(item);
     }
@@ -908,11 +1363,11 @@ fn word_span_at(items: &[Item], pos: MarkdownPos) -> MarkdownSpan {
     }
 }
 
-fn sentence_span_at(items: &[Item], pos: MarkdownPos) -> MarkdownSpan {
+fn sentence_span_at(items: &[Item], pos: MarkdownPos, tables: &[TableGrid]) -> MarkdownSpan {
     if items.is_empty() {
         return MarkdownSpan::default();
     }
-    let (item, plain) = item_plain_at(items, pos);
+    let (item, plain) = plain_at_pos(items, pos, tables);
     if plain.is_empty() {
         return empty_item_span(item);
     }
@@ -960,11 +1415,11 @@ fn sentence_span_at(items: &[Item], pos: MarkdownPos) -> MarkdownSpan {
     }
 }
 
-fn block_span_at(items: &[Item], pos: MarkdownPos) -> MarkdownSpan {
+fn block_span_at(items: &[Item], pos: MarkdownPos, tables: &[TableGrid]) -> MarkdownSpan {
     if items.is_empty() {
         return MarkdownSpan::default();
     }
-    let (item, plain) = item_plain_at(items, pos);
+    let (item, plain) = plain_at_pos(items, pos, tables);
     MarkdownSpan {
         start: MarkdownPos { item, offset: 0 },
         end: MarkdownPos {
@@ -974,15 +1429,20 @@ fn block_span_at(items: &[Item], pos: MarkdownPos) -> MarkdownSpan {
     }
 }
 
-fn unit_span(items: &[Item], pos: MarkdownPos, grain: MarkdownGrain) -> MarkdownSpan {
+fn unit_span(
+    items: &[Item],
+    pos: MarkdownPos,
+    grain: MarkdownGrain,
+    tables: &[TableGrid],
+) -> MarkdownSpan {
     match grain {
         MarkdownGrain::Char => MarkdownSpan {
             start: pos,
             end: pos,
         },
-        MarkdownGrain::Word => word_span_at(items, pos),
-        MarkdownGrain::Sentence => sentence_span_at(items, pos),
-        MarkdownGrain::Block => block_span_at(items, pos),
+        MarkdownGrain::Word => word_span_at(items, pos, tables),
+        MarkdownGrain::Sentence => sentence_span_at(items, pos, tables),
+        MarkdownGrain::Block => block_span_at(items, pos, tables),
     }
 }
 
@@ -1005,37 +1465,66 @@ fn grained_drag(
     anchor: MarkdownPos,
     now: MarkdownPos,
     grain: MarkdownGrain,
+    tables: &[TableGrid],
 ) -> MarkdownSpan {
     union_span(
-        unit_span(items, anchor, grain),
-        unit_span(items, now, grain),
+        unit_span(items, anchor, grain, tables),
+        unit_span(items, now, grain, tables),
     )
 }
 
 /// The word under `(x, y)` (double-click), letters and digits, not comma.
-pub fn markdown_word_span(items: &[Item], x: f32, y: f32, tok: Tokens) -> MarkdownSpan {
-    word_span_at(items, markdown_pos_at(items, x, y, tok))
+pub fn markdown_word_span(
+    items: &[Item],
+    x: f32,
+    y: f32,
+    tok: Tokens,
+    source: &str,
+) -> MarkdownSpan {
+    let tables = parse_tables(source);
+    word_span_at(items, markdown_pos_at(items, x, y, tok, source), &tables)
 }
 
 /// The sentence (or code line) under `(x, y)` (triple-click).
-pub fn markdown_sentence_span(items: &[Item], x: f32, y: f32, tok: Tokens) -> MarkdownSpan {
-    sentence_span_at(items, markdown_pos_at(items, x, y, tok))
+pub fn markdown_sentence_span(
+    items: &[Item],
+    x: f32,
+    y: f32,
+    tok: Tokens,
+    source: &str,
+) -> MarkdownSpan {
+    let tables = parse_tables(source);
+    sentence_span_at(items, markdown_pos_at(items, x, y, tok, source), &tables)
 }
 
 /// The top-level block under `(x, y)` (fourth click).
-pub fn markdown_block_span(items: &[Item], x: f32, y: f32, tok: Tokens) -> MarkdownSpan {
-    block_span_at(items, markdown_pos_at(items, x, y, tok))
+pub fn markdown_block_span(
+    items: &[Item],
+    x: f32,
+    y: f32,
+    tok: Tokens,
+    source: &str,
+) -> MarkdownSpan {
+    let tables = parse_tables(source);
+    block_span_at(items, markdown_pos_at(items, x, y, tok, source), &tables)
 }
 
 /// The estimated visual line under `(x, y)`.
-pub fn markdown_line_span(items: &[Item], x: f32, y: f32, tok: Tokens) -> MarkdownSpan {
+pub fn markdown_line_span(
+    items: &[Item],
+    x: f32,
+    y: f32,
+    tok: Tokens,
+    source: &str,
+) -> MarkdownSpan {
     if items.is_empty() {
         return MarkdownSpan::default();
     }
-    let pos = markdown_pos_at(items, x, y, tok);
+    let pos = markdown_pos_at(items, x, y, tok, source);
     let last = items.len() - 1;
     let item = pos.item.min(last);
-    let plain = markdown_item_plain(&items[item]);
+    let tables = parse_tables(source);
+    let plain = item_plain_at(items, item, &tables);
     if plain.is_empty() {
         return MarkdownSpan {
             start: MarkdownPos { item, offset: 0 },
@@ -1074,10 +1563,7 @@ pub fn markdown_line_span(items: &[Item], x: f32, y: f32, tok: Tokens) -> Markdo
 }
 
 pub(crate) fn markdown_item_plain(item: &Item) -> String {
-    let settings = markdown_paint_settings(markdown_measure_style(), measure_tok());
-    let mut spans = Vec::new();
-    flatten_spans(std::slice::from_ref(item), &settings, &mut spans, 0);
-    spans.iter().map(|s| s.text.as_ref()).collect()
+    item_plain_in(item, &[], &mut 0)
 }
 
 pub(crate) fn markdown_text_len(text: &Text) -> usize {
@@ -1230,7 +1716,7 @@ mod tests {
     fn markdown_plain_preserves_document_order() {
         let items: Vec<_> =
             markdown::parse("# Title\n\nFirst paragraph.\n\nSecond block.").collect();
-        let plain = markdown_plain(&items);
+        let plain = markdown_plain(&items, "");
         assert!(plain.contains("Title"));
         assert!(plain.contains("First paragraph."));
         assert!(plain.contains("Second block."));
@@ -1248,7 +1734,7 @@ mod tests {
     fn markdown_document_spans_join_blocks_for_plain_order() {
         let items: Vec<_> = markdown::parse("# A\n\nB line\n\nC line").collect();
         let settings = markdown_paint_settings(markdown_measure_style(), tok());
-        let spans = markdown_document_spans(&items, &settings);
+        let spans = markdown_document_spans(&items, &settings, "");
         let joined: String = spans.iter().map(|s| s.text.as_ref()).collect();
         assert!(joined.contains('A'));
         assert!(joined.contains("B line"));
@@ -1261,7 +1747,7 @@ mod tests {
         assert!(multi.matches('\n').count() >= 2);
         // Fence with no line tokens still contributes the raw code body.
         let bare: Vec<_> = markdown::parse("```\nplain code\n```").collect();
-        let bare_spans = markdown_document_spans(&bare, &settings);
+        let bare_spans = markdown_document_spans(&bare, &settings, "");
         let bare_joined: String = bare_spans.iter().map(|s| s.text.as_ref()).collect();
         assert!(bare_joined.contains("plain code"));
         // Empty `lines` uses the raw `code` field (host items sometimes omit lines).
@@ -1270,7 +1756,7 @@ mod tests {
             code: "solo".into(),
             lines: vec![],
         }];
-        let empty_spans = markdown_document_spans(&empty_lines, &settings);
+        let empty_spans = markdown_document_spans(&empty_lines, &settings, "");
         let empty_joined: String = empty_spans.iter().map(|s| s.text.as_ref()).collect();
         assert_eq!(empty_joined, "solo");
     }
@@ -1279,15 +1765,15 @@ mod tests {
     fn markdown_select_all_covers_every_block() {
         let items: Vec<_> = markdown::parse("# A\n\nB line").collect();
         assert!(items.len() >= 2);
-        let sel = markdown_select_all(&items);
+        let sel = markdown_select_all(&items, "");
         assert!(!sel.span.is_empty());
         assert_eq!(sel.span.start.item, 0);
         assert_eq!(sel.span.end.item, items.len() - 1);
-        let text = sel.span.text(&items);
+        let text = sel.span.text(&items, "");
         assert!(text.contains('A'));
         assert!(text.contains("B line"));
-        assert_eq!(MarkdownSpan::all(&[]), MarkdownSpan::default());
-        assert!(markdown_select_all(&[]).span.is_empty());
+        assert_eq!(MarkdownSpan::all(&[], ""), MarkdownSpan::default());
+        assert!(markdown_select_all(&[], "").span.is_empty());
     }
 
     #[test]
@@ -1326,7 +1812,7 @@ fn b() {}
 | 1 | 2 |
 "#;
         let items: Vec<_> = markdown::parse(source).collect();
-        let plain = markdown_plain(&items);
+        let plain = markdown_plain(&items, source);
         assert!(plain.contains("H1") && plain.contains("H6"));
         assert!(plain.contains("Paragraph with"));
         assert!(plain.contains("fn a()") && plain.contains("fn b()"));
@@ -1338,23 +1824,133 @@ fn b() {}
         assert!(plain.contains("———"));
         assert!(plain.contains("alt text"));
         assert!(plain.contains("title here") || plain.contains('('));
-        assert!(plain.contains("[table]"));
+        assert!(!plain.contains("[table]"));
+        assert!(plain.contains('a') && plain.contains('b'));
+        assert!(plain.contains('1') && plain.contains('2'));
+        assert!(plain.contains('\t'));
+        let html = MarkdownSpan::all(&items, source).html(&items, source);
+        assert!(html.contains("<table"));
+        assert!(html.contains("<th>a</th>") && html.contains("<td>1</td>"));
+        assert!(html.contains("<h1>"));
+        assert!(html.contains("<strong>") || html.contains("<p>"));
         // Nested depth uses single newline between list kids when present.
         let nested: Vec<_> = markdown::parse("- outer\n  - inner\n").collect();
-        let nested_plain = markdown_plain(&nested);
+        let nested_plain = markdown_plain(&nested, "");
         assert!(nested_plain.contains("outer"));
         assert!(nested_plain.contains("inner"));
     }
 
     #[test]
+    fn markdown_html_covers_marks_partial_table_and_empty() {
+        assert_eq!(MarkdownSpan::default().html(&[], ""), "");
+        let source = concat!(
+            "~~gone~~ [site](https://ex.com) *it* `a<b>` `c>d` say \"hi\"\n\n",
+            "| a&b | q |\n",
+            "| --- | --- |\n",
+            "| 1 | 2 |\n\n",
+            "![**alt**](u.png)\n\n",
+            "```\nsolo\n```\n",
+        );
+        let items: Vec<_> = markdown::parse(source).collect();
+        let html = MarkdownSpan::all(&items, source).html(&items, source);
+        assert!(html.contains("<del>gone</del>"));
+        assert!(html.contains("<a href=\"https://ex.com\">"));
+        assert!(html.contains("<em>"));
+        assert!(html.contains("<code>"));
+        assert!(html.contains("&amp;"));
+        assert!(html.contains("&lt;") && html.contains("&gt;"));
+        assert!(html.contains("&quot;"));
+        assert!(html.contains("<img alt=\"alt\" src=\"u.png\">"));
+        assert!(html.contains("<pre><code>"));
+        let table_i = items
+            .iter()
+            .position(|i| matches!(i, Item::Table { .. }))
+            .expect("table");
+        let tables = parse_tables(source);
+        let table_plain = item_plain_at(&items, table_i, &tables);
+        let mid = table_plain.find('\t').unwrap_or(1);
+        let part = MarkdownSpan {
+            start: MarkdownPos {
+                item: table_i,
+                offset: 0,
+            },
+            end: MarkdownPos {
+                item: table_i,
+                offset: mid,
+            },
+        };
+        let part_html = part.html(&items, source);
+        assert!(part_html.contains("<table"));
+        let head = items
+            .iter()
+            .position(|i| matches!(i, Item::Heading(..) | Item::Paragraph(_)))
+            .expect("text");
+        let head_plain = item_plain_at(&items, head, &tables);
+        let cut = head_plain.len().min(4);
+        let slice = MarkdownSpan {
+            start: MarkdownPos {
+                item: head,
+                offset: 0,
+            },
+            end: MarkdownPos {
+                item: head,
+                offset: cut,
+            },
+        };
+        let sliced = slice.html(&items, source);
+        assert!(sliced.contains("<p>") || sliced.contains("<h"));
+        assert!(items.len() >= 2);
+        let n0 = item_plain_at(&items, 0, &tables).len();
+        let gap = MarkdownSpan {
+            start: MarkdownPos {
+                item: 0,
+                offset: n0,
+            },
+            end: MarkdownPos { item: 1, offset: 0 },
+        };
+        assert!(gap.html(&items, source).is_empty());
+        let code_i = items
+            .iter()
+            .position(|i| matches!(i, Item::CodeBlock { .. }))
+            .expect("code");
+        let code_plain = item_plain_at(&items, code_i, &tables);
+        let code_cut = MarkdownSpan {
+            start: MarkdownPos {
+                item: code_i,
+                offset: 0,
+            },
+            end: MarkdownPos {
+                item: code_i,
+                offset: code_plain.len().min(2),
+            },
+        };
+        assert!(code_cut.html(&items, source).contains("<p>"));
+        let empty_code = [Item::CodeBlock {
+            language: None,
+            code: "bare".into(),
+            lines: vec![],
+        }];
+        assert!(MarkdownSpan::all(&empty_code, "")
+            .html(&empty_code, "")
+            .contains("bare"));
+        let header_only = markdown_plain(
+            &markdown::parse("| h |\n| - |\n| 1 |\n").collect::<Vec<_>>(),
+            "",
+        );
+        assert!(header_only.contains('h'));
+        assert_eq!(table_html(&[]), "");
+        assert_eq!(table_html_from_plain(""), "");
+    }
+
+    #[test]
     fn markdown_empty_and_single_block_still_flatten() {
         let empty: Vec<_> = markdown::parse("").collect();
-        assert_eq!(markdown_plain(&empty), "");
+        assert_eq!(markdown_plain(&empty, ""), "");
         let one: Vec<_> = markdown::parse("only").collect();
-        assert!(markdown_plain(&one).contains("only"));
+        assert!(markdown_plain(&one, "").contains("only"));
         // Fenced code with body hits multi-line mono path.
         let code: Vec<_> = markdown::parse("```\nline1\nline2\n```").collect();
-        let plain = markdown_plain(&code);
+        let plain = markdown_plain(&code, "");
         assert!(plain.contains("line1") && plain.contains("line2"));
         assert!(plain.contains('\n'));
     }
@@ -1364,35 +1960,36 @@ fn b() {}
         let items: Vec<_> = markdown::parse("# Title\n\nA paragraph.\n\n- alpha\n- beta").collect();
         assert!(items.len() >= 3);
         let mut st = MarkdownSelect::default();
-        st = markdown_select(&items, st, MarkdownPointer::at_y(0.0), tok());
-        st = markdown_select(&items, st, MarkdownPointer::Press, tok());
+        st = markdown_select(&items, st, MarkdownPointer::at_y(0.0), tok(), "");
+        st = markdown_select(&items, st, MarkdownPointer::Press, tok(), "");
         let end_y = items
             .iter()
             .map(|i| markdown_item_extent(i, tok()))
             .sum::<f32>();
-        st = markdown_select(&items, st, MarkdownPointer::at_y(end_y), tok());
-        st = markdown_select(&items, st, MarkdownPointer::Release, tok());
+        st = markdown_select(&items, st, MarkdownPointer::at_y(end_y), tok(), "");
+        st = markdown_select(&items, st, MarkdownPointer::Release, tok(), "");
         assert!(!st.dragging);
         assert!(st.span.start.item < st.span.end.item);
-        let copied = st.span.text(&items);
+        let copied = st.span.text(&items, "");
         assert!(copied.contains("Title"), "{copied}");
         assert!(copied.contains("paragraph"), "{copied}");
         assert!(copied.contains("alpha") || copied.contains('•'), "{copied}");
         let mut back = MarkdownSelect::default();
-        back = markdown_select(&items, back, MarkdownPointer::at_y(end_y), tok());
-        back = markdown_select(&items, back, MarkdownPointer::Press, tok());
-        back = markdown_select(&items, back, MarkdownPointer::at_y(0.0), tok());
-        let rev = back.span.text(&items);
+        back = markdown_select(&items, back, MarkdownPointer::at_y(end_y), tok(), "");
+        back = markdown_select(&items, back, MarkdownPointer::Press, tok(), "");
+        back = markdown_select(&items, back, MarkdownPointer::at_y(0.0), tok(), "");
+        let rev = back.span.text(&items, "");
         assert!(rev.contains("Title") && rev.contains("paragraph"));
         assert_eq!(
             markdown_select(
                 &[],
                 MarkdownSelect::default(),
                 MarkdownPointer::Press,
-                tok()
+                tok(),
+                "",
             )
             .span
-            .text(&[]),
+            .text(&[], ""),
             ""
         );
         assert!(MarkdownSpan::default().is_empty());
@@ -1406,33 +2003,33 @@ fn b() {}
             markdown::parse("# Short title here that continues for a while").collect();
         assert_eq!(items.len(), 1);
         let mut st = MarkdownSelect::default();
-        st = markdown_select(&items, st, MarkdownPointer::at(0.0, 8.0), tok());
-        st = markdown_select(&items, st, MarkdownPointer::Press, tok());
+        st = markdown_select(&items, st, MarkdownPointer::at(0.0, 8.0), tok(), "");
+        st = markdown_select(&items, st, MarkdownPointer::Press, tok(), "");
         assert!(st.span.is_empty());
-        st = markdown_select(&items, st, MarkdownPointer::at(56.0, 8.0), tok());
-        st = markdown_select(&items, st, MarkdownPointer::Release, tok());
+        st = markdown_select(&items, st, MarkdownPointer::at(56.0, 8.0), tok(), "");
+        st = markdown_select(&items, st, MarkdownPointer::Release, tok(), "");
         assert!(!st.span.is_empty());
-        let copied = st.span.text(&items);
+        let copied = st.span.text(&items, "");
         assert!(!copied.is_empty());
-        let all = MarkdownSpan::all(&items).text(&items);
+        let all = MarkdownSpan::all(&items, "").text(&items, "");
         assert!(copied.len() < all.len(), "{copied} vs {all}");
         let mut click = MarkdownSelect::default();
-        click = markdown_select(&items, click, MarkdownPointer::at(8.0, 8.0), tok());
-        click = markdown_select(&items, click, MarkdownPointer::Press, tok());
-        click = markdown_select(&items, click, MarkdownPointer::Release, tok());
+        click = markdown_select(&items, click, MarkdownPointer::at(8.0, 8.0), tok(), "");
+        click = markdown_select(&items, click, MarkdownPointer::Press, tok(), "");
+        click = markdown_select(&items, click, MarkdownPointer::Release, tok(), "");
         assert!(click.span.is_empty());
         let mut dbl = MarkdownSelect::default();
-        dbl = markdown_select(&items, dbl, MarkdownPointer::at(16.0, 8.0), tok());
-        dbl = markdown_select(&items, dbl, MarkdownPointer::Double, tok());
+        dbl = markdown_select(&items, dbl, MarkdownPointer::at(16.0, 8.0), tok(), "");
+        dbl = markdown_select(&items, dbl, MarkdownPointer::Double, tok(), "");
         assert!(!dbl.span.is_empty());
-        let word = dbl.span.text(&items);
+        let word = dbl.span.text(&items, "");
         assert!(!word.is_empty());
         assert!(word.len() < all.len(), "{word} vs {all}");
         assert!(!word.contains(' '), "{word}");
-        assert!(MarkdownSpan::all(&items).fully_covers(&items, 0));
+        assert!(MarkdownSpan::all(&items, "").fully_covers(&items, 0));
         assert!(!st.span.fully_covers(&items, 0));
         assert!(!MarkdownSpan::default().fully_covers(&items, 0));
-        assert!(!MarkdownSpan::all(&items).fully_covers(&[], 0));
+        assert!(!MarkdownSpan::all(&items, "").fully_covers(&[], 0));
         let mid = MarkdownSpan {
             start: MarkdownPos { item: 0, offset: 2 },
             end: MarkdownPos { item: 0, offset: 8 },
@@ -1458,7 +2055,7 @@ fn b() {}
         };
         assert!(!from_mid.fully_covers(&many, 0));
         assert!(from_mid.fully_covers(&many, 1));
-        let mid_text = mid.text(&items);
+        let mid_text = mid.text(&items, "");
         assert_ne!(mid_text, all);
         assert_eq!(markdown_item_range(mid, &items, 0), Some((2, 8)));
         assert_eq!(
@@ -1515,12 +2112,12 @@ fn b() {}
                 offset: hello_at + "hello".len(),
             },
         };
-        assert_eq!(span.text(&items), "hello");
+        assert_eq!(span.text(&items, ""), "hello");
         let para = first_paragraph(&items[list_i]).expect("list paragraph");
         let (a, b) = markdown_paint_range(span, &items, list_i, para).expect("list fragment");
         let style = markdown_measure_style();
         let painted = highlight_markdown_spans(&para.spans(style), a, b, iced::Color::WHITE);
-        assert_eq!(highlighted_plain(&painted), span.text(&items));
+        assert_eq!(highlighted_plain(&painted), span.text(&items, ""));
         assert_ne!(b - a, hello_at + "hello".len());
 
         let code_i = items
@@ -1542,13 +2139,13 @@ fn b() {}
                         offset: two_at + "line two".len(),
                     },
                 };
-                assert_eq!(code_span.text(&items), "line two");
+                assert_eq!(code_span.text(&items, ""), "line two");
                 let line = &lines[1];
                 let (ca, cb) =
                     markdown_paint_range(code_span, &items, code_i, line).expect("code fragment");
                 let painted =
                     highlight_markdown_spans(&line.spans(style), ca, cb, iced::Color::WHITE);
-                assert_eq!(highlighted_plain(&painted), code_span.text(&items));
+                assert_eq!(highlighted_plain(&painted), code_span.text(&items, ""));
                 assert_eq!(ca, 0);
                 assert_eq!(
                     cb,
@@ -1602,14 +2199,14 @@ fn b() {}
                 offset: first_at + "first".len(),
             },
         };
-        assert_eq!(span.text(&items), "first");
+        assert_eq!(span.text(&items, ""), "first");
         let mut paras = Vec::new();
         all_paragraphs(&items[list_i], &mut paras);
         let later_msg = "need a later fragment after the selected word";
         assert!(paras.len() >= 2, "{later_msg}");
         let later = *paras.last().expect("later paragraph");
         assert_eq!(markdown_paint_range(span, &items, list_i, later), None);
-        let all = MarkdownSpan::all(&items);
+        let all = MarkdownSpan::all(&items, "");
         for para in paras {
             let _ = markdown_paint_range(all, &items, list_i, para);
         }
@@ -1618,11 +2215,11 @@ fn b() {}
     #[test]
     fn markdown_word_and_line_span_cover_empty_and_breaks() {
         assert_eq!(
-            markdown_word_span(&[], 0.0, 0.0, tok()),
+            markdown_word_span(&[], 0.0, 0.0, tok(), ""),
             MarkdownSpan::default()
         );
         assert_eq!(
-            markdown_line_span(&[], 0.0, 0.0, tok()),
+            markdown_line_span(&[], 0.0, 0.0, tok(), ""),
             MarkdownSpan::default()
         );
         let empty_code = [Item::CodeBlock {
@@ -1630,37 +2227,37 @@ fn b() {}
             code: String::new(),
             lines: vec![],
         }];
-        let empty_word = markdown_word_span(&empty_code, 0.0, 0.0, tok());
+        let empty_word = markdown_word_span(&empty_code, 0.0, 0.0, tok(), "");
         assert_eq!(empty_word.start.offset, 0);
         assert_eq!(empty_word.end.offset, 0);
-        let empty_line = markdown_line_span(&empty_code, 0.0, 0.0, tok());
+        let empty_line = markdown_line_span(&empty_code, 0.0, 0.0, tok(), "");
         assert_eq!(empty_line.start.offset, 0);
         assert_eq!(empty_line.end.offset, 0);
 
         let space: Vec<_> = markdown::parse("hello world").collect();
-        let after_hello = markdown_word_span(&space, 80.0, 8.0, tok());
-        let word = after_hello.text(&space);
+        let after_hello = markdown_word_span(&space, 80.0, 8.0, tok(), "");
+        let word = after_hello.text(&space, "");
         assert!(!word.is_empty());
         let only_space: Vec<_> = markdown::parse("```\n \n```").collect();
         let space_plain = markdown_item_plain(&only_space[0]);
         assert!(space_plain.contains(' ') || space_plain.is_empty() || !space_plain.is_empty());
-        let ws = markdown_word_span(&only_space, 0.0, 4.0, tok());
+        let ws = markdown_word_span(&only_space, 0.0, 4.0, tok(), "");
         assert!(ws.end.offset >= ws.start.offset);
         let lead_space: Vec<_> = markdown::parse("```\n x\n```").collect();
-        let lead = markdown_word_span(&lead_space, 0.0, 4.0, tok());
+        let lead = markdown_word_span(&lead_space, 0.0, 4.0, tok(), "");
         assert!(lead.end.offset >= lead.start.offset);
 
         let multiline: Vec<_> =
             markdown::parse("```\nline one\nline two\nline three\n```").collect();
         let block_h = markdown_item_extent(&multiline[0], tok());
-        let first = markdown_line_span(&multiline, 8.0, 8.0, tok());
-        let second = markdown_line_span(&multiline, 8.0, (block_h * 0.7).max(24.0), tok());
-        assert!(!first.text(&multiline).is_empty());
-        assert!(!second.text(&multiline).is_empty());
+        let first = markdown_line_span(&multiline, 8.0, 8.0, tok(), "");
+        let second = markdown_line_span(&multiline, 8.0, (block_h * 0.7).max(24.0), tok(), "");
+        assert!(!first.text(&multiline, "").is_empty());
+        assert!(!second.text(&multiline, "").is_empty());
         let plain = markdown_item_plain(&multiline[0]);
         for text in [plain.as_str(), "no-newline"] {
             if let Some(nl) = text.find('\n') {
-                let after = markdown_line_span(&multiline, 8.0, block_h.max(32.0), tok());
+                let after = markdown_line_span(&multiline, 8.0, block_h.max(32.0), tok(), "");
                 assert!(after.start.offset <= nl || after.end.offset > nl || !plain.is_empty());
             }
         }
@@ -1750,9 +2347,9 @@ solo
     fn markdown_double_click_selects_the_word() {
         let items: Vec<_> = markdown::parse("Hello, world. Next sentence here.").collect();
         let mut st = MarkdownSelect::default();
-        st = markdown_select(&items, st, MarkdownPointer::at(8.0, 8.0), tok());
-        st = markdown_select(&items, st, MarkdownPointer::Double, tok());
-        assert_eq!(st.span.text(&items), "Hello");
+        st = markdown_select(&items, st, MarkdownPointer::at(8.0, 8.0), tok(), "");
+        st = markdown_select(&items, st, MarkdownPointer::Double, tok(), "");
+        assert_eq!(st.span.text(&items, ""), "Hello");
         assert_eq!(st.grain, MarkdownGrain::Word);
         assert!(st.dragging);
     }
@@ -1761,9 +2358,9 @@ solo
     fn markdown_triple_click_selects_the_sentence() {
         let items: Vec<_> = markdown::parse("Hello, world. Next sentence here.").collect();
         let mut st = MarkdownSelect::default();
-        st = markdown_select(&items, st, MarkdownPointer::at(8.0, 8.0), tok());
-        st = markdown_select(&items, st, MarkdownPointer::Triple, tok());
-        assert_eq!(st.span.text(&items), "Hello, world.");
+        st = markdown_select(&items, st, MarkdownPointer::at(8.0, 8.0), tok(), "");
+        st = markdown_select(&items, st, MarkdownPointer::Triple, tok(), "");
+        assert_eq!(st.span.text(&items, ""), "Hello, world.");
         assert_eq!(st.grain, MarkdownGrain::Sentence);
     }
 
@@ -1774,9 +2371,12 @@ solo
         assert!(items.len() >= 2);
         let y = markdown_item_extent(&items[0], tok()) + 8.0;
         let mut st = MarkdownSelect::default();
-        st = markdown_select(&items, st, MarkdownPointer::at(8.0, y), tok());
-        st = markdown_select(&items, st, MarkdownPointer::Block, tok());
-        assert_eq!(st.span.text(&items), "Hello, world. Next sentence here.");
+        st = markdown_select(&items, st, MarkdownPointer::at(8.0, y), tok(), "");
+        st = markdown_select(&items, st, MarkdownPointer::Block, tok(), "");
+        assert_eq!(
+            st.span.text(&items, ""),
+            "Hello, world. Next sentence here."
+        );
         assert_eq!(st.grain, MarkdownGrain::Block);
     }
 
@@ -1788,8 +2388,9 @@ solo
             MarkdownSelect::default(),
             MarkdownPointer::SelectAll,
             tok(),
+            "",
         );
-        assert_eq!(st.span, MarkdownSpan::all(&items));
+        assert_eq!(st.span, MarkdownSpan::all(&items, ""));
         assert!(!st.dragging);
     }
 
@@ -1797,11 +2398,11 @@ solo
     fn markdown_double_click_drag_grows_by_word() {
         let items: Vec<_> = markdown::parse("Hello world next").collect();
         let mut st = MarkdownSelect::default();
-        st = markdown_select(&items, st, MarkdownPointer::at(8.0, 8.0), tok());
-        st = markdown_select(&items, st, MarkdownPointer::Double, tok());
-        assert_eq!(st.span.text(&items), "Hello");
-        st = markdown_select(&items, st, MarkdownPointer::at(120.0, 8.0), tok());
-        let copied = st.span.text(&items);
+        st = markdown_select(&items, st, MarkdownPointer::at(8.0, 8.0), tok(), "");
+        st = markdown_select(&items, st, MarkdownPointer::Double, tok(), "");
+        assert_eq!(st.span.text(&items, ""), "Hello");
+        st = markdown_select(&items, st, MarkdownPointer::at(120.0, 8.0), tok(), "");
+        let copied = st.span.text(&items, "");
         assert!(copied.starts_with("Hello"), "{copied}");
         assert!(copied.contains("world"), "{copied}");
         assert!(copied.contains("next"), "{copied}");
@@ -1811,13 +2412,13 @@ solo
     fn markdown_shift_click_extends_from_anchor() {
         let items: Vec<_> = markdown::parse("Hello world next").collect();
         let mut st = MarkdownSelect::default();
-        st = markdown_select(&items, st, MarkdownPointer::at(0.0, 8.0), tok());
-        st = markdown_select(&items, st, MarkdownPointer::Press, tok());
-        st = markdown_select(&items, st, MarkdownPointer::Release, tok());
-        st = markdown_select(&items, st, MarkdownPointer::at(120.0, 8.0), tok());
-        st = markdown_select(&items, st, MarkdownPointer::Extend, tok());
+        st = markdown_select(&items, st, MarkdownPointer::at(0.0, 8.0), tok(), "");
+        st = markdown_select(&items, st, MarkdownPointer::Press, tok(), "");
+        st = markdown_select(&items, st, MarkdownPointer::Release, tok(), "");
+        st = markdown_select(&items, st, MarkdownPointer::at(120.0, 8.0), tok(), "");
+        st = markdown_select(&items, st, MarkdownPointer::Extend, tok(), "");
         assert!(!st.span.is_empty());
-        let copied = st.span.text(&items);
+        let copied = st.span.text(&items, "");
         assert!(copied.contains("Hello"), "{copied}");
         assert!(copied.contains("next"), "{copied}");
     }
@@ -1826,7 +2427,7 @@ solo
     fn markdown_cross_block_gap_is_washed() {
         let items: Vec<_> = markdown::parse("# A\n\nB line").collect();
         assert!(items.len() >= 2);
-        let all = MarkdownSpan::all(&items);
+        let all = MarkdownSpan::all(&items, "");
         assert!(markdown_gap_washed(all, 0));
         assert!(!markdown_gap_washed(MarkdownSpan::default(), 0));
         let inside = MarkdownSpan {
@@ -1839,11 +2440,11 @@ solo
     #[test]
     fn markdown_sentence_and_block_follow_the_caret() {
         assert_eq!(
-            markdown_sentence_span(&[], 0.0, 0.0, tok()),
+            markdown_sentence_span(&[], 0.0, 0.0, tok(), ""),
             MarkdownSpan::default()
         );
         assert_eq!(
-            markdown_block_span(&[], 0.0, 0.0, tok()),
+            markdown_block_span(&[], 0.0, 0.0, tok(), ""),
             MarkdownSpan::default()
         );
         let empty_code = [Item::CodeBlock {
@@ -1852,8 +2453,8 @@ solo
             lines: vec![],
         }];
         assert_eq!(
-            markdown_sentence_span(&empty_code, 0.0, 0.0, tok())
-                .text(&empty_code)
+            markdown_sentence_span(&empty_code, 0.0, 0.0, tok(), "")
+                .text(&empty_code, "")
                 .len(),
             0
         );
@@ -1861,17 +2462,17 @@ solo
         let plain = markdown_item_plain(&items[0]);
         let next_at = plain.find("Next").expect("Next");
         let x = (next_at as f32 + 1.0) * tok().body() * 0.5;
-        let sentence = markdown_sentence_span(&items, x, 8.0, tok());
-        assert_eq!(sentence.text(&items), "Next sentence here.");
-        let block = markdown_block_span(&items, x, 8.0, tok());
-        assert_eq!(block.text(&items), plain);
+        let sentence = markdown_sentence_span(&items, x, 8.0, tok(), "");
+        assert_eq!(sentence.text(&items, ""), "Next sentence here.");
+        let block = markdown_block_span(&items, x, 8.0, tok(), "");
+        assert_eq!(block.text(&items, ""), plain);
 
         let code: Vec<_> = markdown::parse("```\nline one\nline two\n```").collect();
         let h = markdown_item_extent(&code[0], tok());
-        let first = markdown_sentence_span(&code, 8.0, 8.0, tok());
-        let second = markdown_sentence_span(&code, 8.0, (h * 0.7).max(24.0), tok());
-        let first_text = first.text(&code);
-        let second_text = second.text(&code);
+        let first = markdown_sentence_span(&code, 8.0, 8.0, tok(), "");
+        let second = markdown_sentence_span(&code, 8.0, (h * 0.7).max(24.0), tok(), "");
+        let first_text = first.text(&code, "");
+        let second_text = second.text(&code, "");
         assert!(first_text.contains("line"), "{first_text}");
         assert!(second_text.contains("line"), "{second_text}");
         assert!(
@@ -1886,17 +2487,17 @@ solo
         let comma = plain.find(',').expect("comma");
         let x = (comma as f32 + 0.4) * tok().body() * 0.5;
         let mut st = MarkdownSelect::default();
-        st = markdown_select(&items, st, MarkdownPointer::at(x, 8.0), tok());
-        st = markdown_select(&items, st, MarkdownPointer::Double, tok());
-        let punct = st.span.text(&items);
+        st = markdown_select(&items, st, MarkdownPointer::at(x, 8.0), tok(), "");
+        st = markdown_select(&items, st, MarkdownPointer::Double, tok(), "");
+        let punct = st.span.text(&items, "");
         assert!(punct.contains(','), "{punct}");
         assert!(!punct.contains("Hello"), "{punct}");
         assert!(!punct.contains("world"), "{punct}");
         let marks: Vec<_> = markdown::parse("!!!").collect();
         let mut bangs = MarkdownSelect::default();
-        bangs = markdown_select(&marks, bangs, MarkdownPointer::at(20.0, 8.0), tok());
-        bangs = markdown_select(&marks, bangs, MarkdownPointer::Double, tok());
-        assert_eq!(bangs.span.text(&marks), "!!!");
+        bangs = markdown_select(&marks, bangs, MarkdownPointer::at(20.0, 8.0), tok(), "");
+        bangs = markdown_select(&marks, bangs, MarkdownPointer::Double, tok(), "");
+        assert_eq!(bangs.span.text(&marks, ""), "!!!");
     }
 
     #[test]
@@ -1924,8 +2525,9 @@ solo
             st,
             MarkdownPointer::Move { x: 12.0, y, width },
             tok(),
+            "",
         );
-        st = markdown_select(&items, st, MarkdownPointer::Press, tok());
+        st = markdown_select(&items, st, MarkdownPointer::Press, tok(), "");
         assert_eq!(st.anchor.item, 1);
         assert_eq!(st.pane_width, width);
     }
@@ -1934,10 +2536,10 @@ solo
     fn markdown_double_click_drag_grows_backward() {
         let items: Vec<_> = markdown::parse("Hello, world.").collect();
         let mut st = MarkdownSelect::default();
-        st = markdown_select(&items, st, MarkdownPointer::at(120.0, 8.0), tok());
-        st = markdown_select(&items, st, MarkdownPointer::Double, tok());
-        st = markdown_select(&items, st, MarkdownPointer::at(8.0, 8.0), tok());
-        let copied = st.span.text(&items);
+        st = markdown_select(&items, st, MarkdownPointer::at(120.0, 8.0), tok(), "");
+        st = markdown_select(&items, st, MarkdownPointer::Double, tok(), "");
+        st = markdown_select(&items, st, MarkdownPointer::at(8.0, 8.0), tok(), "");
+        let copied = st.span.text(&items, "");
         assert!(copied.contains("Hello"), "{copied}");
         assert!(copied.contains("world"), "{copied}");
         let a = MarkdownPos { item: 0, offset: 8 };
@@ -1951,15 +2553,15 @@ solo
     fn markdown_triple_click_drag_grows_by_sentence() {
         let items: Vec<_> = markdown::parse("First sentence. Second goes here.").collect();
         let mut st = MarkdownSelect::default();
-        st = markdown_select(&items, st, MarkdownPointer::at(8.0, 8.0), tok());
-        st = markdown_select(&items, st, MarkdownPointer::Triple, tok());
-        st = markdown_select(&items, st, MarkdownPointer::at(160.0, 8.0), tok());
-        let grown = st.span.text(&items);
+        st = markdown_select(&items, st, MarkdownPointer::at(8.0, 8.0), tok(), "");
+        st = markdown_select(&items, st, MarkdownPointer::Triple, tok(), "");
+        st = markdown_select(&items, st, MarkdownPointer::at(160.0, 8.0), tok(), "");
+        let grown = st.span.text(&items, "");
         assert!(grown.contains("First"), "{grown}");
         assert!(grown.contains("Second"), "{grown}");
         let dec: Vec<_> = markdown::parse("See 3.14 leftover.").collect();
         assert_eq!(
-            markdown_sentence_span(&dec, 8.0, 8.0, tok()).text(&dec),
+            markdown_sentence_span(&dec, 8.0, 8.0, tok(), "").text(&dec, ""),
             "See 3.14 leftover."
         );
     }
@@ -1969,16 +2571,16 @@ solo
         let items: Vec<_> = markdown::parse("# Title\n\nBody paragraph here.").collect();
         let y = markdown_item_extent(&items[0], tok()) + 8.0;
         let mut st = MarkdownSelect::default();
-        st = markdown_select(&items, st, MarkdownPointer::at(8.0, 0.0), tok());
-        st = markdown_select(&items, st, MarkdownPointer::Block, tok());
-        st = markdown_select(&items, st, MarkdownPointer::at(8.0, y), tok());
-        let both = st.span.text(&items);
+        st = markdown_select(&items, st, MarkdownPointer::at(8.0, 0.0), tok(), "");
+        st = markdown_select(&items, st, MarkdownPointer::Block, tok(), "");
+        st = markdown_select(&items, st, MarkdownPointer::at(8.0, y), tok(), "");
+        let both = st.span.text(&items, "");
         assert!(both.contains("Title"), "{both}");
         assert!(both.contains("Body"), "{both}");
         let many: Vec<_> = markdown::parse("# A\n\nB line\n\nC line").collect();
         let mid = markdown_item_plain(&many[1]);
         assert_eq!(
-            markdown_item_range(MarkdownSpan::all(&many), &many, 1),
+            markdown_item_range(MarkdownSpan::all(&many, ""), &many, 1),
             Some((0, mid.len()))
         );
     }
